@@ -22,8 +22,14 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
   
   // Debug logging
   React.useEffect(() => {
-    console.log('AvailableSlotsPage - availability updated:', availability);
-    console.log('AvailableSlotsPage - availableSlots:', availableSlots);
+    console.log('AvailableSlotsPage - raw availability:', availability);
+    console.log('AvailableSlotsPage - filtered availableSlots:', availableSlots);
+    
+    // Show which slots are being filtered out and why
+    if (availability) {
+      const filteredOut = availability.filter(slot => !slot.is_available || slot.is_blocked);
+      console.log('AvailableSlotsPage - filtered out slots:', filteredOut);
+    }
   }, [availability, availableSlots]);
 
   const handlePreviousDay = () => setCurrentDate(subDays(currentDate, 1));
@@ -57,9 +63,14 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
 
   const weekDates = getWeekDates();
   const todaySlots = getSlotsForDate(currentDate);
+  
+  // Debug: Show current context
+  console.log('Current date:', format(currentDate, 'yyyy-MM-dd'));
+  console.log('Today slots:', todaySlots);
 
   const groupSlotsByDate = () => {
     const grouped: Record<string, typeof availableSlots> = {};
+    console.log('groupSlotsByDate - availableSlots:', availableSlots);
     availableSlots.forEach(slot => {
       const dateKey = slot.date;
       if (!grouped[dateKey]) {
@@ -67,7 +78,9 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
       }
       grouped[dateKey].push(slot);
     });
-    return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
+    const result = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
+    console.log('groupSlotsByDate - result:', result);
+    return result;
   };
 
   const groupedSlots = groupSlotsByDate();
