@@ -19,6 +19,12 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
   const { availability, loading, deleteAvailability } = useUserAvailability();
 
   const availableSlots = availability?.filter(slot => slot.is_available && !slot.is_blocked) || [];
+  
+  // Debug logging
+  React.useEffect(() => {
+    console.log('AvailableSlotsPage - availability updated:', availability);
+    console.log('AvailableSlotsPage - availableSlots:', availableSlots);
+  }, [availability, availableSlots]);
 
   const handlePreviousDay = () => setCurrentDate(subDays(currentDate, 1));
   const handleNextDay = () => setCurrentDate(addDays(currentDate, 1));
@@ -36,9 +42,12 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
   };
 
   const getSlotsForDate = (date: Date) => {
-    return availableSlots.filter(slot => 
+    const slots = availableSlots.filter(slot => 
       isSameDay(parseISO(slot.date), date)
     ).sort((a, b) => a.start_time.localeCompare(b.start_time));
+    console.log(`Slots for ${format(date, 'yyyy-MM-dd')}:`, slots);
+    console.log('Available slots total:', availableSlots);
+    return slots;
   };
 
   const getWeekDates = () => {
