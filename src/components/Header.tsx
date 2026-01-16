@@ -14,6 +14,9 @@ import { toast } from "sonner";
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isLeaguesOpen, setIsLeaguesOpen] = useState(false);
+  const [isSinglesOpen, setIsSinglesOpen] = useState(false);
+  const [isDoublesOpen, setIsDoublesOpen] = useState(false);
   const {
     user,
     signOut
@@ -209,22 +212,51 @@ const Header = () => {
               </Link>
               
               {/* Mobile Leagues Section */}
-              <div className="space-y-2">
-                <div className="px-3 py-2 text-base font-medium text-gray-700">
-                  Leagues
-                </div>
-                <div className="pl-6 space-y-1">
-                  <Link to="/leagues#singles" className="text-sm font-medium text-gray-600 py-2 block hover:text-orange-600 transition-colors" onClick={() => setIsMenuOpen(false)}>Singles</Link>
-                  <div className="pl-4 space-y-1">
-                    <Link to="/leagues#mens-singles" className="block py-2 text-sm text-gray-500 hover:text-orange-600 transition-colors" onClick={() => setIsMenuOpen(false)}>Men's Singles</Link>
-                    <Link to="/leagues#womens-singles" className="block py-2 text-sm text-gray-500 hover:text-orange-600 transition-colors" onClick={() => setIsMenuOpen(false)}>Women's Singles</Link>
-                  </div>
-                  
-                  <Link to="/leagues#doubles" className="text-sm font-medium text-gray-600 py-2 pt-3 block hover:text-orange-600 transition-colors" onClick={() => setIsMenuOpen(false)}>Doubles</Link>
-                  <div className="pl-4 space-y-1">
-                    <Link to="/leagues#mens-doubles" className="block py-2 text-sm text-gray-500 hover:text-orange-600 transition-colors" onClick={() => setIsMenuOpen(false)}>Men's Doubles</Link>
-                    <Link to="/leagues#womens-doubles" className="block py-2 text-sm text-gray-500 hover:text-orange-600 transition-colors" onClick={() => setIsMenuOpen(false)}>Women's Doubles</Link>
-                    <Link to="/leagues#mixed-doubles" className="block py-2 text-sm text-gray-500 hover:text-orange-600 transition-colors" onClick={() => setIsMenuOpen(false)}>Mixed Doubles</Link>
+              <div className="space-y-1">
+                <button
+                  onClick={() => setIsLeaguesOpen(!isLeaguesOpen)}
+                  className="w-full flex items-center justify-between px-3 py-3 text-base font-medium text-gray-700 hover:text-orange-600 hover:bg-orange-50/80 rounded-lg transition-all"
+                >
+                  <span>Leagues</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isLeaguesOpen ? 'rotate-180' : ''}`} />
+                </button>
+                
+                <div className={`overflow-hidden transition-all duration-300 ${isLeaguesOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="pl-6 space-y-1 py-2">
+                    {/* Singles Dropdown */}
+                    <div className="space-y-1">
+                      <button
+                        onClick={() => setIsSinglesOpen(!isSinglesOpen)}
+                        className="w-full flex items-center justify-between py-2 text-sm font-medium text-gray-600 hover:text-orange-600 transition-colors"
+                      >
+                        <span>Singles</span>
+                        <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${isSinglesOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      <div className={`overflow-hidden transition-all duration-300 ${isSinglesOpen ? 'max-h-32 opacity-100' : 'max-h-0 opacity-0'}`}>
+                        <div className="pl-4 space-y-1">
+                          <Link to="/leagues#mens-singles" className="block py-2 text-sm text-gray-500 hover:text-orange-600 transition-colors" onClick={() => setIsMenuOpen(false)}>Men's Singles</Link>
+                          <Link to="/leagues#womens-singles" className="block py-2 text-sm text-gray-500 hover:text-orange-600 transition-colors" onClick={() => setIsMenuOpen(false)}>Women's Singles</Link>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Doubles Dropdown */}
+                    <div className="space-y-1 pt-2">
+                      <button
+                        onClick={() => setIsDoublesOpen(!isDoublesOpen)}
+                        className="w-full flex items-center justify-between py-2 text-sm font-medium text-gray-600 hover:text-orange-600 transition-colors"
+                      >
+                        <span>Doubles</span>
+                        <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${isDoublesOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      <div className={`overflow-hidden transition-all duration-300 ${isDoublesOpen ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'}`}>
+                        <div className="pl-4 space-y-1">
+                          <Link to="/leagues#mens-doubles" className="block py-2 text-sm text-gray-500 hover:text-orange-600 transition-colors" onClick={() => setIsMenuOpen(false)}>Men's Doubles</Link>
+                          <Link to="/leagues#womens-doubles" className="block py-2 text-sm text-gray-500 hover:text-orange-600 transition-colors" onClick={() => setIsMenuOpen(false)}>Women's Doubles</Link>
+                          <Link to="/leagues#mixed-doubles" className="block py-2 text-sm text-gray-500 hover:text-orange-600 transition-colors" onClick={() => setIsMenuOpen(false)}>Mixed Doubles</Link>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
