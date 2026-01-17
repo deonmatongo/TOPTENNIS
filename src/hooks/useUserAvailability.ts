@@ -31,8 +31,6 @@ export const useUserAvailability = () => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          console.log('Real-time availability update:', payload);
-          console.log('Event type:', payload.eventType);
           fetchAvailability();
         }
       )
@@ -52,7 +50,6 @@ export const useUserAvailability = () => {
         .order('date', { ascending: true });
 
       if (error) throw error;
-      console.log('Fetched availability from database:', data);
       setAvailability(data || []);
     } catch (error) {
       console.error('Error fetching availability:', error);
@@ -96,14 +93,9 @@ export const useUserAvailability = () => {
     };
 
     // Optimistically update UI immediately
-    console.log('Adding optimistic availability:', optimisticData);
-    setAvailability(prev => {
-      const updated = [...prev, optimisticData as UserAvailability].sort((a, b) => 
-        new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
-      console.log('Availability after optimistic update:', updated);
-      return updated;
-    });
+    setAvailability(prev => [...prev, optimisticData as UserAvailability].sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    ));
 
     try {
       const { data, error } = await supabase

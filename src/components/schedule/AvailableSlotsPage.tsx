@@ -27,14 +27,6 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
     today.setHours(0, 0, 0, 0);
     const isFuture = slotDate >= today;
     
-    console.log(`Slot ${slot.id}:`, {
-      date: slot.date,
-      isAvailable,
-      isFuture,
-      slotDate: format(slotDate, 'yyyy-MM-dd'),
-      today: format(today, 'yyyy-MM-dd')
-    });
-    
     return isAvailable && isFuture;
   }) || [];
   
@@ -46,18 +38,7 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
     }
   }, [refreshKey, fetchAvailability]);
 
-  // Debug logging
-  React.useEffect(() => {
-    console.log('AvailableSlotsPage - raw availability:', availability);
-    console.log('AvailableSlotsPage - filtered availableSlots:', availableSlots);
-    
-    // Show which slots are being filtered out and why
-    if (availability) {
-      const filteredOut = availability.filter(slot => !slot.is_available || slot.is_blocked);
-      console.log('AvailableSlotsPage - filtered out slots:', filteredOut);
-    }
-  }, [availability, availableSlots]);
-
+  
   const handlePreviousDay = () => setCurrentDate(subDays(currentDate, 1));
   const handleNextDay = () => setCurrentDate(addDays(currentDate, 1));
   const handleToday = () => setCurrentDate(new Date());
@@ -87,12 +68,9 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
   };
 
   const getSlotsForDate = (date: Date) => {
-    const slots = availableSlots.filter(slot => 
+    return availableSlots.filter(slot => 
       isSameDay(parseISO(slot.date), date)
     ).sort((a, b) => a.start_time.localeCompare(b.start_time));
-    console.log(`Slots for ${format(date, 'yyyy-MM-dd')}:`, slots);
-    console.log('Available slots total:', availableSlots);
-    return slots;
   };
 
   const getWeekDates = () => {
@@ -103,13 +81,9 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
   const weekDates = getWeekDates();
   const todaySlots = getSlotsForDate(currentDate);
   
-  // Debug: Show current context
-  console.log('Current date:', format(currentDate, 'yyyy-MM-dd'));
-  console.log('Today slots:', todaySlots);
-
+  
   const groupSlotsByDate = () => {
     const grouped: Record<string, typeof availableSlots> = {};
-    console.log('groupSlotsByDate - availableSlots:', availableSlots);
     availableSlots.forEach(slot => {
       const dateKey = slot.date;
       if (!grouped[dateKey]) {
@@ -117,9 +91,7 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
       }
       grouped[dateKey].push(slot);
     });
-    const result = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
-    console.log('groupSlotsByDate - result:', result);
-    return result;
+    return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
   };
 
   const groupedSlots = groupSlotsByDate();
@@ -267,45 +239,7 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
           </CardContent>
         </Card>
 
-        {/* Debug Info - Remove in production */}
-        {process.env.NODE_ENV === 'development' && (
-          <Card className="border-yellow-200 bg-yellow-50/50">
-            <CardHeader>
-              <CardTitle className="text-sm text-yellow-800">Debug Info</CardTitle>
-            </CardHeader>
-            <CardContent className="text-xs space-y-1">
-              <div>Total raw availability: {availability?.length || 0}</div>
-              <div>Filtered available slots: {availableSlots.length}</div>
-              <div>Grouped slots count: {groupedSlots.length}</div>
-              <div>Current date: {format(currentDate, 'yyyy-MM-dd')}</div>
-              <div>Refresh key: {refreshKey}</div>
-              <div>Loading: {loading ? 'Yes' : 'No'}</div>
-              
-              {/* Show filtered out slots */}
-              {availability && (
-                <div className="mt-2 pt-2 border-t border-yellow-300">
-                  <div className="font-semibold text-yellow-800 mb-1">Filtered Out Slots:</div>
-                  {availability.filter(slot => {
-                    const isAvailable = slot.is_available && !slot.is_blocked;
-                    const slotDate = parseISO(slot.date);
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    const isFuture = slotDate >= today;
-                    return !(isAvailable && isFuture);
-                  }).map(slot => (
-                    <div key={slot.id} className="text-yellow-700 ml-2">
-                      {slot.date} {slot.start_time}-{slot.end_time} 
-                      (available: {slot.is_available ? '✓' : '✗'}, 
-                      blocked: {slot.is_blocked ? '✓' : '✗'}, 
-                      future: {parseISO(slot.date) >= new Date(new Date().setHours(0,0,0,0)) ? '✓' : '✗'})
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
+        
         {/* All Upcoming Slots */}
         <Card>
           <CardHeader>
