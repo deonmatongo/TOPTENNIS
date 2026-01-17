@@ -16,10 +16,19 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const { availability, loading, deleteAvailability } = useUserAvailability();
+  const [refreshKey, setRefreshKey] = useState(0);
+  const { availability, loading, deleteAvailability, fetchAvailability } = useUserAvailability();
 
   const availableSlots = availability?.filter(slot => slot.is_available && !slot.is_blocked) || [];
   
+  // Refresh availability when refreshKey changes
+  React.useEffect(() => {
+    if (refreshKey > 0) {
+      console.log('Refreshing availability data...');
+      fetchAvailability();
+    }
+  }, [refreshKey, fetchAvailability]);
+
   // Debug logging
   React.useEffect(() => {
     console.log('AvailableSlotsPage - raw availability:', availability);
@@ -86,7 +95,7 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
   const groupedSlots = groupSlotsByDate();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div key={refreshKey} className="min-h-screen bg-background">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background border-b">
         <div className="p-4 md:p-6">
@@ -286,6 +295,9 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
         onClose={() => {
           setShowAddModal(false);
           setSelectedDate(null);
+          // Force refresh availability data
+          setRefreshKey(prev => prev + 1);
+          fetchAvailability();
         }}
         selectedDate={selectedDate || undefined}
       />
