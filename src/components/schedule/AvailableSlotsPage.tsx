@@ -280,6 +280,28 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
               <div>Current date: {format(currentDate, 'yyyy-MM-dd')}</div>
               <div>Refresh key: {refreshKey}</div>
               <div>Loading: {loading ? 'Yes' : 'No'}</div>
+              
+              {/* Show filtered out slots */}
+              {availability && (
+                <div className="mt-2 pt-2 border-t border-yellow-300">
+                  <div className="font-semibold text-yellow-800 mb-1">Filtered Out Slots:</div>
+                  {availability.filter(slot => {
+                    const isAvailable = slot.is_available && !slot.is_blocked;
+                    const slotDate = parseISO(slot.date);
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const isFuture = slotDate >= today;
+                    return !(isAvailable && isFuture);
+                  }).map(slot => (
+                    <div key={slot.id} className="text-yellow-700 ml-2">
+                      {slot.date} {slot.start_time}-{slot.end_time} 
+                      (available: {slot.is_available ? '✓' : '✗'}, 
+                      blocked: {slot.is_blocked ? '✓' : '✗'}, 
+                      future: {parseISO(slot.date) >= new Date(new Date().setHours(0,0,0,0)) ? '✓' : '✗'})
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
