@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Plus, ChevronLeft, ChevronRight, Trash2, MapPin, RefreshCw, Edit } from 'lucide-react';
 import { useUserAvailability } from '@/hooks/useUserAvailability';
 import { EnhancedAvailabilityModal } from '@/components/dashboard/EnhancedAvailabilityModal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { format, addDays, subDays, startOfWeek, endOfWeek, isSameDay, parseISO } from 'date-fns';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -17,6 +18,9 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [editingSlot, setEditingSlot] = useState<any>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [slotToDelete, setSlotToDelete] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { availability, loading, deleteAvailability, fetchAvailability } = useUserAvailability();
@@ -65,9 +69,23 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
     }
   };
 
-  const handleDeleteSlot = async (slotId: string) => {
-    if (window.confirm('Are you sure you want to delete this availability slot?')) {
-      await deleteAvailability(slotId);
+  const handleDeleteSlot = (slot: any) => {
+    setSlotToDelete(slot);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!slotToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteAvailability(slotToDelete.id);
+      setDeleteDialogOpen(false);
+      setSlotToDelete(null);
+    } catch (error) {
+      console.error('Error deleting slot:', error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -251,7 +269,7 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleDeleteSlot(slot.id)}
+                      onClick={() => handleDeleteSlot(slot)}
                       className="shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -325,7 +343,7 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
                               size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDeleteSlot(slot.id);
+                                handleDeleteSlot(slot);
                               }}
                               className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                               title="Delete slot"
@@ -359,6 +377,19 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
         }}
         editingItem={editingSlot}
         selectedDate={selectedDate || undefined}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Availability"
+        description={`Are you sure you want to delete this availability slot? This action cannot be undone.
+
+${slotToDelete ? `${slotToDelete.start_time} - ${slotToDelete.end_time} on ${format(parseISO(slotToDelete.date), 'EEEE, MMMM d, yyyy')}` : ''}`}
+        confirmText="Delete"
+        onConfirm={confirmDelete}
+        loading={isDeleting}
       />
     </div>
   );
