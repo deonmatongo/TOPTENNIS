@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRealtime } from '@/contexts/RealtimeContext';
+import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
@@ -11,6 +13,9 @@ export const useUserAvailability = () => {
   const [availability, setAvailability] = useState<UserAvailability[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const { subscribeToUserChanges } = useRealtime();
+  const { notifyAvailabilityUpdate } = useRealtimeNotifications();
+
   useEffect(() => {
     if (!user) {
       setLoading(false);
@@ -19,27 +24,17 @@ export const useUserAvailability = () => {
 
     fetchAvailability();
 
-    // Set up real-time subscription for user availability
-    const channel = supabase
-      .channel('user-availability-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen to all changes (INSERT, UPDATE, DELETE)
-          schema: 'public',
-          table: 'user_availability',
-          filter: `user_id=eq.${user.id}`
-        },
-        (payload) => {
-          fetchAvailability();
-        }
-      )
-      .subscribe();
+    // Set up real-time subscription using context
+    const unsubscribe = subscribeToUserChanges((payload) => {
+      if (payload.table === 'user_availability') {
+        fetchAvailability();
+      }
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
-  }, [user]);
+  }, [user, subscribeToUserChanges]);
 
   const fetchAvailability = async () => {
     try {
@@ -81,22 +76,6 @@ export const useUserAvailability = () => {
       throw new Error('Cannot create availability for past dates or times');
     }
 
-    // Create optimistic update data
-    const optimisticData = {
-      id: crypto.randomUUID(),
-      user_id: user.id,
-      privacy_level: 'public' as const,
-      is_blocked: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      ...availabilityData,
-    };
-
-    // Optimistically update UI immediately
-    setAvailability(prev => [...prev, optimisticData as UserAvailability].sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    ));
-
     try {
       const { data, error } = await supabase
         .from('user_availability')
@@ -109,17 +88,15 @@ export const useUserAvailability = () => {
 
       if (error) throw error;
       
-      // Replace optimistic data with real data from server
-      setAvailability(prev => 
-        prev.map(item => item.id === optimisticData.id ? data : item)
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      );
+      // Update UI immediately with real data
+      setAvailability(prev => [...prev, data].sort((a, b) => 
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      ));
       
       toast.success('Availability updated');
+      notifyAvailabilityUpdate(data, 'created');
       return data;
     } catch (error) {
-      // Rollback optimistic update on error
-      setAvailability(prev => prev.filter(item => item.id !== optimisticData.id));
       console.error('Error creating availability:', error);
       toast.error('Failed to update availability');
       throw error;
@@ -142,6 +119,7 @@ export const useUserAvailability = () => {
       );
       
       toast.success('Availability updated');
+      notifyAvailabilityUpdate(data, 'updated');
       return data;
     } catch (error) {
       console.error('Error updating availability:', error);
@@ -152,6 +130,9 @@ export const useUserAvailability = () => {
 
   const deleteAvailability = async (id: string) => {
     try {
+      // Get the availability data before deletion for notification
+      const availabilityToDelete = availability.find(item => item.id === id);
+      
       const { error } = await supabase
         .from('user_availability')
         .delete()
@@ -161,6 +142,10 @@ export const useUserAvailability = () => {
       
       setAvailability(prev => prev.filter(item => item.id !== id));
       toast.success('Availability removed');
+      
+      if (availabilityToDelete) {
+        notifyAvailabilityUpdate(availabilityToDelete, 'deleted');
+      }
     } catch (error) {
       console.error('Error deleting availability:', error);
       toast.error('Failed to remove availability');

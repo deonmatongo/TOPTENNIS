@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRealtime } from '@/contexts/RealtimeContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
@@ -29,6 +30,7 @@ type MatchInvite = Tables<'match_invites'> & {
 
 export const useMatchInvites = () => {
   const { user } = useAuth();
+  const { subscribeToUserChanges } = useRealtime();
   const [invites, setInvites] = useState<MatchInvite[]>([]);
   const [loading, setLoading] = useState(true);
   const { sendNotification } = useBrowserNotifications();
@@ -41,18 +43,13 @@ export const useMatchInvites = () => {
 
     fetchInvites();
 
-    // Set up real-time subscription for match invites
-    const channel = supabase
-      .channel('match-invites-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'match_invites',
-        },
-        async (payload) => {
-          logger.debug('Real-time invite INSERT', { payload });
+    // Set up real-time subscription using context
+    const unsubscribe = subscribeToUserChanges(async (payload) => {
+      if (payload.table === 'match_invites') {
+        logger.debug('Real-time invite update', { payload });
+        
+        // Handle new invite notifications
+        if (payload.eventType === 'INSERT') {
           const newInvite = payload.new as any;
           
           // Only show notification if current user is receiver
@@ -78,44 +75,19 @@ export const useMatchInvites = () => {
                 tag: newInvite.id,
                 clickUrl: '/dashboard?tab=matching',
               });
-
-              // Database notification is handled by the notify_match_invite trigger
             }
           }
-          
-          fetchInvites();
         }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'match_invites',
-        },
-        (payload) => {
-          logger.debug('Real-time invite UPDATE', { payload });
-          fetchInvites();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'match_invites',
-        },
-        (payload) => {
-          logger.debug('Real-time invite DELETE', { payload });
-          fetchInvites();
-        }
-      )
-      .subscribe();
+        
+        // Always refresh invites list
+        fetchInvites();
+      }
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
-  }, [user]);
+  }, [user, subscribeToUserChanges, sendNotification]);
 
   const fetchInvites = async () => {
     try {

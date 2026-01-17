@@ -17,6 +17,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 interface EnhancedAvailabilityModalProps {
   open: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
   editingItem?: any;
   selectedDate?: Date;
   selectedStartTime?: string;
@@ -26,6 +27,7 @@ interface EnhancedAvailabilityModalProps {
 export const EnhancedAvailabilityModal = ({
   open,
   onClose,
+  onSuccess,
   editingItem,
   selectedDate,
   selectedStartTime,
@@ -162,6 +164,7 @@ export const EnhancedAvailabilityModal = ({
         }
       }
       handleClose();
+      onSuccess?.();
     } catch (error: any) {
       console.error('Error saving availability:', error);
       const errorMessage = error?.message || 'Failed to save availability';

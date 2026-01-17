@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useNotifications } from "@/hooks/useNotifications";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { RealtimeStatus } from "@/components/ui/RealtimeStatus";
 import { toast } from "sonner";
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -131,6 +132,7 @@ const Header = () => {
 
           {/* Action Buttons */}
           <div className="hidden lg:flex items-center space-x-3">
+            {user && <RealtimeStatus />}
             <ThemeToggle />
             {user ?
           // Authenticated User Menu
@@ -276,6 +278,12 @@ const Header = () => {
               
               {/* Mobile Action Buttons */}
               <div className="pt-4 space-y-3 border-t border-gray-200 mt-4">
+                {user && (
+                  <div className="px-3 py-2 flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Connection</span>
+                    <RealtimeStatus />
+                  </div>
+                )}
                 <div className="px-3 py-2 flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Theme</span>
                   <ThemeToggle />

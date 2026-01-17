@@ -352,6 +352,11 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
           setSelectedDate(null);
           setEditingSlot(null);
         }}
+        onSuccess={() => {
+          // Force immediate refresh
+          fetchAvailability();
+          setRefreshKey(prev => prev + 1);
+        }}
         editingItem={editingSlot}
         selectedDate={selectedDate || undefined}
       />
