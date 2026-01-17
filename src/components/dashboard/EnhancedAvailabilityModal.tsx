@@ -11,8 +11,9 @@ import { useConflictDetection } from '@/hooks/useConflictDetection';
 import { toast } from 'sonner';
 import { generateRecurringSlots, encodeRecurrenceRule, RecurrencePattern, RecurrenceRule } from '@/utils/recurringAvailability';
 import { Calendar } from '@/components/ui/calendar';
-import { AlertCircle, Repeat } from 'lucide-react';
+import { AlertCircle, Repeat, Clock } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { TimezoneSelect } from '@/components/ui/TimezoneSelect';
 
 interface EnhancedAvailabilityModalProps {
   open: boolean;
@@ -46,6 +47,7 @@ export const EnhancedAvailabilityModal = ({
     is_available: true,
     notes: '',
     privacy_level: 'public',
+    timezone: 'America/New_York', // Default to Eastern Time
   });
 
   const [recurrenceData, setRecurrenceData] = useState<RecurrenceRule>({
@@ -65,6 +67,7 @@ export const EnhancedAvailabilityModal = ({
           is_available: editingItem.is_available,
           notes: editingItem.notes || '',
           privacy_level: editingItem.privacy_level || 'public',
+          timezone: editingItem.timezone || 'America/New_York',
         });
       } else if (selectedDate) {
         setFormData({
@@ -74,6 +77,7 @@ export const EnhancedAvailabilityModal = ({
           is_available: true,
           notes: '',
           privacy_level: 'public',
+          timezone: 'America/New_York',
         });
       }
     }
@@ -182,6 +186,7 @@ export const EnhancedAvailabilityModal = ({
       is_available: true,
       notes: '',
       privacy_level: 'public',
+      timezone: 'America/New_York',
     });
     setRecurrenceData({
       pattern: 'none',
@@ -215,6 +220,19 @@ export const EnhancedAvailabilityModal = ({
               onChange={(e) => setFormData({ ...formData, date: e.target.value })}
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="timezone">Timezone</Label>
+            <TimezoneSelect
+              value={formData.timezone}
+              onValueChange={(value) => setFormData({ ...formData, timezone: value })}
+              placeholder="Select timezone"
+            />
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              <span>Times shown in {formData.timezone}</span>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

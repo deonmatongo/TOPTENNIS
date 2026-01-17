@@ -6,7 +6,9 @@ import { Calendar, Clock, Plus, ChevronLeft, ChevronRight, Trash2, MapPin, Refre
 import { useUserAvailability } from '@/hooks/useUserAvailability';
 import { EnhancedAvailabilityModal } from '@/components/dashboard/EnhancedAvailabilityModal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { TimezoneSelect } from '@/components/ui/TimezoneSelect';
 import { format, addDays, subDays, startOfWeek, endOfWeek, isSameDay, parseISO } from 'date-fns';
+import { convertTimeBetweenTimezones, getUserTimezone, getTimezoneDisplayName } from '@/utils/timezoneConversion';
 import type { Tables } from '@/integrations/supabase/types';
 
 interface AvailableSlotsPageProps {
@@ -23,6 +25,8 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
   const [isDeleting, setIsDeleting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [userTimezone, setUserTimezone] = useState<string>('America/New_York'); // Default to Eastern Time
+  const [convertedSlots, setConvertedSlots] = useState<Record<string, boolean>>({}); // Track which slots are converted
   const { availability, loading, deleteAvailability, fetchAvailability } = useUserAvailability();
 
   const availableSlots = availability?.filter(slot => {
@@ -171,6 +175,24 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
             </Button>
           </div>
         </div>
+
+        {/* Timezone Selector */}
+        <div className="px-4 pb-4 border-b">
+          <div className="flex items-center gap-3">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Your Timezone:</span>
+            <div className="flex-1 max-w-xs">
+              <TimezoneSelect
+                value={userTimezone}
+                onValueChange={setUserTimezone}
+                placeholder="Select timezone"
+              />
+            </div>
+            <span className="text-xs text-muted-foreground">
+              All times shown in {getTimezoneDisplayName(userTimezone)}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Week Navigation */}
@@ -254,14 +276,34 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
                       <Clock className="h-5 w-5 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="font-semibold text-lg">
-                          {slot.start_time} - {slot.end_time}
+                          {convertedSlots[slot.id] && slot.timezone && slot.timezone !== userTimezone
+                            ? `${convertTimeBetweenTimezones(slot.start_time, slot.timezone, userTimezone, slot.date)} - ${convertTimeBetweenTimezones(slot.end_time, slot.timezone, userTimezone, slot.date)}`
+                            : `${slot.start_time} - ${slot.end_time}`}
                         </span>
                         <Badge variant={slot.privacy_level === 'public' ? 'default' : 'secondary'}>
                           {slot.privacy_level}
                         </Badge>
+                        {slot.timezone && (
+                          <Badge variant="outline" className="text-xs">
+                            {convertedSlots[slot.id] ? getTimezoneDisplayName(userTimezone) : getTimezoneDisplayName(slot.timezone || 'America/New_York')}
+                          </Badge>
+                        )}
                       </div>
+                      {slot.timezone && slot.timezone !== userTimezone && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs mb-2"
+                          onClick={() => setConvertedSlots(prev => ({ ...prev, [slot.id]: !prev[slot.id] }))}
+                        >
+                          <Clock className="h-3 w-3 mr-1" />
+                          {convertedSlots[slot.id] 
+                            ? `Show in ${getTimezoneDisplayName(slot.timezone)}` 
+                            : `Convert to ${getTimezoneDisplayName(userTimezone)}`}
+                        </Button>
+                      )}
                       {slot.notes && (
                         <p className="text-sm text-muted-foreground mb-2">{slot.notes}</p>
                       )}

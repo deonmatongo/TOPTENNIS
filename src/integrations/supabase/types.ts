@@ -1260,6 +1260,7 @@ export type Database = {
           privacy_level: string | null
           recurrence_rule: string | null
           start_time: string
+          timezone: string | null
           updated_at: string
           user_id: string
         }
@@ -1274,6 +1275,7 @@ export type Database = {
           privacy_level?: string | null
           recurrence_rule?: string | null
           start_time: string
+          timezone?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1288,6 +1290,7 @@ export type Database = {
           privacy_level?: string | null
           recurrence_rule?: string | null
           start_time?: string
+          timezone?: string | null
           updated_at?: string
           user_id?: string
         }
