@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Plus, ChevronLeft, ChevronRight, Trash2, MapPin, RefreshCw } from 'lucide-react';
@@ -22,7 +22,15 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
 
   const availableSlots = availability?.filter(slot => {
     const isAvailable = slot.is_available && !slot.is_blocked;
-    return isAvailable;
+    if (!isAvailable) return false;
+    
+    // Only show slots within the next 7 days
+    const slotDate = parseISO(slot.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const sevenDaysFromNow = addDays(today, 7);
+    
+    return slotDate >= today && slotDate <= sevenDaysFromNow;
   }) || [];
   
   // Refresh availability when refreshKey changes
@@ -235,10 +243,13 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
         </Card>
 
         
-        {/* All Availability Slots */}
+        {/* Next 7 Days Availability */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">All Availability</CardTitle>
+            <CardTitle className="text-lg">Next 7 Days Availability</CardTitle>
+            <CardDescription className="text-sm">
+              Showing available slots for the next week
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {groupedSlots.length === 0 ? (
