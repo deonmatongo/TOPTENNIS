@@ -22,12 +22,7 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
 
   const availableSlots = availability?.filter(slot => {
     const isAvailable = slot.is_available && !slot.is_blocked;
-    const slotDate = parseISO(slot.date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const isFuture = slotDate >= today;
-    
-    return isAvailable && isFuture;
+    return isAvailable;
   }) || [];
   
   // Refresh availability when refreshKey changes
@@ -240,10 +235,10 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
         </Card>
 
         
-        {/* All Upcoming Slots */}
+        {/* All Availability Slots */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">All Upcoming Availability</CardTitle>
+            <CardTitle className="text-lg">All Availability</CardTitle>
           </CardHeader>
           <CardContent>
             {groupedSlots.length === 0 ? (
