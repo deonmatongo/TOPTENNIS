@@ -1,17 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, List, ChevronLeft, ChevronRight, User } from 'lucide-react';
+import { Calendar, List, User } from 'lucide-react';
 import { AvailableSlotsList } from './AvailableSlotsList';
 import { BookingModal } from './BookingModal';
-import { PlayerAvailabilityGrid } from './PlayerAvailabilityGrid';
+import { ScheduleCalendar } from './ScheduleCalendar';
 import { usePlayerAvailability } from '@/hooks/usePlayerAvailability';
 import { useMatchBookings } from '@/hooks/useMatchBookings';
-import { format, addDays, subDays, addWeeks, subWeeks, startOfWeek, endOfWeek } from 'date-fns';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format, addMonths, subMonths, parseISO, isSameDay } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Card, CardContent } from '@/components/ui/card';
 import type { Tables } from '@/integrations/supabase/types';
 import type { SearchResult } from '@/hooks/usePlayerSearch';
 
@@ -49,7 +48,7 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<'week' | 'day'>('week');
+  const [selectedDate, setSelectedDate] = useState(new Date());
   
   const opponentUserId = player ? ((player.user_id ?? player.id) || undefined) : undefined;
   const { availability } = usePlayerAvailability(opponentUserId);
@@ -82,33 +81,26 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
     setShowBookingModal(true);
   };
 
-  const handlePrevious = () => {
-    if (view === 'week') {
-      setCurrentDate(subWeeks(currentDate, 1));
-    } else {
-      setCurrentDate(subDays(currentDate, 1));
-    }
+  const handlePrevMonth = () => {
+    setCurrentDate(subMonths(currentDate, 1));
   };
 
-  const handleNext = () => {
-    if (view === 'week') {
-      setCurrentDate(addWeeks(currentDate, 1));
-    } else {
-      setCurrentDate(addDays(currentDate, 1));
-    }
+  const handleNextMonth = () => {
+    setCurrentDate(addMonths(currentDate, 1));
   };
 
   const handleToday = () => {
-    setCurrentDate(new Date());
+    const today = new Date();
+    setCurrentDate(today);
+    setSelectedDate(today);
   };
 
-  const getDateRangeText = () => {
-    if (view === 'day') {
-      return format(currentDate, 'EEEE, MMMM d, yyyy');
-    }
-    const start = startOfWeek(currentDate, { weekStartsOn: 1 });
-    const end = endOfWeek(currentDate, { weekStartsOn: 1 });
-    return `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`;
+  const handleDateSelect = (date: Date) => {
+    setSelectedDate(date);
+  };
+
+  const handleAddAvailability = (date: Date) => {
+    // Not needed for viewing player schedule
   };
 
   const handleBookingConfirm = async (courtLocation?: string, message?: string) => {
@@ -141,11 +133,23 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
     return sum + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
   }, 0) || 0;
 
-  const opponentName = player
-    ? ((player as SearchResult).first_name || (player as SearchResult).last_name)
-      ? `${(player as SearchResult).first_name || ''} ${(player as SearchResult).last_name || ''}`.trim()
-      : (player as Tables<'players'>).name
-    : '';
+  const opponentName = player?.name || 'Player';
+
+  // Get dates with availability
+  const availabilityDates = useMemo(() => {
+    return availability
+      ?.filter(slot => slot.is_available && !slot.is_blocked)
+      .map(slot => parseISO(slot.date)) || [];
+  }, [availability]);
+
+  // Get slots for selected date
+  const selectedDateSlots = useMemo(() => {
+    return availability?.filter(slot => 
+      slot.is_available && 
+      !slot.is_blocked && 
+      isSameDay(parseISO(slot.date), selectedDate)
+    ) || [];
+  }, [availability, selectedDate]);
 
   return (
     <>
@@ -176,57 +180,69 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
           
           <Tabs defaultValue="calendar" className="flex-1 flex flex-col overflow-hidden min-h-0">
             <div className="px-6 pt-4 pb-2 border-b bg-muted/30 shrink-0">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <TabsList className="grid grid-cols-2">
-                  <TabsTrigger value="calendar" className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    Calendar
-                  </TabsTrigger>
-                  <TabsTrigger value="list" className="flex items-center gap-2">
-                    <List className="w-4 h-4" />
-                    List View
-                  </TabsTrigger>
-                </TabsList>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleToday}
-                    className="font-medium"
-                  >
-                    Today
-                  </Button>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePrevious}>
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNext}>
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <Select value={view} onValueChange={(v) => setView(v as 'week' | 'day')}>
-                    <SelectTrigger className="w-[110px] h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="day">Day</SelectItem>
-                      <SelectItem value="week">Week</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <h3 className="text-base font-semibold mt-3">{getDateRangeText()}</h3>
+              <TabsList className="grid grid-cols-2">
+                <TabsTrigger value="calendar" className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  Calendar
+                </TabsTrigger>
+                <TabsTrigger value="list" className="flex items-center gap-2">
+                  <List className="w-4 w-4" />
+                  List View
+                </TabsTrigger>
+              </TabsList>
             </div>
             
             <TabsContent value="calendar" className="flex-1 overflow-auto mt-0 p-6">
-              <PlayerAvailabilityGrid 
-                currentDate={currentDate} 
-                view={view}
-                playerId={player?.user_id || player?.id}
-                onSelectSlot={handleSelectSlot}
-              />
+              <div className="grid md:grid-cols-2 gap-6">
+                <ScheduleCalendar
+                  currentDate={currentDate}
+                  selectedDate={selectedDate}
+                  onDateSelect={handleDateSelect}
+                  onPrevMonth={handlePrevMonth}
+                  onNextMonth={handleNextMonth}
+                  onToday={handleToday}
+                  availabilityDates={availabilityDates}
+                  onAddAvailability={handleAddAvailability}
+                />
+                
+                <Card>
+                  <CardContent className="p-6">
+                    <h3 className="font-semibold mb-4">
+                      {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+                    </h3>
+                    {selectedDateSlots.length > 0 ? (
+                      <div className="space-y-2">
+                        {selectedDateSlots.map((slot) => (
+                          <button
+                            key={slot.id}
+                            onClick={() => handleSelectSlot(
+                              selectedDate,
+                              slot.start_time,
+                              slot.end_time,
+                              slot.id
+                            )}
+                            className="w-full text-left p-3 rounded-lg border hover:bg-accent transition-colors"
+                          >
+                            <div className="font-medium">
+                              {slot.start_time} - {slot.end_time}
+                            </div>
+                            {slot.notes && (
+                              <div className="text-sm text-muted-foreground mt-1">
+                                {slot.notes}
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p>No availability on this date</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
             <TabsContent value="list" className="flex-1 overflow-auto mt-0 px-6 py-4">
@@ -243,7 +259,7 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
                   <Calendar className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
                   <h3 className="text-lg font-semibold mb-2">No Available Times</h3>
                   <p className="text-sm text-muted-foreground max-w-sm">
-                    {player?.first_name} hasn't added any available time slots yet. Check back later.
+                    {opponentName} hasn't added any available time slots yet. Check back later.
                   </p>
                 </div>
               )}

@@ -11,9 +11,10 @@ import { format, isFuture, parseISO } from 'date-fns';
 interface ScheduleDashboardProps {
   matches?: Match[];
   onNavigate: (view: 'slots' | 'matches' | 'invites') => void;
+  preSelectedOpponent?: {id?: string, name?: string} | null;
 }
 
-export const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({ matches = [], onNavigate }) => {
+export const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({ matches = [], onNavigate, preSelectedOpponent }) => {
   const { availability } = useUserAvailability();
   const { invites, getPendingInvites, getConfirmedInvites } = useMatchInvites();
 
@@ -48,6 +49,36 @@ export const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({ matches = 
         <h2 className="text-2xl md:text-3xl font-bold tracking-tight">My Schedule</h2>
         <p className="text-muted-foreground mt-1">Manage your availability, matches, and invitations</p>
       </div>
+
+      {/* Pre-selected Opponent Banner */}
+      {preSelectedOpponent && preSelectedOpponent.name && (
+        <Card className="border-orange-500 bg-orange-50 dark:bg-orange-950">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-500 rounded-full">
+                  <Users className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-orange-900 dark:text-orange-100">
+                    Ready to schedule with {preSelectedOpponent.name}
+                  </h3>
+                  <p className="text-sm text-orange-700 dark:text-orange-200">
+                    Add your availability below to find a time that works for both of you
+                  </p>
+                </div>
+              </div>
+              <Button 
+                onClick={() => onNavigate('slots')}
+                className="bg-orange-500 hover:bg-orange-600 text-white shrink-0"
+              >
+                <Calendar className="mr-2 h-4 w-4" />
+                Add Availability
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {/* Available Slots Card */}

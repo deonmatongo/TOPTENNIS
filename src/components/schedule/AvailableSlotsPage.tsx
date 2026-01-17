@@ -13,9 +13,10 @@ import type { Tables } from '@/integrations/supabase/types';
 
 interface AvailableSlotsPageProps {
   onBack: () => void;
+  preSelectedOpponent?: {id?: string, name?: string} | null;
 }
 
-export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }) => {
+export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack, preSelectedOpponent }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -150,9 +151,15 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
             <Button variant="ghost" size="icon" onClick={onBack}>
               <ChevronLeft className="h-5 w-5" />
             </Button>
-            <div>
+            <div className="flex-1">
               <h1 className="text-2xl md:text-3xl font-bold">Available Slots</h1>
               <p className="text-sm text-muted-foreground">Manage when you're available to play</p>
+              {preSelectedOpponent && preSelectedOpponent.name && (
+                <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 bg-orange-100 dark:bg-orange-900/20 text-orange-900 dark:text-orange-100 rounded-full text-sm font-medium">
+                  <Calendar className="h-4 w-4" />
+                  <span>Scheduling match with {preSelectedOpponent.name}</span>
+                </div>
+              )}
             </div>
           </div>
 

@@ -771,23 +771,35 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
         <CardContent>
           <div className="space-y-3">
             {displayLeaderboard.map((player, index) => (
-              <div key={player.user_id} className="flex items-center justify-between p-3 bg-muted/30 rounded">
+              <div key={player.user_id} className={`flex items-center justify-between p-3 rounded ${player.isCurrentUser ? 'bg-primary/10 border border-primary/20' : 'bg-muted/30'}`}>
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${player.isCurrentUser ? 'bg-primary text-primary-foreground' : 'bg-primary/10'}`}>
                     {index + 1}
                   </div>
                   <div>
-                    <div className="font-medium">{player.name}</div>
+                    <div className={`font-medium ${player.isCurrentUser ? 'text-primary' : ''}`}>{player.name}</div>
                     <div className="text-sm text-muted-foreground">
                       {player.wins}W - {player.losses}L
                     </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-medium">{player.points} pts</div>
-                  <div className="text-sm text-muted-foreground">
-                    {player.playoff_eligible ? 'Playoff Eligible' : 'Not Eligible'}
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <div className="font-medium">{player.points} pts</div>
+                    <div className="text-sm text-muted-foreground">
+                      {player.playoff_eligible ? 'Playoff Eligible' : 'Not Eligible'}
+                    </div>
                   </div>
+                  {!player.isCurrentUser && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleScheduleMatch(player.user_id, player.name)}
+                      className="bg-orange-500 hover:bg-orange-600 text-white"
+                    >
+                      <Calendar className="w-4 h-4 mr-1" />
+                      Schedule
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}

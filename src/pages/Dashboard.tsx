@@ -35,6 +35,7 @@ const Dashboard = () => {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedLeague, setSelectedLeague] = useState("");
+  const [selectedOpponent, setSelectedOpponent] = useState<{id?: string, name?: string} | null>(null);
 
   // Set initial tab from URL parameter
   useEffect(() => {
@@ -96,7 +97,13 @@ const Dashboard = () => {
         return (
           <div className="space-y-6">
             <MatchInvitesList />
-            <ScheduleTab player={player} matches={matches} matchesLoading={false} />
+            <ScheduleTab 
+              player={player} 
+              matches={matches} 
+              matchesLoading={false}
+              preSelectedOpponent={selectedOpponent}
+              onClearOpponent={() => setSelectedOpponent(null)}
+            />
           </div>
         );
       case "profile":
@@ -108,8 +115,8 @@ const Dashboard = () => {
           player={player} 
           registrations={registrations}
           onNavigateToSchedule={(opponentId, opponentName) => {
-            setActiveTab('calendar');
-            // You can pass additional state here if needed
+            setSelectedOpponent({ id: opponentId, name: opponentName });
+            setActiveTab('schedule');
           }}
         />;
       case "my-divisions":
