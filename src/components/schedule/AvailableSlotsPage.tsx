@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Plus, ChevronLeft, ChevronRight, Trash2, MapPin } from 'lucide-react';
+import { Calendar, Clock, Plus, ChevronLeft, ChevronRight, Trash2, MapPin, RefreshCw } from 'lucide-react';
 import { useUserAvailability } from '@/hooks/useUserAvailability';
 import { EnhancedAvailabilityModal } from '@/components/dashboard/EnhancedAvailabilityModal';
 import { format, addDays, subDays, startOfWeek, endOfWeek, isSameDay, parseISO } from 'date-fns';
@@ -17,9 +17,26 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { availability, loading, deleteAvailability, fetchAvailability } = useUserAvailability();
 
-  const availableSlots = availability?.filter(slot => slot.is_available && !slot.is_blocked) || [];
+  const availableSlots = availability?.filter(slot => {
+    const isAvailable = slot.is_available && !slot.is_blocked;
+    const slotDate = parseISO(slot.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isFuture = slotDate >= today;
+    
+    console.log(`Slot ${slot.id}:`, {
+      date: slot.date,
+      isAvailable,
+      isFuture,
+      slotDate: format(slotDate, 'yyyy-MM-dd'),
+      today: format(today, 'yyyy-MM-dd')
+    });
+    
+    return isAvailable && isFuture;
+  }) || [];
   
   // Refresh availability when refreshKey changes
   React.useEffect(() => {
@@ -48,6 +65,19 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
   const handleAddAvailability = (date?: Date) => {
     setSelectedDate(date || currentDate);
     setShowAddModal(true);
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchAvailability();
+      setRefreshKey(prev => prev + 1);
+      console.log('Manual refresh completed');
+    } catch (error) {
+      console.error('Error refreshing availability:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const handleDeleteSlot = async (slotId: string) => {
@@ -116,6 +146,15 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
             </Button>
             <Button variant="outline" onClick={handleToday} className="flex-1 sm:flex-none">
               Today
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={handleRefresh} 
+              disabled={isRefreshing || loading}
+              className="flex-1 sm:flex-none"
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
           </div>
         </div>
@@ -227,6 +266,23 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack }
             )}
           </CardContent>
         </Card>
+
+        {/* Debug Info - Remove in production */}
+        {process.env.NODE_ENV === 'development' && (
+          <Card className="border-yellow-200 bg-yellow-50/50">
+            <CardHeader>
+              <CardTitle className="text-sm text-yellow-800">Debug Info</CardTitle>
+            </CardHeader>
+            <CardContent className="text-xs space-y-1">
+              <div>Total raw availability: {availability?.length || 0}</div>
+              <div>Filtered available slots: {availableSlots.length}</div>
+              <div>Grouped slots count: {groupedSlots.length}</div>
+              <div>Current date: {format(currentDate, 'yyyy-MM-dd')}</div>
+              <div>Refresh key: {refreshKey}</div>
+              <div>Loading: {loading ? 'Yes' : 'No'}</div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* All Upcoming Slots */}
         <Card>
