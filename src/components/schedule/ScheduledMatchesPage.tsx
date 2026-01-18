@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ChevronLeft, Calendar, MapPin, Clock, User, Trophy, Info } from 'lucide-react';
+import { ChevronLeft, Calendar, MapPin, Clock, User, Trophy, Info, Trash2 } from 'lucide-react';
 import { useMatchInvites } from '@/hooks/useMatchInvites';
 import { format, parseISO, isFuture, isPast } from 'date-fns';
 import {
@@ -13,14 +13,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
 
 interface ScheduledMatchesPageProps {
   onBack: () => void;
 }
 
 export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBack }) => {
-  const { invites, getConfirmedInvites } = useMatchInvites();
+  const { invites, getConfirmedInvites, deleteInvite } = useMatchInvites();
   const [selectedMatch, setSelectedMatch] = useState<any>(null);
+  const [deletingMatch, setDeletingMatch] = useState<string | null>(null);
 
   const confirmedMatches = getConfirmedInvites().filter(invite => invite.status === 'accepted');
 
@@ -29,8 +41,26 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
     .sort((a, b) => new Date(a.proposed_date!).getTime() - new Date(b.proposed_date!).getTime());
 
   const pastMatches = confirmedMatches
-    .filter(match => match.proposed_date && isPast(parseISO(match.proposed_date)))
-    .sort((a, b) => new Date(b.proposed_date!).getTime() - new Date(a.proposed_date!).getTime());
+    .filter(match => match.date && isPast(parseISO(match.date)))
+    .sort((a, b) => new Date(b.date!).getTime() - new Date(a.date!).getTime());
+
+  const handleDeleteMatch = (matchId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeletingMatch(matchId);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingMatch) return;
+
+    try {
+      await deleteInvite(deletingMatch);
+      setSelectedMatch(null);
+    } catch (error) {
+      // Error already handled in hook
+    } finally {
+      setDeletingMatch(null);
+    }
+  };
 
   const getOpponentInfo = (match: any) => {
     const opponent = match.sender || match.receiver;
@@ -42,7 +72,7 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
 
   const MatchCard = ({ match, isPast = false }: { match: any; isPast?: boolean }) => {
     const opponent = getOpponentInfo(match);
-    const matchDate = match.proposed_date ? parseISO(match.proposed_date) : null;
+    const matchDate = match.date ? parseISO(match.date) : null;
 
     return (
       <Card 
@@ -68,6 +98,16 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
                     {isPast ? 'Completed' : 'Upcoming'}
                   </Badge>
                 </div>
+                {isPast && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                    onClick={(e) => handleDeleteMatch(match.id, e)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
 
               {/* Date & Time */}
@@ -78,12 +118,12 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
                 </div>
               )}
 
-              {match.proposed_start_time && (
+              {match.start_time && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                   <Clock className="h-4 w-4 shrink-0" />
                   <span>
-                    {match.proposed_start_time}
-                    {match.proposed_end_time && ` - ${match.proposed_end_time}`}
+                    {match.start_time}
+                    {match.end_time && ` - ${match.end_time}`}
                   </span>
                 </div>
               )}
@@ -206,26 +246,26 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
 
               {/* Match Information */}
               <div className="space-y-3">
-                {selectedMatch.proposed_date && (
+                {selectedMatch.date && (
                   <div className="flex items-start gap-3">
                     <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div>
                       <div className="font-medium">Date</div>
                       <div className="text-sm text-muted-foreground">
-                        {format(parseISO(selectedMatch.proposed_date), 'EEEE, MMMM d, yyyy')}
+                        {format(parseISO(selectedMatch.date), 'EEEE, MMMM d, yyyy')}
                       </div>
                     </div>
                   </div>
                 )}
 
-                {selectedMatch.proposed_start_time && (
+                {selectedMatch.start_time && (
                   <div className="flex items-start gap-3">
                     <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div>
                       <div className="font-medium">Time</div>
                       <div className="text-sm text-muted-foreground">
-                        {selectedMatch.proposed_start_time}
-                        {selectedMatch.proposed_end_time && ` - ${selectedMatch.proposed_end_time}`}
+                        {selectedMatch.start_time}
+                        {selectedMatch.end_time && ` - ${selectedMatch.end_time}`}
                       </div>
                     </div>
                   </div>
@@ -268,6 +308,19 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
 
               {/* Actions */}
               <div className="flex gap-2 pt-4">
+                {selectedMatch.date && isPast(parseISO(selectedMatch.date)) && (
+                  <Button 
+                    variant="destructive" 
+                    className="flex-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteMatch(selectedMatch.id, e);
+                    }}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Old Match
+                  </Button>
+                )}
                 <Button variant="outline" className="flex-1" onClick={() => setSelectedMatch(null)}>
                   Close
                 </Button>
@@ -276,6 +329,27 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingMatch} onOpenChange={() => setDeletingMatch(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Old Match?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This match is from a past date and will be permanently deleted from your schedule. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

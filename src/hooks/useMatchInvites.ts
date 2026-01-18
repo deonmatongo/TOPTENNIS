@@ -437,6 +437,47 @@ export const useMatchInvites = () => {
     }
   };
 
+  const deleteInvite = async (inviteId: string) => {
+    if (!user) {
+      toast.error('You must be logged in to delete invites');
+      throw new Error('User not authenticated');
+    }
+
+    try {
+      // Verify the user is either sender or receiver
+      const invite = invites.find(i => i.id === inviteId);
+      if (!invite) {
+        toast.error('Invite not found');
+        throw new Error('Invite not found');
+      }
+
+      if (invite.sender_id !== user.id && invite.receiver_id !== user.id) {
+        toast.error('You are not authorized to delete this invite');
+        throw new Error('Unauthorized');
+      }
+
+      // Delete the invite from database
+      const { error } = await supabase
+        .from('match_invites')
+        .delete()
+        .eq('id', inviteId)
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+
+      if (error) {
+        logger.error('Database error deleting invite', { error, inviteId });
+        throw error;
+      }
+
+      await fetchInvites();
+      toast.success('Invite deleted successfully');
+    } catch (error: any) {
+      logger.error('Error deleting match invite', { error, inviteId });
+      const errorMessage = error?.message || 'Failed to delete invite';
+      toast.error(errorMessage);
+      throw error;
+    }
+  };
+
   const getPendingInvites = () => {
     return invites.filter(invite => 
       invite.status === 'pending' && invite.receiver_id === user?.id
@@ -449,6 +490,15 @@ export const useMatchInvites = () => {
     );
   };
 
+  const getOldInvites = () => {
+    const now = new Date();
+    return invites.filter(invite => {
+      const inviteDate = new Date(invite.date);
+      // Consider invites older than today as "old"
+      return inviteDate < now && (invite.status === 'pending' || invite.status === 'declined');
+    });
+  };
+
   return {
     invites,
     loading,
@@ -457,9 +507,11 @@ export const useMatchInvites = () => {
     proposeNewTime,
     acceptProposedTime,
     cancelInvite,
+    deleteInvite,
     getPendingInvites,
     getSentInvites,
     getConfirmedInvites,
+    getOldInvites,
     isSlotBooked,
     refetch: fetchInvites,
   };
