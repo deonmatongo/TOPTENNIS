@@ -67,11 +67,12 @@ export const useUserAvailability = () => {
 
     // Validate that date/time is not in the past
     const now = new Date();
-    const availDate = new Date(availabilityData.date);
-    const [hours, minutes] = availabilityData.start_time.split(':').map(Number);
-    availDate.setHours(hours, minutes, 0, 0);
+    const availDate = new Date(availabilityData.date + 'T' + availabilityData.start_time);
     
-    if (availDate < now) {
+    // Only check if it's clearly in the past (give 1 minute buffer for processing time)
+    const oneMinuteAgo = new Date(now.getTime() - 60000);
+    
+    if (availDate < oneMinuteAgo) {
       toast.error('Cannot create availability for past dates or times');
       throw new Error('Cannot create availability for past dates or times');
     }
