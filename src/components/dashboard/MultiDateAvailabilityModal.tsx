@@ -55,19 +55,7 @@ export const MultiDateAvailabilityModal = ({
       return;
     }
 
-    // Validate that dates/times are not in the past
-    const now = new Date();
-    const pastDates = selectedDates.filter(date => {
-      const availDate = new Date(date);
-      const [hours, minutes] = formData.start_time.split(':').map(Number);
-      availDate.setHours(hours, minutes, 0, 0);
-      return availDate < now;
-    });
-
-    if (pastDates.length > 0) {
-      toast.error('Cannot create availability for past dates or times');
-      return;
-    }
+    // Note: Past date/time validation is handled in the useUserAvailability hook
 
     setLoading(true);
 
