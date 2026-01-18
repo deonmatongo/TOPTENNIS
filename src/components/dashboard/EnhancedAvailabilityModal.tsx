@@ -107,18 +107,8 @@ export const EnhancedAvailabilityModal = ({
       return;
     }
 
-    // Validate that date/time is not in the past (only for new entries, not editing)
-    if (!editingItem) {
-      const now = new Date();
-      const availDate = new Date(formData.date);
-      const [hours, minutes] = formData.start_time.split(':').map(Number);
-      availDate.setHours(hours, minutes, 0, 0);
-      
-      if (availDate < now) {
-        toast.error('Cannot create availability for past dates or times');
-        return;
-      }
-    }
+    // Note: Past date/time validation is handled in the useUserAvailability hook
+    // to ensure consistent validation logic across all entry points
 
     setLoading(true);
 
