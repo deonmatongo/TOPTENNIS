@@ -234,20 +234,37 @@ export const useMatchInvites = () => {
       throw new Error('User not authenticated');
     }
 
+    // First, verify the user is the receiver of this invite
+    const invite = invites.find(i => i.id === inviteId);
+    if (!invite) {
+      toast.error('Invite not found');
+      throw new Error('Invite not found');
+    }
+
+    if (invite.receiver_id !== user.id) {
+      toast.error('You are not authorized to respond to this invite');
+      throw new Error('Unauthorized');
+    }
+
+    // OPTIMISTIC UPDATE: Update UI immediately for instant feedback
+    const previousInvites = [...invites];
+    const optimisticInvites = invites.map(inv => 
+      inv.id === inviteId 
+        ? { 
+            ...inv, 
+            status, 
+            response_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        : inv
+    );
+    setInvites(optimisticInvites);
+    
+    // Show success message immediately
+    toast.success(`Match invite ${status}! ${status === 'accepted' ? 'The sender has been notified.' : ''}`);
+
     try {
-      // First, verify the user is the receiver of this invite
-      const invite = invites.find(i => i.id === inviteId);
-      if (!invite) {
-        toast.error('Invite not found');
-        throw new Error('Invite not found');
-      }
-
-      if (invite.receiver_id !== user.id) {
-        toast.error('You are not authorized to respond to this invite');
-        throw new Error('Unauthorized');
-      }
-
-      // Update the invite status
+      // Update the invite status in database
       const { data, error } = await supabase
         .from('match_invites')
         .update({ 
@@ -262,29 +279,34 @@ export const useMatchInvites = () => {
 
       if (error) {
         logger.error('Database error responding to invite', { error, inviteId, status });
+        // Rollback optimistic update on error
+        setInvites(previousInvites);
+        toast.error(`Failed to ${status} match invite`);
         throw error;
       }
 
       if (!data) {
+        // Rollback on no data
+        setInvites(previousInvites);
+        toast.error(`Failed to ${status} match invite`);
         throw new Error('No data returned from update');
       }
 
-      // If accepted, create a conversation between the users
+      // If accepted, create a conversation between the users (in background)
       if (status === 'accepted') {
-        try {
-          await createConversation(invite);
-        } catch (convError) {
+        createConversation(invite).catch(convError => {
           logger.error('Error creating conversation', { error: convError, inviteId });
           // Don't fail the whole operation if conversation creation fails
-        }
+        });
       }
       
-      await fetchInvites();
-      toast.success(`Match invite ${status}! ${status === 'accepted' ? 'The sender has been notified.' : ''}`);
+      // Refresh invites in background to get latest data
+      fetchInvites().catch(err => {
+        logger.error('Error refreshing invites after response', { error: err });
+      });
     } catch (error: any) {
       logger.error('Error responding to match invite', { error, inviteId, status });
-      const errorMessage = error?.message || `Failed to ${status} match invite`;
-      toast.error(errorMessage);
+      // Error toast already shown above during rollback
       throw error;
     }
   };
