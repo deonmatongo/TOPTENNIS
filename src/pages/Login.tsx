@@ -94,31 +94,62 @@ const Login = () => {
     <AuthRedirect>
       <div className="min-h-screen flex overflow-x-hidden">
         {/* Left Side - Illustration */}
-        <div className="hidden lg:flex lg:flex-1 bg-gradient-primary relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-accent/10"></div>
-          <div className="relative z-10 flex flex-col justify-center items-center text-white p-12 text-center">
-            <div className="text-center mb-8">
-              <div className="w-64 h-64 mx-auto mb-8 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm">
-                <img 
-                  src="/logo.png" 
-                  alt="Tennis League Logo" 
-                  className="h-40 w-56 object-contain"
-                />
-              </div>
-              <h1 className="text-4xl font-bold mb-4">Welcome back my friend</h1>
-              <p className="text-lg text-white/80">Just a couple of clicks and we start</p>
+        <div className="hidden lg:flex lg:flex-1 bg-gradient-to-br from-orange-500 via-orange-600 to-red-600 relative overflow-hidden">
+          {/* Animated Background Pattern */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
+            <div className="absolute bottom-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
+            <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-white rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
+          </div>
+          
+          {/* Tennis Court Lines Pattern */}
+          <div className="absolute inset-0 opacity-5">
+            <div className="absolute top-1/4 left-0 right-0 h-px bg-white"></div>
+            <div className="absolute top-1/2 left-0 right-0 h-1 bg-white"></div>
+            <div className="absolute top-3/4 left-0 right-0 h-px bg-white"></div>
+            <div className="absolute left-1/4 top-0 bottom-0 w-px bg-white"></div>
+            <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white"></div>
+            <div className="absolute left-3/4 top-0 bottom-0 w-px bg-white"></div>
+          </div>
+
+          <div className="relative z-10 flex flex-col justify-center items-center text-white p-12 text-center w-full">
+            {/* Welcome Text */}
+            <div className="space-y-4 mb-12">
+              <h1 className="text-5xl font-bold mb-4 drop-shadow-lg">
+                Welcome Back!
+              </h1>
+              <p className="text-xl text-white/90 max-w-md mx-auto leading-relaxed">
+                Your tennis community awaits. Connect, compete, and conquer the court.
+              </p>
             </div>
-            
-            <div className="flex space-x-2 mt-8" aria-hidden="true">
-              <div className="w-3 h-3 bg-white rounded-full"></div>
-              <div className="w-3 h-3 bg-white/50 rounded-full"></div>
-              <div className="w-3 h-3 bg-white/50 rounded-full"></div>
+
+            {/* Feature Highlights */}
+            <div className="grid grid-cols-3 gap-6 max-w-2xl mx-auto mt-8">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="text-3xl font-bold mb-1">500+</div>
+                <div className="text-sm text-white/80">Active Players</div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="text-3xl font-bold mb-1">1000+</div>
+                <div className="text-sm text-white/80">Matches Played</div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="text-3xl font-bold mb-1">50+</div>
+                <div className="text-sm text-white/80">Active Leagues</div>
+              </div>
+            </div>
+
+            {/* Decorative Elements */}
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex space-x-2">
+              <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-white/60 rounded-full animate-pulse delay-100"></div>
+              <div className="w-2 h-2 bg-white/40 rounded-full animate-pulse delay-200"></div>
             </div>
           </div>
         </div>
 
         {/* Right Side - Login Form */}
-        <div className="flex-1 lg:flex-1 flex items-center justify-center p-4 sm:p-8 bg-gray-50 overflow-y-auto">
+        <div className="flex-1 lg:flex-1 flex items-center justify-center p-4 sm:p-8 bg-white overflow-y-auto">
           <div className="w-full max-w-md">
             <div className="text-center mb-6">
               <img 
