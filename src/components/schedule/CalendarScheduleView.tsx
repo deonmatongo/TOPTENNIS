@@ -287,9 +287,9 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
           )}
 
           {/* Calendar Controls */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Button onClick={handleToday} variant="outline" size="sm">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Button onClick={handleToday} variant="outline" size="sm" className="flex-shrink-0">
                 Today
               </Button>
               <div className="flex items-center gap-1">
@@ -300,16 +300,16 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
-              <h2 className="text-xl font-semibold ml-2">{getHeaderTitle()}</h2>
+              <h2 className="text-base sm:text-xl font-semibold ml-2 truncate">{getHeaderTitle()}</h2>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="flex border rounded-lg overflow-hidden">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex border rounded-lg overflow-hidden flex-1 sm:flex-initial">
                 <Button
                   variant={viewMode === 'week' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('week')}
-                  className="rounded-none"
+                  className="rounded-none flex-1 sm:flex-initial"
                 >
                   Week
                 </Button>
@@ -317,14 +317,14 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                   variant={viewMode === 'month' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('month')}
-                  className="rounded-none"
+                  className="rounded-none flex-1 sm:flex-initial"
                 >
                   Month
                 </Button>
               </div>
-              <Button onClick={() => handleDateClick(new Date())} size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Availability
+              <Button onClick={() => handleDateClick(new Date())} size="sm" className="flex-shrink-0">
+                <Plus className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Add Availability</span>
               </Button>
             </div>
           </div>
@@ -339,8 +339,9 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
             {/* Week day headers */}
             <div className="grid grid-cols-7 border-b bg-muted/50">
               {weekDays.map(day => (
-                <div key={day} className="p-2 text-center text-sm font-medium border-r last:border-r-0">
-                  {day}
+                <div key={day} className="p-1 sm:p-2 text-center text-xs sm:text-sm font-medium border-r last:border-r-0">
+                  <span className="hidden sm:inline">{day}</span>
+                  <span className="sm:hidden">{day.slice(0, 1)}</span>
                 </div>
               ))}
             </div>
@@ -360,28 +361,28 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                   <div
                     key={index}
                     className={cn(
-                      "min-h-[120px] border-r border-b last:border-r-0 p-2 cursor-pointer hover:bg-muted/50 transition-colors",
+                      "min-h-[80px] sm:min-h-[120px] border-r border-b last:border-r-0 p-1 sm:p-2 cursor-pointer hover:bg-muted/50 transition-colors",
                       !isCurrentMonth && viewMode === 'month' && "bg-muted/20 text-muted-foreground",
                       isToday(date) && "bg-blue-50 dark:bg-blue-950/20",
                       isPastDate && "opacity-60"
                     )}
                     onClick={() => !isPastDate && handleDateClick(date)}
                   >
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-1 sm:mb-2">
                       <span className={cn(
-                        "text-sm font-medium",
-                        isToday(date) && "bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center"
+                        "text-xs sm:text-sm font-medium",
+                        isToday(date) && "bg-blue-600 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs"
                       )}>
                         {format(date, 'd')}
                       </span>
                       {events.length > 0 && (
-                        <Badge variant="secondary" className="text-xs h-5">
+                        <Badge variant="secondary" className="text-[10px] sm:text-xs h-4 sm:h-5 px-1 sm:px-2">
                           {events.length}
                         </Badge>
                       )}
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-0.5 sm:space-y-1">
                       {events.slice(0, viewMode === 'month' ? 2 : 5).map((event, idx) => (
                         <div
                           key={idx}
@@ -390,26 +391,27 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                             handleEventClick(event);
                           }}
                           className={cn(
-                            "text-xs p-1.5 rounded border cursor-pointer hover:shadow-sm transition-shadow",
+                            "text-[10px] sm:text-xs p-1 sm:p-1.5 rounded border cursor-pointer hover:shadow-sm transition-shadow",
                             event.color
                           )}
                         >
-                          <div className="flex items-center gap-1 font-medium truncate">
-                            {event.type === 'availability' && <Clock className="h-3 w-3 shrink-0" />}
-                            {event.type === 'match' && <CheckCircle2 className="h-3 w-3 shrink-0" />}
-                            {event.type === 'invite' && <Mail className="h-3 w-3 shrink-0" />}
-                            <span className="truncate">{event.title}</span>
+                          <div className="flex items-center gap-0.5 sm:gap-1 font-medium truncate">
+                            {event.type === 'availability' && <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />}
+                            {event.type === 'match' && <CheckCircle2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />}
+                            {event.type === 'invite' && <Mail className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />}
+                            <span className="truncate hidden sm:inline">{event.title}</span>
+                            <span className="truncate sm:hidden">{event.type === 'availability' ? 'Avail' : event.type === 'match' ? 'Match' : 'Invite'}</span>
                           </div>
                           {event.start_time && (
-                            <div className="text-[10px] opacity-75 mt-0.5">
+                            <div className="text-[9px] sm:text-[10px] opacity-75 mt-0.5">
                               {event.start_time.slice(0, 5)}
                             </div>
                           )}
                         </div>
                       ))}
                       {events.length > (viewMode === 'month' ? 2 : 5) && (
-                        <div className="text-xs text-muted-foreground pl-1">
-                          +{events.length - (viewMode === 'month' ? 2 : 5)} more
+                        <div className="text-[10px] sm:text-xs text-muted-foreground pl-1">
+                          +{events.length - (viewMode === 'month' ? 2 : 5)}
                         </div>
                       )}
                     </div>

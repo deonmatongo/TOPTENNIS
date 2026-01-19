@@ -141,6 +141,10 @@ export const EnhancedAvailabilityModal = ({
             recurrenceData
           );
 
+          // Close modal immediately for better UX
+          handleClose();
+          onSuccess?.();
+
           // Create all recurring slots
           for (const slot of slots) {
             await createAvailability({
@@ -153,12 +157,13 @@ export const EnhancedAvailabilityModal = ({
           }
           toast.success(`Created ${slots.length} recurring availability slots`);
         } else {
+          // Close modal immediately before API call for instant feedback
+          handleClose();
+          onSuccess?.();
+          
           await createAvailability(submissionData);
-          toast.success('Availability added successfully');
         }
       }
-      handleClose();
-      onSuccess?.();
     } catch (error: any) {
       console.error('Error saving availability:', error);
       const errorMessage = error?.message || 'Failed to save availability';
