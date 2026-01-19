@@ -77,6 +77,21 @@ export const useUserAvailability = () => {
       throw new Error('Cannot create availability for past dates or times');
     }
 
+    // Optimistic update - add to UI immediately
+    const tempId = `temp-${Date.now()}`;
+    const optimisticData = {
+      id: tempId,
+      user_id: user.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      is_blocked: false,
+      ...availabilityData,
+    } as UserAvailability;
+
+    setAvailability(prev => [...prev, optimisticData].sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    ));
+
     try {
       const { data, error } = await supabase
         .from('user_availability')
@@ -87,12 +102,17 @@ export const useUserAvailability = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // Rollback optimistic update on error
+        setAvailability(prev => prev.filter(item => item.id !== tempId));
+        throw error;
+      }
       
-      // Update UI immediately with real data
-      setAvailability(prev => [...prev, data].sort((a, b) => 
-        new Date(a.date).getTime() - new Date(b.date).getTime()
-      ));
+      // Replace optimistic data with real data
+      setAvailability(prev => 
+        prev.map(item => item.id === tempId ? data : item)
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      );
       
       toast.success('Availability updated');
       notifyAvailabilityUpdate(data, 'created');

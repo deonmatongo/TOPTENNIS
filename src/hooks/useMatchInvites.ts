@@ -206,6 +206,22 @@ export const useMatchInvites = () => {
   }) => {
     if (!user) return;
 
+    // Optimistic update - add to UI immediately
+    const tempId = `temp-${Date.now()}`;
+    const optimisticInvite = {
+      id: tempId,
+      sender_id: user.id,
+      status: 'pending' as const,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      response_at: null,
+      sender: null,
+      receiver: null,
+      ...inviteData,
+    };
+
+    setInvites(prev => [...prev, optimisticInvite as any]);
+
     try {
       const { data, error } = await supabase
         .from('match_invites')
@@ -216,8 +232,13 @@ export const useMatchInvites = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // Rollback optimistic update on error
+        setInvites(prev => prev.filter(item => item.id !== tempId));
+        throw error;
+      }
       
+      // Replace optimistic data with real data from server
       await fetchInvites();
       toast.success('Match invite sent successfully');
       return data;
