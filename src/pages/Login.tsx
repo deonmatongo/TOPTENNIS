@@ -122,7 +122,7 @@ const Login = () => {
           <div className="w-full max-w-md">
             <div className="text-center mb-6">
               <img 
-                src="/lovable-uploads/aaae8a96-b114-4313-97ef-0c7a47bb57ac.png" 
+                src="/logo.png" 
                 alt="Tennis League Logo" 
                 className="h-32 w-48 object-contain mx-auto mb-4" 
               />

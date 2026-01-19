@@ -333,87 +333,251 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
 
       {/* Calendar Grid */}
       <div className="flex-1 overflow-auto p-4">
-        <div className="border rounded-lg bg-card overflow-hidden">
-          {/* Week day headers */}
-          <div className="grid grid-cols-7 border-b bg-muted/50">
-            {weekDays.map(day => (
-              <div key={day} className="p-2 text-center text-sm font-medium border-r last:border-r-0">
-                {day}
-              </div>
-            ))}
+        <div className="space-y-4">
+          {/* Calendar */}
+          <div className="border rounded-lg bg-card overflow-hidden">
+            {/* Week day headers */}
+            <div className="grid grid-cols-7 border-b bg-muted/50">
+              {weekDays.map(day => (
+                <div key={day} className="p-2 text-center text-sm font-medium border-r last:border-r-0">
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* Calendar days */}
+            <div className={cn(
+              "grid grid-cols-7",
+              viewMode === 'month' ? 'grid-rows-5' : 'grid-rows-1'
+            )}>
+              {calendarRange.map((date, index) => {
+                const dateKey = format(date, 'yyyy-MM-dd');
+                const events = eventsByDate[dateKey] || [];
+                const isCurrentMonth = isSameMonth(date, currentDate);
+                const isPastDate = isPast(startOfDay(date)) && !isToday(date);
+
+                return (
+                  <div
+                    key={index}
+                    className={cn(
+                      "min-h-[120px] border-r border-b last:border-r-0 p-2 cursor-pointer hover:bg-muted/50 transition-colors",
+                      !isCurrentMonth && viewMode === 'month' && "bg-muted/20 text-muted-foreground",
+                      isToday(date) && "bg-blue-50 dark:bg-blue-950/20",
+                      isPastDate && "opacity-60"
+                    )}
+                    onClick={() => !isPastDate && handleDateClick(date)}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={cn(
+                        "text-sm font-medium",
+                        isToday(date) && "bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center"
+                      )}>
+                        {format(date, 'd')}
+                      </span>
+                      {events.length > 0 && (
+                        <Badge variant="secondary" className="text-xs h-5">
+                          {events.length}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      {events.slice(0, viewMode === 'month' ? 2 : 5).map((event, idx) => (
+                        <div
+                          key={idx}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEventClick(event);
+                          }}
+                          className={cn(
+                            "text-xs p-1.5 rounded border cursor-pointer hover:shadow-sm transition-shadow",
+                            event.color
+                          )}
+                        >
+                          <div className="flex items-center gap-1 font-medium truncate">
+                            {event.type === 'availability' && <Clock className="h-3 w-3 shrink-0" />}
+                            {event.type === 'match' && <CheckCircle2 className="h-3 w-3 shrink-0" />}
+                            {event.type === 'invite' && <Mail className="h-3 w-3 shrink-0" />}
+                            <span className="truncate">{event.title}</span>
+                          </div>
+                          {event.start_time && (
+                            <div className="text-[10px] opacity-75 mt-0.5">
+                              {event.start_time.slice(0, 5)}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {events.length > (viewMode === 'month' ? 2 : 5) && (
+                        <div className="text-xs text-muted-foreground pl-1">
+                          +{events.length - (viewMode === 'month' ? 2 : 5)} more
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Calendar days */}
-          <div className={cn(
-            "grid grid-cols-7",
-            viewMode === 'month' ? 'grid-rows-5' : 'grid-rows-1'
-          )}>
-            {calendarRange.map((date, index) => {
-              const dateKey = format(date, 'yyyy-MM-dd');
-              const events = eventsByDate[dateKey] || [];
-              const isCurrentMonth = isSameMonth(date, currentDate);
-              const isPastDate = isPast(startOfDay(date)) && !isToday(date);
-
-              return (
-                <div
-                  key={index}
-                  className={cn(
-                    "min-h-[120px] border-r border-b last:border-r-0 p-2 cursor-pointer hover:bg-muted/50 transition-colors",
-                    !isCurrentMonth && viewMode === 'month' && "bg-muted/20 text-muted-foreground",
-                    isToday(date) && "bg-blue-50 dark:bg-blue-950/20",
-                    isPastDate && "opacity-60"
-                  )}
-                  onClick={() => !isPastDate && handleDateClick(date)}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={cn(
-                      "text-sm font-medium",
-                      isToday(date) && "bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center"
-                    )}>
-                      {format(date, 'd')}
-                    </span>
-                    {events.length > 0 && (
-                      <Badge variant="secondary" className="text-xs h-5">
-                        {events.length}
-                      </Badge>
-                    )}
+          {/* Quick Access Sections */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Pending Invites */}
+            <Card className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-orange-500/50">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
+                      <Mail className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <h3 className="font-semibold text-sm">Pending Invites</h3>
                   </div>
-
-                  <div className="space-y-1">
-                    {events.slice(0, viewMode === 'month' ? 2 : 5).map((event, idx) => (
+                  <Badge variant="secondary">{pendingInvites.length}</Badge>
+                </div>
+                <div className="space-y-2">
+                  {pendingInvites.slice(0, 3).map((invite) => {
+                    const sender = invite.sender;
+                    const senderName = sender 
+                      ? `${sender.first_name || ''} ${sender.last_name || ''}`.trim() 
+                      : 'Unknown';
+                    return (
                       <div
-                        key={idx}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEventClick(event);
-                        }}
-                        className={cn(
-                          "text-xs p-1.5 rounded border cursor-pointer hover:shadow-sm transition-shadow",
-                          event.color
-                        )}
+                        key={invite.id}
+                        onClick={() => handleEventClick({
+                          type: 'invite',
+                          id: invite.id,
+                          date: invite.date,
+                          start_time: invite.start_time,
+                          end_time: invite.end_time,
+                          title: `Invite from ${senderName}`,
+                          color: 'bg-orange-100',
+                          data: invite
+                        })}
+                        className="p-2 bg-muted/50 rounded hover:bg-muted transition-colors"
                       >
-                        <div className="flex items-center gap-1 font-medium truncate">
-                          {event.type === 'availability' && <Clock className="h-3 w-3 shrink-0" />}
-                          {event.type === 'match' && <CheckCircle2 className="h-3 w-3 shrink-0" />}
-                          {event.type === 'invite' && <Mail className="h-3 w-3 shrink-0" />}
-                          <span className="truncate">{event.title}</span>
+                        <p className="text-xs font-medium truncate">{senderName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(parseISO(invite.date), 'MMM d')} • {invite.start_time?.slice(0, 5)}
+                        </p>
+                      </div>
+                    );
+                  })}
+                  {pendingInvites.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-2">No pending invites</p>
+                  )}
+                  {pendingInvites.length > 3 && (
+                    <p className="text-xs text-muted-foreground text-center">+{pendingInvites.length - 3} more</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Upcoming Matches */}
+            <Card className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-blue-500/50">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+                      <CheckCircle2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <h3 className="font-semibold text-sm">Upcoming Matches</h3>
+                  </div>
+                  <Badge variant="secondary">{confirmedMatches.filter(m => isFuture(parseISO(m.date!))).length}</Badge>
+                </div>
+                <div className="space-y-2">
+                  {confirmedMatches
+                    .filter(match => match.date && isFuture(parseISO(match.date)))
+                    .slice(0, 3)
+                    .map((match) => {
+                      const opponent = match.sender_id !== match.receiver_id 
+                        ? (match.sender || match.receiver)
+                        : match.receiver;
+                      const opponentName = opponent 
+                        ? `${opponent.first_name || ''} ${opponent.last_name || ''}`.trim() 
+                        : 'Unknown';
+                      return (
+                        <div
+                          key={match.id}
+                          onClick={() => handleEventClick({
+                            type: 'match',
+                            id: match.id,
+                            date: match.date!,
+                            start_time: match.start_time,
+                            end_time: match.end_time,
+                            title: `Match vs ${opponentName}`,
+                            color: 'bg-blue-100',
+                            data: match
+                          })}
+                          className="p-2 bg-muted/50 rounded hover:bg-muted transition-colors"
+                        >
+                          <p className="text-xs font-medium truncate">vs {opponentName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(parseISO(match.date!), 'MMM d')} • {match.start_time?.slice(0, 5)}
+                          </p>
                         </div>
-                        {event.start_time && (
-                          <div className="text-[10px] opacity-75 mt-0.5">
-                            {event.start_time.slice(0, 5)}
-                          </div>
-                        )}
+                      );
+                    })}
+                  {confirmedMatches.filter(m => m.date && isFuture(parseISO(m.date))).length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-2">No upcoming matches</p>
+                  )}
+                  {confirmedMatches.filter(m => m.date && isFuture(parseISO(m.date))).length > 3 && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      +{confirmedMatches.filter(m => m.date && isFuture(parseISO(m.date))).length - 3} more
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Available Slots */}
+            <Card className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-green-500/50">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
+                      <Clock className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    <h3 className="font-semibold text-sm">Available Slots</h3>
+                  </div>
+                  <Badge variant="secondary">
+                    {availability?.filter(slot => slot.is_available && !slot.is_blocked && isFuture(parseISO(slot.date))).length || 0}
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  {availability
+                    ?.filter(slot => slot.is_available && !slot.is_blocked && isFuture(parseISO(slot.date)))
+                    .slice(0, 3)
+                    .map((slot) => (
+                      <div
+                        key={slot.id}
+                        onClick={() => handleEventClick({
+                          type: 'availability',
+                          id: slot.id,
+                          date: slot.date,
+                          start_time: slot.start_time,
+                          end_time: slot.end_time,
+                          title: 'Available',
+                          color: 'bg-green-100',
+                          data: slot
+                        })}
+                        className="p-2 bg-muted/50 rounded hover:bg-muted transition-colors"
+                      >
+                        <p className="text-xs font-medium">Available to play</p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(parseISO(slot.date), 'MMM d')} • {slot.start_time?.slice(0, 5)} - {slot.end_time?.slice(0, 5)}
+                        </p>
                       </div>
                     ))}
-                    {events.length > (viewMode === 'month' ? 2 : 5) && (
-                      <div className="text-xs text-muted-foreground pl-1">
-                        +{events.length - (viewMode === 'month' ? 2 : 5)} more
-                      </div>
-                    )}
-                  </div>
+                  {(!availability || availability.filter(slot => slot.is_available && !slot.is_blocked && isFuture(parseISO(slot.date))).length === 0) && (
+                    <p className="text-xs text-muted-foreground text-center py-2">No available slots</p>
+                  )}
+                  {availability && availability.filter(slot => slot.is_available && !slot.is_blocked && isFuture(parseISO(slot.date))).length > 3 && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      +{availability.filter(slot => slot.is_available && !slot.is_blocked && isFuture(parseISO(slot.date))).length - 3} more
+                    </p>
+                  )}
                 </div>
-              );
-            })}
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
