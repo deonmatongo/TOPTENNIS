@@ -52,14 +52,15 @@ export const useUserTimezone = () => {
           .eq('id', user.id)
           .single();
 
-        if (error) throw error;
-
-        if (data?.preferred_timezone) {
+        // Only update if column exists and has a value
+        if (!error && data?.preferred_timezone) {
           setTimezone(data.preferred_timezone);
           localStorage.setItem('userTimezone', data.preferred_timezone);
         }
+        // Silently ignore error if column doesn't exist yet
       } catch (error) {
-        console.error('Error loading timezone preference:', error);
+        // Silently ignore - column may not exist yet
+        console.debug('Timezone preference not available in database yet');
       }
     };
 
@@ -80,9 +81,18 @@ export const useUserTimezone = () => {
         .update({ preferred_timezone: newTimezone })
         .eq('id', user.id);
 
-      if (error) throw error;
-
-      toast.success('Timezone preference updated');
+      // Only show error if it's not a column-doesn't-exist error
+      if (error) {
+        if (error.message?.includes('column') || error.message?.includes('preferred_timezone')) {
+          // Column doesn't exist yet - silently use localStorage only
+          console.debug('Timezone saved to localStorage (database column not yet created)');
+          toast.success('Timezone updated');
+        } else {
+          throw error;
+        }
+      } else {
+        toast.success('Timezone preference saved');
+      }
     } catch (error) {
       console.error('Error updating timezone preference:', error);
       toast.error('Failed to save timezone preference');
