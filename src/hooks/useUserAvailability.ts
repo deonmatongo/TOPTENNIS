@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRealtime } from '@/contexts/RealtimeContext';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
@@ -26,7 +26,9 @@ export const useUserAvailability = () => {
 
     // Set up real-time subscription using context
     const unsubscribe = subscribeToUserChanges((payload) => {
+      console.log('🔄 Real-time availability update received:', payload);
       if (payload.table === 'user_availability') {
+        console.log('✅ Refetching availability due to real-time update');
         fetchAvailability();
       }
     });
@@ -34,25 +36,29 @@ export const useUserAvailability = () => {
     return () => {
       unsubscribe();
     };
-  }, [user, subscribeToUserChanges]);
+  }, [user, subscribeToUserChanges, fetchAvailability]);
 
-  const fetchAvailability = async () => {
+  const fetchAvailability = useCallback(async () => {
+    if (!user) return;
+    
     try {
+      console.log('📥 Fetching availability for user:', user.id);
       const { data, error } = await supabase
         .from('user_availability')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .order('date', { ascending: true });
 
       if (error) throw error;
+      console.log('✅ Availability fetched:', data?.length || 0, 'slots');
       setAvailability(data || []);
     } catch (error) {
-      console.error('Error fetching availability:', error);
+      console.error('❌ Error fetching availability:', error);
       toast.error('Failed to load availability');
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   const createAvailability = async (availabilityData: {
     date: string;
@@ -88,6 +94,7 @@ export const useUserAvailability = () => {
       ...availabilityData,
     } as UserAvailability;
 
+    console.log('⚡ Optimistic update: Adding availability to UI immediately');
     setAvailability(prev => [...prev, optimisticData].sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     ));
@@ -103,11 +110,13 @@ export const useUserAvailability = () => {
         .single();
 
       if (error) {
+        console.error('❌ Database insert failed, rolling back optimistic update');
         // Rollback optimistic update on error
         setAvailability(prev => prev.filter(item => item.id !== tempId));
         throw error;
       }
       
+      console.log('✅ Database insert successful, replacing optimistic data with real data');
       // Replace optimistic data with real data
       setAvailability(prev => 
         prev.map(item => item.id === tempId ? data : item)
@@ -116,6 +125,11 @@ export const useUserAvailability = () => {
       
       toast.success('Availability updated');
       notifyAvailabilityUpdate(data, 'created');
+      
+      // Force a refetch to ensure we have the latest data
+      console.log('🔄 Forcing refetch to sync with database');
+      await fetchAvailability();
+      
       return data;
     } catch (error) {
       console.error('Error creating availability:', error);

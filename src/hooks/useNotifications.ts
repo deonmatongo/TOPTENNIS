@@ -207,7 +207,8 @@ export const useNotifications = () => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          console.log('Real-time notification INSERT:', payload);
+          console.log('🔔 Real-time notification INSERT:', payload);
+          console.log('📊 hasLoadedRef.current:', hasLoadedRef.current);
           // Only add notification if we've already loaded initial notifications
           if (hasLoadedRef.current && payload.new) {
             const newNotif = {
@@ -219,6 +220,7 @@ export const useNotifications = () => {
               metadata: payload.new.metadata
             };
             
+            console.log('✅ Adding new notification to UI:', newNotif.title);
             addNotification(newNotif);
             
             // Play notification sound
@@ -232,6 +234,8 @@ export const useNotifications = () => {
               tag: payload.new.id,
               requireInteraction: false,
             });
+          } else {
+            console.warn('⚠️ Skipping notification - not loaded yet or no payload');
           }
         }
       )
