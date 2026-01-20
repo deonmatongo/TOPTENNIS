@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useBrowserNotifications } from './useBrowserNotifications';
+import { playNotificationSound } from '@/utils/notificationSound';
 
 export interface Notification {
   id: string;
@@ -219,6 +220,11 @@ export const useNotifications = () => {
             };
             
             addNotification(newNotif);
+            
+            // Play notification sound
+            playNotificationSound(0.5).catch(err => 
+              console.warn('Failed to play notification sound:', err)
+            );
             
             // Send browser notification if tab is not focused
             sendNotification(newNotif.title, {

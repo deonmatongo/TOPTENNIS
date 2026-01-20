@@ -1,0 +1,13 @@
+# Notification Sound File
+# This is a placeholder. You can replace this with an actual MP3 file.
+# The app will fall back to a generated beep sound if this file is not found.
+# 
+# To add a custom sound:
+# 1. Find or create a short notification sound (0.3-0.5 seconds recommended)
+# 2. Convert it to MP3 format
+# 3. Replace this file with: notification-sound.mp3
+#
+# Free notification sounds can be found at:
+# - https://notificationsounds.com/
+# - https://mixkit.co/free-sound-effects/notification/
+# - https://freesound.org/
