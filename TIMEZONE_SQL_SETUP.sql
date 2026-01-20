@@ -5,16 +5,16 @@
 
 -- 1. Add preferred_timezone column to profiles table
 -- This stores each user's timezone preference
-ALTER TABLE profiles 
+ALTER TABLE public.profiles 
 ADD COLUMN IF NOT EXISTS preferred_timezone TEXT DEFAULT 'America/New_York';
 
 -- 2. Add comment to document the column
-COMMENT ON COLUMN profiles.preferred_timezone IS 
+COMMENT ON COLUMN public.profiles.preferred_timezone IS 
 'User''s preferred timezone for displaying times in the calendar (IANA timezone identifier)';
 
 -- 3. Create index for faster queries
 CREATE INDEX IF NOT EXISTS idx_profiles_preferred_timezone 
-ON profiles(preferred_timezone);
+ON public.profiles(preferred_timezone);
 
 -- 4. Verify the column was added (optional - for testing)
 -- SELECT column_name, data_type, column_default 
@@ -26,11 +26,11 @@ ON profiles(preferred_timezone);
 -- But if you get permission errors, you may need to update the policy:
 
 -- Check existing policies:
--- SELECT * FROM pg_policies WHERE tablename = 'profiles';
+-- SELECT * FROM pg_policies WHERE tablename = 'profiles' AND schemaname = 'public';
 
 -- If needed, update the policy to allow timezone updates:
--- DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
--- CREATE POLICY "Users can update own profile" ON profiles
+-- DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+-- CREATE POLICY "Users can update own profile" ON public.profiles
 --   FOR UPDATE
 --   USING (auth.uid() = id)
 --   WITH CHECK (auth.uid() = id);
@@ -78,4 +78,4 @@ SELECT EXISTS (
 
 -- To remove the timezone feature:
 -- DROP INDEX IF EXISTS idx_profiles_preferred_timezone;
--- ALTER TABLE profiles DROP COLUMN IF EXISTS preferred_timezone;
+-- ALTER TABLE public.profiles DROP COLUMN IF EXISTS preferred_timezone;
