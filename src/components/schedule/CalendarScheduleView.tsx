@@ -12,10 +12,14 @@ import {
   Mail,
   CheckCircle2,
   AlertCircle,
-  Trash2
+  Trash2,
+  Globe
 } from 'lucide-react';
 import { useUserAvailability } from '@/hooks/useUserAvailability';
 import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
+import { TimezoneSelect } from '@/components/ui/TimezoneSelect';
+import { convertTimeBetweenTimezones, getTimezoneDisplayName } from '@/utils/timezoneConversion';
 import { EnhancedAvailabilityModal } from '@/components/dashboard/EnhancedAvailabilityModal';
 import { 
   format, 
@@ -78,6 +82,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
 
   const { availability, deleteAvailability } = useUserAvailability();
   const { invites, getPendingInvites, getConfirmedInvites, respondToInvite, deleteInvite, cancelInvite } = useMatchInvites();
+  const { timezone, updateTimezone } = useUserTimezone();
 
   const pendingInvites = getPendingInvites();
   const confirmedMatches = getConfirmedInvites();
@@ -346,6 +351,22 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 <span className="hidden sm:inline">Add Availability</span>
               </Button>
             </div>
+          </div>
+
+          {/* Timezone Selector */}
+          <div className="flex items-center gap-3 pt-3 border-t">
+            <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <span className="text-sm font-medium whitespace-nowrap">Timezone:</span>
+            <div className="flex-1 max-w-xs">
+              <TimezoneSelect
+                value={timezone}
+                onValueChange={updateTimezone}
+                placeholder="Select timezone"
+              />
+            </div>
+            <span className="text-xs text-muted-foreground hidden sm:inline">
+              All times shown in {getTimezoneDisplayName(timezone)}
+            </span>
           </div>
         </div>
       </div>
