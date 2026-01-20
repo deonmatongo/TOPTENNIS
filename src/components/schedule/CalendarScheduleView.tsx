@@ -114,12 +114,24 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
       if (slot.is_available && !slot.is_blocked) {
         const dateKey = slot.date;
         if (grouped[dateKey]) {
+          // Convert times to user's timezone if different from slot's timezone
+          const slotTimezone = slot.timezone || 'America/New_York';
+          const displayStartTime = slotTimezone !== timezone 
+            ? convertTimeBetweenTimezones(slot.start_time, slotTimezone, timezone, slot.date)
+            : slot.start_time;
+          const displayEndTime = slotTimezone !== timezone
+            ? convertTimeBetweenTimezones(slot.end_time, slotTimezone, timezone, slot.date)
+            : slot.end_time;
+
           grouped[dateKey].push({
             type: 'availability',
             id: slot.id,
             date: slot.date,
-            start_time: slot.start_time,
-            end_time: slot.end_time,
+            start_time: displayStartTime,
+            end_time: displayEndTime,
+            originalStartTime: slot.start_time,
+            originalEndTime: slot.end_time,
+            originalTimezone: slotTimezone,
             title: 'Available',
             color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700',
             data: slot
@@ -140,12 +152,24 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
             ? `${opponent.first_name || ''} ${opponent.last_name || ''}`.trim() 
             : 'Unknown';
 
+          // Convert times to user's timezone if different from match's timezone
+          const matchTimezone = match.timezone || 'America/New_York';
+          const displayStartTime = matchTimezone !== timezone 
+            ? convertTimeBetweenTimezones(match.start_time, matchTimezone, timezone, match.date)
+            : match.start_time;
+          const displayEndTime = matchTimezone !== timezone
+            ? convertTimeBetweenTimezones(match.end_time, matchTimezone, timezone, match.date)
+            : match.end_time;
+
           grouped[dateKey].push({
             type: 'match',
             id: match.id,
             date: match.date,
-            start_time: match.start_time,
-            end_time: match.end_time,
+            start_time: displayStartTime,
+            end_time: displayEndTime,
+            originalStartTime: match.start_time,
+            originalEndTime: match.end_time,
+            originalTimezone: matchTimezone,
             title: `Match vs ${opponentName}`,
             color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700',
             data: match
@@ -164,12 +188,24 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
             ? `${sender.first_name || ''} ${sender.last_name || ''}`.trim() 
             : 'Unknown';
 
+          // Convert times to user's timezone if different from invite's timezone
+          const inviteTimezone = invite.timezone || 'America/New_York';
+          const displayStartTime = inviteTimezone !== timezone 
+            ? convertTimeBetweenTimezones(invite.start_time, inviteTimezone, timezone, invite.date)
+            : invite.start_time;
+          const displayEndTime = inviteTimezone !== timezone
+            ? convertTimeBetweenTimezones(invite.end_time, inviteTimezone, timezone, invite.date)
+            : invite.end_time;
+
           grouped[dateKey].push({
             type: 'invite',
             id: invite.id,
             date: invite.date,
-            start_time: invite.start_time,
-            end_time: invite.end_time,
+            start_time: displayStartTime,
+            end_time: displayEndTime,
+            originalStartTime: invite.start_time,
+            originalEndTime: invite.end_time,
+            originalTimezone: inviteTimezone,
             title: `Invite from ${senderName}`,
             color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700',
             data: invite
@@ -179,7 +215,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
     });
 
     return grouped;
-  }, [calendarRange, availability, confirmedMatches, pendingInvites]);
+  }, [calendarRange, availability, confirmedMatches, pendingInvites, timezone]);
 
   const handlePrevious = () => {
     if (viewMode === 'week') {
@@ -657,11 +693,28 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
 
               <div className="space-y-4">
                 {/* Time */}
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">
-                    {selectedEvent.start_time?.slice(0, 5)} - {selectedEvent.end_time?.slice(0, 5)}
-                  </span>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">
+                      {selectedEvent.start_time?.slice(0, 5)} - {selectedEvent.end_time?.slice(0, 5)}
+                    </span>
+                    <Badge variant="outline" className="text-xs">
+                      {getTimezoneDisplayName(timezone)}
+                    </Badge>
+                  </div>
+                  
+                  {/* Show original time if converted */}
+                  {selectedEvent.originalTimezone && selectedEvent.originalTimezone !== timezone && (
+                    <div className="flex items-center gap-2 ml-6 text-xs text-muted-foreground">
+                      <span>
+                        Original: {selectedEvent.originalStartTime?.slice(0, 5)} - {selectedEvent.originalEndTime?.slice(0, 5)}
+                      </span>
+                      <Badge variant="secondary" className="text-xs">
+                        {getTimezoneDisplayName(selectedEvent.originalTimezone)}
+                      </Badge>
+                    </div>
+                  )}
                 </div>
 
                 {/* Message for invites */}

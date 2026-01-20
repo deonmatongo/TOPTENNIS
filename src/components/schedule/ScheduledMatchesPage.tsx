@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ChevronLeft, Calendar, MapPin, Clock, User, Trophy, Info, Trash2, XCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Calendar, Clock, MapPin, User, Trash2, XCircle, Globe } from 'lucide-react';
 import { useMatchInvites } from '@/hooks/useMatchInvites';
-import { format, parseISO, isFuture, isPast } from 'date-fns';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
+import { convertTimeBetweenTimezones, getTimezoneDisplayName } from '@/utils/timezoneConversion';
+import { format, isPast, isFuture, parseISO } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -31,6 +32,7 @@ interface ScheduledMatchesPageProps {
 
 export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBack }) => {
   const { invites, getConfirmedInvites, deleteInvite, cancelInvite } = useMatchInvites();
+  const { timezone } = useUserTimezone();
   const [selectedMatch, setSelectedMatch] = useState<any>(null);
   const [deletingMatch, setDeletingMatch] = useState<string | null>(null);
   const [cancellingMatch, setCancellingMatch] = useState<string | null>(null);
@@ -152,8 +154,12 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
                   <Clock className="h-4 w-4 shrink-0" />
                   <span>
                     {match.start_time}
-                    {match.end_time && ` - ${match.end_time}`}
                   </span>
+                  {match.timezone && match.timezone !== timezone && (
+                    <Badge variant="outline" className="text-xs">
+                      {getTimezoneDisplayName(timezone)}
+                    </Badge>
+                  )}
                 </div>
               )}
 
@@ -287,18 +293,36 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
                   </div>
                 )}
 
-                {selectedMatch.start_time && (
-                  <div className="flex items-start gap-3">
-                    <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <div className="font-medium">Time</div>
-                      <div className="text-sm text-muted-foreground">
-                        {selectedMatch.start_time}
-                        {selectedMatch.end_time && ` - ${selectedMatch.end_time}`}
+                      <div className="text-xs text-muted-foreground">Time</div>
+                      <div className="font-medium">
+                        {(() => {
+                          const matchTimezone = selectedMatch.timezone || 'America/New_York';
+                          const startTime = matchTimezone !== timezone 
+                            ? convertTimeBetweenTimezones(selectedMatch.start_time, matchTimezone, timezone, selectedMatch.date || selectedMatch.proposed_date)
+                            : selectedMatch.start_time;
+                          const endTime = matchTimezone !== timezone
+                            ? convertTimeBetweenTimezones(selectedMatch.end_time, matchTimezone, timezone, selectedMatch.date || selectedMatch.proposed_date)
+                            : selectedMatch.end_time;
+                          return `${startTime?.slice(0, 5)} - ${endTime?.slice(0, 5)}`;
+                        })()}
                       </div>
+                      {selectedMatch.timezone && selectedMatch.timezone !== timezone && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Badge variant="outline" className="text-xs">
+                            {getTimezoneDisplayName(timezone)}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            (Original: {selectedMatch.start_time?.slice(0, 5)} {getTimezoneDisplayName(selectedMatch.timezone)})
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
+                </div>
 
                 {selectedMatch.court_location && (
                   <div className="flex items-start gap-3">
