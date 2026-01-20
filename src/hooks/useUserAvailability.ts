@@ -16,28 +16,7 @@ export const useUserAvailability = () => {
   const { subscribeToUserChanges } = useRealtime();
   const { notifyAvailabilityUpdate } = useRealtimeNotifications();
 
-  useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    fetchAvailability();
-
-    // Set up real-time subscription using context
-    const unsubscribe = subscribeToUserChanges((payload) => {
-      console.log('🔄 Real-time availability update received:', payload);
-      if (payload.table === 'user_availability') {
-        console.log('✅ Refetching availability due to real-time update');
-        fetchAvailability();
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [user, subscribeToUserChanges, fetchAvailability]);
-
+  // Define fetchAvailability before useEffect to avoid 'used before declaration' error
   const fetchAvailability = useCallback(async () => {
     if (!user) return;
     
@@ -59,6 +38,28 @@ export const useUserAvailability = () => {
       setLoading(false);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    fetchAvailability();
+
+    // Set up real-time subscription using context
+    const unsubscribe = subscribeToUserChanges((payload) => {
+      console.log('🔄 Real-time availability update received:', payload);
+      if (payload.table === 'user_availability') {
+        console.log('✅ Refetching availability due to real-time update');
+        fetchAvailability();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user, subscribeToUserChanges, fetchAvailability]);
 
   const createAvailability = async (availabilityData: {
     date: string;
