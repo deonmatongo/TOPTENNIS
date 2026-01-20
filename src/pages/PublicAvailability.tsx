@@ -5,10 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Calendar, Clock, MapPin, Mail, Loader2 } from 'lucide-react';
+import { Calendar, Clock, MapPin, Mail, Loader2, Globe } from 'lucide-react';
 import { format, parseISO, isSameDay } from 'date-fns';
 import Header from '@/components/Header';
 import { toast } from 'sonner';
+import { TimezoneSelect } from '@/components/ui/TimezoneSelect';
+import { convertTimeBetweenTimezones, getTimezoneDisplayName } from '@/utils/timezoneConversion';
 
 interface UserProfile {
   id: string;
@@ -24,6 +26,7 @@ interface Availability {
   start_time: string;
   end_time: string;
   location?: string;
+  timezone?: string;
 }
 
 export default function PublicAvailability() {
@@ -32,6 +35,29 @@ export default function PublicAvailability() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [availability, setAvailability] = useState<Availability[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewerTimezone, setViewerTimezone] = useState<string>(() => {
+    // Try to detect user's timezone
+    try {
+      const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const timezoneMap: Record<string, string> = {
+        'America/New_York': 'America/New_York',
+        'US/Eastern': 'America/New_York',
+        'America/Chicago': 'America/Chicago',
+        'US/Central': 'America/Chicago',
+        'America/Denver': 'America/Denver',
+        'US/Mountain': 'America/Denver',
+        'America/Los_Angeles': 'America/Los_Angeles',
+        'US/Pacific': 'America/Los_Angeles',
+        'America/Anchorage': 'America/Anchorage',
+        'US/Alaska': 'America/Anchorage',
+        'Pacific/Honolulu': 'Pacific/Honolulu',
+        'US/Hawaii': 'Pacific/Honolulu',
+      };
+      return timezoneMap[detected] || 'America/New_York';
+    } catch {
+      return 'America/New_York';
+    }
+  });
 
   useEffect(() => {
     if (userId) {
@@ -54,7 +80,7 @@ export default function PublicAvailability() {
       // Fetch public availability
       const { data: availabilityData, error: availabilityError } = await supabase
         .from('user_availability')
-        .select('id, date, start_time, end_time')
+        .select('id, date, start_time, end_time, timezone')
         .eq('user_id', userId)
         .eq('is_available', true)
         .eq('is_blocked', false)
@@ -177,10 +203,25 @@ export default function PublicAvailability() {
         {/* Availability */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Available Times
-            </CardTitle>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Available Times
+              </CardTitle>
+              
+              {/* Timezone Selector */}
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm font-medium whitespace-nowrap">View in:</span>
+                <div className="flex-1 sm:flex-initial min-w-[200px]">
+                  <TimezoneSelect
+                    value={viewerTimezone}
+                    onValueChange={setViewerTimezone}
+                    placeholder="Select timezone"
+                  />
+                </div>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {availability.length === 0 ? (
@@ -196,28 +237,48 @@ export default function PublicAvailability() {
                       {format(parseISO(date), 'EEEE, MMMM d, yyyy')}
                     </h3>
                     <div className="grid gap-2">
-                      {slots.map(slot => (
-                        <Card key={slot.id} className="hover:border-primary transition-colors">
-                          <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                  <Clock className="h-4 w-4 text-muted-foreground" />
-                                  <span className="font-medium">
-                                    {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
-                                  </span>
+                      {slots.map(slot => {
+                        // Convert times to viewer's timezone
+                        const slotTimezone = slot.timezone || 'America/New_York';
+                        const displayStartTime = slotTimezone !== viewerTimezone
+                          ? convertTimeBetweenTimezones(slot.start_time, slotTimezone, viewerTimezone, slot.date)
+                          : slot.start_time;
+                        const displayEndTime = slotTimezone !== viewerTimezone
+                          ? convertTimeBetweenTimezones(slot.end_time, slotTimezone, viewerTimezone, slot.date)
+                          : slot.end_time;
+                        
+                        return (
+                          <Card key={slot.id} className="hover:border-primary transition-colors">
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between gap-4">
+                                <div className="space-y-1 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <Clock className="h-4 w-4 text-muted-foreground" />
+                                    <span className="font-medium">
+                                      {displayStartTime.slice(0, 5)} - {displayEndTime.slice(0, 5)}
+                                    </span>
+                                    <Badge variant="outline" className="text-xs">
+                                      {getTimezoneDisplayName(viewerTimezone)}
+                                    </Badge>
+                                  </div>
+                                  {slotTimezone !== viewerTimezone && (
+                                    <div className="text-xs text-muted-foreground ml-6">
+                                      Original: {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)} ({getTimezoneDisplayName(slotTimezone)})
+                                    </div>
+                                  )}
                                 </div>
+                                <Button
+                                  size="sm"
+                                  onClick={() => requestMatch(slot.id)}
+                                  className="flex-shrink-0"
+                                >
+                                  Request Match
+                                </Button>
                               </div>
-                              <Button
-                                size="sm"
-                                onClick={() => requestMatch(slot.id)}
-                              >
-                                Request Match
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
