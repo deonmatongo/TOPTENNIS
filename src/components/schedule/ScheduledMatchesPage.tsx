@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ChevronLeft, Calendar, MapPin, Clock, User, Trophy, Info, Trash2 } from 'lucide-react';
+import { ChevronLeft, Calendar, MapPin, Clock, User, Trophy, Info, Trash2, XCircle } from 'lucide-react';
 import { useMatchInvites } from '@/hooks/useMatchInvites';
 import { format, parseISO, isFuture, isPast } from 'date-fns';
 import {
@@ -30,9 +30,10 @@ interface ScheduledMatchesPageProps {
 }
 
 export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBack }) => {
-  const { invites, getConfirmedInvites, deleteInvite } = useMatchInvites();
+  const { invites, getConfirmedInvites, deleteInvite, cancelInvite } = useMatchInvites();
   const [selectedMatch, setSelectedMatch] = useState<any>(null);
   const [deletingMatch, setDeletingMatch] = useState<string | null>(null);
+  const [cancellingMatch, setCancellingMatch] = useState<string | null>(null);
 
   const confirmedMatches = getConfirmedInvites().filter(invite => invite.status === 'accepted');
 
@@ -49,6 +50,11 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
     setDeletingMatch(matchId);
   };
 
+  const handleCancelMatch = (matchId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCancellingMatch(matchId);
+  };
+
   const confirmDelete = async () => {
     if (!deletingMatch) return;
 
@@ -59,6 +65,20 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
       // Error already handled in hook
     } finally {
       setDeletingMatch(null);
+    }
+  };
+
+  const confirmCancel = async () => {
+    if (!cancellingMatch) return;
+
+    try {
+      await cancelInvite(cancellingMatch, 'Match cancelled by user');
+      setSelectedMatch(null);
+      toast.success('Match cancelled successfully');
+    } catch (error) {
+      // Error already handled in hook
+    } finally {
+      setCancellingMatch(null);
     }
   };
 
@@ -98,7 +118,7 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
                     {isPast ? 'Completed' : 'Upcoming'}
                   </Badge>
                 </div>
-                {isPast && (
+                {isPast ? (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -106,6 +126,15 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
                     onClick={(e) => handleDeleteMatch(match.id, e)}
                   >
                     <Trash2 className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-950"
+                    onClick={(e) => handleCancelMatch(match.id, e)}
+                  >
+                    <XCircle className="h-4 w-4" />
                   </Button>
                 )}
               </div>
@@ -308,7 +337,7 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
 
               {/* Actions */}
               <div className="flex gap-2 pt-4">
-                {selectedMatch.date && isPast(parseISO(selectedMatch.date)) && (
+                {selectedMatch.date && isPast(parseISO(selectedMatch.date)) ? (
                   <Button 
                     variant="destructive" 
                     className="flex-1"
@@ -319,6 +348,18 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
                     Delete Old Match
+                  </Button>
+                ) : selectedMatch.proposed_date && isFuture(parseISO(selectedMatch.proposed_date)) && (
+                  <Button 
+                    variant="destructive" 
+                    className="flex-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCancelMatch(selectedMatch.id, e);
+                    }}
+                  >
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Cancel Match
                   </Button>
                 )}
                 <Button variant="outline" className="flex-1" onClick={() => setSelectedMatch(null)}>
@@ -346,6 +387,27 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
               className="bg-red-600 hover:bg-red-700"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel Match Confirmation Dialog */}
+      <AlertDialog open={!!cancellingMatch} onOpenChange={() => setCancellingMatch(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel This Match?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel this upcoming match? Your opponent will be notified of the cancellation.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Match</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmCancel}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              Cancel Match
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

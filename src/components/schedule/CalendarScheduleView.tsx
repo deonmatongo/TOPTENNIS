@@ -74,9 +74,10 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [deletingItem, setDeletingItem] = useState<{id: string, type: 'availability' | 'invite'} | null>(null);
+  const [cancellingMatch, setCancellingMatch] = useState<string | null>(null);
 
   const { availability, deleteAvailability } = useUserAvailability();
-  const { invites, getPendingInvites, getConfirmedInvites, respondToInvite, deleteInvite } = useMatchInvites();
+  const { invites, getPendingInvites, getConfirmedInvites, respondToInvite, deleteInvite, cancelInvite } = useMatchInvites();
 
   const pendingInvites = getPendingInvites();
   const confirmedMatches = getConfirmedInvites();
@@ -224,6 +225,24 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
       // Error handled in hooks
     } finally {
       setDeletingItem(null);
+    }
+  };
+
+  const handleCancelMatch = (matchId: string) => {
+    setCancellingMatch(matchId);
+  };
+
+  const confirmCancelMatch = async () => {
+    if (!cancellingMatch) return;
+
+    try {
+      await cancelInvite(cancellingMatch, 'Match cancelled by user');
+      setShowEventDialog(false);
+      toast.success('Match cancelled successfully');
+    } catch (error) {
+      // Error handled in hook
+    } finally {
+      setCancellingMatch(null);
     }
   };
 
@@ -659,12 +678,11 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                     </>
                   )}
                   
-                  {(selectedEvent.type === 'availability' || 
-                    (selectedEvent.type === 'match' && isPast(parseISO(selectedEvent.date)))) && (
+                  {selectedEvent.type === 'availability' && (
                     <Button
                       onClick={(e) => handleDeleteClick(
                         selectedEvent.id, 
-                        selectedEvent.type === 'availability' ? 'availability' : 'invite',
+                        'availability',
                         e
                       )}
                       variant="destructive"
@@ -672,6 +690,32 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
                       Delete
+                    </Button>
+                  )}
+
+                  {selectedEvent.type === 'match' && isPast(parseISO(selectedEvent.date)) && (
+                    <Button
+                      onClick={(e) => handleDeleteClick(
+                        selectedEvent.id, 
+                        'invite',
+                        e
+                      )}
+                      variant="destructive"
+                      className="flex-1"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                  )}
+
+                  {selectedEvent.type === 'match' && isFuture(parseISO(selectedEvent.date)) && (
+                    <Button
+                      onClick={() => handleCancelMatch(selectedEvent.id)}
+                      variant="destructive"
+                      className="flex-1"
+                    >
+                      <AlertCircle className="h-4 w-4 mr-2" />
+                      Cancel Match
                     </Button>
                   )}
 
@@ -705,6 +749,27 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
               className="bg-red-600 hover:bg-red-700"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel Match Confirmation Dialog */}
+      <AlertDialog open={!!cancellingMatch} onOpenChange={() => setCancellingMatch(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel This Match?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel this upcoming match? Your opponent will be notified of the cancellation.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Match</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmCancelMatch}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              Cancel Match
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
