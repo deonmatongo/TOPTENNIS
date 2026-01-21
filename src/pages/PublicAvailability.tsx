@@ -35,6 +35,13 @@ export default function PublicAvailability() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [availability, setAvailability] = useState<Availability[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Check if this is from a league context
+  const searchParams = new URLSearchParams(window.location.search);
+  const isLeagueContext = searchParams.get('source') === 'league';
+  const divisionId = searchParams.get('divisionId');
+  const divisionName = searchParams.get('divisionName');
+  
   const [viewerTimezone, setViewerTimezone] = useState<string>(() => {
     // Try to detect user's timezone
     try {
@@ -104,32 +111,57 @@ export default function PublicAvailability() {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
-      toast.error('Please log in to request a match');
-      navigate('/login?redirect=/public-availability/' + userId);
+      toast.error('Please sign in to request a match');
+      navigate('/login');
       return;
     }
 
-    const slot = availability.find(a => a.id === availabilityId);
-    if (!slot) return;
-
     try {
-      const { error } = await supabase
-        .from('match_invites')
-        .insert({
-          sender_id: user.id,
-          receiver_id: userId,
-          availability_id: availabilityId,
-          date: slot.date,
-          start_time: slot.start_time,
-          end_time: slot.end_time,
-          status: 'pending',
+      const slot = availability.find(a => a.id === availabilityId);
+      if (!slot) return;
+
+      // If this is from a league context, create a league match
+      if (isLeagueContext && divisionId) {
+        const { data, error } = await supabase.rpc('create_league_match_with_invite', {
+          p_division_id: divisionId,
+          p_player1_id: user.id,
+          p_player2_id: userId,
+          p_scheduled_date: slot.date,
+          p_scheduled_time: slot.start_time,
+          p_timezone: slot.timezone || 'America/New_York',
+          p_court_location: slot.location || null,
+          p_message: `League match request for ${divisionName || 'your division'}`
         });
 
-      if (error) throw error;
-      toast.success('Match request sent!');
-    } catch (error) {
+        if (error) throw error;
+        toast.success('League match request sent!');
+        
+        // Navigate back to league page after a short delay
+        setTimeout(() => {
+          navigate('/dashboard?tab=leagues');
+        }, 1500);
+      } else {
+        // Regular match invite
+        const { error } = await supabase
+          .from('match_invites')
+          .insert({
+            sender_id: user.id,
+            receiver_id: userId,
+            availability_id: availabilityId,
+            date: slot.date,
+            start_time: slot.start_time,
+            end_time: slot.end_time,
+            timezone: slot.timezone || 'America/New_York',
+            court_location: slot.location,
+            status: 'pending',
+          });
+
+        if (error) throw error;
+        toast.success('Match request sent!');
+      }
+    } catch (error: any) {
       console.error('Error requesting match:', error);
-      toast.error('Failed to send match request');
+      toast.error(error.message || 'Failed to send match request');
     }
   };
 
@@ -270,9 +302,9 @@ export default function PublicAvailability() {
                                 <Button
                                   size="sm"
                                   onClick={() => requestMatch(slot.id)}
-                                  className="flex-shrink-0"
+                                  className={`flex-shrink-0 ${isLeagueContext ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
                                 >
-                                  Request Match
+                                  {isLeagueContext ? 'Request League Match' : 'Request Match'}
                                 </Button>
                               </div>
                             </CardContent>
