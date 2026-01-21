@@ -47,19 +47,23 @@ CREATE INDEX IF NOT EXISTS idx_match_invites_is_league ON public.match_invites(i
 -- 4. Enable RLS
 ALTER TABLE public.league_matches ENABLE ROW LEVEL SECURITY;
 
--- 5. Create RLS policies
+-- 5. Create RLS policies (drop existing first to avoid conflicts)
+DROP POLICY IF EXISTS "Users can view their division matches" ON public.league_matches;
 CREATE POLICY "Users can view their division matches"
 ON public.league_matches FOR SELECT
 USING (EXISTS (SELECT 1 FROM public.division_assignments da WHERE da.division_id = league_matches.division_id AND da.user_id = auth.uid() AND da.status = 'active'));
 
+DROP POLICY IF EXISTS "Users can view their own league matches" ON public.league_matches;
 CREATE POLICY "Users can view their own league matches"
 ON public.league_matches FOR SELECT
 USING (auth.uid() IN (player1_id, player2_id));
 
+DROP POLICY IF EXISTS "Users can create matches in their division" ON public.league_matches;
 CREATE POLICY "Users can create matches in their division"
 ON public.league_matches FOR INSERT
 WITH CHECK (auth.uid() IN (player1_id, player2_id) AND EXISTS (SELECT 1 FROM public.division_assignments da WHERE da.division_id = league_matches.division_id AND da.user_id = auth.uid() AND da.status = 'active'));
 
+DROP POLICY IF EXISTS "Users can update their league matches" ON public.league_matches;
 CREATE POLICY "Users can update their league matches"
 ON public.league_matches FOR UPDATE
 USING (auth.uid() IN (player1_id, player2_id))
