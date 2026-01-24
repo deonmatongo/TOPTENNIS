@@ -32,6 +32,8 @@ import {
   subWeeks,
   addMonths,
   subMonths,
+  addDays,
+  subDays,
   isSameDay,
   isSameMonth,
   isToday,
@@ -219,7 +221,9 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   }, [calendarRange, availability, confirmedMatches, pendingInvites, timezone]);
 
   const handlePrevious = () => {
-    if (viewMode === 'week') {
+    if (viewMode === 'day') {
+      setCurrentDate(subDays(currentDate, 1));
+    } else if (viewMode === 'week') {
       setCurrentDate(subWeeks(currentDate, 1));
     } else {
       setCurrentDate(subMonths(currentDate, 1));
@@ -227,7 +231,9 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   };
 
   const handleNext = () => {
-    if (viewMode === 'week') {
+    if (viewMode === 'day') {
+      setCurrentDate(addDays(currentDate, 1));
+    } else if (viewMode === 'week') {
       setCurrentDate(addWeeks(currentDate, 1));
     } else {
       setCurrentDate(addMonths(currentDate, 1));
