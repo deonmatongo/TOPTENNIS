@@ -70,8 +70,14 @@ export const EnhancedAvailabilityModal = ({
           timezone: editingItem.timezone || 'America/New_York',
         });
       } else if (selectedDate) {
+        // Format date in local timezone to avoid date shifting
+        const year = selectedDate.getFullYear();
+        const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+        const day = String(selectedDate.getDate()).padStart(2, '0');
+        const localDateString = `${year}-${month}-${day}`;
+        
         setFormData({
-          date: selectedDate.toISOString().split('T')[0],
+          date: localDateString,
           start_time: selectedStartTime || '09:00',
           end_time: selectedEndTime || '10:00',
           is_available: true,

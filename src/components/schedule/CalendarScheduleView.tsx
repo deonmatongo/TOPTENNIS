@@ -60,7 +60,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 
-type ViewMode = 'week' | 'month';
+type ViewMode = 'day' | 'week' | 'month';
 
 interface CalendarScheduleViewProps {
   preSelectedOpponent?: {id?: string, name?: string} | null;
@@ -72,9 +72,10 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   onClearOpponent
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedTime, setSelectedTime] = useState<{start: string, end: string} | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [deletingItem, setDeletingItem] = useState<{id: string, type: 'availability' | 'invite'} | null>(null);
@@ -237,8 +238,17 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
     setCurrentDate(new Date());
   };
 
-  const handleDateClick = (date: Date) => {
+  const handleDateClick = (date: Date, startTime?: string) => {
     setSelectedDate(date);
+    if (startTime) {
+      // Calculate end time (1 hour after start time)
+      const [hours, minutes] = startTime.split(':').map(Number);
+      const endHour = hours + 1;
+      const endTime = `${String(endHour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+      setSelectedTime({ start: startTime, end: endTime });
+    } else {
+      setSelectedTime(null);
+    }
     setShowAddModal(true);
   };
 
@@ -306,7 +316,385 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
     }
   };
 
-  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const weekDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  
+  // Helper function to calculate event position and height
+  const calculateEventLayout = (startTime: string, endTime: string) => {
+    // Handle both HH:MM and HH:MM:SS formats
+    const startParts = startTime.split(':');
+    const endParts = endTime.split(':');
+    
+    const startHour = parseInt(startParts[0], 10);
+    const startMinute = parseInt(startParts[1], 10);
+    const endHour = parseInt(endParts[0], 10);
+    const endMinute = parseInt(endParts[1], 10);
+    
+    const startMinutes = startHour * 60 + startMinute;
+    const endMinutes = endHour * 60 + endMinute;
+    
+    // Each hour row is 50px
+    const pixelsPerMinute = 50 / 60;
+    
+    // Calculate absolute position from top (0:00) with precise rounding
+    // Round to nearest pixel to avoid sub-pixel rendering issues
+    const absoluteTop = Math.round(startMinutes * pixelsPerMinute);
+    const absoluteBottom = Math.round(endMinutes * pixelsPerMinute);
+    // Subtract 2px to account for border spacing and prevent visual overlap into next hour
+    const height = Math.max(absoluteBottom - absoluteTop - 2, 20);
+    
+    return { absoluteTop, height, startHour, startMinute };
+  };
+
+  // Render Day view with time grid (single day column)
+  const renderDayView = () => {
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+    const dateKey = format(currentDate, 'yyyy-MM-dd');
+    const dayEvents = eventsByDate[dateKey] || [];
+
+    return (
+      <div className="border rounded-lg bg-card overflow-hidden">
+        {/* Header */}
+        <div className="grid grid-cols-[60px_1fr] border-b sticky top-0 bg-card z-10">
+          <div className="border-r"></div>
+          <div className={cn(
+            "px-2 py-3 text-center",
+            isToday(currentDate) && "bg-blue-50 dark:bg-blue-950/20"
+          )}>
+            <div className="text-xs font-medium text-muted-foreground uppercase">
+              {format(currentDate, 'EEEE')}
+            </div>
+            <div className={cn(
+              "text-2xl font-semibold mt-1",
+              isToday(currentDate) && "text-blue-600"
+            )}>
+              {format(currentDate, 'MMMM d, yyyy')}
+            </div>
+          </div>
+        </div>
+
+        {/* Time grid */}
+        <div className="overflow-y-auto max-h-[600px] relative">
+          {/* Hour rows */}
+          {hours.map((hour) => {
+            const timeString = `${String(hour).padStart(2, '0')}:00`;
+            return (
+              <div key={hour} className="grid grid-cols-[60px_1fr] border-b min-h-[50px]">
+                <div className="px-2 py-1 text-xs text-muted-foreground text-right border-r bg-muted/20">
+                  {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+                </div>
+                <div className={cn(
+                  "min-h-[50px] hover:bg-muted/30 cursor-pointer relative",
+                  isToday(currentDate) && "bg-blue-50/50 dark:bg-blue-950/10"
+                )}
+                onClick={() => handleDateClick(currentDate, timeString)}>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Absolutely positioned events */}
+          <div className="absolute top-0 left-[60px] right-0 pointer-events-none" style={{ height: '1200px' }}>
+            <div className="relative h-full pointer-events-none">
+              {dayEvents.map((event) => {
+                const { absoluteTop, height } = calculateEventLayout(
+                  event.start_time,
+                  event.end_time
+                );
+
+                return (
+                  <div
+                    key={event.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEventClick(event);
+                    }}
+                    className={cn(
+                      "absolute left-1 right-1 text-sm px-2 py-1 border-l-4 cursor-pointer hover:shadow-md transition-shadow pointer-events-auto",
+                      event.color
+                    )}
+                    style={{
+                      top: `${absoluteTop}px`,
+                      height: `${height}px`,
+                      zIndex: 10
+                    }}
+                  >
+                    <div className="flex items-center gap-2 font-medium truncate">
+                      {event.type === 'availability' && <Clock className="h-4 w-4 shrink-0" />}
+                      {event.type === 'match' && <CheckCircle2 className="h-4 w-4 shrink-0" />}
+                      {event.type === 'invite' && <Mail className="h-4 w-4 shrink-0" />}
+                      <span className="truncate">{event.title}</span>
+                    </div>
+                    <div className="text-xs opacity-75 mt-1">
+                      {event.start_time?.slice(0, 5)} - {event.end_time?.slice(0, 5)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Render Month view with time grid (all days in one grid)
+  const renderMonthTimeGridView = () => {
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(currentDate);
+    const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
+    const endDate = endOfWeek(monthEnd, { weekStartsOn: 0 });
+    const allDays = eachDayOfInterval({ start: startDate, end: endDate });
+    
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+    const numDays = allDays.length;
+
+    const eventsByDay: Record<string, any[]> = {};
+    allDays.forEach(day => {
+      const dateKey = format(day, 'yyyy-MM-dd');
+      eventsByDay[dateKey] = eventsByDate[dateKey] || [];
+    });
+
+    return (
+      <div className="border rounded-lg bg-card overflow-hidden">
+        {/* Header with all days */}
+        <div className={`grid grid-cols-[60px_repeat(${numDays},1fr)] border-b sticky top-0 bg-card z-10`}>
+          <div className="border-r"></div>
+          {allDays.map((day) => {
+            const isCurrentDay = isToday(day);
+            const isCurrentMonth = isSameMonth(day, currentDate);
+            return (
+              <div
+                key={day.toISOString()}
+                className={cn(
+                  "px-1 py-2 text-center border-l text-xs",
+                  isCurrentDay && "bg-blue-50 dark:bg-blue-950/20",
+                  !isCurrentMonth && "text-muted-foreground/50"
+                )}
+              >
+                <div className="font-medium text-[10px]">{format(day, 'EEE')}</div>
+                <div className={cn(
+                  "text-sm font-semibold",
+                  isCurrentDay && "text-blue-600"
+                )}>
+                  {format(day, 'd')}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Time grid */}
+        <div className="overflow-y-auto max-h-[600px] relative">
+          {/* Hour rows */}
+          {hours.map((hour) => (
+            <div key={hour} className={`grid grid-cols-[60px_repeat(${numDays},1fr)] border-b min-h-[40px]`}>
+              <div className="px-2 py-1 text-[10px] text-muted-foreground text-right border-r bg-muted/20">
+                {hour === 0 ? '12a' : hour < 12 ? `${hour}a` : hour === 12 ? '12p' : `${hour - 12}p`}
+              </div>
+              {allDays.map((day) => {
+                const dateKey = format(day, 'yyyy-MM-dd');
+                const isCurrentDay = isToday(day);
+                const isPastDate = isPast(startOfDay(day)) && !isToday(day);
+                const isCurrentMonth = isSameMonth(day, currentDate);
+
+                return (
+                  <div
+                    key={`${dateKey}-${hour}`}
+                    className={cn(
+                      "min-h-[40px] border-l hover:bg-muted/30 cursor-pointer relative",
+                      isCurrentDay && "bg-blue-50/50 dark:bg-blue-950/10",
+                      isPastDate && "opacity-60",
+                      !isCurrentMonth && "bg-muted/10"
+                    )}
+                    onClick={() => !isPastDate && handleDateClick(day)}
+                  />
+                );
+              })}
+            </div>
+          ))}
+
+          {/* Absolutely positioned events */}
+          <div className="absolute top-0 left-[60px] right-0 bottom-0 pointer-events-none">
+            <div className={`grid grid-cols-${numDays} h-full`}>
+              {allDays.map((day) => {
+                const dateKey = format(day, 'yyyy-MM-dd');
+                const dayEvents = eventsByDay[dateKey] || [];
+
+                return (
+                  <div key={dateKey} className="relative border-l pointer-events-none">
+                    {dayEvents.map((event) => {
+                      const { absoluteTop, height } = calculateEventLayout(
+                        event.start_time,
+                        event.end_time
+                      );
+                      // Scale for 40px rows instead of 50px
+                      const scaledTop = absoluteTop * 40 / 50;
+                      const scaledHeight = height * 40 / 50;
+
+                      return (
+                        <div
+                          key={event.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEventClick(event);
+                          }}
+                          className={cn(
+                            "absolute left-0.5 right-0.5 text-[10px] p-1 rounded border cursor-pointer hover:shadow-md transition-shadow pointer-events-auto overflow-hidden",
+                            event.color
+                          )}
+                          style={{
+                            top: `${scaledTop}px`,
+                            height: `${Math.max(scaledHeight, 16)}px`,
+                            zIndex: 10
+                          }}
+                        >
+                          <div className="flex items-center gap-0.5 font-medium truncate">
+                            {event.type === 'availability' && <Clock className="h-2 w-2 shrink-0" />}
+                            {event.type === 'match' && <CheckCircle2 className="h-2 w-2 shrink-0" />}
+                            {event.type === 'invite' && <Mail className="h-2 w-2 shrink-0" />}
+                            <span className="truncate text-[9px]">{event.title}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Render Week view with time grid (7 day columns)
+  const renderWeekTimeGridView = () => {
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+    const daysInWeek = eachDayOfInterval({ 
+      start: weekStart, 
+      end: endOfWeek(currentDate, { weekStartsOn: 0 }) 
+    });
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+
+    const eventsByDay: Record<string, any[]> = {};
+    daysInWeek.forEach(day => {
+      const dateKey = format(day, 'yyyy-MM-dd');
+      eventsByDay[dateKey] = eventsByDate[dateKey] || [];
+    });
+
+    return (
+      <div className="border rounded-lg bg-card overflow-hidden">
+        {/* Header with days */}
+        <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b sticky top-0 bg-card z-10">
+          <div className="border-r"></div>
+          {daysInWeek.map((day) => {
+            const isCurrentDay = isToday(day);
+            return (
+              <div
+                key={day.toISOString()}
+                className={cn(
+                  "px-2 py-3 text-center border-l",
+                  isCurrentDay && "bg-blue-50 dark:bg-blue-950/20"
+                )}
+              >
+                <div className="text-xs font-medium text-muted-foreground uppercase">
+                  {format(day, 'EEE')}
+                </div>
+                <div className={cn(
+                  "text-2xl font-semibold mt-1",
+                  isCurrentDay && "text-blue-600"
+                )}>
+                  {format(day, 'd')}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Time grid */}
+        <div className="overflow-y-auto max-h-[600px] relative">
+          {/* Hour rows */}
+          {hours.map((hour) => {
+            const timeString = `${String(hour).padStart(2, '0')}:00`;
+            return (
+              <div key={hour} className="grid grid-cols-[60px_repeat(7,1fr)] border-b min-h-[50px]">
+                <div className="px-2 py-1 text-xs text-muted-foreground text-right border-r bg-muted/20">
+                  {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+                </div>
+                {daysInWeek.map((day) => {
+                  const dateKey = format(day, 'yyyy-MM-dd');
+                  const isCurrentDay = isToday(day);
+                  const isPastDate = isPast(startOfDay(day)) && !isToday(day);
+
+                  return (
+                    <div
+                      key={`${dateKey}-${hour}`}
+                      className={cn(
+                        "min-h-[50px] border-l hover:bg-muted/30 cursor-pointer relative",
+                        isCurrentDay && "bg-blue-50/50 dark:bg-blue-950/10",
+                        isPastDate && "opacity-60"
+                      )}
+                      onClick={() => !isPastDate && handleDateClick(day, timeString)}
+                    />
+                  );
+                })}
+              </div>
+            );
+          })}
+
+          {/* Absolutely positioned events */}
+          <div className="absolute top-0 left-[60px] right-0 pointer-events-none" style={{ height: '1200px' }}>
+            <div className="grid grid-cols-7 h-full">
+              {daysInWeek.map((day) => {
+                const dateKey = format(day, 'yyyy-MM-dd');
+                const dayEvents = eventsByDay[dateKey] || [];
+
+                return (
+                  <div key={dateKey} className="relative border-l pointer-events-none">
+                    {dayEvents.map((event) => {
+                      const { absoluteTop, height } = calculateEventLayout(
+                        event.start_time,
+                        event.end_time
+                      );
+
+                      return (
+                        <div
+                          key={event.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEventClick(event);
+                          }}
+                          className={cn(
+                            "absolute left-0.5 right-0.5 text-xs px-1.5 py-0.5 border-l-4 cursor-pointer hover:shadow-md transition-shadow pointer-events-auto",
+                            event.color
+                          )}
+                          style={{
+                            top: `${absoluteTop}px`,
+                            height: `${height}px`,
+                            zIndex: 10
+                          }}
+                        >
+                          <div className="flex items-center gap-1 font-medium truncate">
+                            {event.type === 'availability' && <Clock className="h-3 w-3 shrink-0" />}
+                            {event.type === 'match' && <CheckCircle2 className="h-3 w-3 shrink-0" />}
+                            {event.type === 'invite' && <Mail className="h-3 w-3 shrink-0" />}
+                            <span className="truncate">{event.title}</span>
+                          </div>
+                          <div className="text-[10px] opacity-75 mt-0.5">
+                            {event.start_time?.slice(0, 5)} - {event.end_time?.slice(0, 5)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -347,62 +735,87 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
           )}
 
           {/* Calendar Controls */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <Button onClick={handleToday} variant="outline" size="sm" className="flex-shrink-0">
-                Today
-              </Button>
-              <div className="flex items-center gap-1">
-                <Button onClick={handlePrevious} variant="ghost" size="icon">
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button onClick={handleNext} variant="ghost" size="icon">
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-              <h2 className="text-base sm:text-xl font-semibold ml-2 truncate">{getHeaderTitle()}</h2>
-            </div>
+          <div className="space-y-4">
+            <Card>
+              <CardContent className="py-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePrevious}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleToday}
+                    >
+                      Today
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleNext}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <div className="flex border rounded-lg overflow-hidden flex-1 sm:flex-initial">
-                <Button
-                  variant={viewMode === 'week' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('week')}
-                  className="rounded-none flex-1 sm:flex-initial"
-                >
-                  Week
-                </Button>
-                <Button
-                  variant={viewMode === 'month' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('month')}
-                  className="rounded-none flex-1 sm:flex-initial"
-                >
-                  Month
-                </Button>
-              </div>
-              <Button onClick={() => handleDateClick(new Date())} size="sm" className="flex-shrink-0">
-                <Plus className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Add Availability</span>
+                  <h2 className="text-lg sm:text-xl font-semibold">{getHeaderTitle()}</h2>
+
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1 sm:flex-initial min-w-[200px]">
+                        <TimezoneSelect
+                          value={timezone}
+                          onValueChange={updateTimezone}
+                          placeholder="Select timezone"
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => handleDateClick(new Date())}
+                      size="sm"
+                      className="w-full sm:w-auto"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Availability
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* View Mode Selector */}
+            <div className="flex border rounded-lg overflow-hidden w-full sm:w-auto">
+              <Button
+                variant={viewMode === 'day' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('day')}
+                className="rounded-none flex-1 sm:flex-initial"
+              >
+                Day
+              </Button>
+              <Button
+                variant={viewMode === 'week' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('week')}
+                className="rounded-none flex-1 sm:flex-initial"
+              >
+                Week
+              </Button>
+              <Button
+                variant={viewMode === 'month' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('month')}
+                className="rounded-none flex-1 sm:flex-initial"
+              >
+                Month
               </Button>
             </div>
-          </div>
-
-          {/* Timezone Selector */}
-          <div className="flex items-center gap-3 pt-3 border-t">
-            <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <span className="text-sm font-medium whitespace-nowrap">Timezone:</span>
-            <div className="flex-1 max-w-xs">
-              <TimezoneSelect
-                value={timezone}
-                onValueChange={updateTimezone}
-                placeholder="Select timezone"
-              />
-            </div>
-            <span className="text-xs text-muted-foreground hidden sm:inline">
-              All times shown in {getTimezoneDisplayName(timezone)}
-            </span>
           </div>
         </div>
       </div>
@@ -410,24 +823,30 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
       {/* Calendar Grid */}
       <div className="flex-1 overflow-auto p-4">
         <div className="space-y-4">
-          {/* Calendar */}
-          <div className="border rounded-lg bg-card overflow-hidden">
-            {/* Week day headers */}
-            <div className="grid grid-cols-7 border-b bg-muted/50">
-              {weekDays.map(day => (
-                <div key={day} className="p-1 sm:p-2 text-center text-xs sm:text-sm font-medium border-r last:border-r-0">
-                  <span className="hidden sm:inline">{day}</span>
-                  <span className="sm:hidden">{day.slice(0, 1)}</span>
-                </div>
-              ))}
-            </div>
+          {/* Calendar - Day/Week/Month Views */}
+          {viewMode === 'day' ? (
+            renderDayView()
+          ) : viewMode === 'week' ? (
+            renderWeekTimeGridView()
+          ) : (
+            /* Calendar - Month View (Original Grid) */
+            <div className="border rounded-lg bg-card overflow-hidden">
+              {/* Week day headers */}
+              <div className="grid grid-cols-7 border-b bg-muted/50">
+                {weekDays.map(day => (
+                  <div key={day} className="p-1 sm:p-2 text-center text-xs sm:text-sm font-medium border-r last:border-r-0">
+                    <span className="hidden sm:inline">{day}</span>
+                    <span className="sm:hidden">{day.slice(0, 1)}</span>
+                  </div>
+                ))}
+              </div>
 
-            {/* Calendar days */}
-            <div className={cn(
-              "grid grid-cols-7",
-              viewMode === 'month' ? 'grid-rows-5' : 'grid-rows-1'
-            )}>
-              {calendarRange.map((date, index) => {
+              {/* Calendar days */}
+              <div className={cn(
+                "grid grid-cols-7",
+                viewMode === 'month' ? 'grid-rows-5' : 'grid-rows-1'
+              )}>
+                {calendarRange.map((date, index) => {
                 const dateKey = format(date, 'yyyy-MM-dd');
                 const events = eventsByDate[dateKey] || [];
                 const isCurrentMonth = isSameMonth(date, currentDate);
@@ -459,35 +878,48 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                     </div>
 
                     <div className="space-y-0.5 sm:space-y-1">
-                      {events.slice(0, viewMode === 'month' ? 2 : 5).map((event, idx) => (
-                        <div
-                          key={idx}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEventClick(event);
-                          }}
-                          className={cn(
-                            "text-[10px] sm:text-xs p-1 sm:p-1.5 rounded border cursor-pointer hover:shadow-sm transition-shadow",
-                            event.color
-                          )}
-                        >
-                          <div className="flex items-center gap-0.5 sm:gap-1 font-medium truncate">
-                            {event.type === 'availability' && <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />}
-                            {event.type === 'match' && <CheckCircle2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />}
-                            {event.type === 'invite' && <Mail className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />}
-                            <span className="truncate hidden sm:inline">{event.title}</span>
-                            <span className="truncate sm:hidden">{event.type === 'availability' ? 'Avail' : event.type === 'match' ? 'Match' : 'Invite'}</span>
-                          </div>
-                          {event.start_time && (
-                            <div className="text-[9px] sm:text-[10px] opacity-75 mt-0.5">
-                              {event.start_time.slice(0, 5)}
+                      {events.slice(0, viewMode === 'month' ? 2 : 5).map((event, idx) => {
+                        // Calculate duration for display
+                        const [startHour, startMin] = event.start_time.split(':').map(Number);
+                        const [endHour, endMin] = event.end_time.split(':').map(Number);
+                        const durationMins = (endHour * 60 + endMin) - (startHour * 60 + startMin);
+                        const hours = Math.floor(durationMins / 60);
+                        const mins = durationMins % 60;
+                        const durationText = hours > 0 
+                          ? (mins > 0 ? `${hours}h ${mins}m` : `${hours}h`)
+                          : `${mins}m`;
+
+                        return (
+                          <div
+                            key={idx}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEventClick(event);
+                            }}
+                            className={cn(
+                              "text-[10px] sm:text-xs p-1 sm:p-1.5 rounded border cursor-pointer hover:shadow-sm transition-shadow",
+                              event.color
+                            )}
+                          >
+                            <div className="flex items-center gap-0.5 sm:gap-1 font-medium truncate">
+                              {event.type === 'availability' && <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />}
+                              {event.type === 'match' && <CheckCircle2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />}
+                              {event.type === 'invite' && <Mail className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />}
+                              <span className="truncate hidden sm:inline">{event.title}</span>
+                              <span className="truncate sm:hidden">{event.type === 'availability' ? 'Avail' : event.type === 'match' ? 'Match' : 'Invite'}</span>
                             </div>
-                          )}
-                        </div>
-                      ))}
+                            {event.start_time && event.end_time && (
+                              <div className="text-[9px] sm:text-[10px] opacity-75 mt-0.5 flex items-center gap-1">
+                                <span>{event.start_time.slice(0, 5)}-{event.end_time.slice(0, 5)}</span>
+                                <span className="hidden sm:inline">({durationText})</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                       {events.length > (viewMode === 'month' ? 2 : 5) && (
                         <div className="text-[10px] sm:text-xs text-muted-foreground pl-1">
-                          +{events.length - (viewMode === 'month' ? 2 : 5)}
+                          +{events.length - (viewMode === 'month' ? 2 : 5)} more
                         </div>
                       )}
                     </div>
@@ -496,6 +928,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
               })}
             </div>
           </div>
+          )}
 
           {/* Quick Access Sections */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -666,11 +1099,15 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
         onClose={() => {
           setShowAddModal(false);
           setSelectedDate(null);
+          setSelectedTime(null);
         }}
-        selectedDate={selectedDate}
+        selectedDate={selectedDate || undefined}
+        selectedStartTime={selectedTime?.start}
+        selectedEndTime={selectedTime?.end}
         onSuccess={() => {
           setShowAddModal(false);
           setSelectedDate(null);
+          setSelectedTime(null);
         }}
       />
 

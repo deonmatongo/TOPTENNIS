@@ -72,27 +72,27 @@ const MatchScoringModal = ({
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('matches')
-        .update({
-          winner_id: winnerId,
-          set1_player1: parseInt(set1Player1),
-          set1_player2: parseInt(set1Player2),
-          set2_player1: parseInt(set2Player1),
-          set2_player2: parseInt(set2Player2),
-          set3_player1: set3Player1 ? parseInt(set3Player1) : null,
-          set3_player2: set3Player2 ? parseInt(set3Player2) : null,
-          tiebreak_player1: tiebreakPlayer1 ? parseInt(tiebreakPlayer1) : null,
-          tiebreak_player2: tiebreakPlayer2 ? parseInt(tiebreakPlayer2) : null,
-          reported_by_user_id: playerId,
-          reported_at: new Date().toISOString(),
-          status: 'completed'
-        })
-        .eq('id', match.id);
+      // Use the new league scoring function with validation
+      const { data, error } = await supabase.rpc('submit_league_match_score', {
+        p_match_id: match.id,
+        p_winner_id: winnerId,
+        p_set1_p1: parseInt(set1Player1),
+        p_set1_p2: parseInt(set1Player2),
+        p_set2_p1: parseInt(set2Player1),
+        p_set2_p2: parseInt(set2Player2),
+        p_set3_p1: set3Player1 ? parseInt(set3Player1) : null,
+        p_set3_p2: set3Player2 ? parseInt(set3Player2) : null,
+        p_tiebreak_p1: tiebreakPlayer1 ? parseInt(tiebreakPlayer1) : null,
+        p_tiebreak_p2: tiebreakPlayer2 ? parseInt(tiebreakPlayer2) : null,
+        p_reported_by: playerId
+      });
 
       if (error) throw error;
 
-      toast.success('Match score submitted successfully! All dashboards will update automatically.');
+      toast.success('Match score submitted! Your opponent will be notified to confirm the score.', {
+        description: 'The leaderboard will update once your opponent confirms.',
+        duration: 5000
+      });
       onScoreSubmitted();
       onOpenChange(false);
     } catch (error: any) {

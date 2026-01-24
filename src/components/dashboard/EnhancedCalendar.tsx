@@ -167,19 +167,19 @@ export const EnhancedCalendar = () => {
     const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
     const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 0 });
     const daysInWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
-    const hours = Array.from({ length: 13 }, (_, i) => i + 7); // 7 AM to 7 PM
+    const hours = Array.from({ length: 24 }, (_, i) => i); // 0 AM to 11 PM (24 hours)
 
     return (
       <div className="flex flex-col h-full">
         {/* Header with days */}
-        <div className="grid grid-cols-[80px_repeat(7,1fr)] border-b border-border sticky top-0 bg-card z-10">
-          <div className=""></div>
+        <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-border sticky top-0 bg-card z-10">
+          <div className="border-r border-border"></div>
           {daysInWeek.map((day) => {
             const isCurrentDay = isToday(day);
             return (
               <div
                 key={day.toISOString()}
-                className={`px-4 py-3 text-center border-l border-border ${
+                className={`px-2 py-3 text-center border-l border-border ${
                   isCurrentDay ? 'bg-primary/5' : ''
                 }`}
               >
@@ -200,11 +200,14 @@ export const EnhancedCalendar = () => {
         <div className="flex-1 overflow-y-auto">
           <div className="relative">
             {hours.map((hour) => (
-              <div key={hour} className="grid grid-cols-[80px_repeat(7,1fr)] border-b border-border">
-                <div className="px-4 py-2 text-xs text-muted-foreground text-right">
-                  {hour.toString().padStart(2, '0')}:00
+              <div key={hour} className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-border min-h-[48px]">
+                {/* Time label on the left */}
+                <div className="px-2 py-1 text-xs text-muted-foreground text-right border-r border-border bg-muted/20">
+                  {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
                 </div>
-                {daysInWeek.map((day, dayIndex) => {
+                
+                {/* Day columns */}
+                {daysInWeek.map((day) => {
                   const dayStr = format(day, 'yyyy-MM-dd');
                   const hourStr = `${hour.toString().padStart(2, '0')}:00`;
                   const nextHourStr = `${((hour + 1) % 24).toString().padStart(2, '0')}:00`;
@@ -216,54 +219,42 @@ export const EnhancedCalendar = () => {
                     b => b.date === dayStr && b.status === 'confirmed' && b.start_time >= hourStr && b.start_time < nextHourStr
                   );
 
+                  const isCurrentDay = isToday(day);
+
                   return (
                     <div
                       key={`${dayStr}-${hour}`}
-                      className="h-[60px] border-l border-border hover:bg-muted/30 cursor-pointer relative"
+                      className={`min-h-[48px] border-l border-border hover:bg-muted/30 cursor-pointer relative ${
+                        isCurrentDay ? 'bg-primary/5' : ''
+                      }`}
                       onClick={() => setSelectedDate(day)}
                     >
-                      {dayAvailability.map((a) => {
-                        const { top, height } = calculateEventPosition(a.start_time, a.end_time);
-                        return (
-                          <div
-                            key={a.id}
-                            className={`absolute left-1 right-1 ${getEventColor(2)} rounded px-2 py-1 text-white text-xs overflow-hidden`}
-                            style={{ 
-                              top: `${top}px`, 
-                              height: `${Math.max(height, 20)}px`,
-                              zIndex: 1 
-                            }}
-                          >
-                            <div className="font-medium">{a.start_time}</div>
-                            <div className="text-[10px] opacity-90">Available</div>
-                          </div>
-                        );
-                      })}
-                      {dayBookings.map((b, idx) => {
-                        const { top, height } = calculateEventPosition(b.start_time, b.end_time);
-                        return (
-                          <div
-                            key={b.id}
-                            className={`absolute left-1 right-1 ${getEventColor(idx)} rounded px-2 py-1 text-white text-xs overflow-hidden shadow-sm`}
-                            style={{ 
-                              top: `${top}px`, 
-                              height: `${Math.max(height, 40)}px`,
-                              zIndex: 2
-                            }}
-                          >
-                            <div className="flex items-start gap-1">
-                              <Video className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium">{b.start_time}</div>
-                                <div className="text-[10px] opacity-90 truncate">Tennis Match</div>
-                                {b.court_location && height > 40 && (
-                                  <div className="text-[10px] opacity-75 truncate mt-0.5">{b.court_location}</div>
-                                )}
-                              </div>
+                      {dayAvailability.map((a) => (
+                        <div
+                          key={a.id}
+                          className="absolute left-1 right-1 top-1 bg-green-100 border-l-4 border-green-500 rounded px-2 py-1 text-xs overflow-hidden hover:shadow-md transition-shadow"
+                        >
+                          <div className="font-medium text-green-700">{a.start_time}</div>
+                          <div className="text-[10px] text-green-600">Available</div>
+                        </div>
+                      ))}
+                      {dayBookings.map((b) => (
+                        <div
+                          key={b.id}
+                          className="absolute left-1 right-1 top-1 bg-blue-100 border-l-4 border-blue-500 rounded px-2 py-1 text-xs overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                        >
+                          <div className="flex items-start gap-1">
+                            <Video className="h-3 w-3 mt-0.5 flex-shrink-0 text-blue-600" />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-blue-700">{b.start_time}</div>
+                              <div className="text-[10px] text-blue-600 truncate">Tennis Match</div>
+                              {b.court_location && (
+                                <div className="text-[10px] text-blue-500 truncate mt-0.5">{b.court_location}</div>
+                              )}
                             </div>
                           </div>
-                        );
-                      })}
+                        </div>
+                      ))}
                     </div>
                   );
                 })}
