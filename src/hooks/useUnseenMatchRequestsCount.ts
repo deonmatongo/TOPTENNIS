@@ -85,6 +85,11 @@ export const useUnseenMatchRequestsCount = () => {
     // Initial load
     fetchUnseenCount();
 
+    // Fallback polling (in case Supabase Realtime isn't enabled / events are blocked)
+    const pollId = window.setInterval(() => {
+      fetchUnseenCount();
+    }, 15000);
+
     // Realtime updates
     const channel = supabase
       .channel(`schedule-unseen-match-requests:${userId}`)
@@ -103,6 +108,7 @@ export const useUnseenMatchRequestsCount = () => {
       .subscribe();
 
     return () => {
+      window.clearInterval(pollId);
       supabase.removeChannel(channel);
     };
   }, [fetchUnseenCount, userId]);

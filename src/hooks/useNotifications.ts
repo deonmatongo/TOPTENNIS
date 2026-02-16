@@ -195,6 +195,11 @@ export const useNotifications = () => {
 
     fetchNotifications();
 
+    // Fallback polling (in case Supabase Realtime isn't enabled / events are blocked)
+    const pollId = window.setInterval(() => {
+      fetchNotifications();
+    }, 15000);
+
     // Set up real-time subscription for notifications
     const channel = supabase
       .channel(`notifications-${user.id}`)
@@ -209,8 +214,14 @@ export const useNotifications = () => {
         (payload) => {
           console.log('🔔 Real-time notification INSERT:', payload);
           console.log('📊 hasLoadedRef.current:', hasLoadedRef.current);
+          // If INSERT arrives before initial load finishes, refetch so the badge still updates
+          if (!hasLoadedRef.current) {
+            fetchNotifications();
+            return;
+          }
+
           // Only add notification if we've already loaded initial notifications
-          if (hasLoadedRef.current && payload.new) {
+          if (payload.new) {
             const newNotif = {
               type: payload.new.type,
               title: payload.new.title,
@@ -270,9 +281,10 @@ export const useNotifications = () => {
       .subscribe();
 
     return () => {
+      window.clearInterval(pollId);
       supabase.removeChannel(channel);
     };
-  }, [user]); // Removed fetchNotifications and addNotification from deps to prevent infinite re-renders
+  }, [user, addNotification, fetchNotifications, sendNotification]);
 
   const markAsRead = useCallback(async (notificationId: string) => {
     if (!user) return;
