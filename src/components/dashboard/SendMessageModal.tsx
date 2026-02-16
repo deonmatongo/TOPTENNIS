@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Mail, Send, Loader2 } from 'lucide-react';
-import { useMessages } from '@/hooks/useMessages';
+import { useMessagesContext } from '@/contexts/MessagesContext';
 import { toast } from 'sonner';
 import { SearchResult } from '@/hooks/usePlayerSearch';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,7 +26,7 @@ const SendMessageModal = ({ player, isOpen, onClose }: SendMessageModalProps) =>
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
   const [sending, setSending] = useState(false);
-  const { sendMessage } = useMessages();
+  const { sendMessage } = useMessagesContext();
 
   const handleSend = async () => {
     if (!player || !content.trim()) {

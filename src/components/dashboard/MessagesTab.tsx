@@ -8,7 +8,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { MessageCircle, Search, Send, Plus, Filter, Clock, Check, CheckCheck, Reply, X, Users, Mail, Eye, EyeOff } from 'lucide-react';
-import { useMessages, Message } from '@/hooks/useMessages';
+import { useMessagesContext } from '@/contexts/MessagesContext';
+import type { Message } from '@/hooks/useMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns';
 import { toast } from 'sonner';
@@ -41,7 +42,7 @@ const MessagesTab = () => {
     markAsRead,
     getUnreadCount,
     sendMessage
-  } = useMessages();
+  } = useMessagesContext();
   const {
     user
   } = useAuth();

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNotifications } from "@/hooks/useNotifications";
+import { useNotificationsContext } from "@/contexts/NotificationsContext";
 import { toast } from "sonner";
 import { 
   Home, 
@@ -30,7 +30,7 @@ interface DashboardSidebarProps {
 }
 
 const DashboardSidebar = ({ activeTab, setActiveTab, isMobile = false, sidebarOpen = false, setSidebarOpen }: DashboardSidebarProps) => {
-  const { unreadCount } = useNotifications();
+  const { unreadCount } = useNotificationsContext();
   const navigate = useNavigate();
   const { signOut } = useAuth();
 

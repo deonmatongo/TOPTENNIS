@@ -10,18 +10,12 @@ import {
   X,
   MoreHorizontal
 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useNotifications, Notification } from '@/hooks/useNotifications';
+import { useNotificationsContext } from '@/contexts/NotificationsContext';
+import type { Notification } from '@/hooks/useNotifications';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useMatchResponses } from '@/hooks/useMatchResponses';
 import { MatchResponseModal } from './MatchResponseModal';
 
@@ -78,7 +72,7 @@ interface NotificationDropdownProps {
 
 const NotificationDropdown = ({ children }: NotificationDropdownProps) => {
   const navigate = useNavigate();
-  const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification, isLoading } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification, isLoading } = useNotificationsContext();
   const { pendingInvites, respondToMatch } = useMatchResponses();
   const [isOpen, setIsOpen] = React.useState(false);
   const [selectedMatch, setSelectedMatch] = React.useState<any>(null);

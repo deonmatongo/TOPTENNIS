@@ -3,7 +3,7 @@ import React from "react";
 import { Search, Bell, Settings, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useNotifications } from "@/hooks/useNotifications";
+import { useNotificationsContext } from "@/contexts/NotificationsContext";
 import NotificationDropdown from "./NotificationDropdown";
 import PlayerSearch from "./PlayerSearch";
 import PlayerProfileModal from "./PlayerProfileModal";
@@ -21,7 +21,7 @@ interface DashboardHeaderProps {
 }
 
 const DashboardHeader = ({ player, user, sidebarCollapsed, setSidebarCollapsed, isMobile = false, sidebarOpen = false, setSidebarOpen }: DashboardHeaderProps) => {
-  const { unreadCount } = useNotifications();
+  const { unreadCount } = useNotificationsContext();
   const [selectedPlayer, setSelectedPlayer] = React.useState<SearchResult | null>(null);
   const [showPlayerModal, setShowPlayerModal] = React.useState(false);
 

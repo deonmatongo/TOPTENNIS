@@ -7,9 +7,9 @@ import { useMatches } from "@/hooks/useMatches";
 import { useLeaderboard } from "@/hooks/useLeaderboard";
 import { useLeagueRegistrations } from "@/hooks/useLeagueRegistrations";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useNotifications } from "@/hooks/useNotifications";
+import { useNotificationsContext } from "@/contexts/NotificationsContext";
 import { useFriendRequests } from "@/hooks/useFriendRequests";
-import { useMessages } from "@/hooks/useMessages";
+import { useMessagesContext } from "@/contexts/MessagesContext";
 import { useMatchInvitesCount } from "@/hooks/useMatchInvitesCount";
 import { Home, Calendar, User, FileText, BarChart3, Trophy, Users, Bell, Search, Settings, LogOut, Menu, X, Zap, TrendingUp, Target, MessageCircle, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -62,15 +62,11 @@ const NewDashboard = () => {
   const {
     registrations
   } = useLeagueRegistrations();
-  const {
-    unreadCount
-  } = useNotifications();
+  const { unreadCount } = useNotificationsContext();
   const {
     getPendingRequestsCount
   } = useFriendRequests();
-  const {
-    getUnreadCount
-  } = useMessages();
+  const { getUnreadCount } = useMessagesContext();
   const pendingMatchInvites = useMatchInvitesCount();
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState('profile');

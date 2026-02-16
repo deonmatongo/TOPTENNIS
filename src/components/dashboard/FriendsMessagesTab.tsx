@@ -29,8 +29,9 @@ import {
   Reply
 } from 'lucide-react';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
-import { useMessages, Message } from '@/hooks/useMessages';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMessagesContext } from '@/contexts/MessagesContext';
+import type { Message } from '@/hooks/useMessages';
 import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
 import { toast } from 'sonner';
 import PlayerSearch from './PlayerSearch';
@@ -62,7 +63,7 @@ const FriendsMessagesTab = () => {
 
   const { user } = useAuth();
   const { requests, loading: friendsLoading, updateRequestStatus, getPendingRequestsCount } = useFriendRequests();
-  const { messages, loading: messagesLoading, markAsRead, getUnreadCount, sendMessage } = useMessages();
+  const { messages, loading: messagesLoading, markAsRead, getUnreadCount, sendMessage } = useMessagesContext();
 
   // Process friends data
   const pendingRequests = requests.filter(req => 

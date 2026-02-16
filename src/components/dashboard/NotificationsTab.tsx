@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Bell, Trophy, Calendar, Users, TrendingUp, CheckCircle, X, Filter, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useNotifications, Notification } from '@/hooks/useNotifications';
+import { useNotificationsContext } from '@/contexts/NotificationsContext';
+import type { Notification } from '@/hooks/useNotifications';
 import { useNavigate } from 'react-router-dom';
 import { useMatchResponses } from '@/hooks/useMatchResponses';
 import { MatchResponseModal } from './MatchResponseModal';
@@ -58,14 +59,34 @@ const NotificationsTab = () => {
     markAsRead,
     markAllAsRead,
     removeNotification,
-    addNotification
-  } = useNotifications();
+    addNotification,
+    isLoading
+  } = useNotificationsContext();
   const { pendingInvites, respondToMatch } = useMatchResponses();
   const [filter, setFilter] = React.useState<'all' | 'unread' | 'read'>('all');
   const [typeFilter, setTypeFilter] = React.useState<string>('all');
   const [searchTerm, setSearchTerm] = React.useState('');
   const [selectedMatch, setSelectedMatch] = React.useState<any>(null);
   const [matchModalOpen, setMatchModalOpen] = React.useState(false);
+
+  // When the user opens the Notifications tab, mark currently visible unread notifications as read
+  React.useEffect(() => {
+    if (isLoading) return;
+
+    const visibleUnreadNotifications = notifications
+      .slice(0, 20)
+      .filter(n => !n.read);
+
+    if (visibleUnreadNotifications.length === 0) return;
+
+    const timer = setTimeout(() => {
+      visibleUnreadNotifications.forEach(notification => {
+        markAsRead(notification.id);
+      });
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [isLoading, notifications, markAsRead]);
 
   // Filter notifications based on criteria
   const filteredNotifications = notifications.filter(notification => {

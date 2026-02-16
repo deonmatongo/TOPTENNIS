@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Menu, X, ChevronDown, MapPin, User, Settings, LogOut, BarChart3, Bell, Mail } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { useNotifications } from "@/hooks/useNotifications";
+import { useNotificationsContext } from "@/contexts/NotificationsContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { RealtimeStatus } from "@/components/ui/RealtimeStatus";
 import { toast } from "sonner";
@@ -27,7 +27,7 @@ const Header = () => {
   } = useUserProfile();
   const {
     unreadCount
-  } = useNotifications();
+  } = useNotificationsContext();
   const navigate = useNavigate();
   const location = useLocation();
   const isDashboard = location.pathname === '/dashboard';

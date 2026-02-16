@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { RealtimeProvider } from "@/contexts/RealtimeContext";
+import { NotificationsProvider } from "@/contexts/NotificationsContext";
+import { MessagesProvider } from "@/contexts/MessagesContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminRoute from "@/components/admin/AdminRoute";
 import { logger } from "@/utils/logger";
@@ -43,52 +45,56 @@ const App: React.FC = () => {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <RealtimeProvider>
-          <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <ScrollToTop />
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/leagues" element={<Leagues />} />
-              <Route path="/league/:leagueId" element={
-                <ProtectedRoute>
-                  <League />
-                </ProtectedRoute>
-              } />
-              <Route path="/courts" element={<Courts />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/rules" element={<Rules />} />
-              <Route path="/profile-setup" element={
-                <ProtectedRoute>
-                  <ProfileSetup />
-                </ProtectedRoute>
-              } />
-              <Route path="/dashboard" element={
-                <ProtectedRoute>
-                  <NewDashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/dashboard-old" element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin" element={
-                <AdminRoute>
-                  <AdminDashboard />
-                </AdminRoute>
-              } />
-              <Route path="/public-availability/:userId" element={<PublicAvailability />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
+          <NotificationsProvider>
+            <MessagesProvider>
+              <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <ScrollToTop />
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/leagues" element={<Leagues />} />
+                  <Route path="/league/:leagueId" element={
+                    <ProtectedRoute>
+                      <League />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/courts" element={<Courts />} />
+                  <Route path="/contact" element={<Contact />} />
+                  <Route path="/rules" element={<Rules />} />
+                  <Route path="/profile-setup" element={
+                    <ProtectedRoute>
+                      <ProfileSetup />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/dashboard" element={
+                    <ProtectedRoute>
+                      <NewDashboard />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/dashboard-old" element={
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin" element={
+                    <AdminRoute>
+                      <AdminDashboard />
+                    </AdminRoute>
+                  } />
+                  <Route path="/public-availability/:userId" element={<PublicAvailability />} />
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </TooltipProvider>
+            </MessagesProvider>
+          </NotificationsProvider>
         </RealtimeProvider>
       </AuthProvider>
     </QueryClientProvider>
