@@ -188,8 +188,12 @@ export const useMatchInvites = () => {
           .select('id, first_name, last_name, email')
           .in('id', uniqueUserIds);
 
-        if (profilesError) throw profilesError;
-        (profiles || []).forEach(p => profileMap.set(p.id, p));
+        // If profile enrichment fails (often due to RLS), still show invites instead of erroring.
+        if (!profilesError) {
+          (profiles || []).forEach(p => profileMap.set(p.id, p));
+        } else {
+          logger.error('Error fetching match invite profiles', { error: profilesError });
+        }
       }
 
       const invitesWithProfiles: MatchInvite[] = safeInviteData.map(invite => ({
@@ -201,8 +205,7 @@ export const useMatchInvites = () => {
       setInvites(invitesWithProfiles);
     } catch (error) {
       logger.error('Error fetching match invites', { error });
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(`Failed to load match invites: ${message}`);
+      toast.error('Failed to load match invites');
     } finally {
       setLoading(false);
     }
@@ -251,8 +254,15 @@ export const useMatchInvites = () => {
         throw error;
       }
       
-      // Replace optimistic data with real data from server
-      await fetchInvites();
+      // Replace optimistic data with real data from server (fast UI update)
+      setInvites(prev => prev.map(inv => (inv.id === tempId ? ({
+        ...(data as any),
+        sender: inv.sender,
+        receiver: inv.receiver,
+      }) : inv)));
+
+      // Refresh in the background to populate profiles / ensure latest state
+      fetchInvites();
       toast.success('Match invite sent successfully');
       return data;
     } catch (error) {
