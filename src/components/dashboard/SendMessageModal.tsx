@@ -101,7 +101,7 @@ const SendMessageModal = ({ player, isOpen, onClose }: SendMessageModalProps) =>
             <Label htmlFor="subject">Subject (optional)</Label>
             <Input
               id="subject"
-              placeholder="Match invitation, question about tennis..."
+              placeholder="Match request, question about tennis..."
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               maxLength={100}

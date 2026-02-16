@@ -10,7 +10,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useNotificationsContext } from "@/contexts/NotificationsContext";
 import { useFriendRequests } from "@/hooks/useFriendRequests";
 import { useMessagesContext } from "@/contexts/MessagesContext";
-import { useMatchInvitesCount } from "@/hooks/useMatchInvitesCount";
+import { useUnseenMatchRequestsCount } from "@/hooks/useUnseenMatchRequestsCount";
 import { Home, Calendar, User, FileText, BarChart3, Trophy, Users, Bell, Search, Settings, LogOut, Menu, X, Zap, TrendingUp, Target, MessageCircle, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -67,7 +67,7 @@ const NewDashboard = () => {
     getPendingRequestsCount
   } = useFriendRequests();
   const { getUnreadCount } = useMessagesContext();
-  const pendingMatchInvites = useMatchInvitesCount();
+  const { unseenCount: scheduleNotificationCount, markSeenNow: markScheduleNotificationsSeen } = useUnseenMatchRequestsCount();
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState('profile');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -83,6 +83,13 @@ const NewDashboard = () => {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (activeTab !== 'schedule') return;
+    if (scheduleNotificationCount > 0) {
+      markScheduleNotificationsSeen();
+    }
+  }, [activeTab, markScheduleNotificationsSeen, scheduleNotificationCount]);
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -102,6 +109,9 @@ const NewDashboard = () => {
     navigate(`/dashboard?tab=${tab}`, {
       replace: true
     });
+    if (tab === 'schedule') {
+      markScheduleNotificationsSeen();
+    }
     if (tab === 'schedule' || tab === 'overview') {
       refetchMatches();
     }
@@ -142,12 +152,12 @@ const NewDashboard = () => {
     label: "My Schedule",
     icon: Calendar,
     description: "Availability & matches",
-    badge: pendingMatchInvites > 0 ? pendingMatchInvites : null
+    badge: scheduleNotificationCount > 0 ? scheduleNotificationCount : null
   }, {
     id: "matching",
     label: "Casual Match",
-    icon: Users,
-    description: "Find an Opponent"
+    icon: Zap,
+    description: "Find players"
   }, {
     id: "register",
     label: "Join a League",
@@ -171,7 +181,7 @@ const NewDashboard = () => {
     icon: Bell,
     description: "Updates & alerts",
     badge: unreadCount > 0 ? unreadCount : null
-  }], [pendingMatchInvites, unreadMessagesCount, getPendingRequestsCount, unreadCount]);
+  }], [scheduleNotificationCount, unreadMessagesCount, getPendingRequestsCount, unreadCount]);
   
   // Early return for loading state (must be after all hooks)
   if (playerLoading) {

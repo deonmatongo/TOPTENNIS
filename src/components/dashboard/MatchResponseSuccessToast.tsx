@@ -14,8 +14,8 @@ export const MatchResponseSuccessToast = ({ action, playerName }: MatchResponseS
   };
 
   const messages = {
-    accept: 'Match invitation accepted!',
-    decline: 'Match invitation declined',
+    accept: 'Match request accepted!',
+    decline: 'Match request declined',
     propose: 'New time proposed successfully'
   };
 

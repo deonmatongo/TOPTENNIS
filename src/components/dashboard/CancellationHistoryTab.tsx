@@ -119,7 +119,7 @@ export const CancellationHistoryTab = () => {
       <div>
         <h2 className="text-2xl font-bold">Cancellation History</h2>
         <p className="text-muted-foreground mt-1">
-          View all cancelled match invitations
+          View all cancelled match requests
         </p>
       </div>
 

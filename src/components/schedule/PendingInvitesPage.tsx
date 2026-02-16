@@ -44,12 +44,12 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
         await respondToInvite(respondingTo, actionType === 'accept' ? 'accepted' : 'declined');
         toast.success(
           actionType === 'accept' 
-            ? 'Match invitation accepted!' 
-            : 'Match invitation declined'
+            ? 'Match request accepted!' 
+            : 'Match request declined'
         );
       }
     } catch (error) {
-      toast.error(`Failed to ${actionType} invitation`);
+      toast.error(`Failed to ${actionType} request`);
     } finally {
       setRespondingTo(null);
       setActionType(null);
@@ -205,7 +205,7 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
               <ChevronLeft className="h-5 w-5" />
             </Button>
             <div className="flex-1">
-              <h1 className="text-2xl md:text-3xl font-bold">Pending Invites</h1>
+              <h1 className="text-2xl md:text-3xl font-bold">You have a match request</h1>
               <p className="text-sm text-muted-foreground">Respond to match requests</p>
             </div>
             {pendingInvites.length > 0 && (
@@ -227,7 +227,7 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
                   <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
                 </div>
                 <h3 className="text-xl font-semibold mb-2">All caught up!</h3>
-                <p className="text-muted-foreground">You have no pending match invitations</p>
+                <p className="text-muted-foreground">You have no match requests</p>
                 <p className="text-sm text-muted-foreground mt-1">
                   New invites will appear here when players send you match requests
                 </p>
@@ -244,7 +244,7 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
                   Action Required
                 </h3>
                 <p className="text-sm text-orange-800 dark:text-orange-200 mt-1">
-                  You have {pendingInvites.length} pending {pendingInvites.length === 1 ? 'invitation' : 'invitations'} waiting for your response
+                  You have {pendingInvites.length} pending {pendingInvites.length === 1 ? 'request' : 'requests'} waiting for your response
                 </p>
               </div>
             </div>
@@ -264,14 +264,14 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {actionType === 'accept' && 'Accept Match Invitation?'}
-              {actionType === 'decline' && 'Decline Match Invitation?'}
-              {actionType === 'delete' && 'Delete Old Invitation?'}
+              {actionType === 'accept' && 'Accept Match Request?'}
+              {actionType === 'decline' && 'Decline Match Request?'}
+              {actionType === 'delete' && 'Delete Old Request?'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {actionType === 'accept' && 'This match will be added to your schedule and the inviter will be notified.'}
               {actionType === 'decline' && 'The inviter will be notified that you declined this match request.'}
-              {actionType === 'delete' && 'This invitation is for a past date and will be permanently deleted. This action cannot be undone.'}
+              {actionType === 'delete' && 'This request is for a past date and will be permanently deleted. This action cannot be undone.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -817,7 +817,7 @@ export const OutlookCalendar: React.FC<OutlookCalendarProps> = ({
                           </div>
                         </div>) : <div className="text-center py-4 text-muted-foreground">
                         <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">No pending invites</p>
+                        <p className="text-sm">No match requests</p>
                       </div>}
                   </div>
                 </ScrollArea>
@@ -840,9 +840,9 @@ export const OutlookCalendar: React.FC<OutlookCalendarProps> = ({
       <Dialog open={showSendInviteModal} onOpenChange={setShowSendInviteModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Send Match Invite</DialogTitle>
+            <DialogTitle>Send Match Request</DialogTitle>
             <DialogDescription>
-              Send a match invitation to {viewingPlayer?.name}
+              Send a match request to {viewingPlayer?.name}
             </DialogDescription>
           </DialogHeader>
           
@@ -882,7 +882,7 @@ export const OutlookCalendar: React.FC<OutlookCalendarProps> = ({
                 <label className="text-sm font-medium mb-2 block">
                   Message (optional)
                 </label>
-                <Textarea value={inviteMessage} onChange={e => setInviteMessage(e.target.value)} placeholder="Add a message to your invitation..." className="resize-none" rows={3} />
+                <Textarea value={inviteMessage} onChange={e => setInviteMessage(e.target.value)} placeholder="Add a message to your request..." className="resize-none" rows={3} />
               </div>
             </div>}
           
@@ -892,7 +892,7 @@ export const OutlookCalendar: React.FC<OutlookCalendarProps> = ({
             </Button>
             <Button onClick={handleSendInvite}>
               <Send className="w-4 h-4 mr-2" />
-              Send Invite
+              Send Request
             </Button>
           </DialogFooter>
         </DialogContent>

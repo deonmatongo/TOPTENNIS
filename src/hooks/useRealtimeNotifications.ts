@@ -35,8 +35,8 @@ export const useRealtimeNotifications = () => {
       if (payload.eventType === 'INSERT') {
         const invite = payload.new;
         if (invite.receiver_id === user.id) {
-          toast.info('New match invitation!', {
-            description: `You have a new match invitation to respond to`,
+          toast.info('You have a match request', {
+            description: `Open your match requests to respond`,
             duration: 5000,
             action: {
               label: 'View',
@@ -44,8 +44,8 @@ export const useRealtimeNotifications = () => {
             },
           });
         } else if (invite.sender_id === user.id) {
-          toast.success('Match invitation sent!', {
-            description: 'Your invitation has been delivered',
+          toast.success('Match request sent!', {
+            description: 'Your match request has been delivered',
             duration: 3000,
           });
         }
@@ -56,7 +56,7 @@ export const useRealtimeNotifications = () => {
           const otherUser = invite.receiver_id === user.id ? invite.sender_id : invite.receiver_id;
           
           if (invite.status === 'accepted') {
-            toast.success('Match invitation accepted!', {
+            toast.success('Match request accepted!', {
               description: `Your match has been scheduled`,
               duration: 5000,
               action: {
@@ -65,8 +65,8 @@ export const useRealtimeNotifications = () => {
               },
             });
           } else if (invite.status === 'declined') {
-            toast.info('Match invitation declined', {
-              description: `The invitation was declined`,
+            toast.info('Match request declined', {
+              description: `The request was declined`,
               duration: 3000,
             });
           }

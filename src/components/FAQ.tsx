@@ -15,7 +15,7 @@ const FAQ = () => {
     },
     {
       question: "How do I schedule matches with other players?",
-      answer: "Once you connect with a player, you can use our built-in scheduling system to propose match times, book courts, and confirm details. Both players receive notifications and calendar invites."
+      answer: "Once you connect with a player, you can use our built-in scheduling system to propose match times, book courts, and confirm details. Both players receive notifications and match requests."
     },
     {
       question: "What if I need to cancel a scheduled match?",

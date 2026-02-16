@@ -76,9 +76,9 @@ export const MatchInviteResponseModal = ({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Match Invitation</DialogTitle>
+          <DialogTitle>Match Request</DialogTitle>
           <DialogDescription>
-            You have been invited to play a match
+            You have a match request
           </DialogDescription>
         </DialogHeader>
 

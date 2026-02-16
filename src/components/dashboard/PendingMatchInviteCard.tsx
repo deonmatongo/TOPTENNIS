@@ -133,7 +133,7 @@ export const PendingMatchInviteCard = ({ match, onRespond }: PendingMatchInviteC
                 className="flex-1"
                 size="sm"
               >
-                Respond to Invitation
+                Respond to Request
               </Button>
             )}
             <Button
@@ -151,9 +151,9 @@ export const PendingMatchInviteCard = ({ match, onRespond }: PendingMatchInviteC
       <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancel Match Invitation?</AlertDialogTitle>
+            <AlertDialogTitle>Cancel Match Request?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to cancel this match invitation? The other player will be notified of the cancellation.
+              Are you sure you want to cancel this match request? The other player will be notified of the cancellation.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-4">
@@ -172,7 +172,7 @@ export const PendingMatchInviteCard = ({ match, onRespond }: PendingMatchInviteC
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setCancellationReason('')}>No, keep it</AlertDialogCancel>
             <AlertDialogAction onClick={handleCancel} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Yes, cancel invitation
+              Yes, cancel request
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

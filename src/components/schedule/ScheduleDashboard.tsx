@@ -175,7 +175,7 @@ export const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({ matches = 
                 <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
                   <Mail className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                 </div>
-                <CardTitle className="text-lg">Pending Invites</CardTitle>
+                <CardTitle className="text-lg">You have a match request</CardTitle>
               </div>
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </div>
@@ -192,11 +192,11 @@ export const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({ matches = 
                     Action Required
                   </Badge>
                   <p className="text-xs text-muted-foreground text-center">
-                    {pendingInvites.length} {pendingInvites.length === 1 ? 'invite needs' : 'invites need'} your response
+                    {pendingInvites.length} {pendingInvites.length === 1 ? 'request needs' : 'requests need'} your response
                   </p>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No pending invites</p>
+                <p className="text-sm text-muted-foreground">No match requests</p>
               )}
             </div>
           </CardContent>
