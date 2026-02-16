@@ -23,6 +23,7 @@ interface EnhancedAvailabilityModalProps {
   selectedDate?: Date;
   selectedStartTime?: string;
   selectedEndTime?: string;
+  availabilityActions?: Pick<ReturnType<typeof useUserAvailability>, 'createAvailability' | 'updateAvailability'>;
 }
 
 export const EnhancedAvailabilityModal = ({
@@ -33,8 +34,11 @@ export const EnhancedAvailabilityModal = ({
   selectedDate,
   selectedStartTime,
   selectedEndTime,
+  availabilityActions,
 }: EnhancedAvailabilityModalProps) => {
-  const { createAvailability, updateAvailability } = useUserAvailability();
+  const fallbackAvailabilityActions = useUserAvailability();
+  const createAvailability = availabilityActions?.createAvailability ?? fallbackAvailabilityActions.createAvailability;
+  const updateAvailability = availabilityActions?.updateAvailability ?? fallbackAvailabilityActions.updateAvailability;
   const { checkConflict } = useConflictDetection();
   const [loading, setLoading] = useState(false);
   const [hasConflict, setHasConflict] = useState(false);

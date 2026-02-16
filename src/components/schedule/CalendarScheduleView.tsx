@@ -83,7 +83,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   const [deletingItem, setDeletingItem] = useState<{id: string, type: 'availability' | 'invite'} | null>(null);
   const [cancellingMatch, setCancellingMatch] = useState<string | null>(null);
 
-  const { availability, deleteAvailability } = useUserAvailability();
+  const { availability, deleteAvailability, createAvailability, updateAvailability, fetchAvailability } = useUserAvailability();
   const { invites, getPendingInvites, getConfirmedInvites, respondToInvite, deleteInvite, cancelInvite } = useMatchInvites();
   const { timezone, updateTimezone } = useUserTimezone();
 
@@ -156,7 +156,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
             : 'Unknown';
 
           // Convert times to user's timezone if different from match's timezone
-          const matchTimezone = match.timezone || 'America/New_York';
+          const matchTimezone = (match as any).timezone || 'America/New_York';
           const displayStartTime = matchTimezone !== timezone 
             ? convertTimeBetweenTimezones(match.start_time, matchTimezone, timezone, match.date)
             : match.start_time;
@@ -192,7 +192,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
             : 'Unknown';
 
           // Convert times to user's timezone if different from invite's timezone
-          const inviteTimezone = invite.timezone || 'America/New_York';
+          const inviteTimezone = (invite as any).timezone || 'America/New_York';
           const displayStartTime = inviteTimezone !== timezone 
             ? convertTimeBetweenTimezones(invite.start_time, inviteTimezone, timezone, invite.date)
             : invite.start_time;
@@ -1110,10 +1110,12 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
         selectedDate={selectedDate || undefined}
         selectedStartTime={selectedTime?.start}
         selectedEndTime={selectedTime?.end}
+        availabilityActions={{ createAvailability, updateAvailability }}
         onSuccess={() => {
           setShowAddModal(false);
           setSelectedDate(null);
           setSelectedTime(null);
+          fetchAvailability();
         }}
       />
 
