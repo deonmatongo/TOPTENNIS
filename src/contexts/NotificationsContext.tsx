@@ -1,6 +1,5 @@
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useContext } from 'react';
 import { useNotifications as useNotificationsHook } from '@/hooks/useNotifications';
-import { useMatchResponses } from '@/hooks/useMatchResponses';
 
 type NotificationsContextType = ReturnType<typeof useNotificationsHook>;
 
@@ -8,18 +7,9 @@ const NotificationsContext = createContext<NotificationsContextType | undefined>
 
 export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const notifications = useNotificationsHook();
-  const { pendingInvites } = useMatchResponses();
-
-  const value = useMemo(() => {
-    const pendingInvitesCount = pendingInvites?.length ?? 0;
-    return {
-      ...notifications,
-      unreadCount: notifications.unreadCount + pendingInvitesCount,
-    };
-  }, [notifications, pendingInvites]);
 
   return (
-    <NotificationsContext.Provider value={value}>
+    <NotificationsContext.Provider value={notifications}>
       {children}
     </NotificationsContext.Provider>
   );

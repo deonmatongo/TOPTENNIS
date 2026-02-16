@@ -68,12 +68,12 @@ export const MatchResponseModal = ({ open, onClose, match, onRespond }: MatchRes
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {isProposedTime ? 'Reschedule Request' : 'Match Request'}
+            {isProposedTime ? 'Reschedule Request' : 'Match Invitation'}
           </DialogTitle>
           <DialogDescription>
             {isProposedTime 
               ? 'Your opponent has proposed a new time for this match'
-              : 'You have a match request'
+              : 'You have been invited to play a match'
             }
           </DialogDescription>
         </DialogHeader>

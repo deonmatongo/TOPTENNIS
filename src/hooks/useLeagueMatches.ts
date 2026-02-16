@@ -181,7 +181,7 @@ export const useLeagueMatches = (divisionId?: string) => {
       }
 
       console.log('✅ League match created:', data);
-      toast.success('League match request sent!');
+      toast.success('League match invitation sent!');
       
       // Refresh matches
       await fetchLeagueMatches();

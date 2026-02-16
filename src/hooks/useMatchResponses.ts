@@ -67,7 +67,7 @@ export const useMatchResponses = () => {
           filter: 'invitation_status=in.(pending,rescheduled,accepted,confirmed)'
         },
         (payload) => {
-          console.log('Match request status changed:', payload);
+          console.log('Match invitation status changed:', payload);
           queryClient.invalidateQueries({ queryKey: ['match-invites-pending'] });
           
           // Show toast for confirmed matches
@@ -184,8 +184,8 @@ export const useMatchResponses = () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       
       const actionMessages = {
-        accept: 'Match request accepted!',
-        decline: 'Match request declined',
+        accept: 'Match invitation accepted!',
+        decline: 'Match invitation declined',
         propose: 'New time proposed successfully'
       };
       
@@ -195,7 +195,7 @@ export const useMatchResponses = () => {
       if (error.message.includes('Maximum reschedule attempts')) {
         toast.error('Maximum reschedule attempts reached (3)');
       } else {
-        toast.error('Failed to respond to match request');
+        toast.error('Failed to respond to invitation');
       }
     }
   });

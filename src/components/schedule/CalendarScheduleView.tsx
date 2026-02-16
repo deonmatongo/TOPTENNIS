@@ -946,7 +946,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                     <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
                       <Mail className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                     </div>
-                    <h3 className="font-semibold text-sm">You have a match request</h3>
+                    <h3 className="font-semibold text-sm">Pending Invites</h3>
                   </div>
                   <Badge variant="secondary">{pendingInvites.length}</Badge>
                 </div>
@@ -979,7 +979,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                     );
                   })}
                   {pendingInvites.length === 0 && (
-                    <p className="text-xs text-muted-foreground text-center py-2">No match requests</p>
+                    <p className="text-xs text-muted-foreground text-center py-2">No pending invites</p>
                   )}
                   {pendingInvites.length > 3 && (
                     <p className="text-xs text-muted-foreground text-center">+{pendingInvites.length - 3} more</p>

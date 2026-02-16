@@ -30,7 +30,7 @@ export const ScheduleStats: React.FC<ScheduleStatsProps> = ({
       iconColor: 'text-primary',
     },
     {
-      label: 'You have a match request',
+      label: 'Pending Invites',
       value: pendingInvites,
       icon: User,
       bgColor: 'bg-amber-500/10',

@@ -68,16 +68,16 @@ export const QuickBookingModal: React.FC<QuickBookingModalProps> = ({
       await supabase.from('notifications').insert({
         user_id: selectedUser,
         type: 'match_invite',
-        title: 'You have a match request',
-        message: `${user.email} sent you a match request for ${format(selectedDate, 'MMM d, yyyy')} at ${selectedHour}:00`,
+        title: 'New Match Invitation',
+        message: `${user.email} has invited you to play on ${format(selectedDate, 'MMM d, yyyy')} at ${selectedHour}:00`,
         action_url: '/dashboard?tab=matches',
       });
 
-      toast.success('Match request sent successfully!');
+      toast.success('Match invitation sent successfully!');
       handleClose();
     } catch (error) {
       console.error('Error sending match invite:', error);
-      toast.error('Failed to send match request');
+      toast.error('Failed to send match invitation');
     } finally {
       setLoading(false);
     }
@@ -96,7 +96,7 @@ export const QuickBookingModal: React.FC<QuickBookingModalProps> = ({
         <DialogHeader>
           <DialogTitle>Book a Match</DialogTitle>
           <DialogDescription>
-            Select a player and send them a match request
+            Select a player and send them a match invitation
           </DialogDescription>
         </DialogHeader>
 
@@ -172,7 +172,7 @@ export const QuickBookingModal: React.FC<QuickBookingModalProps> = ({
               id="message"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Add a message to your request..."
+              placeholder="Add a message to your invitation..."
               rows={3}
             />
           </div>
@@ -182,7 +182,7 @@ export const QuickBookingModal: React.FC<QuickBookingModalProps> = ({
               Cancel
             </Button>
             <Button type="submit" disabled={!selectedUser || loading}>
-              {loading ? 'Sending...' : 'Send Request'}
+              {loading ? 'Sending...' : 'Send Invitation'}
             </Button>
           </DialogFooter>
         </form>

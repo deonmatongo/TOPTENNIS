@@ -92,11 +92,11 @@ export const MatchInvitationModal = ({
         message: formData.message,
       });
 
-      toast.success(`Match request sent to ${opponent.name}`);
+      toast.success(`Match invitation sent to ${opponent.name}`);
       onClose();
     } catch (error) {
-      console.error('Error sending match request:', error);
-      toast.error('Failed to send match request');
+      console.error('Error sending match invitation:', error);
+      toast.error('Failed to send match invitation');
     } finally {
       setLoading(false);
     }
@@ -106,9 +106,9 @@ export const MatchInvitationModal = ({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Match Request</DialogTitle>
+          <DialogTitle>Invite to Match</DialogTitle>
           <DialogDescription>
-            {opponent ? `Send a match request to ${opponent.name}` : 'Select an opponent first'}
+            {opponent ? `Send a match invitation to ${opponent.name}` : 'Select an opponent first'}
           </DialogDescription>
         </DialogHeader>
 
@@ -199,7 +199,7 @@ export const MatchInvitationModal = ({
                 id="message"
                 value={formData.message}
                 onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                placeholder="Add a message to your request..."
+                placeholder="Add a message to your invitation..."
                 rows={3}
               />
             </div>
@@ -209,7 +209,7 @@ export const MatchInvitationModal = ({
                 Cancel
               </Button>
               <Button type="submit" disabled={loading || hasConflict}>
-                {loading ? 'Sending...' : 'Send Request'}
+                {loading ? 'Sending...' : 'Send Invitation'}
               </Button>
             </DialogFooter>
           </form>

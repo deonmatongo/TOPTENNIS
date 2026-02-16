@@ -33,7 +33,7 @@ export const MatchInvitesList = () => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Match Requests</CardTitle>
+          <CardTitle>Match Invitations</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {[1, 2, 3].map(i => (
@@ -52,12 +52,12 @@ export const MatchInvitesList = () => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Match Requests</CardTitle>
+          <CardTitle>Match Invitations</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
             <AlertCircle className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p>No match requests</p>
+            <p>No pending match invitations</p>
           </div>
         </CardContent>
       </Card>
@@ -68,7 +68,7 @@ export const MatchInvitesList = () => {
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Match Requests ({pendingInvites.length})</CardTitle>
+          <CardTitle>Match Invitations ({pendingInvites.length})</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {pendingInvites.map((match) => (
