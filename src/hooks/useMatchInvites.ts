@@ -160,12 +160,6 @@ export const useMatchInvites = () => {
 
   const fetchInvites = async () => {
     try {
-      if (!user) {
-        setInvites([]);
-        return;
-      }
-
-      setLoading(true);
       const { data: inviteData, error } = await supabase
         .from('match_invites')
         .select('*')
@@ -174,25 +168,19 @@ export const useMatchInvites = () => {
 
       if (error) throw error;
 
-      const safeInviteData = inviteData || [];
-
       // Batch fetch all unique profile IDs
-      const uniqueUserIds = Array.from(
-        new Set(safeInviteData.flatMap(invite => [invite.sender_id, invite.receiver_id]))
-      );
+      const uniqueUserIds = Array.from(new Set(
+        (inviteData || []).flatMap(invite => [invite.sender_id, invite.receiver_id])
+      ));
 
-      const profileMap = new Map<string, any>();
-      if (uniqueUserIds.length > 0) {
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, email')
-          .in('id', uniqueUserIds);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', uniqueUserIds);
 
-        if (profilesError) throw profilesError;
-        (profiles || []).forEach(p => profileMap.set(p.id, p));
-      }
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
-      const invitesWithProfiles: MatchInvite[] = safeInviteData.map(invite => ({
+      const invitesWithProfiles: MatchInvite[] = (inviteData || []).map(invite => ({
         ...invite,
         sender: profileMap.get(invite.sender_id),
         receiver: profileMap.get(invite.receiver_id),
@@ -201,8 +189,7 @@ export const useMatchInvites = () => {
       setInvites(invitesWithProfiles);
     } catch (error) {
       logger.error('Error fetching match invites', { error });
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(`Failed to load match invites: ${message}`);
+      toast.error('Failed to load match invites');
     } finally {
       setLoading(false);
     }
