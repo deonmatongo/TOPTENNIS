@@ -200,6 +200,20 @@ export const useNotifications = () => {
       fetchNotifications();
     }, 15000);
 
+    // Refetch when the tab becomes active again (covers browser throttling/backgrounding)
+    const handleFocus = () => {
+      fetchNotifications();
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchNotifications();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
     // Set up real-time subscription for notifications
     const channel = supabase
       .channel(`notifications-${user.id}`)
@@ -282,6 +296,8 @@ export const useNotifications = () => {
 
     return () => {
       window.clearInterval(pollId);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
       supabase.removeChannel(channel);
     };
   }, [user, addNotification, fetchNotifications, sendNotification]);
