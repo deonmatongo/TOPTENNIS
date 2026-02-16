@@ -90,20 +90,6 @@ export const useUnseenMatchRequestsCount = () => {
       fetchUnseenCount();
     }, 15000);
 
-    // Refetch when the tab becomes active again (covers browser throttling/backgrounding)
-    const handleFocus = () => {
-      fetchUnseenCount();
-    };
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        fetchUnseenCount();
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleVisibility);
-
     // Realtime updates
     const channel = supabase
       .channel(`schedule-unseen-match-requests:${userId}`)
@@ -123,8 +109,6 @@ export const useUnseenMatchRequestsCount = () => {
 
     return () => {
       window.clearInterval(pollId);
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleVisibility);
       supabase.removeChannel(channel);
     };
   }, [fetchUnseenCount, userId]);

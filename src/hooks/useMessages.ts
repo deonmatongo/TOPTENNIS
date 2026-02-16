@@ -146,25 +146,6 @@ export const useMessages = () => {
   useEffect(() => {
     fetchMessages();
 
-    // Fallback polling (in case Supabase Realtime isn't enabled / events are blocked)
-    const pollId = window.setInterval(() => {
-      fetchMessages();
-    }, 15000);
-
-    // Refetch when the tab becomes active again (covers browser throttling/backgrounding)
-    const handleFocus = () => {
-      fetchMessages();
-    };
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        fetchMessages();
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleVisibility);
-
     // Set up real-time subscription for messages
     if (user) {
       const channel = supabase
@@ -210,18 +191,9 @@ export const useMessages = () => {
         .subscribe();
 
       return () => {
-        window.clearInterval(pollId);
-        window.removeEventListener('focus', handleFocus);
-        document.removeEventListener('visibilitychange', handleVisibility);
         supabase.removeChannel(channel);
       };
     }
-    
-    return () => {
-      window.clearInterval(pollId);
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
   }, [user]);
 
   return {
