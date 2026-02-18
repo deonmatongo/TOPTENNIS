@@ -57,6 +57,9 @@ const PlayerSearch = ({
   };
 
   const handleSendFriendRequest = async (player: SearchResult) => {
+    console.log('Attempting to send friend request to player:', player);
+    console.log('Player user_id:', player.user_id);
+    
     if (!player.user_id) {
       toast.error('Cannot send friend request to this player');
       return;
@@ -66,6 +69,7 @@ const PlayerSearch = ({
       await sendFriendRequest(player.user_id);
       toast.success('Friend request sent successfully');
     } catch (error) {
+      console.error('Error sending friend request:', error);
       toast.error('Failed to send friend request');
     }
   };
