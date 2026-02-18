@@ -33,9 +33,9 @@ const SkillLevelStep = ({ formData, updateFormData }: SkillLevelStepProps) => {
           className="space-y-4"
         >
           {[
-            { value: 'beginner', label: 'Beginner', icon: Sprout, desc: 'New to tennis or still learning basics', color: 'from-green-500/20 to-green-500/5' },
-            { value: 'intermediate', label: 'Intermediate', icon: Target, desc: 'Reliable rally and serve, comfortable playing', color: 'from-blue-500/20 to-blue-500/5' },
-            { value: 'advanced', label: 'Advanced', icon: Trophy, desc: 'League or tournament player, strong technique', color: 'from-amber-500/20 to-amber-500/5' }
+            { value: 'beginner', label: 'Beginner', icon: Sprout, desc: 'Less than 3 years of playing tennis', color: 'from-green-500/20 to-green-500/5' },
+            { value: 'intermediate', label: 'Intermediate', icon: Target, desc: '3 to 10 years of playing tennis', color: 'from-blue-500/20 to-blue-500/5' },
+            { value: 'advanced', label: 'Advanced', icon: Trophy, desc: '+10 years of playing tennis', color: 'from-amber-500/20 to-amber-500/5' }
           ].map(option => (
             <div key={option.value} className="relative group">
               <RadioGroupItem 

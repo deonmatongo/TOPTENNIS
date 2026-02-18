@@ -300,7 +300,6 @@ export const EnhancedAvailabilityModal = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="public">Public (Visible to all)</SelectItem>
-                <SelectItem value="friends-only">Friends Only</SelectItem>
                 <SelectItem value="private">Private (For matching only)</SelectItem>
               </SelectContent>
             </Select>

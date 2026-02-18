@@ -20,7 +20,7 @@ export const useNotifications = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const { sendNotification } = useBrowserNotifications();
+  const { sendNotification, clearNotificationQueue, isSupported } = useBrowserNotifications();
   
   // Use ref to track if we've loaded notifications to prevent duplicate state updates
   const hasLoadedRef = useRef(false);
@@ -127,14 +127,19 @@ export const useNotifications = () => {
     };
     
     setNotifications(prev => {
-      // Check for duplicates based on title and message to prevent real-time duplicates
+      // Check for duplicates based on title, message, and type within a time window
+      const timeWindow = 10000; // 10 seconds
       const isDuplicate = prev.some(n => 
         n.title === newNotification.title && 
         n.message === newNotification.message &&
-        Math.abs(n.createdAt.getTime() - newNotification.createdAt.getTime()) < 5000 // 5 second window
+        n.type === newNotification.type &&
+        Math.abs(n.createdAt.getTime() - newNotification.createdAt.getTime()) < timeWindow
       );
       
-      if (isDuplicate) return prev;
+      if (isDuplicate) {
+        console.log('🔄 Skipping duplicate notification:', newNotification.title);
+        return prev;
+      }
       
       const newList = [newNotification, ...prev];
       // Update unread count in the same state update to prevent race conditions
@@ -229,11 +234,21 @@ export const useNotifications = () => {
             );
             
             // Send browser notification if tab is not focused
-            sendNotification(newNotif.title, {
-              body: newNotif.message,
-              tag: payload.new.id,
-              requireInteraction: false,
-            });
+            if (isSupported) {
+              sendNotification(newNotif.title, {
+                body: newNotif.message,
+                tag: payload.new.id,
+                requireInteraction: false,
+                icon: '/favicon.ico',
+                badge: '1',
+                vibrate: [200, 100, 200],
+              });
+            }
+            
+            // Process queued notifications when permission is granted
+            if (isSupported && sendNotification.clearNotificationQueue) {
+              sendNotification.clearNotificationQueue();
+            }
           } else {
             console.warn('⚠️ Skipping notification - not loaded yet or no payload');
           }

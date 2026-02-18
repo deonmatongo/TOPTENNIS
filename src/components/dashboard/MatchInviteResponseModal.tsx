@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { Check, X, Clock, MapPin, User, Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { Tables } from '@/integrations/supabase/types';
@@ -13,13 +14,13 @@ type MatchInvite = Tables<'match_invites'> & {
     first_name: string;
     last_name: string;
     email: string;
-  };
+  } & Partial<Tables<'players'>>;
   receiver?: {
     id: string;
     first_name: string;
     last_name: string;
     email: string;
-  };
+  } & Partial<Tables<'players'>>;
 };
 
 interface MatchInviteResponseModalProps {
@@ -46,6 +47,52 @@ export const MatchInviteResponseModal = ({
 
   if (!invite) return null;
 
+  const getSenderName = () => {
+    return `${invite.sender?.first_name || ''} ${invite.sender?.last_name || ''}`.trim() || 'Opponent';
+  };
+
+  const getSkillBadgeColor = (skillLevel?: number | null) => {
+    if (!skillLevel) return 'bg-gray-100 text-gray-800 border-gray-200';
+    if (skillLevel >= 8) return 'bg-red-100 text-red-800 border-red-200';
+    if (skillLevel >= 6) return 'bg-orange-100 text-orange-800 border-orange-200';
+    if (skillLevel >= 4) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    return 'bg-green-100 text-green-800 border-green-200';
+  };
+
+  const getSkillLabel = (skillLevel?: number | null) => {
+    if (!skillLevel) return 'Not rated';
+    if (skillLevel >= 8) return 'Advanced';
+    if (skillLevel >= 6) return 'Intermediate';
+    if (skillLevel >= 4) return 'Beginner+';
+    return 'Beginner';
+  };
+
+  const getCompetitivenessLabel = (competitiveness?: string | null) => {
+    switch (competitiveness) {
+      case 'fun': return '🎾 Just for fun';
+      case 'casual': return '😎 Casual but competitive';
+      case 'competitive': return '🏆 Very competitive';
+      default: return 'Not specified';
+    }
+  };
+
+  const getAgeRangeLabel = (ageRange?: string | null) => {
+    switch (ageRange) {
+      case 'under-18': return 'Under 18';
+      case '18-29': return '18-29';
+      case '30-39': return '30-39';
+      case '40-49': return '40-49';
+      case '50-59': return '50-59';
+      case '60-plus': return '60+';
+      default: return 'Not specified';
+    }
+  };
+
+  const totalMatches = (invite.sender?.wins || 0) + (invite.sender?.losses || 0);
+  const winRate = totalMatches > 0 ? Math.round(((invite.sender?.wins || 0) / totalMatches) * 100) : 0;
+
+  const hasProposedTime = invite.proposed_date && invite.proposed_start_time && invite.proposed_end_time;
+
   const handleSubmit = () => {
     if (action === 'accept') {
       onAccept();
@@ -66,12 +113,6 @@ export const MatchInviteResponseModal = ({
     onClose();
   };
 
-  const getSenderName = () => {
-    return `${invite.sender?.first_name || ''} ${invite.sender?.last_name || ''}`.trim() || 'Opponent';
-  };
-
-  const hasProposedTime = invite.proposed_date && invite.proposed_start_time && invite.proposed_end_time;
-
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
@@ -83,13 +124,47 @@ export const MatchInviteResponseModal = ({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Match Details */}
-          <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+          {/* Player Profile */}
+          <div className="bg-muted/30 rounded-lg p-4 space-y-3">
             <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">vs {getSenderName()}</span>
             </div>
             
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge 
+                variant="outline" 
+                className={`${getSkillBadgeColor(invite.sender?.skill_level)} text-xs`}
+              >
+                {getSkillLabel(invite.sender?.skill_level)} • {invite.sender?.skill_level || '?'}/10
+              </Badge>
+              {invite.sender?.usta_rating && (
+                <Badge variant="secondary" className="text-xs">
+                  USTA {invite.sender.usta_rating}
+                </Badge>
+              )}
+              <Badge variant="outline" className="text-xs">
+                {totalMatches} matches • {winRate}% win rate
+              </Badge>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
+              <div>
+                <span className="font-medium">Style:</span> {getCompetitivenessLabel(invite.sender?.competitiveness)}
+              </div>
+              <div>
+                <span className="font-medium">Age:</span> {getAgeRangeLabel(invite.sender?.age_range)}
+              </div>
+              {invite.sender?.city && (
+                <div className="sm:col-span-2">
+                  <span className="font-medium">Location:</span> {invite.sender.city}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Match Details */}
+          <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
             <div className="flex items-center gap-2">
               <CalendarIcon className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">{format(new Date(invite.date), 'EEEE, MMMM d, yyyy')}</span>

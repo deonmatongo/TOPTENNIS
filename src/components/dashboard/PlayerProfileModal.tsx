@@ -18,12 +18,17 @@ import {
   Phone,
   Target,
   Flame,
-  MessageCircle
+  MessageCircle,
+  Ban,
+  UserMinus
 } from 'lucide-react';
 import { SearchResult } from '@/hooks/usePlayerSearch';
 import { toast } from 'sonner';
 import SendMessageModal from './SendMessageModal';
 import { PlayerScheduleModal } from './PlayerScheduleModal';
+import { useFriendRequests } from '@/hooks/useFriendRequests';
+import { useBlockedUsers } from '@/hooks/useBlockedUsers';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface PlayerProfileModalProps {
   player: SearchResult | null;
@@ -34,6 +39,9 @@ interface PlayerProfileModalProps {
 const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps) => {
   const [showSendMessage, setShowSendMessage] = useState(false);
   const [showScheduleMatch, setShowScheduleMatch] = useState(false);
+  const { user } = useAuth();
+  const { sendFriendRequest, updateRequestStatus, getRelationshipWith, requests } = useFriendRequests();
+  const { blockUser } = useBlockedUsers();
   
   if (!player) return null;
 
@@ -81,6 +89,44 @@ const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps
 
   const handleChallengeMatch = () => {
     setShowScheduleMatch(true);
+  };
+
+  const otherUserId = player.user_id;
+  const relationship = getRelationshipWith(otherUserId);
+  const incomingRequest = requests.find(r => r.status === 'pending' && r.sender_id === otherUserId && r.receiver_id === user?.id);
+
+  const handleBlockUser = async () => {
+    if (!player?.user_id || player?.user_id === user?.id) return;
+    
+    try {
+      await blockUser(player.user_id, 'Inappropriate behavior');
+      toast.success('User blocked successfully');
+    } catch (error) {
+      toast.error('Failed to block user');
+    }
+  };
+
+  const handleSendFriendRequest = async () => {
+    if (!otherUserId) {
+      toast.error('This player cannot receive friend requests');
+      return;
+    }
+    try {
+      await sendFriendRequest(otherUserId);
+      toast.success('Friend request sent');
+    } catch (e) {
+      toast.error('Failed to send friend request');
+    }
+  };
+
+  const handleRespondToRequest = async (status: 'accepted' | 'declined') => {
+    if (!incomingRequest) return;
+    try {
+      await updateRequestStatus(incomingRequest.id, status);
+      toast.success(status === 'accepted' ? 'Friend request accepted' : 'Friend request declined');
+    } catch (e) {
+      toast.error('Failed to update friend request');
+    }
   };
 
   return (
@@ -245,6 +291,34 @@ const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps
               <Calendar className="w-4 h-4 mr-2" />
               Send Match Request
             </Button>
+
+            {relationship === 'friends' ? (
+              <Button variant="secondary" className="w-full sm:flex-1" disabled>
+                Friend
+              </Button>
+            ) : relationship === 'pending_sent' ? (
+              <Button variant="secondary" className="w-full sm:flex-1" disabled>
+                Request Sent
+              </Button>
+            ) : relationship === 'pending_received' ? (
+              <div className="w-full sm:flex-1 flex gap-2">
+                <Button className="flex-1" onClick={() => handleRespondToRequest('accepted')}>
+                  Accept
+                </Button>
+                <Button variant="outline" className="flex-1" onClick={() => handleRespondToRequest('declined')}>
+                  Decline
+                </Button>
+              </div>
+            ) : (
+              <Button
+                onClick={handleSendFriendRequest}
+                variant="outline"
+                className="w-full sm:flex-1"
+                disabled={!otherUserId || otherUserId === user?.id}
+              >
+                Add Friend
+              </Button>
+            )}
             
             <Button 
               onClick={handleSendMessage}
@@ -253,6 +327,16 @@ const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps
             >
               <MessageCircle className="w-4 h-4 mr-2" />
               Send Message
+            </Button>
+            
+            <Button 
+              onClick={handleBlockUser}
+              variant="outline" 
+              className="w-full sm:flex-1 text-red-600 border-red-300 hover:bg-red-50"
+              disabled={player?.user_id === user?.id}
+            >
+              <Ban className="w-4 h-4 mr-2" />
+              Block User
             </Button>
           </div>
         </div>

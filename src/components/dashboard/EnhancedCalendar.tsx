@@ -391,7 +391,7 @@ export const EnhancedCalendar = () => {
                         variant="secondary" 
                         className="text-xs bg-[hsl(var(--tennis-green-50))] text-[hsl(var(--tennis-green-700))] dark:bg-[hsl(var(--tennis-green-600))]/20 dark:text-[hsl(var(--tennis-green-500))]"
                       >
-                        {a.privacy_level === 'public' ? 'Public' : a.privacy_level === 'friends-only' ? 'Friends Only' : 'Private'}
+                        {a.privacy_level === 'public' ? 'Public' : 'Private'}
                       </Badge>
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

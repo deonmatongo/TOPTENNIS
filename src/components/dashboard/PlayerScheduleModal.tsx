@@ -13,6 +13,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import type { Tables } from '@/integrations/supabase/types';
 import type { SearchResult } from '@/hooks/usePlayerSearch';
+import { useFriendRequests } from '@/hooks/useFriendRequests';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 
 type SchedulePlayer = (SearchResult | Tables<'players'>) & {
   avatar_url?: string | null;
@@ -50,9 +53,32 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   
+  const { user } = useAuth();
+  const { sendFriendRequest, updateRequestStatus, getRelationshipWith, requests } = useFriendRequests();
+
   const opponentUserId = player ? ((player.user_id ?? player.id) || undefined) : undefined;
-  const { availability } = usePlayerAvailability(opponentUserId);
+  const relationship = getRelationshipWith(opponentUserId);
+  const canViewCalendar = relationship === 'friends' || opponentUserId === user?.id;
+  const { availability } = usePlayerAvailability(canViewCalendar ? opponentUserId : undefined);
   const { createBooking, isSlotBooked } = useMatchBookings();
+
+  const incomingRequest = requests.find(r => r.status === 'pending' && r.sender_id === opponentUserId && r.receiver_id === user?.id);
+
+  const handleSendFriendRequest = async () => {
+    if (!opponentUserId) return;
+    try {
+      await sendFriendRequest(opponentUserId);
+    } catch (e) {
+    }
+  };
+
+  const handleRespondToRequest = async (status: 'accepted' | 'declined') => {
+    if (!incomingRequest) return;
+    try {
+      await updateRequestStatus(incomingRequest.id, status);
+    } catch (e) {
+    }
+  };
 
   const handleSelectSlots = (slots: HourlySlotSelection[]) => {
     if (slots.length === 0) return;
@@ -193,6 +219,28 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
             </div>
             
             <TabsContent value="calendar" className="flex-1 overflow-auto mt-0 p-6">
+              {!canViewCalendar && (
+                <Card className="mb-6">
+                  <CardContent className="p-4 flex items-center justify-between gap-4">
+                    <div className="text-sm text-muted-foreground">
+                      Only friends can view each other’s calendar.
+                    </div>
+                    {relationship === 'pending_received' ? (
+                      <div className="flex gap-2">
+                        <Button onClick={() => handleRespondToRequest('accepted')}>Accept</Button>
+                        <Button variant="outline" onClick={() => handleRespondToRequest('declined')}>Decline</Button>
+                      </div>
+                    ) : relationship === 'pending_sent' ? (
+                      <Button variant="secondary" disabled>Request Sent</Button>
+                    ) : (
+                      <Button onClick={handleSendFriendRequest} disabled={!opponentUserId || opponentUserId === user?.id}>
+                        Add Friend
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
               <div className="grid md:grid-cols-2 gap-6">
                 <ScheduleCalendar
                   currentDate={currentDate}

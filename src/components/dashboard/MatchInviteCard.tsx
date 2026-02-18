@@ -12,10 +12,28 @@ interface MatchInviteCardProps {
     sender?: {
       first_name: string;
       last_name: string;
+      email: string;
+    } & {
+      skill_level?: number | null;
+      usta_rating?: string | null;
+      wins?: number | null;
+      losses?: number | null;
+      competitiveness?: string | null;
+      age_range?: string | null;
+      city?: string | null;
     };
     receiver?: {
       first_name: string;
       last_name: string;
+      email: string;
+    } & {
+      skill_level?: number | null;
+      usta_rating?: string | null;
+      wins?: number | null;
+      losses?: number | null;
+      competitiveness?: string | null;
+      age_range?: string | null;
+      city?: string | null;
     };
     date: string;
     start_time: string;
@@ -44,9 +62,48 @@ const MatchInviteCard: React.FC<MatchInviteCardProps> = ({
   const isReceiver = invite.sender_id !== currentUserId;
   const isPending = invite.status === 'pending';
   
-  const opponentName = isReceiver
-    ? `${invite.sender?.first_name} ${invite.sender?.last_name}`
-    : `${invite.receiver?.first_name} ${invite.receiver?.last_name}`;
+  const opponent = isReceiver ? invite.sender : invite.receiver;
+  const opponentName = `${opponent?.first_name || ''} ${opponent?.last_name || ''}`.trim() || 'Opponent';
+
+  const getSkillBadgeColor = (skillLevel?: number | null) => {
+    if (!skillLevel) return 'bg-gray-100 text-gray-800 border-gray-200';
+    if (skillLevel >= 8) return 'bg-red-100 text-red-800 border-red-200';
+    if (skillLevel >= 6) return 'bg-orange-100 text-orange-800 border-orange-200';
+    if (skillLevel >= 4) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    return 'bg-green-100 text-green-800 border-green-200';
+  };
+
+  const getSkillLabel = (skillLevel?: number | null) => {
+    if (!skillLevel) return 'Not rated';
+    if (skillLevel >= 8) return 'Advanced';
+    if (skillLevel >= 6) return 'Intermediate';
+    if (skillLevel >= 4) return 'Beginner+';
+    return 'Beginner';
+  };
+
+  const getCompetitivenessLabel = (competitiveness?: string | null) => {
+    switch (competitiveness) {
+      case 'fun': return '🎾 Just for fun';
+      case 'casual': return '😎 Casual but competitive';
+      case 'competitive': return '🏆 Very competitive';
+      default: return 'Not specified';
+    }
+  };
+
+  const getAgeRangeLabel = (ageRange?: string | null) => {
+    switch (ageRange) {
+      case 'under-18': return 'Under 18';
+      case '18-29': return '18-29';
+      case '30-39': return '30-39';
+      case '40-49': return '40-49';
+      case '50-59': return '50-59';
+      case '60-plus': return '60+';
+      default: return 'Not specified';
+    }
+  };
+
+  const totalMatches = (opponent?.wins || 0) + (opponent?.losses || 0);
+  const winRate = totalMatches > 0 ? Math.round(((opponent?.wins || 0) / totalMatches) * 100) : 0;
 
   const handleAccept = async () => {
     setLoading(true);
@@ -120,6 +177,40 @@ const MatchInviteCard: React.FC<MatchInviteCardProps> = ({
                 {invite.home_away_indicator} Game
               </Badge>
             )}
+          </div>
+
+          {/* Player Profile Information */}
+          <div className="bg-muted/30 rounded-lg p-3 space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge 
+                variant="outline" 
+                className={`${getSkillBadgeColor(opponent?.skill_level)} text-xs`}
+              >
+                {getSkillLabel(opponent?.skill_level)} • {opponent?.skill_level || '?'}/10
+              </Badge>
+              {opponent?.usta_rating && (
+                <Badge variant="secondary" className="text-xs">
+                  USTA {opponent.usta_rating}
+                </Badge>
+              )}
+              <Badge variant="outline" className="text-xs">
+                {totalMatches} matches • {winRate}% win rate
+              </Badge>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
+              <div>
+                <span className="font-medium">Style:</span> {getCompetitivenessLabel(opponent?.competitiveness)}
+              </div>
+              <div>
+                <span className="font-medium">Age:</span> {getAgeRangeLabel(opponent?.age_range)}
+              </div>
+              {opponent?.city && (
+                <div className="sm:col-span-2">
+                  <span className="font-medium">Location:</span> {opponent.city}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">

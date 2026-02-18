@@ -27,6 +27,25 @@ export const useFriendRequests = () => {
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
+  const getRelationshipWith = (otherUserId?: string) => {
+    if (!user || !otherUserId) return 'none' as const;
+
+    const existing = requests.find(r =>
+      (r.sender_id === user.id && r.receiver_id === otherUserId) ||
+      (r.sender_id === otherUserId && r.receiver_id === user.id)
+    );
+
+    if (!existing) return 'none' as const;
+    if (existing.status === 'accepted') return 'friends' as const;
+
+    if (existing.status === 'pending') {
+      if (existing.sender_id === user.id) return 'pending_sent' as const;
+      return 'pending_received' as const;
+    }
+
+    return 'none' as const;
+  };
+
   const fetchRequests = async () => {
     if (!user) return;
 
@@ -49,18 +68,24 @@ export const useFriendRequests = () => {
         userIds.add(req.receiver_id);
       });
 
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email, profile_picture_url')
-        .in('id', Array.from(userIds));
+      let profilesData: any[] = [];
+      if (userIds.size > 0) {
+        const { data, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email, profile_picture_url')
+          .in('id', Array.from(userIds));
 
-      if (profilesError) throw profilesError;
+        // If profile enrichment fails (often due to RLS), still show requests.
+        if (profilesError) {
+          console.error('Error fetching profiles for friend requests:', profilesError);
+        } else {
+          profilesData = data || [];
+        }
+      }
 
       // Create a map of profiles for quick lookup
       const profilesMap = new Map();
-      (profilesData || []).forEach(profile => {
-        profilesMap.set(profile.id, profile);
-      });
+      (profilesData || []).forEach(profile => profilesMap.set(profile.id, profile));
 
       const transformedRequests = (friendRequestsData || []).map((req: any) => {
         const senderProfile = profilesMap.get(req.sender_id);
@@ -183,6 +208,7 @@ export const useFriendRequests = () => {
     sendFriendRequest,
     updateRequestStatus,
     getPendingRequestsCount,
+    getRelationshipWith,
     refetch: fetchRequests
   };
 };

@@ -13,19 +13,19 @@ type MatchInvite = Tables<'match_invites'> & {
     first_name: string;
     last_name: string;
     email: string;
-  };
+  } & Partial<Tables<'players'>>;
   receiver?: {
     id: string;
     first_name: string;
     last_name: string;
     email: string;
-  };
+  } & Partial<Tables<'players'>>;
   proposed_by?: {
     id: string;
     first_name: string;
     last_name: string;
     email: string;
-  };
+  } & Partial<Tables<'players'>>;
 };
 
 export const useMatchInvites = () => {
@@ -173,18 +173,33 @@ export const useMatchInvites = () => {
         (inviteData || []).flatMap(invite => [invite.sender_id, invite.receiver_id])
       ));
 
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email')
-        .in('id', uniqueUserIds);
+      // Fetch both profiles and player data
+      const [{ data: profiles }, { data: players }] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .in('id', uniqueUserIds),
+        supabase
+          .from('players')
+          .select('*')
+          .in('user_id', uniqueUserIds)
+      ]);
 
       const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      const playerMap = new Map(players?.map(p => [p.user_id, p]) || []);
 
-      const invitesWithProfiles: MatchInvite[] = (inviteData || []).map(invite => ({
-        ...invite,
-        sender: profileMap.get(invite.sender_id),
-        receiver: profileMap.get(invite.receiver_id),
-      }));
+      const invitesWithProfiles: MatchInvite[] = (inviteData || []).map(invite => {
+        const senderProfile = profileMap.get(invite.sender_id);
+        const receiverProfile = profileMap.get(invite.receiver_id);
+        const senderPlayer = playerMap.get(invite.sender_id);
+        const receiverPlayer = playerMap.get(invite.receiver_id);
+
+        return {
+          ...invite,
+          sender: senderProfile ? { ...senderProfile, ...(senderPlayer || {}) } : undefined,
+          receiver: receiverProfile ? { ...receiverProfile, ...(receiverPlayer || {}) } : undefined,
+        };
+      });
       
       setInvites(invitesWithProfiles);
     } catch (error) {
