@@ -1,10 +1,12 @@
 import React, { useRef, useEffect } from 'react';
-import { Search, User, Trophy, X, Loader2 } from 'lucide-react';
+import { Search, User, Trophy, X, Loader2, UserPlus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { usePlayerSearch, SearchResult } from '@/hooks/usePlayerSearch';
+import { useFriendRequests } from '@/hooks/useFriendRequests';
 import PlayerProfileModal from './PlayerProfileModal';
+import { toast } from 'sonner';
 
 interface PlayerSearchProps {
   onPlayerSelect?: (player: SearchResult) => void;
@@ -24,7 +26,7 @@ const PlayerSearch = ({
     isSearching, 
     clearSearch 
   } = usePlayerSearch();
-  
+  const { sendFriendRequest } = useFriendRequests();
   const [showResults, setShowResults] = React.useState(false);
   const [selectedPlayer, setSelectedPlayer] = React.useState<SearchResult | null>(null);
   const [showPlayerModal, setShowPlayerModal] = React.useState(false);
@@ -52,13 +54,26 @@ const PlayerSearch = ({
     setSelectedPlayer(player);
     setShowPlayerModal(true);
     onPlayerSelect?.(player);
-    setSearchTerm('');
-    setShowResults(false);
+  };
+
+  const handleSendFriendRequest = async (player: SearchResult) => {
+    if (!player.user_id) {
+      toast.error('Cannot send friend request to this player');
+      return;
+    }
+    
+    try {
+      await sendFriendRequest(player.user_id);
+      toast.success('Friend request sent successfully');
+    } catch (error) {
+      toast.error('Failed to send friend request');
+    }
   };
 
   const handleClear = () => {
     clearSearch();
     setShowResults(false);
+    setSearchTerm('');
   };
 
   const handleInputFocus = () => {
@@ -166,6 +181,26 @@ const PlayerSearch = ({
                           </Badge>
                         )}
                       </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2 mt-2">
+                      <Button
+                        size="sm"
+                        onClick={() => handlePlayerSelect(player)}
+                        className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
+                      >
+                        View Profile
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleSendFriendRequest(player)}
+                        className="flex-1 border-green-300 text-green-600 hover:bg-green-50"
+                        disabled={!player.user_id}
+                      >
+                        <UserPlus className="w-3 h-3 mr-1" />
+                        Send Friend Request
+                      </Button>
                     </div>
                   </div>
                 ))}
