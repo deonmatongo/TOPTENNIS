@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 export const useBrowserNotifications = () => {
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [isSupported, setIsSupported] = useState(false);
-  const notificationQueue = useRef<Array<{title: string, options?: NotificationOptions & { clickUrl?: string; respectFocus?: boolean }>>([]);
+  const notificationQueue = useRef<Array<{title: string; options?: NotificationOptions & { clickUrl?: string; respectFocus?: boolean }>>([]);
 
   useEffect(() => {
     // Check if notifications are supported
@@ -35,14 +35,10 @@ export const useBrowserNotifications = () => {
       }
       
       return result;
-    } else {
-      console.warn('Notification permission denied:', result);
-      return result;
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
+      return 'denied';
     }
-  } catch (error) {
-    console.error('Error requesting notification permission:', error);
-    return 'denied';
-  }
   }, [isSupported]);
 
   const sendNotification = useCallback((title: string, options?: NotificationOptions & { clickUrl?: string; respectFocus?: boolean }) => {
@@ -65,7 +61,6 @@ export const useBrowserNotifications = () => {
         requireInteraction: false,
         icon: '/favicon.ico',
         badge: '1',
-        vibrate: [200, 100, 200],
         ...options,
       });
 
