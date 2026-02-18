@@ -7,25 +7,41 @@ import { toast } from 'sonner';
 import { useBrowserNotifications } from './useBrowserNotifications';
 import { logger } from '@/utils/logger';
 
+export interface PlayerProfile {
+  id: string;
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  skill_level?: number;
+  wins?: number;
+  losses?: number;
+  usta_rating?: string;
+  competitiveness?: string;
+  age_range?: string;
+  phone?: string;
+  gender?: string;
+  networking_enabled?: boolean;
+  profile_picture_url?: string;
+  [key: string]: any;
+} 
+
 type MatchInvite = Tables<'match_invites'> & {
-  sender?: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-  } & Partial<Tables<'players'>>;
-  receiver?: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-  } & Partial<Tables<'players'>>;
-  proposed_by?: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-  } & Partial<Tables<'players'>>;
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  status: string;
+  created_at: string;
+  updated_at?: string;
+  proposed_date?: string;
+  proposed_start_time?: string;
+  proposed_end_time?: string;
+  court_location?: string;
+  message?: string;
+  home_away_indicator?: string;
+  sender?: PlayerProfile & Partial<Tables<'players'>>;
+  receiver?: PlayerProfile & Partial<Tables<'players'>>;
+  proposed_by?: PlayerProfile & Partial<Tables<'players'>>;
 };
 
 export const useMatchInvites = () => {
@@ -54,12 +70,26 @@ export const useMatchInvites = () => {
           
           // Only show notification if current user is receiver
           if (newInvite.receiver_id === user.id) {
-            // Fetch sender profile for notification
-            const { data: senderProfile } = await supabase
+            // Fetch receiver profile for notification
+            const { data: receiverProfile } = await supabase
               .from('profiles')
-              .select('first_name, last_name')
-              .eq('id', newInvite.sender_id)
+              .select('id, first_name, last_name, email, skill_level, wins, losses, usta_rating, competitiveness, age_range, phone, gender, networking_enabled, profile_picture_url')
+              .eq('id', newInvite.receiver_id)
               .single();
+              
+              // Handle case where profile doesn't exist (user might be deleted)
+              if (!receiverProfile) {
+                console.warn('Receiver profile not found for user:', newInvite.receiver_id);
+                const fallbackProfile = {
+                  first_name: 'Unknown',
+                  last_name: 'User',
+                  email: 'Unknown',
+                  profile_picture_url: null
+                };
+                const senderName = `${fallbackProfile.first_name} ${fallbackProfile.last_name}`;
+              } else {
+                const senderName = `${senderProfile.first_name} ${senderProfile.last_name}`;
+              }
             
             if (senderProfile) {
               const senderName = `${senderProfile.first_name} ${senderProfile.last_name}`;
@@ -86,23 +116,20 @@ export const useMatchInvites = () => {
           
           // Check if status changed
           if (oldInvite.status !== updatedInvite.status) {
-            // If current user is the sender, notify them of receiver's response
-            if (updatedInvite.sender_id === user.id) {
+            // If current user is receiver, notify them of sender's response
+            if (updatedInvite.receiver_id === user.id) {
               const { data: receiverProfile } = await supabase
                 .from('profiles')
-                .select('first_name, last_name')
-                .eq('id', updatedInvite.receiver_id)
+                .select('id, first_name, last_name, email, skill_level, wins, losses, usta_rating, competitiveness, age_range, phone, gender, networking_enabled, profile_picture_url')
+                .eq('id', updatedInvite.sender_id)
                 .single();
               
               if (receiverProfile) {
                 const receiverName = `${receiverProfile.first_name} ${receiverProfile.last_name}`;
+                const message = updatedInvite.status === 'accepted' 
+                  ? `Match invitation from ${oldInvite.sender?.first_name || 'Opponent'} accepted!`
+                  : `Match invitation from ${oldInvite.sender?.first_name || 'Opponent'} declined`;
                 
-                if (updatedInvite.status === 'accepted') {
-                  const message = `${receiverName} accepted your match invite!`;
-                  toast.success(message, {
-                    duration: 5000,
-                  });
-                  
                   sendNotification('Match Invite Accepted', {
                     body: message,
                     tag: updatedInvite.id,
