@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useMatchSuggestions } from "@/hooks/useMatchSuggestions";
+import { useBlockedUsers } from "@/hooks/useBlockedUsers";
 import { Users, Star, Trophy, Target, RefreshCw, UserCheck, UserX, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { PlayerScheduleModal } from './dashboard/PlayerScheduleModal';
@@ -16,13 +17,15 @@ const MatchSuggestions = ({ competitivenessFilter }: MatchSuggestionsProps) => {
   const [selectedPlayer, setSelectedPlayer] = useState<Tables<'players'> | null>(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   
+  const { blockedUsers } = useBlockedUsers();
+  const blockedUserIds = blockedUsers.map(b => b.blocked_user_id);
   const { 
     suggestions, 
     loading, 
     error, 
     generateSuggestions, 
     updateSuggestionStatus 
-  } = useMatchSuggestions(competitivenessFilter);
+  } = useMatchSuggestions(competitivenessFilter, blockedUserIds);
 
   const handleGenerateSuggestions = async () => {
     try {

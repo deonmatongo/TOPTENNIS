@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { usePlayerSearch, SearchResult } from '@/hooks/usePlayerSearch';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
+import { useBlockedUsers } from '@/hooks/useBlockedUsers';
 import PlayerProfileModal from './PlayerProfileModal';
 import { toast } from 'sonner';
 
@@ -19,13 +20,15 @@ const PlayerSearch = ({
   placeholder = "Search players...",
   className = ""
 }: PlayerSearchProps) => {
+  const { blockedUsers } = useBlockedUsers();
+  const blockedUserIds = blockedUsers.map(b => b.blocked_user_id);
   const { 
     searchTerm, 
     setSearchTerm, 
     searchResults, 
     isSearching, 
     clearSearch 
-  } = usePlayerSearch();
+  } = usePlayerSearch(blockedUserIds);
   const { sendFriendRequest } = useFriendRequests();
   const [showResults, setShowResults] = React.useState(false);
   const [selectedPlayer, setSelectedPlayer] = React.useState<SearchResult | null>(null);
@@ -94,9 +97,8 @@ const PlayerSearch = ({
   };
 
   const getSkillLabel = (skillLevel: number) => {
-    if (skillLevel >= 8) return 'Advanced';
-    if (skillLevel >= 6) return 'Intermediate';
-    if (skillLevel >= 4) return 'Beginner+';
+    if (skillLevel >= 7) return 'Advanced';
+    if (skillLevel >= 4) return 'Intermediate';
     return 'Beginner';
   };
 

@@ -70,42 +70,25 @@ export const useMatchInvites = () => {
           
           // Only show notification if current user is receiver
           if (newInvite.receiver_id === user.id) {
-            // Fetch receiver profile for notification
-            const { data: receiverProfile } = await supabase
+            // Fetch sender's profile for the notification message
+            const { data: senderProfile } = await supabase
               .from('profiles')
-              .select('id, first_name, last_name, email, skill_level, wins, losses, usta_rating, competitiveness, age_range, phone, gender, networking_enabled, profile_picture_url')
-              .eq('id', newInvite.receiver_id)
+              .select('first_name, last_name')
+              .eq('id', newInvite.sender_id)
               .single();
-              
-              // Handle case where profile doesn't exist (user might be deleted)
-              if (!receiverProfile) {
-                console.warn('Receiver profile not found for user:', newInvite.receiver_id);
-                const fallbackProfile = {
-                  first_name: 'Unknown',
-                  last_name: 'User',
-                  email: 'Unknown',
-                  profile_picture_url: null
-                };
-                const senderName = `${fallbackProfile.first_name} ${fallbackProfile.last_name}`;
-              } else {
-                const senderName = `${senderProfile.first_name} ${senderProfile.last_name}`;
-              }
             
-            if (senderProfile) {
-              const senderName = `${senderProfile.first_name} ${senderProfile.last_name}`;
-              const message = `New match invite from ${senderName}!`;
-              
-              toast.info(message, {
-                duration: 5000,
-              });
-              
-              // Send browser notification with click action
-              sendNotification('New Match Invite', {
-                body: message,
-                tag: newInvite.id,
-                clickUrl: '/dashboard?tab=schedule',
-              });
-            }
+            const senderName = senderProfile
+              ? `${senderProfile.first_name} ${senderProfile.last_name}`.trim()
+              : 'Someone';
+            const message = `New match invite from ${senderName}!`;
+            
+            toast.info(message, { duration: 5000 });
+            
+            sendNotification('New Match Invite', {
+              body: message,
+              tag: newInvite.id,
+              clickUrl: '/dashboard?tab=schedule',
+            });
           }
         }
         
@@ -116,61 +99,45 @@ export const useMatchInvites = () => {
           
           // Check if status changed
           if (oldInvite.status !== updatedInvite.status) {
-            // If current user is receiver, notify them of sender's response
-            if (updatedInvite.receiver_id === user.id) {
-              const { data: receiverProfile } = await supabase
-                .from('profiles')
-                .select('id, first_name, last_name, email, skill_level, wins, losses, usta_rating, competitiveness, age_range, phone, gender, networking_enabled, profile_picture_url')
-                .eq('id', updatedInvite.sender_id)
-                .single();
-              
-              if (receiverProfile) {
-                const receiverName = `${receiverProfile.first_name} ${receiverProfile.last_name}`;
-                const message = updatedInvite.status === 'accepted' 
-                  ? `Match invitation from ${oldInvite.sender?.first_name || 'Opponent'} accepted!`
-                  : `Match invitation from ${oldInvite.sender?.first_name || 'Opponent'} declined`;
-                
-                  sendNotification('Match Invite Accepted', {
-                    body: message,
-                    tag: updatedInvite.id,
-                    clickUrl: '/dashboard?tab=schedule',
-                  });
-                } else if (updatedInvite.status === 'declined') {
-                  const message = `${receiverName} declined your match invite`;
-                  toast.info(message, {
-                    duration: 5000,
-                  });
-                  
-                  sendNotification('Match Invite Declined', {
-                    body: message,
-                    tag: updatedInvite.id,
-                    clickUrl: '/dashboard?tab=schedule',
-                  });
-                }
-              }
-            }
-            
-            // If current user is the receiver and status changed to cancelled
-            if (updatedInvite.receiver_id === user.id && updatedInvite.status === 'cancelled') {
-              const { data: senderProfile } = await supabase
-                .from('profiles')
-                .select('first_name, last_name')
-                .eq('id', updatedInvite.sender_id)
-                .single();
-              
-              if (senderProfile) {
-                const senderName = `${senderProfile.first_name} ${senderProfile.last_name}`;
-                const message = `${senderName} cancelled the match`;
-                toast.info(message, {
-                  duration: 5000,
-                });
-                
-                sendNotification('Match Cancelled', {
-                  body: message,
-                  tag: updatedInvite.id,
-                  clickUrl: '/dashboard?tab=schedule',
-                });
-              }
+            // Fetch the other party's profile for the notification message
+            const otherUserId = updatedInvite.receiver_id === user.id
+              ? updatedInvite.sender_id
+              : updatedInvite.receiver_id;
+
+            const { data: otherProfile } = await supabase
+              .from('profiles')
+              .select('first_name, last_name')
+              .eq('id', otherUserId)
+              .single();
+
+            const otherName = otherProfile
+              ? `${otherProfile.first_name} ${otherProfile.last_name}`.trim()
+              : 'Opponent';
+
+            if (updatedInvite.status === 'accepted' && updatedInvite.receiver_id === user.id) {
+              const message = `${otherName} accepted your match invite`;
+              toast.success(message, { duration: 5000 });
+              sendNotification('Match Invite Accepted', {
+                body: message,
+                tag: updatedInvite.id,
+                clickUrl: '/dashboard?tab=schedule',
+              });
+            } else if (updatedInvite.status === 'declined' && updatedInvite.receiver_id === user.id) {
+              const message = `${otherName} declined your match invite`;
+              toast.info(message, { duration: 5000 });
+              sendNotification('Match Invite Declined', {
+                body: message,
+                tag: updatedInvite.id,
+                clickUrl: '/dashboard?tab=schedule',
+              });
+            } else if (updatedInvite.status === 'cancelled') {
+              const message = `${otherName} cancelled the match`;
+              toast.info(message, { duration: 5000 });
+              sendNotification('Match Cancelled', {
+                body: message,
+                tag: updatedInvite.id,
+                clickUrl: '/dashboard?tab=schedule',
+              });
             }
           }
         }
@@ -223,8 +190,16 @@ export const useMatchInvites = () => {
 
         return {
           ...invite,
-          sender: senderProfile ? { ...senderProfile, ...(senderPlayer || {}) } : undefined,
-          receiver: receiverProfile ? { ...receiverProfile, ...(receiverPlayer || {}) } : undefined,
+          sender: senderProfile ? {
+            user_id: invite.sender_id,
+            ...senderProfile,
+            ...(senderPlayer || {}),
+          } as any : undefined,
+          receiver: receiverProfile ? {
+            user_id: invite.receiver_id,
+            ...receiverProfile,
+            ...(receiverPlayer || {}),
+          } as any : undefined,
         };
       });
       
@@ -282,6 +257,26 @@ export const useMatchInvites = () => {
       
       // Replace optimistic data with real data from server
       await fetchInvites();
+
+      // Notify the receiver
+      const { data: senderProfile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('id', user.id)
+        .single();
+      const senderName = senderProfile
+        ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim()
+        : 'Someone';
+      await supabase.from('notifications').insert({
+        user_id: inviteData.receiver_id,
+        type: 'match_invite',
+        title: 'New Match Invitation',
+        message: `${senderName} invited you to a match on ${inviteData.date} at ${inviteData.start_time}`,
+        read: false,
+        action_url: '/dashboard?tab=schedule',
+        metadata: { match_id: data?.id, sender_id: user.id },
+      });
+
       toast.success('Match invite sent successfully');
       return data;
     } catch (error) {
@@ -355,6 +350,28 @@ export const useMatchInvites = () => {
         throw new Error('No data returned from update');
       }
 
+      // Notify the other party of the response
+      const otherUserId = invite.sender_id === user.id ? invite.receiver_id : invite.sender_id;
+      const { data: responderProfile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('id', user.id)
+        .single();
+      const responderName = responderProfile
+        ? `${responderProfile.first_name || ''} ${responderProfile.last_name || ''}`.trim()
+        : 'Someone';
+      await supabase.from('notifications').insert({
+        user_id: otherUserId,
+        type: status === 'accepted' ? 'match_accepted' : 'match_declined',
+        title: status === 'accepted' ? 'Match Invitation Accepted' : 'Match Invitation Declined',
+        message: status === 'accepted'
+          ? `${responderName} accepted your match invitation`
+          : `${responderName} declined your match invitation`,
+        read: false,
+        action_url: '/dashboard?tab=schedule',
+        metadata: { match_id: inviteId },
+      });
+
       // If accepted, create a conversation between the users (in background)
       if (status === 'accepted') {
         createConversation(invite).catch(convError => {
@@ -403,6 +420,29 @@ export const useMatchInvites = () => {
 
       toast.success("New time proposed!");
       await fetchInvites();
+
+      // Notify the other party of the proposed reschedule
+      const invite = invites.find(i => i.id === inviteId);
+      if (invite) {
+        const otherUserId = invite.sender_id === user.id ? invite.receiver_id : invite.sender_id;
+        const { data: proposerProfile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('id', user.id)
+          .single();
+        const proposerName = proposerProfile
+          ? `${proposerProfile.first_name || ''} ${proposerProfile.last_name || ''}`.trim()
+          : 'Someone';
+        await supabase.from('notifications').insert({
+          user_id: otherUserId,
+          type: 'match_rescheduled',
+          title: 'New Time Proposed',
+          message: `${proposerName} proposed a new time for your match: ${newDate} at ${newStartTime}`,
+          read: false,
+          action_url: '/dashboard?tab=schedule',
+          metadata: { match_id: inviteId },
+        });
+      }
     } catch (error) {
       logger.error('Error proposing new time', { error, inviteId });
       toast.error("Failed to propose new time");
@@ -451,6 +491,29 @@ export const useMatchInvites = () => {
 
       toast.success("Proposed time accepted!");
       await fetchInvites();
+
+      // Notify the proposer that their new time was accepted
+      const inv = invites.find(i => i.id === inviteId);
+      if (inv) {
+        const otherUserId = inv.sender_id === user.id ? inv.receiver_id : inv.sender_id;
+        const { data: acceptorProfile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('id', user.id)
+          .single();
+        const acceptorName = acceptorProfile
+          ? `${acceptorProfile.first_name || ''} ${acceptorProfile.last_name || ''}`.trim()
+          : 'Someone';
+        await supabase.from('notifications').insert({
+          user_id: otherUserId,
+          type: 'match_accepted',
+          title: 'Proposed Time Accepted',
+          message: `${acceptorName} accepted your proposed match time`,
+          read: false,
+          action_url: '/dashboard?tab=schedule',
+          metadata: { match_id: inviteId },
+        });
+      }
     } catch (error) {
       logger.error('Error accepting proposed time', { error, inviteId });
       toast.error("Failed to accept proposed time");
@@ -512,7 +575,30 @@ export const useMatchInvites = () => {
         .eq('id', inviteId);
 
       if (error) throw error;
-      
+
+      // Notify the other party of the cancellation
+      const invite = invites.find(i => i.id === inviteId);
+      if (invite && user) {
+        const otherUserId = invite.sender_id === user.id ? invite.receiver_id : invite.sender_id;
+        const { data: cancellerProfile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('id', user.id)
+          .single();
+        const cancellerName = cancellerProfile
+          ? `${cancellerProfile.first_name || ''} ${cancellerProfile.last_name || ''}`.trim()
+          : 'Someone';
+        await supabase.from('notifications').insert({
+          user_id: otherUserId,
+          type: 'match_cancelled',
+          title: 'Match Cancelled',
+          message: `${cancellerName} cancelled the match`,
+          read: false,
+          action_url: '/dashboard?tab=schedule',
+          metadata: { match_id: inviteId },
+        });
+      }
+
       await fetchInvites();
       toast.success('Match invite cancelled');
     } catch (error) {

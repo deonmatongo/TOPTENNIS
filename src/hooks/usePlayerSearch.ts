@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface SearchResult {
   id: string;
@@ -17,13 +18,14 @@ export interface SearchResult {
   last_name?: string;
 }
 
-export const usePlayerSearch = () => {
+export const usePlayerSearch = (blockedUserIds: string[] = []) => {
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [allPlayers, setAllPlayers] = useState<SearchResult[]>([]);
 
-  // Fetch all players on mount
+  // Fetch all players on mount (re-fetch when current user or blocked list changes)
   useEffect(() => {
     const fetchAllPlayers = async () => {
       try {
@@ -53,6 +55,7 @@ export const usePlayerSearch = () => {
         }
 
         // Combine the data - include all players, prioritizing those with networking enabled
+        const blockedSet = new Set(blockedUserIds);
         const playersWithNetworking = (playersData || []).map(player => {
           const profile = profilesData?.find(p => p.id === player.user_id);
           return {
@@ -61,7 +64,11 @@ export const usePlayerSearch = () => {
             first_name: profile?.first_name,
             last_name: profile?.last_name
           };
-        }).filter(player => player.networking_enabled !== false); // Include null/undefined as enabled
+        }).filter(player =>
+          player.networking_enabled !== false &&
+          player.user_id !== user?.id &&
+          !blockedSet.has(player.user_id)
+        );
         
         console.log(`Found ${playersWithNetworking.length} searchable players`);
         setAllPlayers(playersWithNetworking);
@@ -75,10 +82,13 @@ export const usePlayerSearch = () => {
             .order('name');
           
           if (fallbackData) {
-            const fallbackPlayers = fallbackData.map(player => ({
-              ...player,
-              networking_enabled: true
-            }));
+            const blockedSet = new Set(blockedUserIds);
+            const fallbackPlayers = fallbackData
+              .filter(player => player.user_id !== user?.id && !blockedSet.has(player.user_id))
+              .map(player => ({
+                ...player,
+                networking_enabled: true
+              }));
             console.log(`Fallback: Found ${fallbackPlayers.length} players`);
             setAllPlayers(fallbackPlayers);
           }
@@ -89,7 +99,8 @@ export const usePlayerSearch = () => {
     };
 
     fetchAllPlayers();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, blockedUserIds.join(',')]);
 
   // Search function with debouncing
   const searchPlayers = useCallback(

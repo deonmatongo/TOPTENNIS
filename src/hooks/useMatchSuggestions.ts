@@ -8,7 +8,7 @@ type MatchSuggestion = Tables<'match_suggestions'> & {
   suggested_player?: Tables<'players'>;
 };
 
-export const useMatchSuggestions = (competitivenessFilter?: string) => {
+export const useMatchSuggestions = (competitivenessFilter?: string, blockedUserIds: string[] = []) => {
   const { user } = useAuth();
   const [suggestions, setSuggestions] = useState<MatchSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -212,7 +212,11 @@ export const useMatchSuggestions = (competitivenessFilter?: string) => {
         
         setSuggestions(dummyCasualPlayers);
       } else {
-        setSuggestions(data || []);
+        const blockedSet = new Set(blockedUserIds);
+        const filtered = (data || []).filter(
+          (s: MatchSuggestion) => !blockedSet.has(s.suggested_player?.user_id ?? '')
+        );
+        setSuggestions(filtered);
       }
     } catch (err) {
       console.error('Unexpected error:', err);

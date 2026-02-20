@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Clock, MapPin, User, Calendar, AlertCircle, X } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Clock, MapPin, Calendar, AlertCircle, X, ExternalLink } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { MatchWithResponse } from '@/hooks/useMatchResponses';
 import {
@@ -18,6 +19,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useMatchInvites } from '@/hooks/useMatchInvites';
+import PlayerProfileModal from './PlayerProfileModal';
 
 interface PendingMatchInviteCardProps {
   match: MatchWithResponse;
@@ -27,9 +29,31 @@ interface PendingMatchInviteCardProps {
 export const PendingMatchInviteCard = ({ match, onRespond }: PendingMatchInviteCardProps) => {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const { cancelInvite } = useMatchInvites();
   const matchDate = match.proposed_start ? parseISO(match.proposed_start) : parseISO(match.match_date);
   const isProposedTime = !!match.proposed_start;
+
+  const opponent = match.opponent_profile;
+  const opponentInitials = opponent
+    ? `${opponent.first_name?.charAt(0) ?? ''}${opponent.last_name?.charAt(0) ?? ''}`.toUpperCase() || opponent.name.charAt(0).toUpperCase()
+    : '?';
+
+  const playerForModal = opponent ? {
+    id: opponent.user_id,
+    user_id: opponent.user_id,
+    name: opponent.name,
+    email: opponent.email ?? '',
+    skill_level: opponent.skill_level ?? 0,
+    wins: opponent.wins ?? 0,
+    losses: opponent.losses ?? 0,
+    usta_rating: opponent.usta_rating,
+    competitiveness: opponent.competitiveness,
+    age_range: opponent.age_range,
+    networking_enabled: opponent.networking_enabled,
+    first_name: opponent.first_name,
+    last_name: opponent.last_name,
+  } : null;
 
   const handleCancel = async () => {
     await cancelInvite(match.id, cancellationReason || undefined);
@@ -79,42 +103,65 @@ export const PendingMatchInviteCard = ({ match, onRespond }: PendingMatchInviteC
     <>
       <Card className="overflow-hidden border-l-4 border-l-primary hover:shadow-md transition-shadow">
         <CardContent className="p-4">
-          <div className="flex items-start justify-between mb-3">
-            <div className="space-y-2 flex-1">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="font-semibold text-foreground">
-                  vs {match.player1?.name || match.player2?.name}
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Calendar className="h-3.5 w-3.5" />
-                  <span>{format(matchDate, 'EEE, MMM d')}</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Clock className="h-3.5 w-3.5" />
-                  <span>{format(matchDate, 'HH:mm')}</span>
-                </div>
-              </div>
-              
-              {match.court_location && (
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <MapPin className="h-3.5 w-3.5" />
-                  <span>{match.court_location}</span>
-                </div>
+          {/* Opponent header row */}
+          <div className="flex items-center gap-3 mb-3">
+            <Avatar className="h-10 w-10 flex-shrink-0">
+              <AvatarImage src={opponent?.profile_picture_url} alt={opponent?.name} />
+              <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">
+                {opponentInitials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-foreground text-sm truncate">
+                vs {opponent?.name || match.player1?.name || match.player2?.name}
+              </p>
+              {opponent?.skill_level && (
+                <p className="text-xs text-muted-foreground">
+                  Skill {opponent.skill_level}/10
+                  {opponent.usta_rating ? ` · USTA ${opponent.usta_rating}` : ''}
+                </p>
               )}
+            </div>
+            <div className="flex flex-col items-end gap-1.5">
+              {getStatusBadge()}
+              {opponent && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowProfileModal(true)}
+                  className="h-6 px-2 text-xs text-primary hover:text-primary/80 gap-1"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Profile
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Match details */}
+          <div className="space-y-1.5 mb-3">
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Calendar className="h-3.5 w-3.5" />
+                <span>{format(matchDate, 'EEE, MMM d')}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" />
+                <span>{format(matchDate, 'HH:mm')}</span>
+              </div>
             </div>
             
-            <div className="flex flex-col items-end gap-2">
-              {getStatusBadge()}
-              {isProposedTime && (
-                <span className="text-xs text-muted-foreground">
-                  Attempt {match.reschedule_count}/3
-                </span>
-              )}
-            </div>
+            {match.court_location && (
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <MapPin className="h-3.5 w-3.5" />
+                <span>{match.court_location}</span>
+              </div>
+            )}
+            {isProposedTime && (
+              <span className="text-xs text-muted-foreground">
+                Reschedule attempt {match.reschedule_count}/3
+              </span>
+            )}
           </div>
 
           {isProposedTime && (
@@ -177,6 +224,14 @@ export const PendingMatchInviteCard = ({ match, onRespond }: PendingMatchInviteC
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {playerForModal && (
+        <PlayerProfileModal
+          player={playerForModal}
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+        />
+      )}
     </>
   );
 };

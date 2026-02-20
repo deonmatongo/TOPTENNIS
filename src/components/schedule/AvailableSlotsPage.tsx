@@ -290,7 +290,7 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack, 
                             : `${slot.start_time} - ${slot.end_time}`}
                         </span>
                         <Badge variant={slot.privacy_level === 'public' ? 'default' : 'secondary'}>
-                          {slot.privacy_level}
+                          {slot.privacy_level === 'public' ? 'Public' : 'Private'}
                         </Badge>
                         {slot.timezone && (
                           <Badge variant="outline" className="text-xs">
@@ -370,7 +370,7 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack, 
                                 {slot.start_time} - {slot.end_time}
                               </span>
                               <Badge variant="outline" className="text-xs">
-                                {slot.privacy_level}
+                                {slot.privacy_level === 'public' ? 'Public' : 'Private'}
                               </Badge>
                             </div>
                             {slot.notes && (

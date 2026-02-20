@@ -77,7 +77,7 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
 
     // Set up connection monitoring with heartbeat
     const heartbeatInterval = setInterval(() => {
-      if (channel.state === 'SUBSCRIBED') {
+      if ((channel.state as string) === 'joined') {
         // Send heartbeat to keep connection alive
         try {
           channel.send({
@@ -93,14 +93,14 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
 
     // Set up connection monitoring
     const connectionMonitor = setInterval(() => {
-      const wasConnected = isConnected;
-      const currentlyConnected = channel.isConnected;
-      
-      if (wasConnected !== currentlyConnected) {
-        setIsConnected(currentlyConnected);
-        setIsReconnecting(!currentlyConnected && wasConnected);
-        console.log(`Connection status changed: ${wasConnected} -> ${currentlyConnected}`);
-      }
+      const currentlyConnected = (channel.state as string) === 'joined';
+      setIsConnected(prev => {
+        if (prev !== currentlyConnected) {
+          setIsReconnecting(!currentlyConnected);
+          console.log(`Connection status changed: ${prev} -> ${currentlyConnected}`);
+        }
+        return currentlyConnected;
+      });
     }, 5000); // Check every 5 seconds
 
     return () => {
@@ -108,7 +108,7 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
       clearInterval(heartbeatInterval);
       clearInterval(connectionMonitor);
     };
-  };, [user]);
+  }, [user]);
 
   const subscribeToTable = (table: string, callback: (payload: any) => void) => {
     if (!user) return () => {};
@@ -163,7 +163,7 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
 
     // Monitor connection and attempt reconnection if needed
     const monitorConnection = () => {
-      if (!channel.isConnected && !isReconnecting) {
+      if ((channel.state as string) !== 'joined' && !isReconnecting) {
         console.log(`Connection to ${channelName} lost, attempting reconnection...`);
         setIsReconnecting(true);
         attemptReconnect();

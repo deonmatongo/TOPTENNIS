@@ -127,7 +127,28 @@ export const useFriendRequests = () => {
         });
 
       if (error) throw error;
-      
+
+      // Fetch sender name for the notification message
+      const { data: senderProfile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('id', user.id)
+        .single();
+      const senderName = senderProfile
+        ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim()
+        : 'Someone';
+
+      // Notify the receiver
+      await supabase.from('notifications').insert({
+        user_id: receiverId,
+        type: 'friend_request',
+        title: 'New Friend Request',
+        message: `${senderName} sent you a friend request`,
+        read: false,
+        action_url: '/dashboard?tab=friends',
+        metadata: { sender_id: user.id },
+      });
+
       await fetchRequests();
       return true;
     } catch (err) {
@@ -140,6 +161,9 @@ export const useFriendRequests = () => {
     if (!user) return;
 
     try {
+      // Fetch the request first so we know who the sender is
+      const request = requests.find(r => r.id === requestId);
+
       const { error } = await supabase
         .from('friend_requests')
         .update({ status })
@@ -147,7 +171,30 @@ export const useFriendRequests = () => {
         .eq('receiver_id', user.id);
 
       if (error) throw error;
-      
+
+      if (status === 'accepted' && request) {
+        // Fetch receiver (current user) name
+        const { data: receiverProfile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('id', user.id)
+          .single();
+        const receiverName = receiverProfile
+          ? `${receiverProfile.first_name || ''} ${receiverProfile.last_name || ''}`.trim()
+          : 'Someone';
+
+        // Notify the original sender that their request was accepted
+        await supabase.from('notifications').insert({
+          user_id: request.sender_id,
+          type: 'friend_request',
+          title: 'Friend Request Accepted',
+          message: `${receiverName} accepted your friend request`,
+          read: false,
+          action_url: '/dashboard?tab=friends',
+          metadata: { receiver_id: user.id },
+        });
+      }
+
       await fetchRequests();
     } catch (err) {
       console.error('Error updating friend request:', err);

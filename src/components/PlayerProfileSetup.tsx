@@ -322,9 +322,9 @@ const PlayerProfileSetup = ({
                 className="space-y-3"
               >
                 {[
-                  { value: 'beginner', label: 'Beginner', emoji: '🌱', desc: 'New to tennis or still learning basics' },
-                  { value: 'intermediate', label: 'Intermediate', emoji: '🎯', desc: 'Reliable rally and serve, comfortable playing' },
-                  { value: 'advanced', label: 'Advanced', emoji: '🏆', desc: 'League or tournament player, strong technique' }
+                  { value: 'beginner', label: 'Beginner', emoji: '🌱', desc: 'Less than 3 years of playing tennis' },
+                  { value: 'intermediate', label: 'Intermediate', emoji: '🎯', desc: '3 to 10 years of playing tennis' },
+                  { value: 'advanced', label: 'Advanced', emoji: '🏆', desc: '+10 years of playing tennis' }
                 ].map(option => (
                   <div key={option.value} className="relative">
                     <RadioGroupItem value={option.value} id={`skill-${option.value}`} className="peer absolute opacity-0" />

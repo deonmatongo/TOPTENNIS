@@ -20,97 +20,15 @@ export const useNotifications = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const { sendNotification, clearNotificationQueue, isSupported } = useBrowserNotifications();
+  const { sendNotification, isSupported } = useBrowserNotifications();
   
-  // Use ref to track if we've loaded notifications to prevent duplicate state updates
+  // Refs to hold latest values for use inside real-time callbacks (avoids stale closures)
+  const isSupportedRef = useRef(isSupported);
+  const sendNotificationRef = useRef(sendNotification);
+  // hasLoadedRef tracks whether the initial fetch has completed
   const hasLoadedRef = useRef(false);
-
-  // Mock notifications for demonstration - showing more for scrolling
-  const generateMockNotifications = useCallback((): Notification[] => [
-    {
-      id: '1',
-      type: 'match_scheduled',
-      title: 'New Match Scheduled',
-      message: 'Your match with Sarah Johnson is scheduled for tomorrow at 2:00 PM',
-      read: false,
-      createdAt: new Date(Date.now() - 1000 * 60 * 30), // 30 min ago
-      actionUrl: '/dashboard?tab=matches',
-      metadata: { matchId: '123', opponent: 'Sarah Johnson' }
-    },
-    {
-      id: '2',
-      type: 'match_result',
-      title: 'Match Result Updated',
-      message: 'Great job! You won your match against Mike Thompson 6-4, 6-2',
-      read: false,
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-      actionUrl: '/dashboard?tab=matches',
-      metadata: { matchId: '124', result: 'won' }
-    },
-    {
-      id: '3',
-      type: 'achievement',
-      title: 'Achievement Unlocked!',
-      message: 'Congratulations! You\'ve achieved a 3-match winning streak',
-      read: true,
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-      metadata: { achievement: '3-match-streak' }
-    },
-    {
-      id: '4',
-      type: 'match_suggestion',
-      title: 'New Match Suggestions',
-      message: '3 new players found that match your skill level and preferences',
-      read: false,
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 4), // 4 hours ago
-      actionUrl: '/dashboard?tab=matching',
-      metadata: { suggestionsCount: 3 }
-    },
-    {
-      id: '5',
-      type: 'league_update',
-      title: 'League Standings Updated',
-      message: 'You\'ve moved up to #4 in the Summer League standings!',
-      read: false,
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
-      actionUrl: '/dashboard?tab=competition',
-      metadata: { newRank: 4, previousRank: 6 }
-    },
-    {
-      id: '6',
-      type: 'general',
-      title: 'System Maintenance',
-      message: 'Scheduled maintenance will occur tonight from 2-4 AM',
-      read: true,
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12), // 12 hours ago
-    },
-    {
-      id: '7',
-      type: 'match_scheduled',
-      title: 'Match Reminder',
-      message: 'Don\'t forget about your match with John Smith in 2 hours',
-      read: false,
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 18), // 18 hours ago
-      actionUrl: '/dashboard?tab=matches',
-    },
-    {
-      id: '8',
-      type: 'achievement',
-      title: 'New Badge Earned',
-      message: 'You\'ve earned the "Active Player" badge for playing 10+ matches',
-      read: true,
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2), // 2 days ago
-    },
-    {
-      id: '9',
-      type: 'league_update',
-      title: 'New Tournament',
-      message: 'Summer Championship registration is now open!',
-      read: false,
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3), // 3 days ago
-      actionUrl: '/dashboard?tab=register',
-    }
-  ], []);
+  // pendingQueue holds real-time events that arrive before the initial fetch completes
+  const pendingQueueRef = useRef<any[]>([]);
 
   // Calculate unread count from notifications array to ensure consistency
   const updateUnreadCount = useCallback((notificationsList: Notification[]) => {
@@ -148,6 +66,53 @@ export const useNotifications = () => {
     });
   }, [updateUnreadCount]);
 
+  // Keep refs in sync with latest values so real-time callbacks are never stale
+  useEffect(() => {
+    isSupportedRef.current = isSupported;
+    sendNotificationRef.current = sendNotification;
+  }, [isSupported, sendNotification]);
+
+  // Helper to transform a raw DB row into a Notification object
+  const transformRow = useCallback((row: any): Notification => ({
+    id: row.id,
+    type: row.type as Notification['type'],
+    title: row.title,
+    message: row.message,
+    read: row.read,
+    createdAt: new Date(row.created_at),
+    actionUrl: row.action_url,
+    metadata: row.metadata
+  }), []);
+
+  // Inject a real-time row into state, deduplicating by DB id
+  const injectRealtimeRow = useCallback((row: any) => {
+    const incoming = transformRow(row);
+    setNotifications(prev => {
+      if (prev.some(n => n.id === incoming.id)) {
+        return prev; // already present (e.g. from initial fetch)
+      }
+      const newList = [incoming, ...prev];
+      updateUnreadCount(newList);
+      return newList;
+    });
+
+    // Play notification sound
+    playNotificationSound(0.5).catch(err =>
+      console.warn('Failed to play notification sound:', err)
+    );
+
+    // Send browser notification when tab is not focused
+    if (isSupportedRef.current) {
+      sendNotificationRef.current(incoming.title, {
+        body: incoming.message,
+        tag: incoming.id,
+        requireInteraction: false,
+        icon: '/favicon.ico',
+        clickUrl: incoming.actionUrl,
+      });
+    }
+  }, [transformRow, updateUnreadCount]);
+
   const fetchNotifications = useCallback(async () => {
     if (!user) {
       setIsLoading(false);
@@ -164,32 +129,29 @@ export const useNotifications = () => {
 
       if (error) throw error;
 
-      const transformedNotifications = (data || []).map(notif => ({
-        id: notif.id,
-        type: notif.type as Notification['type'],
-        title: notif.title,
-        message: notif.message,
-        read: notif.read,
-        createdAt: new Date(notif.created_at),
-        actionUrl: notif.action_url,
-        metadata: notif.metadata
-      }));
+      const transformedNotifications = (data || []).map(transformRow);
 
       // Update both notifications and unread count atomically
       setNotifications(transformedNotifications);
       updateUnreadCount(transformedNotifications);
       hasLoadedRef.current = true;
+
+      // Flush any real-time events that arrived before the initial load completed
+      if (pendingQueueRef.current.length > 0) {
+        console.log(`🔄 Flushing ${pendingQueueRef.current.length} queued real-time events`);
+        pendingQueueRef.current.forEach(row => injectRealtimeRow(row));
+        pendingQueueRef.current = [];
+      }
     } catch (error) {
       console.error('Error fetching notifications:', error);
-      // Fall back to mock notifications if real ones fail
-      const mockNotifications = generateMockNotifications();
-      setNotifications(mockNotifications);
-      updateUnreadCount(mockNotifications);
+      setNotifications([]);
+      setUnreadCount(0);
       hasLoadedRef.current = true;
+      pendingQueueRef.current = [];
     } finally {
       setIsLoading(false);
     }
-  }, [user, generateMockNotifications, updateUnreadCount]);
+  }, [user, updateUnreadCount, transformRow, injectRealtimeRow]);
 
   // Initial fetch and real-time subscription setup
   useEffect(() => {
@@ -197,6 +159,9 @@ export const useNotifications = () => {
       setIsLoading(false);
       return;
     }
+
+    hasLoadedRef.current = false;
+    pendingQueueRef.current = [];
 
     fetchNotifications();
 
@@ -212,45 +177,16 @@ export const useNotifications = () => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          console.log('🔔 Real-time notification INSERT:', payload);
-          console.log('📊 hasLoadedRef.current:', hasLoadedRef.current);
-          // Only add notification if we've already loaded initial notifications
-          if (hasLoadedRef.current && payload.new) {
-            const newNotif = {
-              type: payload.new.type,
-              title: payload.new.title,
-              message: payload.new.message,
-              read: false,
-              actionUrl: payload.new.action_url,
-              metadata: payload.new.metadata
-            };
-            
-            console.log('✅ Adding new notification to UI:', newNotif.title);
-            addNotification(newNotif);
-            
-            // Play notification sound
-            playNotificationSound(0.5).catch(err => 
-              console.warn('Failed to play notification sound:', err)
-            );
-            
-            // Send browser notification if tab is not focused
-            if (isSupported) {
-              sendNotification(newNotif.title, {
-                body: newNotif.message,
-                tag: payload.new.id,
-                requireInteraction: false,
-                icon: '/favicon.ico',
-                badge: '1',
-                vibrate: [200, 100, 200],
-              });
-            }
-            
-            // Process queued notifications when permission is granted
-            if (isSupported && sendNotification.clearNotificationQueue) {
-              sendNotification.clearNotificationQueue();
-            }
+          console.log('🔔 Real-time notification INSERT:', payload.new);
+          if (!payload.new) return;
+
+          if (hasLoadedRef.current) {
+            // Initial load done — inject immediately
+            injectRealtimeRow(payload.new);
           } else {
-            console.warn('⚠️ Skipping notification - not loaded yet or no payload');
+            // Initial load still in progress — queue for later
+            console.log('⏳ Queuing notification until initial load completes');
+            pendingQueueRef.current.push(payload.new);
           }
         }
       )
@@ -263,31 +199,45 @@ export const useNotifications = () => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          console.log('Real-time notification UPDATE:', payload);
-          if (hasLoadedRef.current && payload.new) {
-            setNotifications(prev => {
-              const updated = prev.map(n => 
-                n.id === payload.new.id
-                  ? {
-                      ...n,
-                      read: payload.new.read,
-                      title: payload.new.title,
-                      message: payload.new.message
-                    }
-                  : n
-              );
-              updateUnreadCount(updated);
-              return updated;
-            });
-          }
+          console.log('🔄 Real-time notification UPDATE:', payload.new);
+          if (!payload.new) return;
+          setNotifications(prev => {
+            const updated = prev.map(n =>
+              n.id === payload.new.id
+                ? { ...n, read: payload.new.read, title: payload.new.title, message: payload.new.message }
+                : n
+            );
+            updateUnreadCount(updated);
+            return updated;
+          });
         }
       )
-      .subscribe();
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('🗑️ Real-time notification DELETE:', payload.old);
+          if (!payload.old?.id) return;
+          setNotifications(prev => {
+            const filtered = prev.filter(n => n.id !== payload.old.id);
+            updateUnreadCount(filtered);
+            return filtered;
+          });
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Notification channel status:', status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]); // Removed fetchNotifications and addNotification from deps to prevent infinite re-renders
+  }, [user, fetchNotifications, injectRealtimeRow, updateUnreadCount]);
 
   const markAsRead = useCallback(async (notificationId: string) => {
     if (!user) return;

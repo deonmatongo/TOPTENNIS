@@ -75,9 +75,8 @@ const MatchInviteCard: React.FC<MatchInviteCardProps> = ({
 
   const getSkillLabel = (skillLevel?: number | null) => {
     if (!skillLevel) return 'Not rated';
-    if (skillLevel >= 8) return 'Advanced';
-    if (skillLevel >= 6) return 'Intermediate';
-    if (skillLevel >= 4) return 'Beginner+';
+    if (skillLevel >= 7) return 'Advanced';
+    if (skillLevel >= 4) return 'Intermediate';
     return 'Beginner';
   };
 

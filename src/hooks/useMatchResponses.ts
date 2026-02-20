@@ -15,6 +15,23 @@ export interface MatchResponse {
   updated_at: string;
 }
 
+export interface OpponentProfile {
+  user_id: string;
+  name: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  skill_level?: number;
+  wins?: number;
+  losses?: number;
+  usta_rating?: string;
+  competitiveness?: string;
+  age_range?: string;
+  city?: string;
+  profile_picture_url?: string;
+  networking_enabled?: boolean;
+}
+
 export interface MatchWithResponse {
   id: string;
   player1_id: string;
@@ -34,6 +51,7 @@ export interface MatchWithResponse {
     name: string;
     user_id: string;
   };
+  opponent_profile?: OpponentProfile;
   my_response?: MatchResponse;
   opponent_response?: MatchResponse;
 }
@@ -119,16 +137,64 @@ export const useMatchResponses = () => {
         .select('*')
         .in('match_id', matchIds);
 
-      // Combine matches with responses
+      // Collect all unique opponent user IDs to batch-fetch profiles
+      const opponentUserIds = Array.from(new Set(
+        (matches || []).map(match => {
+          return match.player1?.user_id === user.id
+            ? match.player2?.user_id
+            : match.player1?.user_id;
+        }).filter(Boolean) as string[]
+      ));
+
+      // Batch-fetch profiles and player stats for all opponents
+      const [{ data: profiles }, { data: playerStats }] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email, profile_picture_url, city, networking_enabled')
+          .in('id', opponentUserIds),
+        supabase
+          .from('players')
+          .select('user_id, skill_level, wins, losses, usta_rating, competitiveness, age_range, gender')
+          .in('user_id', opponentUserIds),
+      ]);
+
+      const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+      const statsMap = new Map((playerStats || []).map(p => [p.user_id, p]));
+
+      // Combine matches with responses and opponent profile
       return matches?.map(match => {
         const myResponse = responses?.find(r => r.user_id === user.id && r.match_id === match.id);
-        const opponentUserId = match.player1?.user_id === user.id 
-          ? match.player2?.user_id 
+        const opponentUserId = match.player1?.user_id === user.id
+          ? match.player2?.user_id
           : match.player1?.user_id;
         const opponentResponse = responses?.find(r => r.user_id === opponentUserId && r.match_id === match.id);
 
+        const profile = opponentUserId ? profileMap.get(opponentUserId) : undefined;
+        const stats = opponentUserId ? statsMap.get(opponentUserId) : undefined;
+        const opponentName = match.player1?.user_id === user.id
+          ? match.player2?.name
+          : match.player1?.name;
+
+        const opponent_profile: OpponentProfile | undefined = opponentUserId ? {
+          user_id: opponentUserId,
+          name: opponentName || `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || 'Opponent',
+          first_name: profile?.first_name ?? undefined,
+          last_name: profile?.last_name ?? undefined,
+          email: profile?.email ?? undefined,
+          profile_picture_url: profile?.profile_picture_url ?? undefined,
+          city: profile?.city ?? undefined,
+          networking_enabled: profile?.networking_enabled,
+          skill_level: stats?.skill_level ?? undefined,
+          wins: stats?.wins ?? undefined,
+          losses: stats?.losses ?? undefined,
+          usta_rating: stats?.usta_rating ?? undefined,
+          competitiveness: stats?.competitiveness ?? undefined,
+          age_range: stats?.age_range ?? undefined,
+        } : undefined;
+
         return {
           ...match,
+          opponent_profile,
           my_response: myResponse,
           opponent_response: opponentResponse
         };

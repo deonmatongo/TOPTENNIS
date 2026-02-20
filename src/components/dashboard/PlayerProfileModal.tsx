@@ -4,11 +4,14 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle,
-  DialogDescription
+  DialogDescription,
+  DialogFooter
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { 
   User, 
   Trophy, 
@@ -20,7 +23,8 @@ import {
   Flame,
   MessageCircle,
   Ban,
-  UserMinus
+  UserMinus,
+  ShieldAlert
 } from 'lucide-react';
 import { SearchResult } from '@/hooks/usePlayerSearch';
 import { toast } from 'sonner';
@@ -39,9 +43,13 @@ interface PlayerProfileModalProps {
 const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps) => {
   const [showSendMessage, setShowSendMessage] = useState(false);
   const [showScheduleMatch, setShowScheduleMatch] = useState(false);
+  const [showBlockDialog, setShowBlockDialog] = useState(false);
+  const [showUnfriendDialog, setShowUnfriendDialog] = useState(false);
+  const [blockReason, setBlockReason] = useState('');
+  const [isActioning, setIsActioning] = useState(false);
   const { user } = useAuth();
-  const { sendFriendRequest, updateRequestStatus, getRelationshipWith, requests } = useFriendRequests();
-  const { blockUser } = useBlockedUsers();
+  const { sendFriendRequest, updateRequestStatus, getRelationshipWith, requests, refetch: refetchFriends } = useFriendRequests();
+  const { blockUser, unfriendUser } = useBlockedUsers();
   
   if (!player) return null;
 
@@ -53,9 +61,8 @@ const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps
   };
 
   const getSkillLabel = (skillLevel: number) => {
-    if (skillLevel >= 8) return 'Advanced';
-    if (skillLevel >= 6) return 'Intermediate';
-    if (skillLevel >= 4) return 'Beginner+';
+    if (skillLevel >= 7) return 'Advanced';
+    if (skillLevel >= 4) return 'Intermediate';
     return 'Beginner';
   };
 
@@ -95,14 +102,33 @@ const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps
   const relationship = getRelationshipWith(otherUserId);
   const incomingRequest = requests.find(r => r.status === 'pending' && r.sender_id === otherUserId && r.receiver_id === user?.id);
 
-  const handleBlockUser = async () => {
+  const handleBlockConfirm = async () => {
     if (!player?.user_id || player?.user_id === user?.id) return;
-    
+    setIsActioning(true);
     try {
-      await blockUser(player.user_id, 'Inappropriate behavior');
-      toast.success('User blocked successfully');
+      await blockUser(player.user_id, blockReason.trim() || undefined);
+      setShowBlockDialog(false);
+      setBlockReason('');
+      onClose();
     } catch (error) {
       toast.error('Failed to block user');
+    } finally {
+      setIsActioning(false);
+    }
+  };
+
+  const handleUnfriendConfirm = async () => {
+    if (!player?.user_id) return;
+    setIsActioning(true);
+    try {
+      await unfriendUser(player.user_id);
+      await refetchFriends();
+      setShowUnfriendDialog(false);
+      onClose();
+    } catch (error) {
+      toast.error('Failed to remove friend');
+    } finally {
+      setIsActioning(false);
     }
   };
 
@@ -130,6 +156,7 @@ const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader className="pb-4 sm:pb-6">
@@ -293,8 +320,13 @@ const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps
             </Button>
 
             {relationship === 'friends' ? (
-              <Button variant="secondary" className="w-full sm:flex-1" disabled>
-                Friend
+              <Button
+                variant="outline"
+                className="w-full sm:flex-1 text-orange-600 border-orange-300 hover:bg-orange-50"
+                onClick={() => setShowUnfriendDialog(true)}
+              >
+                <UserMinus className="w-4 h-4 mr-2" />
+                Remove Friend
               </Button>
             ) : relationship === 'pending_sent' ? (
               <Button variant="secondary" className="w-full sm:flex-1" disabled>
@@ -330,7 +362,7 @@ const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps
             </Button>
             
             <Button 
-              onClick={handleBlockUser}
+              onClick={() => setShowBlockDialog(true)}
               variant="outline" 
               className="w-full sm:flex-1 text-red-600 border-red-300 hover:bg-red-50"
               disabled={player?.user_id === user?.id}
@@ -356,6 +388,74 @@ const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps
         />
       </DialogContent>
     </Dialog>
+
+    {/* Block User Confirmation Dialog */}
+    <Dialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-red-600">
+            <ShieldAlert className="w-5 h-5" />
+            Block {player?.name}?
+          </DialogTitle>
+          <DialogDescription>
+            Blocking this user will prevent them from sending you match requests, messages, or viewing your profile. They will also be removed from your search results and match suggestions.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-2 space-y-2">
+          <Label htmlFor="block-reason" className="text-sm font-medium">Reason (optional)</Label>
+          <Textarea
+            id="block-reason"
+            placeholder="Let us know why you're blocking this user..."
+            value={blockReason}
+            onChange={(e) => setBlockReason(e.target.value)}
+            rows={3}
+          />
+        </div>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => { setShowBlockDialog(false); setBlockReason(''); }}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleBlockConfirm}
+            disabled={isActioning}
+          >
+            <Ban className="w-4 h-4 mr-2" />
+            {isActioning ? 'Blocking...' : 'Block User'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Unfriend Confirmation Dialog */}
+    <Dialog open={showUnfriendDialog} onOpenChange={setShowUnfriendDialog}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-orange-600">
+            <UserMinus className="w-5 h-5" />
+            Remove {player?.name} from network?
+          </DialogTitle>
+          <DialogDescription>
+            This will remove your connection with {player?.name}. They won't be notified, and you can send a new friend request in the future.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => setShowUnfriendDialog(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="outline"
+            className="text-orange-600 border-orange-300 hover:bg-orange-50"
+            onClick={handleUnfriendConfirm}
+            disabled={isActioning}
+          >
+            <UserMinus className="w-4 h-4 mr-2" />
+            {isActioning ? 'Removing...' : 'Remove Friend'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 
