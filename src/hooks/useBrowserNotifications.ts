@@ -1,9 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 
+type NotificationOptionsExtended = NotificationOptions & { clickUrl?: string; respectFocus?: boolean };
+type NotificationQueueItem = { title: string; options?: NotificationOptionsExtended };
+
 export const useBrowserNotifications = () => {
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [isSupported, setIsSupported] = useState(false);
-  const notificationQueue = useRef<Array<{title: string; options?: NotificationOptions & { clickUrl?: string; respectFocus?: boolean }>>([]);
+  const notificationQueue = useRef<NotificationQueueItem[]>([]);
 
   useEffect(() => {
     // Check if notifications are supported
@@ -41,7 +44,7 @@ export const useBrowserNotifications = () => {
     }
   }, [isSupported]);
 
-  const sendNotification = useCallback((title: string, options?: NotificationOptions & { clickUrl?: string; respectFocus?: boolean }) => {
+  const sendNotification = useCallback((title: string, options?: NotificationOptionsExtended) => {
     if (!isSupported) return;
 
     // Queue notification if permission not granted yet
