@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ChevronLeft, Calendar, MapPin, Clock, Check, X, Mail, AlertCircle, Send, Trash2 } from 'lucide-react';
+import { ChevronLeft, Calendar, MapPin, Clock, Check, X, Mail, AlertCircle, Send, Trash2, User } from 'lucide-react';
 import { useMatchInvites } from '@/hooks/useMatchInvites';
 import { format, parseISO, formatDistanceToNow, isPast } from 'date-fns';
 import { toast } from 'sonner';
@@ -17,6 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import PlayerProfileModal from '@/components/dashboard/PlayerProfileModal';
 
 interface PendingInvitesPageProps {
   onBack: () => void;
@@ -26,12 +27,36 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
   const { invites, getPendingInvites, respondToInvite, deleteInvite, getOldInvites } = useMatchInvites();
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
   const [actionType, setActionType] = useState<'accept' | 'decline' | 'delete' | null>(null);
+  const [selectedInvite, setSelectedInvite] = useState<any | null>(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   const pendingInvites = getPendingInvites();
 
-  const handleRespond = (inviteId: string, action: 'accept' | 'decline') => {
+  const buildPlayerForModal = (invite: any) => {
+    const sender = invite.sender || invite.proposed_by;
+    if (!sender) return null;
+    return {
+      id: sender.user_id || invite.sender_id,
+      user_id: sender.user_id || invite.sender_id,
+      name: `${sender.first_name || ''} ${sender.last_name || ''}`.trim() || 'Unknown Player',
+      email: sender.email || '',
+      skill_level: sender.skill_level ?? 0,
+      wins: sender.wins ?? 0,
+      losses: sender.losses ?? 0,
+      usta_rating: sender.usta_rating,
+      competitiveness: sender.competitiveness,
+      age_range: sender.age_range,
+      networking_enabled: sender.networking_enabled,
+      first_name: sender.first_name,
+      last_name: sender.last_name,
+      profile_picture_url: sender.profile_picture_url || sender.avatar_url,
+    };
+  };
+
+  const handleRespond = (inviteId: string, action: 'accept' | 'decline', invite: any) => {
     setRespondingTo(inviteId);
     setActionType(action);
+    setSelectedInvite(invite);
   };
 
   const confirmResponse = async () => {
@@ -169,7 +194,7 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
                 ) : (
                   <>
                     <Button
-                      onClick={() => handleRespond(invite.id, 'accept')}
+                      onClick={() => handleRespond(invite.id, 'accept', invite)}
                       className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                       size="lg"
                     >
@@ -177,7 +202,7 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
                       Accept
                     </Button>
                     <Button
-                      onClick={() => handleRespond(invite.id, 'decline')}
+                      onClick={() => handleRespond(invite.id, 'decline', invite)}
                       variant="outline"
                       className="flex-1 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
                       size="lg"
@@ -274,8 +299,21 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
               {actionType === 'delete' && 'This invitation is for a past date and will be permanently deleted. This action cannot be undone.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2">
             <AlertDialogCancel>Cancel</AlertDialogCancel>
+            {selectedInvite && buildPlayerForModal(selectedInvite) && (
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => {
+                  setRespondingTo(null);
+                  setShowProfileModal(true);
+                }}
+              >
+                <User className="h-4 w-4" />
+                View Profile
+              </Button>
+            )}
             <AlertDialogAction
               onClick={confirmResponse}
               className={
@@ -291,6 +329,17 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Player Profile Modal */}
+      {showProfileModal && selectedInvite && (() => {
+        const player = buildPlayerForModal(selectedInvite);
+        return player ? (
+          <PlayerProfileModal
+            player={player}
+            isOpen={showProfileModal}
+            onClose={() => setShowProfileModal(false)}
+          />
+        ) : null;
+      })()}
     </div>
   );
 };
