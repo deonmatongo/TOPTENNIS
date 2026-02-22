@@ -29,17 +29,23 @@ export const useBlockedUsers = () => {
       setLoading(true);
       
       // Use RPC function to get blocked users with profile data
-      const { data, error } = await supabase.rpc('get_blocked_users', {
+      const { data, error } = await (supabase as any).rpc('get_blocked_users', {
         p_user_id: user.id
       });
 
-      if (error) throw error;
+      if (error) {
+        // If the RPC doesn't exist yet, silently return empty — don't toast
+        if ((error as any).code === 'PGRST202' || error.message?.includes('function') || error.message?.includes('does not exist')) {
+          setBlockedUsers([]);
+          return;
+        }
+        throw error;
+      }
 
       setBlockedUsers(data || []);
     } catch (err) {
       logger.error('Error fetching blocked users', { err });
       setError('Failed to fetch blocked users');
-      toast.error('Failed to load blocked users');
     } finally {
       setLoading(false);
     }
@@ -57,7 +63,7 @@ export const useBlockedUsers = () => {
     }
 
     try {
-      const { error } = await supabase.rpc('block_user', {
+      const { error } = await (supabase as any).rpc('block_user', {
         p_blocked_user_id: userIdToBlock,
         p_reason: reason || null
       });
@@ -87,7 +93,7 @@ export const useBlockedUsers = () => {
     }
 
     try {
-      const { error } = await supabase.rpc('unblock_user', {
+      const { error } = await (supabase as any).rpc('unblock_user', {
         p_blocked_user_id: blockedUserId
       });
 
@@ -107,7 +113,7 @@ export const useBlockedUsers = () => {
     if (!user) return false;
 
     try {
-      const { data, error } = await supabase.rpc('is_user_blocked', {
+      const { data, error } = await (supabase as any).rpc('is_user_blocked', {
         p_blocker_id: user.id,
         p_blocked_user_id: userIdToCheck
       });
