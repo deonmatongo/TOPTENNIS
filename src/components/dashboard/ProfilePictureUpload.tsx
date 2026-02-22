@@ -82,8 +82,9 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
         .from('profile-pictures')
         .getPublicUrl(data.path);
 
-      // Update profile with new image URL
+      // Update both profiles and players tables
       await updateProfile({ profile_picture_url: publicUrl });
+      await syncPlayerPicture(publicUrl);
 
       // Call callback if provided
       onImageUpdate?.(publicUrl);
@@ -106,15 +107,21 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
     fileInputRef.current?.click();
   };
 
+  const syncPlayerPicture = async (url: string | null) => {
+    if (!user) return;
+    await (supabase.from('players') as any).update({ profile_picture_url: url }).eq('user_id', user.id);
+  };
+
   const handleRemoveImage = async () => {
     if (!user) return;
 
     try {
       setUploading(true);
       
-      // Update profile to remove image URL
+      // Update both profiles and players tables
       await updateProfile({ profile_picture_url: null });
-      
+      await syncPlayerPicture(null);
+
       // Call callback if provided
       onImageUpdate?.('');
       

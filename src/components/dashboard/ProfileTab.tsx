@@ -9,6 +9,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { User, Edit3, Trophy, Calendar, MapPin, Mail, Phone, Target, Flame, Users, Network, Camera, Save, X } from "lucide-react";
+import { ProfilePictureUpload } from "@/components/dashboard/ProfilePictureUpload";
 interface ProfileTabProps {
   player: any;
 }
@@ -63,17 +64,10 @@ const ProfileTab = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <div className="relative">
-            <Avatar className="h-16 w-16 border-4 border-background shadow-lg">
-              <AvatarImage src={profile?.profile_picture_url} />
-              <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground text-xl font-bold">
-                {player?.name?.charAt(0)?.toUpperCase() || 'U'}
-              </AvatarFallback>
-            </Avatar>
-            <Button size="sm" variant="outline" className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full p-0 shadow-md">
-              <Camera className="h-3 w-3" />
-            </Button>
-          </div>
+          <ProfilePictureUpload
+            currentImageUrl={profile?.profile_picture_url}
+            size="md"
+          />
           <div>
             <h1 className="text-2xl font-bold text-foreground">{player?.name || 'Player'}</h1>
             <p className="text-muted-foreground flex items-center space-x-2">
