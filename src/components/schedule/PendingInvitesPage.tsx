@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ChevronLeft, Calendar, MapPin, Clock, Check, X, Mail, AlertCircle, Send, Trash2 } from 'lucide-react';
+import { ChevronLeft, Calendar, MapPin, Clock, Check, X, Mail, AlertCircle, Send, Trash2, ChevronRight } from 'lucide-react';
 import { useMatchInvites } from '@/hooks/useMatchInvites';
 import { format, parseISO, formatDistanceToNow, isPast } from 'date-fns';
 import { toast } from 'sonner';
@@ -17,6 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import PlayerProfileModal from '@/components/dashboard/PlayerProfileModal';
 
 interface PendingInvitesPageProps {
   onBack: () => void;
@@ -26,8 +27,42 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
   const { invites, getPendingInvites, respondToInvite, deleteInvite, getOldInvites } = useMatchInvites();
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
   const [actionType, setActionType] = useState<'accept' | 'decline' | 'delete' | null>(null);
+  const [profileModalInvite, setProfileModalInvite] = useState<any | null>(null);
 
   const pendingInvites = getPendingInvites();
+
+  const buildPlayerForModal = (invite: any) => {
+    const sender = invite.sender || invite.proposed_by;
+    if (!sender) return null;
+    return {
+      id: sender.user_id || invite.sender_id,
+      user_id: sender.user_id || invite.sender_id,
+      name: `${sender.first_name || ''} ${sender.last_name || ''}`.trim() || 'Unknown Player',
+      email: sender.email || '',
+      skill_level: sender.skill_level ?? 0,
+      wins: sender.wins ?? 0,
+      losses: sender.losses ?? 0,
+      usta_rating: sender.usta_rating,
+      competitiveness: sender.competitiveness,
+      age_range: sender.age_range,
+      networking_enabled: sender.networking_enabled,
+      first_name: sender.first_name,
+      last_name: sender.last_name,
+      profile_picture_url: sender.profile_picture_url || sender.avatar_url,
+    };
+  };
+
+  const handleAcceptFromModal = async (inviteId: string) => {
+    await respondToInvite(inviteId, 'accepted');
+    toast.success('Match invitation accepted!');
+    setProfileModalInvite(null);
+  };
+
+  const handleDeclineFromModal = async (inviteId: string) => {
+    await respondToInvite(inviteId, 'declined');
+    toast.success('Match invitation declined');
+    setProfileModalInvite(null);
+  };
 
   const handleRespond = (inviteId: string, action: 'accept' | 'decline') => {
     setRespondingTo(inviteId);
@@ -82,16 +117,19 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
     const isExpired = isInviteExpired(invite);
 
     return (
-      <Card className={`border-2 ${
-        isExpired 
-          ? 'border-red-200 dark:border-red-900/50 bg-red-50/30 dark:bg-red-950/10' 
-          : 'border-orange-200 dark:border-orange-900/50 bg-orange-50/50 dark:bg-orange-950/20'
-      }`}>
+      <Card
+        className={`border-2 cursor-pointer transition-shadow hover:shadow-md ${
+          isExpired
+            ? 'border-red-200 dark:border-red-900/50 bg-red-50/30 dark:bg-red-950/10'
+            : 'border-orange-200 dark:border-orange-900/50 bg-orange-50/50 dark:bg-orange-950/20'
+        }`}
+        onClick={() => !isExpired && setProfileModalInvite(invite)}
+      >
         <CardContent className="p-4">
           <div className="flex items-start gap-4">
             {/* Inviter Avatar */}
             <Avatar className="h-12 w-12 border-2 border-orange-500/30">
-              <AvatarImage src={invite.sender?.avatar_url || invite.proposed_by?.avatar_url} />
+              <AvatarImage src={invite.sender?.profile_picture_url || invite.sender?.avatar_url || invite.proposed_by?.avatar_url} />
               <AvatarFallback className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 font-semibold">
                 {inviter.initials}
               </AvatarFallback>
@@ -105,6 +143,11 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
                   {isExpired && (
                     <Badge variant="destructive" className="text-xs">
                       Expired
+                    </Badge>
+                  )}
+                  {!isExpired && (
+                    <Badge variant="outline" className="text-xs text-orange-600 border-orange-300 ml-auto">
+                      Tap to view profile
                     </Badge>
                   )}
                 </div>
@@ -158,7 +201,7 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
               <div className="flex gap-2 mt-4">
                 {isExpired ? (
                   <Button
-                    onClick={() => handleDelete(invite.id)}
+                    onClick={(e) => { e.stopPropagation(); handleDelete(invite.id); }}
                     variant="destructive"
                     className="flex-1"
                     size="lg"
@@ -169,7 +212,7 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
                 ) : (
                   <>
                     <Button
-                      onClick={() => handleRespond(invite.id, 'accept')}
+                      onClick={(e) => { e.stopPropagation(); handleRespond(invite.id, 'accept'); }}
                       className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                       size="lg"
                     >
@@ -177,7 +220,7 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
                       Accept
                     </Button>
                     <Button
-                      onClick={() => handleRespond(invite.id, 'decline')}
+                      onClick={(e) => { e.stopPropagation(); handleRespond(invite.id, 'decline'); }}
                       variant="outline"
                       className="flex-1 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
                       size="lg"
@@ -258,6 +301,21 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
           </div>
         )}
       </div>
+
+      {/* Player Profile Modal */}
+      {profileModalInvite && (() => {
+        const player = buildPlayerForModal(profileModalInvite);
+        return player ? (
+          <PlayerProfileModal
+            player={player}
+            isOpen={!!profileModalInvite}
+            onClose={() => setProfileModalInvite(null)}
+            inviteId={profileModalInvite.id}
+            onAcceptInvite={handleAcceptFromModal}
+            onDeclineInvite={handleDeclineFromModal}
+          />
+        ) : null;
+      })()}
 
       {/* Confirmation Dialog */}
       <AlertDialog open={!!respondingTo} onOpenChange={() => setRespondingTo(null)}>
