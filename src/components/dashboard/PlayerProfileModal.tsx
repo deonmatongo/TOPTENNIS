@@ -24,9 +24,7 @@ import {
   MessageCircle,
   Ban,
   UserMinus,
-  ShieldAlert,
-  CheckCircle,
-  XCircle
+  ShieldAlert
 } from 'lucide-react';
 import { SearchResult } from '@/hooks/usePlayerSearch';
 import { toast } from 'sonner';
@@ -40,19 +38,15 @@ interface PlayerProfileModalProps {
   player: SearchResult | null;
   isOpen: boolean;
   onClose: () => void;
-  inviteId?: string;
-  onAcceptInvite?: (inviteId: string) => Promise<void>;
-  onDeclineInvite?: (inviteId: string) => Promise<void>;
 }
 
-const PlayerProfileModal = ({ player, isOpen, onClose, inviteId, onAcceptInvite, onDeclineInvite }: PlayerProfileModalProps) => {
+const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps) => {
   const [showSendMessage, setShowSendMessage] = useState(false);
   const [showScheduleMatch, setShowScheduleMatch] = useState(false);
   const [showBlockDialog, setShowBlockDialog] = useState(false);
   const [showUnfriendDialog, setShowUnfriendDialog] = useState(false);
   const [blockReason, setBlockReason] = useState('');
   const [isActioning, setIsActioning] = useState(false);
-  const [inviteActioning, setInviteActioning] = useState<'accept' | 'decline' | null>(null);
   const { user } = useAuth();
   const { sendFriendRequest, updateRequestStatus, getRelationshipWith, requests, refetch: refetchFriends } = useFriendRequests();
   const { blockUser, unfriendUser } = useBlockedUsers();
@@ -314,52 +308,6 @@ const PlayerProfileModal = ({ player, isOpen, onClose, inviteId, onAcceptInvite,
               </div>
             </CardContent>
           </Card>
-
-          {/* Accept / Decline invite buttons — shown when opened from a pending invite */}
-          {inviteId && (onAcceptInvite || onDeclineInvite) && (
-            <div className="flex gap-3 p-4 bg-orange-50 dark:bg-orange-950/30 border-2 border-orange-200 dark:border-orange-900 rounded-xl">
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-orange-900 dark:text-orange-100 mb-3">Respond to this match invitation</p>
-                <div className="flex gap-3">
-                  {onAcceptInvite && (
-                    <Button
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                      disabled={!!inviteActioning}
-                      onClick={async () => {
-                        setInviteActioning('accept');
-                        try { await onAcceptInvite(inviteId); onClose(); }
-                        finally { setInviteActioning(null); }
-                      }}
-                    >
-                      {inviteActioning === 'accept' ? (
-                        <span className="flex items-center gap-2"><span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />Accepting...</span>
-                      ) : (
-                        <span className="flex items-center gap-2"><CheckCircle className="h-4 w-4" />Accept Match</span>
-                      )}
-                    </Button>
-                  )}
-                  {onDeclineInvite && (
-                    <Button
-                      variant="outline"
-                      className="flex-1 border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
-                      disabled={!!inviteActioning}
-                      onClick={async () => {
-                        setInviteActioning('decline');
-                        try { await onDeclineInvite(inviteId); onClose(); }
-                        finally { setInviteActioning(null); }
-                      }}
-                    >
-                      {inviteActioning === 'decline' ? (
-                        <span className="flex items-center gap-2"><span className="animate-spin h-4 w-4 border-2 border-red-400 border-t-transparent rounded-full" />Declining...</span>
-                      ) : (
-                        <span className="flex items-center gap-2"><XCircle className="h-4 w-4" />Decline</span>
-                      )}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 pt-4">
