@@ -133,7 +133,7 @@ const PlayerSearch = ({
 
       {/* Search Results Dropdown */}
       {showResults && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto min-w-[320px]">
           {searchResults.length === 0 && searchTerm && !isSearching && (
             <div className="p-6 text-center">
               <User className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
@@ -153,59 +153,56 @@ const PlayerSearch = ({
                 {searchResults.map((player) => (
                   <div
                     key={player.id}
-                    onClick={() => handlePlayerSelect(player)}
-                    className="flex items-center space-x-3 p-3 rounded-lg cursor-pointer hover:bg-accent/50 transition-colors active:bg-accent/70"
+                    className="p-3 rounded-lg hover:bg-accent/50 transition-colors"
                   >
-                    <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center text-primary-foreground font-bold text-sm">
-                      {player.name.charAt(0).toUpperCase()}
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <p className="font-medium text-foreground truncate">
-                          {player.name}
-                        </p>
-                        <Badge 
-                          variant="outline" 
-                          className={`text-xs ${getSkillBadgeColor(player.skill_level)}`}
-                        >
-                          {getSkillLabel(player.skill_level)}
-                        </Badge>
+                    {/* Player info row */}
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-9 h-9 shrink-0 bg-gradient-primary rounded-full flex items-center justify-center text-primary-foreground font-bold text-sm">
+                        {player.name.charAt(0).toUpperCase()}
                       </div>
-                      
-                      <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                        <span className="truncate">{player.email}</span>
-                        {(player.wins > 0 || player.losses > 0) && (
-                          <div className="flex items-center space-x-1">
-                            <Trophy className="w-3 h-3" />
-                            <span>{player.wins}W-{player.losses}L</span>
-                          </div>
-                        )}
-                        {player.usta_rating && (
-                          <Badge variant="secondary" className="text-xs">
-                            {player.usta_rating}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <p className="font-medium text-foreground text-sm truncate">
+                            {player.name}
+                          </p>
+                          <Badge
+                            variant="outline"
+                            className={`text-xs shrink-0 ${getSkillBadgeColor(player.skill_level)}`}
+                          >
+                            {getSkillLabel(player.skill_level)}
                           </Badge>
-                        )}
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span className="truncate">{player.email}</span>
+                          {(player.wins > 0 || player.losses > 0) && (
+                            <span className="shrink-0 flex items-center gap-1">
+                              <Trophy className="w-3 h-3" />
+                              {player.wins}W-{player.losses}L
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center space-x-2 mt-2">
+
+                    {/* Action buttons row */}
+                    <div className="flex flex-wrap gap-2 mt-1 pl-12">
                       <Button
                         size="sm"
                         onClick={() => handlePlayerSelect(player)}
-                        className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
+                        className="h-7 px-2 text-xs bg-primary hover:bg-primary/90 text-primary-foreground whitespace-nowrap"
                       >
+                        <User className="w-3 h-3 mr-1" />
                         View Profile
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleSendFriendRequest(player)}
-                        className="flex-1 border-green-300 text-green-600 hover:bg-green-50"
+                        onClick={(e) => { e.stopPropagation(); handleSendFriendRequest(player); }}
+                        className="h-7 px-2 text-xs border-green-300 text-green-600 hover:bg-green-50 whitespace-nowrap"
                         disabled={!player.user_id}
                       >
                         <UserPlus className="w-3 h-3 mr-1" />
-                        Send Friend Request
+                        Add Friend
                       </Button>
                     </div>
                   </div>
