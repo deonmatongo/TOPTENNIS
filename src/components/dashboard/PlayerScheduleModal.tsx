@@ -58,8 +58,13 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
 
   const opponentUserId = player ? ((player.user_id ?? player.id) || undefined) : undefined;
   const relationship = getRelationshipWith(opponentUserId);
-  const canViewCalendar = relationship === 'friends' || opponentUserId === user?.id;
-  const { availability } = usePlayerAvailability(canViewCalendar ? opponentUserId : undefined);
+  const isFriendOrSelf = relationship === 'friends' || opponentUserId === user?.id;
+  // Always fetch availability — the DB query filters by privacy_level for non-friends
+  const { availability: allAvailability } = usePlayerAvailability(opponentUserId);
+  // Non-friends only see public slots; friends/self see everything
+  const availability = isFriendOrSelf
+    ? allAvailability
+    : allAvailability.filter(slot => slot.privacy_level === 'public' || !slot.privacy_level);
   const { createBooking, isSlotBooked } = useMatchBookings();
 
   const incomingRequest = requests.find(r => r.status === 'pending' && r.sender_id === opponentUserId && r.receiver_id === user?.id);
@@ -219,11 +224,11 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
             </div>
             
             <TabsContent value="calendar" className="flex-1 overflow-auto mt-0 p-6">
-              {!canViewCalendar && (
-                <Card className="mb-6">
+              {!isFriendOrSelf && (
+                <Card className="mb-6 border-orange-200 dark:border-orange-900">
                   <CardContent className="p-4 flex items-center justify-between gap-4">
                     <div className="text-sm text-muted-foreground">
-                      Only friends can view each other’s calendar.
+                      Showing public availability only. Add as friend to see all slots.
                     </div>
                     {relationship === 'pending_received' ? (
                       <div className="flex gap-2">
