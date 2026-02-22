@@ -43,5 +43,4 @@ CREATE POLICY "Users can delete their own availability"
   ON user_availability FOR DELETE
   USING (auth.uid() = user_id);
 
--- Also ensure the realtime publication includes this table
-ALTER PUBLICATION supabase_realtime ADD TABLE user_availability;
+-- Note: user_availability is already a member of supabase_realtime publication
