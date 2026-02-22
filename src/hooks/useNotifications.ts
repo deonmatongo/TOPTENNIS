@@ -84,24 +84,25 @@ export const useNotifications = () => {
     metadata: row.metadata
   }), []);
 
-  // Inject a real-time row into state, deduplicating by DB id
+  // Stable ref for injectRealtimeRow so the subscription useEffect never needs
+  // to re-run (and tear down the channel) when callbacks change.
+  const injectRealtimeRowRef = useRef<(row: any) => void>(() => {});
+
   const injectRealtimeRow = useCallback((row: any) => {
     const incoming = transformRow(row);
     setNotifications(prev => {
       if (prev.some(n => n.id === incoming.id)) {
-        return prev; // already present (e.g. from initial fetch)
+        return prev;
       }
       const newList = [incoming, ...prev];
       updateUnreadCount(newList);
       return newList;
     });
 
-    // Play notification sound
     playNotificationSound(0.5).catch(err =>
       console.warn('Failed to play notification sound:', err)
     );
 
-    // Send browser notification when tab is not focused
     if (isSupportedRef.current) {
       sendNotificationRef.current(incoming.title, {
         body: incoming.message,
@@ -112,6 +113,11 @@ export const useNotifications = () => {
       });
     }
   }, [transformRow, updateUnreadCount]);
+
+  // Keep the ref pointing at the latest version of injectRealtimeRow
+  useEffect(() => {
+    injectRealtimeRowRef.current = injectRealtimeRow;
+  }, [injectRealtimeRow]);
 
   const fetchNotifications = useCallback(async () => {
     if (!user) {
@@ -131,15 +137,13 @@ export const useNotifications = () => {
 
       const transformedNotifications = (data || []).map(transformRow);
 
-      // Update both notifications and unread count atomically
       setNotifications(transformedNotifications);
       updateUnreadCount(transformedNotifications);
       hasLoadedRef.current = true;
 
-      // Flush any real-time events that arrived before the initial load completed
       if (pendingQueueRef.current.length > 0) {
         console.log(`🔄 Flushing ${pendingQueueRef.current.length} queued real-time events`);
-        pendingQueueRef.current.forEach(row => injectRealtimeRow(row));
+        pendingQueueRef.current.forEach(row => injectRealtimeRowRef.current(row));
         pendingQueueRef.current = [];
       }
     } catch (error) {
@@ -151,9 +155,16 @@ export const useNotifications = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [user, updateUnreadCount, transformRow, injectRealtimeRow]);
+  }, [user, updateUnreadCount, transformRow]);
 
-  // Initial fetch and real-time subscription setup
+  // Stable ref for fetchNotifications so the subscription effect doesn't depend on it
+  const fetchNotificationsRef = useRef<() => Promise<void>>(async () => {});
+  useEffect(() => {
+    fetchNotificationsRef.current = fetchNotifications;
+  }, [fetchNotifications]);
+
+  // Initial fetch + real-time subscription — only re-runs when user.id changes.
+  // All callbacks are accessed via stable refs to prevent channel churn.
   useEffect(() => {
     if (!user) {
       setIsLoading(false);
@@ -163,9 +174,8 @@ export const useNotifications = () => {
     hasLoadedRef.current = false;
     pendingQueueRef.current = [];
 
-    fetchNotifications();
+    fetchNotificationsRef.current();
 
-    // Set up real-time subscription for notifications
     const channel = supabase
       .channel(`notifications-${user.id}`)
       .on(
@@ -179,12 +189,9 @@ export const useNotifications = () => {
         (payload) => {
           console.log('🔔 Real-time notification INSERT:', payload.new);
           if (!payload.new) return;
-
           if (hasLoadedRef.current) {
-            // Initial load done — inject immediately
-            injectRealtimeRow(payload.new);
+            injectRealtimeRowRef.current(payload.new);
           } else {
-            // Initial load still in progress — queue for later
             console.log('⏳ Queuing notification until initial load completes');
             pendingQueueRef.current.push(payload.new);
           }
@@ -207,7 +214,7 @@ export const useNotifications = () => {
                 ? { ...n, read: payload.new.read, title: payload.new.title, message: payload.new.message }
                 : n
             );
-            updateUnreadCount(updated);
+            setUnreadCount(updated.filter(n => !n.read).length);
             return updated;
           });
         }
@@ -225,7 +232,7 @@ export const useNotifications = () => {
           if (!payload.old?.id) return;
           setNotifications(prev => {
             const filtered = prev.filter(n => n.id !== payload.old.id);
-            updateUnreadCount(filtered);
+            setUnreadCount(filtered.filter(n => !n.read).length);
             return filtered;
           });
         }
@@ -237,7 +244,7 @@ export const useNotifications = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, fetchNotifications, injectRealtimeRow, updateUnreadCount]);
+  }, [user?.id]); // Only user.id — stable refs handle everything else
 
   const markAsRead = useCallback(async (notificationId: string) => {
     if (!user) return;
