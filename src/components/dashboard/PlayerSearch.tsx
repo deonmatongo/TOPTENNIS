@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Search, User, Trophy, X, Loader2, UserPlus } from 'lucide-react';
+import { Search, User, X, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -153,58 +153,22 @@ const PlayerSearch = ({
                 {searchResults.map((player) => (
                   <div
                     key={player.id}
-                    className="p-3 rounded-lg hover:bg-accent/50 transition-colors"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-accent/50 cursor-pointer transition-colors"
+                    onClick={() => handlePlayerSelect(player)}
                   >
-                    {/* Player info row */}
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-9 h-9 shrink-0 bg-gradient-primary rounded-full flex items-center justify-center text-primary-foreground font-bold text-sm">
-                        {player.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <p className="font-medium text-foreground text-sm truncate">
-                            {player.name}
-                          </p>
-                          <Badge
-                            variant="outline"
-                            className={`text-xs shrink-0 ${getSkillBadgeColor(player.skill_level)}`}
-                          >
-                            {getSkillLabel(player.skill_level)}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <span className="truncate">{player.email}</span>
-                          {(player.wins > 0 || player.losses > 0) && (
-                            <span className="shrink-0 flex items-center gap-1">
-                              <Trophy className="w-3 h-3" />
-                              {player.wins}W-{player.losses}L
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                    <div className="w-8 h-8 shrink-0 bg-gradient-primary rounded-full flex items-center justify-center text-primary-foreground font-bold text-sm">
+                      {player.name.charAt(0).toUpperCase()}
                     </div>
-
-                    {/* Action buttons row */}
-                    <div className="flex flex-wrap gap-2 mt-1 pl-12">
-                      <Button
-                        size="sm"
-                        onClick={() => handlePlayerSelect(player)}
-                        className="h-7 px-2 text-xs bg-primary hover:bg-primary/90 text-primary-foreground whitespace-nowrap"
-                      >
-                        <User className="w-3 h-3 mr-1" />
-                        View Profile
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => { e.stopPropagation(); handleSendFriendRequest(player); }}
-                        className="h-7 px-2 text-xs border-green-300 text-green-600 hover:bg-green-50 whitespace-nowrap"
-                        disabled={!player.user_id}
-                      >
-                        <UserPlus className="w-3 h-3 mr-1" />
-                        Add Friend
-                      </Button>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground text-sm truncate">{player.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{player.email}</p>
                     </div>
+                    <Badge
+                      variant="outline"
+                      className={`text-xs shrink-0 ${getSkillBadgeColor(player.skill_level)}`}
+                    >
+                      {getSkillLabel(player.skill_level)}
+                    </Badge>
                   </div>
                 ))}
               </div>
