@@ -310,66 +310,72 @@ const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps
           </Card>
 
           {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 pt-4">
-            <Button 
-              onClick={handleChallengeMatch}
-              className="w-full sm:flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
-            >
-              <Calendar className="w-4 h-4 mr-2" />
-              Send Match Request
-            </Button>
+          <div className="space-y-3 pt-2">
+            {/* Primary actions */}
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                onClick={handleChallengeMatch}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
+                <Calendar className="w-4 h-4 mr-2 shrink-0" />
+                Match Request
+              </Button>
+              <Button
+                onClick={handleSendMessage}
+                variant="outline"
+              >
+                <MessageCircle className="w-4 h-4 mr-2 shrink-0" />
+                Send Message
+              </Button>
+            </div>
 
+            {/* Friend / relationship action */}
             {relationship === 'friends' ? (
               <Button
                 variant="outline"
-                className="w-full sm:flex-1 text-orange-600 border-orange-300 hover:bg-orange-50"
+                className="w-full text-orange-600 border-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950"
                 onClick={() => setShowUnfriendDialog(true)}
               >
-                <UserMinus className="w-4 h-4 mr-2" />
+                <UserMinus className="w-4 h-4 mr-2 shrink-0" />
                 Remove Friend
               </Button>
             ) : relationship === 'pending_sent' ? (
-              <Button variant="secondary" className="w-full sm:flex-1" disabled>
-                Request Sent
+              <Button variant="secondary" className="w-full" disabled>
+                Friend Request Sent
               </Button>
             ) : relationship === 'pending_received' ? (
-              <div className="w-full sm:flex-1 flex gap-2">
-                <Button className="flex-1" onClick={() => handleRespondToRequest('accepted')}>
-                  Accept
+              <div className="grid grid-cols-2 gap-3">
+                <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleRespondToRequest('accepted')}>
+                  Accept Friend Request
                 </Button>
-                <Button variant="outline" className="flex-1" onClick={() => handleRespondToRequest('declined')}>
+                <Button variant="outline" onClick={() => handleRespondToRequest('declined')}>
                   Decline
                 </Button>
               </div>
-            ) : (
+            ) : otherUserId && otherUserId !== user?.id ? (
               <Button
                 onClick={handleSendFriendRequest}
                 variant="outline"
-                className="w-full sm:flex-1"
-                disabled={!otherUserId || otherUserId === user?.id}
+                className="w-full"
               >
                 Add Friend
               </Button>
+            ) : null}
+
+            {/* Destructive action — visually separated */}
+            {player?.user_id !== user?.id && (
+              <div className="pt-1 border-t">
+                <Button
+                  onClick={() => setShowBlockDialog(true)}
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                >
+                  <Ban className="w-4 h-4 mr-2 shrink-0" />
+                  Block User
+                </Button>
+              </div>
             )}
-            
-            <Button 
-              onClick={handleSendMessage}
-              variant="outline" 
-              className="w-full sm:flex-1"
-            >
-              <MessageCircle className="w-4 h-4 mr-2" />
-              Send Message
-            </Button>
-            
-            <Button 
-              onClick={() => setShowBlockDialog(true)}
-              variant="outline" 
-              className="w-full sm:flex-1 text-red-600 border-red-300 hover:bg-red-50"
-              disabled={player?.user_id === user?.id}
-            >
-              <Ban className="w-4 h-4 mr-2" />
-              Block User
-            </Button>
           </div>
         </div>
 
