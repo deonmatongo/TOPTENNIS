@@ -61,6 +61,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import PlayerProfileModal from '@/components/dashboard/PlayerProfileModal';
+import { User } from 'lucide-react';
 
 type ViewMode = 'day' | 'week' | 'month';
 
@@ -82,6 +84,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [deletingItem, setDeletingItem] = useState<{id: string, type: 'availability' | 'invite'} | null>(null);
   const [cancellingMatch, setCancellingMatch] = useState<string | null>(null);
+  const [showInviterProfile, setShowInviterProfile] = useState(false);
 
   const { availability, deleteAvailability, createAvailability, updateAvailability, fetchAvailability } = useUserAvailability();
   const { invites, getPendingInvites, getConfirmedInvites, respondToInvite, deleteInvite, cancelInvite } = useMatchInvites();
@@ -1194,6 +1197,19 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                       >
                         Decline
                       </Button>
+                      {selectedEvent.data?.sender && (
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => {
+                            setShowEventDialog(false);
+                            setShowInviterProfile(true);
+                          }}
+                        >
+                          <User className="h-4 w-4 mr-2" />
+                          View Profile
+                        </Button>
+                      )}
                     </>
                   )}
                   
@@ -1251,6 +1267,34 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Inviter Profile Modal */}
+      {showInviterProfile && selectedEvent?.data?.sender && (() => {
+        const sender = selectedEvent.data.sender;
+        const player = {
+          id: sender.user_id || selectedEvent.data.sender_id,
+          user_id: sender.user_id || selectedEvent.data.sender_id,
+          name: `${sender.first_name || ''} ${sender.last_name || ''}`.trim() || 'Unknown Player',
+          email: sender.email || '',
+          skill_level: sender.skill_level ?? 0,
+          wins: sender.wins ?? 0,
+          losses: sender.losses ?? 0,
+          usta_rating: sender.usta_rating,
+          competitiveness: sender.competitiveness,
+          age_range: sender.age_range,
+          networking_enabled: sender.networking_enabled,
+          first_name: sender.first_name,
+          last_name: sender.last_name,
+          profile_picture_url: sender.profile_picture_url || sender.avatar_url,
+        };
+        return (
+          <PlayerProfileModal
+            player={player}
+            isOpen={showInviterProfile}
+            onClose={() => setShowInviterProfile(false)}
+          />
+        );
+      })()}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deletingItem} onOpenChange={() => setDeletingItem(null)}>
