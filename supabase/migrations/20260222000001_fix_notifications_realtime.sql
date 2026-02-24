@@ -26,12 +26,12 @@ CREATE POLICY "Users can view their own notifications"
   ON notifications FOR SELECT
   USING (auth.uid() = user_id);
 
--- 6. INSERT — authenticated users can create notifications
---    (needed for the app to insert notifications for other users via service role,
---     but also allows self-inserts for testing)
-CREATE POLICY "Users can insert their own notifications"
+-- 6. INSERT — any authenticated user can insert notifications for any user_id.
+--    This is required because the app inserts notifications for OTHER users
+--    (e.g. sender inserts a notification for the receiver of a message).
+CREATE POLICY "Authenticated users can insert notifications"
   ON notifications FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  WITH CHECK (auth.uid() IS NOT NULL);
 
 -- 7. UPDATE — users can mark their own notifications as read
 CREATE POLICY "Users can update their own notifications"

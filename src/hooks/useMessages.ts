@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -30,7 +30,7 @@ export const useMessages = () => {
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -89,9 +89,9 @@ export const useMessages = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  const sendMessage = async (receiverId: string, subject: string, content: string) => {
+  const sendMessage = useCallback(async (receiverId: string, subject: string, content: string) => {
     if (!user) throw new Error('User not authenticated');
 
     try {
@@ -105,17 +105,36 @@ export const useMessages = () => {
         });
 
       if (error) throw error;
-      
-      // Refresh messages after sending
+
+      // Notify RECEIVER only — never the sender
+      const { data: senderProfile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('id', user.id)
+        .single();
+      const senderName = senderProfile
+        ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim()
+        : 'Someone';
+
+      await supabase.from('notifications').insert({
+        user_id: receiverId,          // receiver only
+        type: 'message_received',
+        title: 'New Message',
+        message: `${senderName} sent you a message`,
+        read: false,
+        action_url: '/dashboard?tab=messages',
+        metadata: { sender_id: user.id },
+      });
+
       await fetchMessages();
       return true;
     } catch (err) {
       console.error('Error sending message:', err);
       throw err;
     }
-  };
+  }, [user, fetchMessages]);
 
-  const markAsRead = async (messageId: string) => {
+  const markAsRead = useCallback(async (messageId: string) => {
     if (!user) return;
 
     try {
@@ -136,65 +155,46 @@ export const useMessages = () => {
     } catch (err) {
       console.error('Error marking message as read:', err);
     }
-  };
+  }, [user]);
 
-  const getUnreadCount = () => {
+  const getUnreadCount = useCallback(() => {
     if (!user) return 0;
     return messages.filter(msg => msg.receiver_id === user.id && !msg.read).length;
-  };
+  }, [user, messages]);
 
   useEffect(() => {
+    if (!user) { setLoading(false); return; }
+
     fetchMessages();
 
-    // Set up real-time subscription for messages
-    if (user) {
-      const channel = supabase
-        .channel('messages-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*', // Listen to all changes (INSERT, UPDATE, DELETE)
-            schema: 'public',
-            table: 'messages',
-            filter: `sender_id=eq.${user.id}`
-          },
-          (payload) => {
-            console.log('Real-time message update (sent):', payload);
-            fetchMessages();
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*', // Listen to all changes (INSERT, UPDATE, DELETE)
-            schema: 'public',
-            table: 'messages',
-            filter: `receiver_id=eq.${user.id}`
-          },
-          (payload) => {
-            console.log('Real-time message update (received):', payload);
-            
-            // Show toast notification for new incoming messages
-            if (payload.eventType === 'INSERT') {
-              toast.info('New message received', {
-                description: 'You have a new message in your inbox',
-                action: {
-                  label: 'View',
-                  onClick: () => window.location.href = '/dashboard?tab=messages'
-                }
-              });
-            }
-            
-            fetchMessages();
-          }
-        )
-        .subscribe();
+    // Only subscribe to INCOMING messages for this user
+    // (sender_id filter removed — sender doesn't need real-time on their own sends)
+    const channel = supabase
+      .channel(`messages-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `receiver_id=eq.${user.id}`,
+        },
+        () => { fetchMessages(); }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `receiver_id=eq.${user.id}`,
+        },
+        () => { fetchMessages(); }
+      )
+      .subscribe();
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-  }, [user]);
+    return () => { supabase.removeChannel(channel); };
+  }, [user, fetchMessages]);
 
   return {
     messages,
