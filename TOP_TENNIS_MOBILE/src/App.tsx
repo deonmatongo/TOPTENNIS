@@ -234,9 +234,11 @@ function AppNavigator() {
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
       {!user ? (
-        <Stack.Screen name="Auth" component={AuthScreen} />
+        <>
+          <Stack.Screen name="Auth" component={AuthScreen} />
+          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+        </>
       ) : !player ? (
         <Stack.Screen name="Onboarding">
           {() => <OnboardingScreen onComplete={refetch} />}
@@ -244,6 +246,7 @@ function AppNavigator() {
       ) : (
         <>
           <Stack.Screen name="Main" component={TabNavigator} />
+          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
           <Stack.Screen
             name="Notifications"
             component={NotificationsScreen}
