@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bell, Trophy, Calendar, Users, TrendingUp, CheckCircle, X, Filter, Search } from 'lucide-react';
+import { Bell, Trophy, Calendar, Users, TrendingUp, CheckCircle, X, Filter, Search, ChevronRight, MessageCircle, UserPlus, Award } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNotificationsContext } from '@/contexts/NotificationsContext';
@@ -12,7 +12,13 @@ import { useMatchResponses } from '@/hooks/useMatchResponses';
 import { MatchResponseModal } from './MatchResponseModal';
 const getNotificationIcon = (type: Notification['type']) => {
   switch (type) {
+    case 'match_invite':
     case 'match_scheduled':
+    case 'match_accepted':
+    case 'match_confirmed':
+    case 'match_declined':
+    case 'match_cancelled':
+    case 'match_rescheduled':
     case 'match_result':
       return Calendar;
     case 'achievement':
@@ -21,8 +27,41 @@ const getNotificationIcon = (type: Notification['type']) => {
       return Users;
     case 'league_update':
       return TrendingUp;
+    case 'friend_request':
+    case 'friend_accepted':
+      return UserPlus;
+    case 'message_received':
+      return MessageCircle;
     default:
       return Bell;
+  }
+};
+
+const getDestinationLabel = (type: Notification['type']): string | null => {
+  switch (type) {
+    case 'match_invite':
+    case 'match_rescheduled':
+      return 'View in Schedule';
+    case 'match_accepted':
+    case 'match_confirmed':
+    case 'match_declined':
+    case 'match_cancelled':
+    case 'match_scheduled':
+    case 'match_result':
+      return 'Go to Schedule';
+    case 'match_suggestion':
+      return 'Find Opponents';
+    case 'friend_request':
+    case 'friend_accepted':
+      return 'Go to Friends';
+    case 'message_received':
+      return 'Open Messages';
+    case 'league_update':
+      return 'View Competition';
+    case 'achievement':
+      return 'View Overview';
+    default:
+      return null;
   }
 };
 const getNotificationColor = (type: Notification['type']) => {
@@ -95,14 +134,46 @@ const NotificationsTab = () => {
     const matchesSearch = searchTerm === '' || notification.title.toLowerCase().includes(searchTerm.toLowerCase()) || notification.message.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesReadFilter && matchesTypeFilter && matchesSearch;
   });
+  const getDestination = (notification: Notification): string | null => {
+    // Explicit actionUrl always wins
+    if (notification.actionUrl) return notification.actionUrl;
+
+    // Derive from type
+    switch (notification.type) {
+      case 'match_invite':
+      case 'match_rescheduled':
+        return '/dashboard?tab=schedule';
+      case 'match_accepted':
+      case 'match_confirmed':
+      case 'match_declined':
+      case 'match_cancelled':
+      case 'match_scheduled':
+      case 'match_result':
+        return '/dashboard?tab=schedule';
+      case 'match_suggestion':
+        return '/dashboard?tab=matching';
+      case 'friend_request':
+      case 'friend_accepted':
+        return '/dashboard?tab=friends';
+      case 'message_received':
+        return '/dashboard?tab=messages';
+      case 'league_update':
+        return '/dashboard?tab=competition';
+      case 'achievement':
+        return '/dashboard?tab=overview';
+      default:
+        return null;
+    }
+  };
+
   const handleNotificationClick = (notification: Notification) => {
     if (!notification.read) {
       markAsRead(notification.id);
     }
-    
-    // Check if this is a match invite/response notification
-    const matchTypes = ['match_invite', 'match_rescheduled', 'match_accepted'];
-    if (matchTypes.includes(notification.type) && notification.metadata?.match_id) {
+
+    // Try to open match invite modal for actionable invites
+    const inviteModalTypes = ['match_invite', 'match_rescheduled'];
+    if (inviteModalTypes.includes(notification.type) && notification.metadata?.match_id) {
       const match = pendingInvites.find(m => m.id === notification.metadata.match_id);
       if (match) {
         setSelectedMatch(match);
@@ -110,9 +181,10 @@ const NotificationsTab = () => {
         return;
       }
     }
-    
-    if (notification.actionUrl) {
-      navigate(notification.actionUrl);
+
+    const dest = getDestination(notification);
+    if (dest) {
+      navigate(dest);
     }
   };
 
@@ -257,7 +329,9 @@ const NotificationsTab = () => {
               {filteredNotifications.map(notification => {
             const Icon = getNotificationIcon(notification.type);
             const iconColor = getNotificationColor(notification.type);
-            return <div key={notification.id} className={`group flex items-start space-x-3 sm:space-x-4 p-4 sm:p-6 cursor-pointer transition-colors touch-manipulation ${!notification.read ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-muted/30'}`} onClick={() => handleNotificationClick(notification)}>
+            const destLabel = getDestinationLabel(notification.type);
+            const isClickable = !!(destLabel || notification.actionUrl);
+            return <div key={notification.id} className={`group flex items-start space-x-3 sm:space-x-4 p-4 sm:p-6 transition-colors touch-manipulation ${isClickable ? 'cursor-pointer' : 'cursor-default'} ${!notification.read ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-muted/30'}`} onClick={() => handleNotificationClick(notification)}>
                     <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${!notification.read ? 'bg-primary/10' : 'bg-muted/50'}`}>
                       <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${iconColor}`} />
                     </div>
@@ -274,20 +348,31 @@ const NotificationsTab = () => {
                           <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mb-2 sm:mb-3 line-clamp-2">
                             {notification.message}
                           </p>
-                          <div className="flex flex-col xs:flex-row xs:items-center gap-1 xs:gap-4 text-xs text-muted-foreground/70">
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground/70">
                             <span>{formatTimeAgo(notification.createdAt)}</span>
-                            <Badge variant="outline" className="text-xs self-start xs:self-auto">
-                              {notification.type.replace('_', ' ')}
+                            <Badge variant="outline" className="text-xs">
+                              {notification.type.replace(/_/g, ' ')}
                             </Badge>
+                            {isClickable && destLabel && (
+                              <span className="flex items-center gap-0.5 text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                                {destLabel}
+                                <ChevronRight className="w-3 h-3" />
+                              </span>
+                            )}
                           </div>
                         </div>
                         
-                        <Button variant="ghost" size="icon" className="w-8 h-8 opacity-0 group-hover:opacity-100 transition-opacity touch-target flex-shrink-0" onClick={e => {
-                    e.stopPropagation();
-                    removeNotification(notification.id);
-                  }}>
-                          <X className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {isClickable && (
+                            <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                          )}
+                          <Button variant="ghost" size="icon" className="w-8 h-8 opacity-0 group-hover:opacity-100 transition-opacity touch-target" onClick={e => {
+                            e.stopPropagation();
+                            removeNotification(notification.id);
+                          }}>
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>;
