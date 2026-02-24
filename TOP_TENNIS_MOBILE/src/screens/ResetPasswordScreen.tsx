@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { supabase } from '@/services/supabase';
 import { Colors, FontSize, FontWeight, Radius, Spacing } from '@/theme/colors';
 
@@ -32,6 +33,7 @@ const getPasswordStrength = (pw: string) => {
 };
 
 export const ResetPasswordScreen: React.FC = () => {
+  const navigation = useNavigation();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -100,6 +102,16 @@ export const ResetPasswordScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* Cancel / back button */}
+          <TouchableOpacity
+            style={styles.cancelBtn}
+            onPress={() => navigation.canGoBack() ? navigation.goBack() : (navigation as any).replace('Auth')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="arrow-back" size={20} color={Colors.textSecondary} />
+            <Text style={styles.cancelText}>Cancel</Text>
+          </TouchableOpacity>
+
           <View style={styles.header}>
             <View style={styles.logoCircle}>
               <Ionicons name="lock-open-outline" size={32} color={Colors.primary} />
@@ -260,6 +272,17 @@ const styles = StyleSheet.create({
   },
   submitBtnDisabled: { opacity: 0.6 },
   submitText: { color: Colors.textInverse, fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+
+  cancelBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    alignSelf: 'flex-start',
+    marginBottom: Spacing.sm,
+  },
+  cancelText: { fontSize: FontSize.md, color: Colors.textSecondary, fontWeight: FontWeight.medium },
 
   doneContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xxl },
   doneIcon: { marginBottom: Spacing.xl },
