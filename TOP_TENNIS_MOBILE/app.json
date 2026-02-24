@@ -1,11 +1,15 @@
 {
   "expo": {
-    "name": "TOP TENNIS",
+    "name": "Top Tennis",
     "slug": "top-tennis",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "scheme": "toptennis",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -15,26 +19,79 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.top.tennis"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.top.tennis",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Top Tennis uses your camera to update your profile photo.",
+        "NSPhotoLibraryUsageDescription": "Top Tennis accesses your photo library to let you choose a profile photo.",
+        "NSPhotoLibraryAddUsageDescription": "Top Tennis saves photos to your library.",
+        "NSCalendarsUsageDescription": "Top Tennis adds your upcoming matches to your calendar.",
+        "NSUserNotificationsUsageDescription": "Top Tennis sends you match reminders and league updates.",
+        "NSLocationWhenInUseUsageDescription": "Top Tennis uses your location to find nearby courts and players.",
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#F97316"
       },
-      "package": "com.top.tennis"
+      "package": "com.top.tennis",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-notifications"
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#F97316",
+          "sounds": [],
+          "mode": "production"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Top Tennis accesses your photos to let you set a profile picture.",
+          "cameraPermission": "Top Tennis uses your camera to take a profile photo."
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Top Tennis adds your matches to your calendar."
+        }
+      ],
+      "expo-web-browser"
     ],
     "notification": {
       "icon": "./assets/notification-icon.png",
-      "color": "#ffffff",
+      "color": "#F97316",
       "iosDisplayInForeground": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "YOUR_EAS_PROJECT_ID"
+      }
     }
   }
 }

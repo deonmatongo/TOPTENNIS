@@ -1,0 +1,38 @@
+{
+  "_README": "INSTRUCTIONS: Replace this file with your real google-services.json from Firebase Console.",
+  "_STEPS": [
+    "1. Go to https://console.firebase.google.com",
+    "2. Create or open your project",
+    "3. Click the Android icon to add an Android app",
+    "4. Package name: com.top.tennis",
+    "5. Download google-services.json",
+    "6. Place it at: TOP_TENNIS_MOBILE/google-services.json",
+    "7. Also copy the FCM Server Key into EAS: eas credentials"
+  ],
+  "project_info": {
+    "project_number": "YOUR_PROJECT_NUMBER",
+    "project_id": "YOUR_PROJECT_ID",
+    "storage_bucket": "YOUR_PROJECT_ID.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "YOUR_MOBILESDK_APP_ID",
+        "android_client_info": {
+          "package_name": "com.top.tennis"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "YOUR_API_KEY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
