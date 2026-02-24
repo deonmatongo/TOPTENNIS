@@ -241,7 +241,15 @@ const MatchingTab = () => {
       {matchingMode === 'player-search' && renderPlayerSearch()}
 
       {/* Player Schedule Modal */}
-      <PlayerScheduleModal open={showScheduleModal} onClose={() => setShowScheduleModal(false)} player={selectedPlayer} />
+      <PlayerScheduleModal
+        open={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        player={selectedPlayer}
+        onInviteSent={() => {
+          setShowScheduleModal(false);
+          window.location.href = '/dashboard?tab=schedule';
+        }}
+      />
 
       {/* Unmatched Player Dialog */}
       <Dialog open={showUnmatchedDialog} onOpenChange={setShowUnmatchedDialog}>

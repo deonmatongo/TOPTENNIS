@@ -41,12 +41,14 @@ interface PlayerScheduleModalProps {
   open: boolean;
   onClose: () => void;
   player: SchedulePlayer | null;
+  onInviteSent?: () => void;
 }
 
 export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
   open,
   onClose,
-  player
+  player,
+  onInviteSent,
 }) => {
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
@@ -152,6 +154,8 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
       
       setShowBookingModal(false);
       setSelectedSlot(null);
+      onClose();
+      onInviteSent?.();
     } catch (error) {
       console.error('Error creating booking:', error);
     }

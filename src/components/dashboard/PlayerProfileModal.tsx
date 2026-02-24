@@ -385,6 +385,11 @@ const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps
           open={showScheduleMatch}
           onClose={() => setShowScheduleMatch(false)}
           player={player}
+          onInviteSent={() => {
+            setShowScheduleMatch(false);
+            onClose();
+            window.location.href = '/dashboard?tab=schedule';
+          }}
         />
       </DialogContent>
     </Dialog>
