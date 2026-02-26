@@ -15,7 +15,15 @@ CREATE TABLE IF NOT EXISTS blocked_users (
 );
 
 -- 2. Realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE blocked_users;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'blocked_users'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE blocked_users;
+  END IF;
+END $$;
 ALTER TABLE blocked_users REPLICA IDENTITY FULL;
 
 -- 3. RLS

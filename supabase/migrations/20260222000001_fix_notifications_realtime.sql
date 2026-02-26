@@ -3,7 +3,15 @@
 -- ============================================================
 
 -- 1. Ensure the table is in the realtime publication
-ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'notifications'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+  END IF;
+END $$;
 
 -- 2. Set REPLICA IDENTITY FULL so filtered postgres_changes
 --    subscriptions (filter: user_id=eq.<id>) actually fire.
@@ -20,6 +28,7 @@ DROP POLICY IF EXISTS "Users can insert their own notifications" ON notification
 DROP POLICY IF EXISTS "Users can update their own notifications" ON notifications;
 DROP POLICY IF EXISTS "Users can delete their own notifications" ON notifications;
 DROP POLICY IF EXISTS "Service role can manage all notifications" ON notifications;
+DROP POLICY IF EXISTS "Authenticated users can insert notifications" ON notifications;
 
 -- 5. SELECT — users can only read their own notifications
 CREATE POLICY "Users can view their own notifications"
