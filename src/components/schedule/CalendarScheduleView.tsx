@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useUserAvailability } from '@/hooks/useUserAvailability';
 import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { TimezoneSelect } from '@/components/ui/TimezoneSelect';
 import { convertTimeBetweenTimezones, getTimezoneDisplayName } from '@/utils/timezoneConversion';
@@ -88,6 +89,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
 
   const { availability, deleteAvailability, createAvailability, updateAvailability, fetchAvailability } = useUserAvailability();
   const { invites, getPendingInvites, getConfirmedInvites, respondToInvite, deleteInvite, cancelInvite } = useMatchInvites();
+  const { notifications, markAsRead } = useNotificationsContext();
   const { timezone, updateTimezone } = useUserTimezone();
 
   const pendingInvites = getPendingInvites();
@@ -308,6 +310,12 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
 
   const handleRespondToInvite = async (inviteId: string, response: 'accepted' | 'declined') => {
     try {
+      // Mark any related notifications as read when responding
+      const matchNotificationTypes = ['match_invite', 'match_rescheduled', 'match_accepted'];
+      notifications
+        .filter(n => !n.read && matchNotificationTypes.includes(n.type) && n.metadata?.match_id === inviteId)
+        .forEach(n => markAsRead(n.id));
+
       await respondToInvite(inviteId, response);
       setShowEventDialog(false);
     } catch (error) {

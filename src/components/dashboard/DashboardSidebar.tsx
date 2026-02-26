@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotificationsContext } from "@/contexts/NotificationsContext";
+import { useMatchResponses } from "@/hooks/useMatchResponses";
 import { toast } from "sonner";
 import { 
   Home, 
@@ -31,6 +32,8 @@ interface DashboardSidebarProps {
 
 const DashboardSidebar = ({ activeTab, setActiveTab, isMobile = false, sidebarOpen = false, setSidebarOpen }: DashboardSidebarProps) => {
   const { unreadCount } = useNotificationsContext();
+  const { pendingInvites } = useMatchResponses();
+  const pendingInviteCount = pendingInvites.length;
   const navigate = useNavigate();
   const { signOut } = useAuth();
 
@@ -103,6 +106,11 @@ const DashboardSidebar = ({ activeTab, setActiveTab, isMobile = false, sidebarOp
               {item.id === 'notifications' && unreadCount > 0 && (
                 <Badge className="bg-destructive text-destructive-foreground text-xs px-1.5 py-0.5 min-w-[1.25rem] h-5">
                   {unreadCount > 99 ? '99+' : unreadCount}
+                </Badge>
+              )}
+              {(item.id === 'calendar' || item.id === 'schedule') && pendingInviteCount > 0 && (
+                <Badge className="bg-orange-500 text-white text-xs px-1.5 py-0.5 min-w-[1.25rem] h-5">
+                  {pendingInviteCount > 99 ? '99+' : pendingInviteCount}
                 </Badge>
               )}
             </Button>

@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
 import { useMatchResponses, MatchWithResponse } from '@/hooks/useMatchResponses';
+import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import { MatchResponseModal } from './MatchResponseModal';
 import { PendingMatchInviteCard } from './PendingMatchInviteCard';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export const MatchInvitesList = () => {
   const { pendingInvites, isLoading, respondToMatch } = useMatchResponses();
+  const { notifications, markAsRead } = useNotificationsContext();
   const [selectedMatch, setSelectedMatch] = useState<MatchWithResponse | null>(null);
   const [showModal, setShowModal] = useState(false);
 
@@ -18,6 +20,12 @@ export const MatchInvitesList = () => {
     comment?: string
   ) => {
     if (!selectedMatch) return;
+
+    // Mark any related notifications as read when responding
+    const matchNotificationTypes = ['match_invite', 'match_rescheduled', 'match_accepted'];
+    notifications
+      .filter(n => !n.read && matchNotificationTypes.includes(n.type) && n.metadata?.match_id === selectedMatch.id)
+      .forEach(n => markAsRead(n.id));
 
     respondToMatch.mutate({
       matchId: selectedMatch.id,
