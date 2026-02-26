@@ -164,13 +164,15 @@ export const useFriendRequests = () => {
       // Fetch the request first so we know who the sender is
       const request = requests.find(r => r.id === requestId);
 
-      const { error } = await supabase
+      const { error, data: updated } = await supabase
         .from('friend_requests')
         .update({ status })
         .eq('id', requestId)
-        .eq('receiver_id', user.id);
+        .select();
 
+      console.error('[updateRequestStatus] result:', { error, updated, requestId, status, userId: user.id });
       if (error) throw error;
+      if (!updated || updated.length === 0) throw new Error('No rows updated — check RLS policies on friend_requests');
 
       if (status === 'accepted' && request) {
         // Fetch receiver (current user) name

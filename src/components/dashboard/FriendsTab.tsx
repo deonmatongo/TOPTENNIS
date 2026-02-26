@@ -31,10 +31,11 @@ export const FriendsTab = () => {
         title: status === 'accepted' ? 'Friend request accepted' : 'Friend request declined',
         description: `You have ${status} the friend request.`,
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[FriendsTab] handleRequestResponse error:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update friend request',
+        description: error?.message || 'Failed to update friend request',
         variant: 'destructive',
       });
     }
