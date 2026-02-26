@@ -315,14 +315,27 @@ export const useNotifications = () => {
   }, [user, notifications, updateUnreadCount]);
 
 
-  const removeNotification = useCallback((notificationId: string) => {
+  const removeNotification = useCallback(async (notificationId: string) => {
+    // Optimistically remove from UI
     setNotifications(prev => {
       const newNotifications = prev.filter(n => n.id !== notificationId);
-      // Update unread count based on the new filtered list
       updateUnreadCount(newNotifications);
       return newNotifications;
     });
-  }, [updateUnreadCount]);
+
+    // Delete from DB
+    if (user) {
+      try {
+        await supabase
+          .from('notifications')
+          .delete()
+          .eq('id', notificationId)
+          .eq('user_id', user.id);
+      } catch (error) {
+        console.error('Error deleting notification:', error);
+      }
+    }
+  }, [user, updateUnreadCount]);
 
   return {
     notifications,

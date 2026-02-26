@@ -108,24 +108,8 @@ const NotificationsTab = () => {
   const [selectedMatch, setSelectedMatch] = React.useState<any>(null);
   const [matchModalOpen, setMatchModalOpen] = React.useState(false);
 
-  // When the user opens the Notifications tab, mark currently visible unread notifications as read
-  React.useEffect(() => {
-    if (isLoading) return;
-
-    const visibleUnreadNotifications = notifications
-      .slice(0, 20)
-      .filter(n => !n.read);
-
-    if (visibleUnreadNotifications.length === 0) return;
-
-    const timer = setTimeout(() => {
-      visibleUnreadNotifications.forEach(notification => {
-        markAsRead(notification.id);
-      });
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [isLoading, notifications, markAsRead]);
+  // Notifications are marked as read only when the user clicks on them individually.
+  // This ensures the counter accurately reflects truly unseen notifications.
 
   // Filter notifications based on criteria
   const filteredNotifications = notifications.filter(notification => {

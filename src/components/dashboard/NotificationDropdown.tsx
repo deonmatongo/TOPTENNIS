@@ -78,24 +78,8 @@ const NotificationDropdown = ({ children }: NotificationDropdownProps) => {
   const [selectedMatch, setSelectedMatch] = React.useState<any>(null);
   const [showMatchModal, setShowMatchModal] = React.useState(false);
 
-  // Mark notifications as read when dropdown opens - but don't mark ALL as read automatically
-  // Only mark visible notifications as read to preserve user intent
-  React.useEffect(() => {
-    if (isOpen && !isLoading) {
-      const visibleUnreadNotifications = notifications
-        .slice(0, 12) // Only the visible ones
-        .filter(n => !n.read);
-      
-      // Use a small delay to allow the user to see the notifications first
-      const timer = setTimeout(() => {
-        visibleUnreadNotifications.forEach(notification => {
-          markAsRead(notification.id);
-        });
-      }, 500);
-
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, isLoading, notifications, markAsRead]);
+  // Notifications are only marked as read when the user clicks on them individually.
+  // This keeps the counter accurate — it only decreases when a notification is actually opened.
 
   const handleNotificationClick = (notification: Notification) => {
     if (!notification.read) {
