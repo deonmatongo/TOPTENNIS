@@ -38,11 +38,12 @@ export function useFriendRequests() {
   };
 
   const updateRequestStatus = async (requestId: string, status: 'accepted' | 'declined') => {
-    const { error } = await supabase
+    const { error, count } = await supabase
       .from('friend_requests')
       .update({ status })
       .eq('id', requestId)
-      .eq('receiver_id', user!.id);
+      .select();
+    console.log('updateRequestStatus result:', { error, count, requestId, status, userId: user?.id });
     if (error) throw error;
     await fetchRequests();
   };

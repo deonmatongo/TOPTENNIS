@@ -87,6 +87,15 @@ const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps
     }
   };
 
+  const getGenderLabel = (gender?: string | null) => {
+    switch (gender?.toLowerCase()) {
+      case 'male': return 'Male';
+      case 'female': return 'Female';
+      case 'other': return 'Other';
+      default: return 'Not specified';
+    }
+  };
+
   const totalMatches = player.wins + player.losses;
   const winRate = totalMatches > 0 ? Math.round((player.wins / totalMatches) * 100) : 0;
 
@@ -235,6 +244,14 @@ const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps
                 </div>
 
                 <div className="flex items-center space-x-3">
+                  <User className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Gender</p>
+                    <p className="text-sm text-muted-foreground">{getGenderLabel(player.gender)}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-3">
                   <Calendar className="w-4 h-4 text-muted-foreground" />
                   <div>
                     <p className="text-sm font-medium text-foreground">Age Range</p>
@@ -358,7 +375,7 @@ const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps
                 variant="outline"
                 className="w-full"
               >
-                Add Friend
+                Send a friend request
               </Button>
             ) : null}
 
@@ -394,7 +411,6 @@ const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps
           onInviteSent={() => {
             setShowScheduleMatch(false);
             onClose();
-            window.location.href = '/dashboard?tab=schedule';
           }}
         />
       </DialogContent>

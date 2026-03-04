@@ -83,21 +83,25 @@ const MatchingTab = () => {
               <Bot className="w-8 h-8 text-primary-foreground" />
             </div>
             <CardTitle className="text-xl">AI-Recommended Matches</CardTitle>
-            <CardDescription className="text-center">Let our AI help you find a competitive opponent based on: </CardDescription>
+            <CardDescription className="text-center">Let our AI help you find the best opponent based on:</CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                Same age range
+                Closest skill level match
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                Radius and same location
+                Compatible play style (casual / competitive)
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                Players who are willing to match
+                Activity level &amp; balanced win rate
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                Excludes blocked players automatically
               </div>
             </div>
             <Button className="w-full mt-4" onClick={() => setMatchingMode('ai-recommendations')}>
@@ -247,7 +251,8 @@ const MatchingTab = () => {
         player={selectedPlayer}
         onInviteSent={() => {
           setShowScheduleModal(false);
-          window.location.href = '/dashboard?tab=schedule';
+          setSelectedPlayer(null);
+          setMatchingMode('selection');
         }}
       />
 

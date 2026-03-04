@@ -58,6 +58,7 @@ export const useAllAvailability = () => {
         `)
         .eq('is_available', true)
         .eq('is_blocked', false)
+        .or('privacy_level.eq.public,privacy_level.is.null')
         .gte('date', new Date().toISOString().split('T')[0])
         .order('date', { ascending: true })
         .order('start_time', { ascending: true });

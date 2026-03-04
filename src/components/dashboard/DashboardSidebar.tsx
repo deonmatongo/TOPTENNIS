@@ -19,7 +19,8 @@ import {
   Shield,
   Users,
   Bell,
-  XCircle
+  XCircle,
+  X
 } from "lucide-react";
 
 interface DashboardSidebarProps {
@@ -65,23 +66,34 @@ const DashboardSidebar = ({ activeTab, setActiveTab, isMobile = false, sidebarOp
 
   return (
     <div className={`fixed left-0 top-0 h-full w-64 bg-card border-r border-border shadow-tennis-xl z-50 transition-transform duration-300 ${
-      isMobile ? (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'
+      sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
     }`}>
       {/* Logo/Brand Section */}
       <div className="p-6 border-b border-border">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center shadow-md">
-            <span className="text-white font-bold text-lg">🎾</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center shadow-md">
+              <span className="text-white font-bold text-lg">🎾</span>
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-foreground">Tennis Pro</h2>
+              <p className="text-xs text-muted-foreground">Dashboard</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg font-bold text-foreground">Tennis Pro</h2>
-            <p className="text-xs text-muted-foreground">Dashboard</p>
-          </div>
+          {/* Close button — only visible on mobile */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden h-8 w-8 text-muted-foreground hover:text-foreground"
+            onClick={() => setSidebarOpen && setSidebarOpen(false)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </div>
       </div>
       
-      {/* Navigation Menu */}
-      <nav className="px-4 py-6 space-y-2">
+      {/* Navigation Menu — scrollable so it doesn't overlap bottom actions */}
+      <nav className="px-4 py-6 space-y-2 overflow-y-auto max-h-[calc(100vh-200px)]">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;

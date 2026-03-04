@@ -1,5 +1,4 @@
-import React, { useState, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -7,221 +6,297 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { 
-  Users, 
-  MessageCircle, 
-  Send, 
-  Search, 
-  Check, 
-  X, 
-  Clock, 
-  UserPlus, 
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import {
+  Users,
+  MessageCircle,
+  Send,
+  Search,
+  Check,
+  X,
+  Clock,
+  UserPlus,
   Plus,
-  Mail,
   AlertCircle,
-  CheckCircle2,
-  User,
   CheckCheck,
-  Filter,
-  Eye,
-  EyeOff,
-  Reply
+  ChevronLeft,
+  Settings,
+  UserMinus,
+  Trash2,
 } from 'lucide-react';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
+import { useBlockedUsers } from '@/hooks/useBlockedUsers';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMessagesContext } from '@/contexts/MessagesContext';
-import type { Message } from '@/hooks/useMessages';
+import { useConversations, type Conversation } from '@/hooks/useConversations';
+import { useMatchInvites } from '@/hooks/useMatchInvites';
 import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
 import { toast } from 'sonner';
 import PlayerSearch from './PlayerSearch';
 import { SearchResult } from '@/hooks/usePlayerSearch';
-import SendMessageModal from './SendMessageModal';
+import PlayerProfileModal from './PlayerProfileModal';
 
-interface Conversation {
-  otherUserId: string;
-  otherUser: {
-    name: string;
-    email: string;
-    profile_picture_url?: string;
-  };
-  messages: Message[];
-  lastMessage: Message;
-  unreadCount: number;
-  isFriend: boolean;
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatTime(dateString: string) {
+  const date = new Date(dateString);
+  if (isToday(date)) return format(date, 'HH:mm');
+  if (isYesterday(date)) return 'Yesterday';
+  return format(date, 'MMM d');
 }
+
+function getConvName(conv: Conversation, currentUserId: string): string {
+  if (conv.is_group) return conv.name || 'Group Chat';
+  const other = conv.members.find(m => m.user_id !== currentUserId);
+  if (!other?.profile) return 'Direct Message';
+  return `${other.profile.first_name || ''} ${other.profile.last_name || ''}`.trim() || other.profile.email;
+}
+
+function getConvAvatar(conv: Conversation, currentUserId: string): string | undefined {
+  if (conv.is_group) return conv.avatar_url ?? undefined;
+  const other = conv.members.find(m => m.user_id !== currentUserId);
+  return other?.profile?.profile_picture_url ?? undefined;
+}
+
+// ── Group create dialog ───────────────────────────────────────────────────────
+
+interface GroupCreateDialogProps {
+  open: boolean;
+  onClose: () => void;
+  friends: { userId: string; name: string; avatar?: string }[];
+  onSubmit: (name: string, memberIds: string[]) => Promise<void>;
+}
+
+const GroupCreateDialog: React.FC<GroupCreateDialogProps> = ({ open, onClose, friends, onSubmit }) => {
+  const [name, setName] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [creating, setCreating] = useState(false);
+
+  const toggle = (id: string) => setSelected(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  const handleCreate = async () => {
+    if (!name.trim() || selected.size === 0) return;
+    setCreating(true);
+    try {
+      await onSubmit(name.trim(), Array.from(selected));
+      setName('');
+      setSelected(new Set());
+      onClose();
+    } catch {
+      toast.error('Failed to create group');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Create Group Chat</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1">
+            <Label>Group name</Label>
+            <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Tennis Squad" />
+          </div>
+          <div className="space-y-1">
+            <Label>Add members</Label>
+            <ScrollArea className="h-48 border rounded-md p-2">
+              <div className="space-y-1">
+                {friends.map(f => (
+                  <div
+                    key={f.userId}
+                    className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${selected.has(f.userId) ? 'bg-primary/10 border border-primary/20' : 'hover:bg-muted/50'}`}
+                    onClick={() => toggle(f.userId)}
+                  >
+                    <Avatar className="h-7 w-7">
+                      {f.avatar && <AvatarImage src={f.avatar} />}
+                      <AvatarFallback className="text-xs bg-primary/10 text-primary">{f.name.charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm flex-1">{f.name}</span>
+                    {selected.has(f.userId) && <Check className="w-4 h-4 text-primary" />}
+                  </div>
+                ))}
+                {friends.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">Add friends first to create a group</p>}
+              </div>
+            </ScrollArea>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleCreate} disabled={!name.trim() || selected.size === 0 || creating}>
+            {creating ? 'Creating...' : `Create (${selected.size} members)`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 const FriendsMessagesTab = () => {
   const [activeView, setActiveView] = useState<'conversations' | 'friends' | 'requests'>('conversations');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
-  const [replyContent, setReplyContent] = useState('');
+  const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
+  const [msgInput, setMsgInput] = useState('');
   const [sending, setSending] = useState(false);
   const [showPlayerSearch, setShowPlayerSearch] = useState(false);
-  const [selectedPlayer, setSelectedPlayer] = useState<SearchResult | null>(null);
-  const [showComposeModal, setShowComposeModal] = useState(false);
+  const [showGroupCreate, setShowGroupCreate] = useState(false);
+  const [profilePlayer, setProfilePlayer] = useState<any | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { user } = useAuth();
-  const { requests, loading: friendsLoading, updateRequestStatus, getPendingRequestsCount } = useFriendRequests();
-  const { messages, loading: messagesLoading, markAsRead, getUnreadCount, sendMessage } = useMessagesContext();
+  const { requests, loading: friendsLoading, updateRequestStatus, revokeFriendRequest, getPendingRequestsCount } = useFriendRequests();
+  const { blockedUsers } = useBlockedUsers();
+  const { conversations, loading: convLoading, sendMessage, getOrCreateDM, createGroupChat, markConversationRead, getTotalUnread } = useConversations();
+  const { invites } = useMatchInvites();
 
-  // Process friends data
-  const pendingRequests = requests.filter(req => 
-    req.status === 'pending' && req.receiver_id === user?.id
-  );
-  
-  const sentRequests = requests.filter(req => 
-    req.status === 'pending' && req.sender_id === user?.id
-  );
-  
-  const friends = requests.filter(req => req.status === 'accepted');
+  const blockedIds = useMemo(() => new Set(blockedUsers.map(b => b.blocked_user_id)), [blockedUsers]);
 
-  // Process messages into conversations
-  const conversations: Conversation[] = useMemo(() => {
-    if (!user || !messages.length) return [];
+  const pendingRequests = requests.filter(r => r.status === 'pending' && r.receiver_id === user?.id);
+  const sentRequests    = requests.filter(r => r.status === 'pending' && r.sender_id === user?.id);
+  const friends         = requests.filter(r => r.status === 'accepted');
 
-    const conversationMap = new Map<string, Conversation>();
-    const friendUserIds = new Set(friends.map(friend => 
-      friend.sender_id === user.id ? friend.receiver_id : friend.sender_id
-    ));
-
-    messages.forEach(message => {
-      const isReceived = message.receiver_id === user.id;
-      const otherUserId = isReceived ? message.sender_id : message.receiver_id;
-      const otherUser = isReceived ? message.sender : message.receiver;
-
-      if (!otherUser) return;
-
-      if (!conversationMap.has(otherUserId)) {
-        conversationMap.set(otherUserId, {
-          otherUserId,
-          otherUser,
-          messages: [],
-          lastMessage: message,
-          unreadCount: 0,
-          isFriend: friendUserIds.has(otherUserId)
-        });
-      }
-
-      const conversation = conversationMap.get(otherUserId)!;
-      conversation.messages.push(message);
-      
-      if (new Date(message.created_at) > new Date(conversation.lastMessage.created_at)) {
-        conversation.lastMessage = message;
-      }
-
-      if (isReceived && !message.read) {
-        conversation.unreadCount++;
-      }
+  // Filter out conversations with blocked users
+  const visibleConversations = useMemo(() => {
+    return conversations.filter(conv => {
+      if (conv.is_group) return true;
+      const other = conv.members.find(m => m.user_id !== user?.id);
+      return other ? !blockedIds.has(other.user_id) : true;
     });
+  }, [conversations, user, blockedIds]);
 
-    return Array.from(conversationMap.values()).sort(
-      (a, b) => new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime()
-    );
-  }, [messages, user, friends]);
-
-  // Filter conversations and friends based on search
-  const filteredConversations = conversations.filter(conversation => {
-    const searchLower = searchTerm.toLowerCase();
-    return conversation.otherUser.name.toLowerCase().includes(searchLower) ||
-           conversation.otherUser.email.toLowerCase().includes(searchLower);
+  const filteredConversations = visibleConversations.filter(conv => {
+    const name = getConvName(conv, user?.id || '').toLowerCase();
+    return name.includes(searchTerm.toLowerCase());
   });
 
-  const filteredFriends = friends.filter(friend => {
-    const friendData = friend.sender_id === user?.id ? friend.receiver : friend.sender;
-    const searchLower = searchTerm.toLowerCase();
-    return friendData?.name?.toLowerCase().includes(searchLower) ||
-           friendData?.email?.toLowerCase().includes(searchLower);
+  const filteredFriends = friends.filter(f => {
+    const fd = f.sender_id === user?.id ? f.receiver : f.sender;
+    const sl = searchTerm.toLowerCase();
+    return fd?.name?.toLowerCase().includes(sl) || fd?.email?.toLowerCase().includes(sl);
   });
 
-  const selectedConversationData = conversations.find(c => c.otherUserId === selectedConversation);
+  const selectedConv = visibleConversations.find(c => c.id === selectedConvId) ?? null;
 
-  const handleRequestResponse = async (requestId: string, status: 'accepted' | 'declined') => {
-    try {
-      await updateRequestStatus(requestId, status);
-      toast.success(
-        status === 'accepted' ? 'Friend request accepted!' : 'Friend request declined.'
-      );
-    } catch (error) {
-      toast.error('Failed to update friend request');
-    }
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [selectedConv?.messages.length]);
+
+  // Mark as read when opening a conversation
+  useEffect(() => {
+    if (selectedConvId) markConversationRead(selectedConvId);
+  }, [selectedConvId, markConversationRead]);
+
+  const handleConvSelect = (id: string) => {
+    setSelectedConvId(id);
+    setMsgInput('');
   };
 
-  const handleConversationClick = (conversation: Conversation) => {
-    setSelectedConversation(conversation.otherUserId);
-    setReplyContent('');
-    
-    conversation.messages
-      .filter(msg => msg.receiver_id === user?.id && !msg.read)
-      .forEach(msg => markAsRead(msg.id));
-  };
-
-  const handleSendReply = async () => {
-    if (!selectedConversationData || !replyContent.trim()) return;
-
+  const handleSend = async () => {
+    if (!selectedConvId || !msgInput.trim()) return;
+    setSending(true);
     try {
-      setSending(true);
-      await sendMessage(selectedConversationData.otherUserId, '', replyContent);
-      setReplyContent('');
-      toast.success('Message sent!');
-    } catch (error) {
+      await sendMessage(selectedConvId, msgInput);
+      setMsgInput('');
+    } catch {
       toast.error('Failed to send message');
     } finally {
       setSending(false);
     }
   };
 
-  const handlePlayerSelect = (player: SearchResult) => {
-    setSelectedPlayer(player);
-    setShowComposeModal(true);
-    setShowPlayerSearch(false);
-  };
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    if (isToday(date)) {
-      return format(date, 'HH:mm');
-    } else if (isYesterday(date)) {
-      return 'Yesterday';
-    } else {
-      return format(date, 'MMM d');
+  const handleStartDM = async (otherUserId: string) => {
+    try {
+      const convId = await getOrCreateDM(otherUserId);
+      setActiveView('conversations');
+      setSelectedConvId(convId);
+    } catch {
+      toast.error('Failed to open conversation');
     }
   };
 
-  const isLoading = friendsLoading || messagesLoading;
+  const handlePlayerSelect = async (player: SearchResult) => {
+    setShowPlayerSearch(false);
+    if (!player.user_id) return;
+    await handleStartDM(player.user_id);
+  };
+
+  const handleRequestResponse = async (requestId: string, status: 'accepted' | 'declined') => {
+    try {
+      await updateRequestStatus(requestId, status);
+      toast.success(status === 'accepted' ? 'Friend request accepted!' : 'Friend request declined.');
+    } catch {
+      toast.error('Failed to update friend request');
+    }
+  };
+
+  const handleRevokeRequest = async (requestId: string) => {
+    try {
+      await revokeFriendRequest(requestId);
+      toast.success('Friend request revoked.');
+    } catch {
+      toast.error('Failed to revoke friend request');
+    }
+  };
+
+  // Build profile object for PlayerProfileModal from a conversation member profile
+  const buildProfilePlayer = (profile: NonNullable<Conversation['members'][0]['profile']>, userId: string) => ({
+    id: userId,
+    user_id: userId,
+    name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email,
+    email: profile.email,
+    skill_level: 0,
+    wins: 0,
+    losses: 0,
+  });
+
+  // Friends list for group create
+  const friendsList = friends.map(f => {
+    const friendUserId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
+    const fd = f.sender_id === user?.id ? f.receiver : f.sender;
+    return { userId: friendUserId, name: fd?.name || 'Unknown', avatar: fd?.profile_picture_url };
+  });
+
+  const isLoading = friendsLoading || convLoading;
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-center space-y-4">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-muted-foreground">Loading your connections...</p>
-        </div>
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
     );
   }
 
+  const convName = selectedConv ? getConvName(selectedConv, user?.id || '') : '';
+  const convAvatar = selectedConv ? getConvAvatar(selectedConv, user?.id || '') : undefined;
+
   return (
     <div className="h-[calc(100vh-200px)] flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="flex items-center justify-between p-4 border-b bg-background/95 backdrop-blur">
         <div className="flex items-center space-x-3">
           <Users className="w-6 h-6 text-primary" />
           <div>
             <h2 className="text-xl font-bold text-foreground">Network & Messages</h2>
             <p className="text-sm text-muted-foreground">
-              {friends.length} friends • {getUnreadCount()} unread messages
+              {friends.length} friends · {getTotalUnread()} unread
             </p>
           </div>
         </div>
-        
-        <div className="flex items-center space-x-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setShowPlayerSearch(!showPlayerSearch)}
-            className="flex items-center space-x-2"
-          >
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setShowGroupCreate(true)}>
+            <Users className="w-4 h-4 mr-1" />
+            <span className="hidden sm:inline">New Group</span>
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setShowPlayerSearch(!showPlayerSearch)}>
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">{showPlayerSearch ? 'Close' : 'Find Players'}</span>
           </Button>
@@ -230,196 +305,131 @@ const FriendsMessagesTab = () => {
 
       {/* Player Search */}
       {showPlayerSearch && (
-        <Card className="m-4 mb-0">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2 mb-3">
-              <Search className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Find players to connect with</span>
-            </div>
-            <PlayerSearch 
-              onPlayerSelect={handlePlayerSelect}
-              placeholder="Search for players..."
-            />
-          </CardContent>
-        </Card>
+        <div className="mx-4 mt-3 mb-0 p-4 border rounded-lg bg-card">
+          <div className="flex items-center gap-2 mb-3">
+            <Search className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Find players to message</span>
+          </div>
+          <PlayerSearch onPlayerSelect={handlePlayerSelect} placeholder="Search for players..." />
+        </div>
       )}
 
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
-        <div className="w-full lg:w-80 border-r bg-muted/30">
-          {/* View Tabs */}
-          <div className="p-4 border-b">
-            <Tabs value={activeView} onValueChange={(value: any) => setActiveView(value)}>
+        <div className={`w-full lg:w-80 border-r bg-muted/30 flex flex-col ${selectedConvId ? 'hidden lg:flex' : 'flex'}`}>
+          <div className="p-3 border-b">
+            <Tabs value={activeView} onValueChange={(v: any) => setActiveView(v)}>
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="conversations" className="text-xs">
                   <MessageCircle className="w-3 h-3 mr-1" />
                   Chat
-                  {getUnreadCount() > 0 && (
-                    <Badge variant="default" className="ml-1 text-xs">
-                      {getUnreadCount()}
-                    </Badge>
-                  )}
+                  {getTotalUnread() > 0 && <Badge className="ml-1 text-xs h-4 px-1">{getTotalUnread()}</Badge>}
                 </TabsTrigger>
                 <TabsTrigger value="friends" className="text-xs">
                   <Users className="w-3 h-3 mr-1" />
                   Friends
-                  <Badge variant="secondary" className="ml-1 text-xs">
-                    {friends.length}
-                  </Badge>
+                  <Badge variant="secondary" className="ml-1 text-xs h-4 px-1">{friends.length}</Badge>
                 </TabsTrigger>
                 <TabsTrigger value="requests" className="text-xs">
                   <AlertCircle className="w-3 h-3 mr-1" />
                   Requests
-                  {getPendingRequestsCount() > 0 && (
-                    <Badge variant="destructive" className="ml-1 text-xs">
-                      {getPendingRequestsCount()}
-                    </Badge>
-                  )}
+                  {getPendingRequestsCount() > 0 && <Badge variant="destructive" className="ml-1 text-xs h-4 px-1">{getPendingRequestsCount()}</Badge>}
                 </TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
 
-          {/* Search */}
-          <div className="p-4">
+          <div className="p-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder={`Search ${activeView}...`}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-background"
-              />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9 bg-background h-8 text-sm" />
             </div>
           </div>
 
-          {/* Content */}
           <ScrollArea className="flex-1">
             <div className="px-2 pb-4">
+              {/* ── Conversations ── */}
               {activeView === 'conversations' && (
                 <div className="space-y-1">
                   {filteredConversations.length === 0 ? (
                     <div className="text-center py-8 px-4">
-                      <MessageCircle className="w-8 h-8 text-muted-foreground/50 mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">
-                        {conversations.length === 0 ? 'No conversations yet' : 'No matches found'}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Start a new conversation to connect with players
-                      </p>
+                      <MessageCircle className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">No conversations yet</p>
+                      <p className="text-xs text-muted-foreground mt-1">Find players above to start chatting</p>
                     </div>
                   ) : (
-                    filteredConversations.map((conversation) => (
-                      <div
-                        key={conversation.otherUserId}
-                        className={`p-3 rounded-lg cursor-pointer transition-all hover:bg-accent/50 ${
-                          selectedConversation === conversation.otherUserId 
-                            ? 'bg-primary/10 border border-primary/20' 
-                            : 'hover:bg-accent/30'
-                        }`}
-                        onClick={() => handleConversationClick(conversation)}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="relative">
-                            <Avatar className="h-10 w-10">
-                              {conversation.otherUser.profile_picture_url ? (
-                                <AvatarImage 
-                                  src={conversation.otherUser.profile_picture_url} 
-                                  alt={conversation.otherUser.name}
-                                />
-                              ) : null}
-                              <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-semibold">
-                                {conversation.otherUser.name.charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            {conversation.unreadCount > 0 && (
-                              <div className="absolute -top-1 -right-1 h-5 w-5 bg-primary rounded-full flex items-center justify-center">
-                                <span className="text-xs font-medium text-primary-foreground">
-                                  {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <p className={`text-sm truncate ${
-                                conversation.unreadCount > 0 ? 'font-semibold' : 'font-medium'
-                              }`}>
-                                {conversation.otherUser.name}
-                              </p>
-                              <span className="text-xs text-muted-foreground">
-                                {formatTime(conversation.lastMessage.created_at)}
-                              </span>
+                    filteredConversations.map(conv => {
+                      const name = getConvName(conv, user?.id || '');
+                      const avatar = getConvAvatar(conv, user?.id || '');
+                      const isActive = selectedConvId === conv.id;
+                      return (
+                        <div
+                          key={conv.id}
+                          className={`p-3 rounded-lg cursor-pointer transition-all ${isActive ? 'bg-primary/10 border border-primary/20' : 'hover:bg-accent/30'}`}
+                          onClick={() => handleConvSelect(conv.id)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="relative shrink-0">
+                              <Avatar className="h-10 w-10">
+                                {avatar && <AvatarImage src={avatar} alt={name} />}
+                                <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-semibold">
+                                  {conv.is_group ? <Users className="w-4 h-4" /> : name.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              {conv.unreadCount > 0 && (
+                                <div className="absolute -top-1 -right-1 h-5 w-5 bg-primary rounded-full flex items-center justify-center">
+                                  <span className="text-xs font-medium text-primary-foreground">{conv.unreadCount > 9 ? '9+' : conv.unreadCount}</span>
+                                </div>
+                              )}
                             </div>
-                            
-                            <p className="text-xs text-muted-foreground truncate">
-                              {conversation.lastMessage.receiver_id === user?.id ? '' : 'You: '}
-                              {conversation.lastMessage.content}
-                            </p>
-                            
-                            {conversation.isFriend && (
-                              <Badge variant="secondary" className="text-xs mt-1">
-                                Friend
-                              </Badge>
-                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-0.5">
+                                <p className={`text-sm truncate ${conv.unreadCount > 0 ? 'font-semibold' : 'font-medium'}`}>{name}</p>
+                                {conv.lastMessage && <span className="text-xs text-muted-foreground shrink-0 ml-1">{formatTime(conv.lastMessage.created_at)}</span>}
+                              </div>
+                              {conv.lastMessage && (
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {conv.lastMessage.sender_id === user?.id ? 'You: ' : ''}
+                                  {conv.lastMessage.content}
+                                </p>
+                              )}
+                              {conv.is_group && <Badge variant="secondary" className="text-xs mt-0.5">Group · {conv.members.length}</Badge>}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               )}
 
+              {/* ── Friends ── */}
               {activeView === 'friends' && (
                 <div className="space-y-1">
                   {filteredFriends.length === 0 ? (
                     <div className="text-center py-8 px-4">
-                      <Users className="w-8 h-8 text-muted-foreground/50 mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">
-                        {friends.length === 0 ? 'No friends yet' : 'No matches found'}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Start connecting with other tennis players!
-                      </p>
+                      <Users className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">{friends.length === 0 ? 'No friends yet' : 'No matches'}</p>
                     </div>
                   ) : (
-                    filteredFriends.map((friend) => {
-                      const friendData = friend.sender_id === user?.id ? friend.receiver : friend.sender;
-                      const hasConversation = conversations.some(c => 
-                        c.otherUserId === (friend.sender_id === user?.id ? friend.receiver_id : friend.sender_id)
-                      );
-                      
+                    filteredFriends.map(friend => {
+                      const friendUserId = friend.sender_id === user?.id ? friend.receiver_id : friend.sender_id;
+                      const fd = friend.sender_id === user?.id ? friend.receiver : friend.sender;
+                      if (blockedIds.has(friendUserId)) return null;
                       return (
                         <div key={friend.id} className="p-3 rounded-lg hover:bg-accent/50 transition-colors">
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <Avatar className="h-10 w-10">
-                                {friendData?.profile_picture_url ? (
-                                  <AvatarImage 
-                                    src={friendData.profile_picture_url} 
-                                    alt={friendData.name || 'User'}
-                                  />
-                                ) : null}
-                                <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-semibold">
-                                  {friendData?.name?.charAt(0)?.toUpperCase() || 'U'}
-                                </AvatarFallback>
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-9 w-9">
+                                {fd?.profile_picture_url && <AvatarImage src={fd.profile_picture_url} alt={fd.name} />}
+                                <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">{fd?.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
                               </Avatar>
                               <div>
-                                <p className="font-medium text-sm">{friendData?.name || 'Unknown User'}</p>
-                                <p className="text-xs text-muted-foreground">{friendData?.email}</p>
+                                <p className="font-medium text-sm">{fd?.name || 'Unknown'}</p>
+                                <p className="text-xs text-muted-foreground">{fd?.email}</p>
                               </div>
                             </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                const otherUserId = friend.sender_id === user?.id ? friend.receiver_id : friend.sender_id;
-                                setActiveView('conversations');
-                                setTimeout(() => setSelectedConversation(otherUserId), 100);
-                              }}
-                              className="text-xs h-7"
-                            >
+                            <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => handleStartDM(friendUserId)}>
                               <MessageCircle className="w-3 h-3 mr-1" />
                               Chat
                             </Button>
@@ -431,51 +441,31 @@ const FriendsMessagesTab = () => {
                 </div>
               )}
 
+              {/* ── Requests ── */}
               {activeView === 'requests' && (
-                <div className="space-y-3">
-                  {/* Pending Requests */}
+                <div className="space-y-3 p-1">
                   {pendingRequests.length > 0 && (
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-2 px-1">PENDING REQUESTS</p>
+                      <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">INCOMING</p>
                       <div className="space-y-2">
-                        {pendingRequests.map((request) => (
-                          <div key={request.id} className="p-3 rounded-lg border bg-card">
-                            <div className="flex items-center space-x-2 mb-2">
+                        {pendingRequests.map(req => (
+                          <div key={req.id} className="p-3 rounded-lg border bg-card">
+                            <div className="flex items-center gap-2 mb-2">
                               <Avatar className="h-8 w-8">
-                                {request.sender?.profile_picture_url ? (
-                                  <AvatarImage 
-                                    src={request.sender.profile_picture_url} 
-                                    alt={request.sender.name || 'User'}
-                                  />
-                                ) : null}
-                                <AvatarFallback className="text-xs bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
-                                  {request.sender?.name?.charAt(0)?.toUpperCase() || 'U'}
-                                </AvatarFallback>
+                                {req.sender?.profile_picture_url && <AvatarImage src={req.sender.profile_picture_url} />}
+                                <AvatarFallback className="text-xs bg-primary/10 text-primary">{req.sender?.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
                               </Avatar>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{request.sender?.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {formatDistanceToNow(new Date(request.created_at), { addSuffix: true })}
-                                </p>
+                                <p className="text-sm font-medium truncate">{req.sender?.name}</p>
+                                <p className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}</p>
                               </div>
                             </div>
-                            <div className="flex space-x-2">
-                              <Button
-                                size="sm"
-                                onClick={() => handleRequestResponse(request.id, 'accepted')}
-                                className="flex-1 text-xs h-7"
-                              >
-                                <Check className="w-3 h-3 mr-1" />
-                                Accept
+                            <div className="flex gap-2">
+                              <Button size="sm" className="flex-1 text-xs h-7" onClick={() => handleRequestResponse(req.id, 'accepted')}>
+                                <Check className="w-3 h-3 mr-1" />Accept
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleRequestResponse(request.id, 'declined')}
-                                className="flex-1 text-xs h-7"
-                              >
-                                <X className="w-3 h-3 mr-1" />
-                                Decline
+                              <Button size="sm" variant="outline" className="flex-1 text-xs h-7" onClick={() => handleRequestResponse(req.id, 'declined')}>
+                                <X className="w-3 h-3 mr-1" />Decline
                               </Button>
                             </div>
                           </div>
@@ -484,36 +474,29 @@ const FriendsMessagesTab = () => {
                     </div>
                   )}
 
-                  {/* Sent Requests */}
                   {sentRequests.length > 0 && (
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-2 px-1">SENT REQUESTS</p>
+                      <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">SENT</p>
                       <div className="space-y-2">
-                        {sentRequests.map((request) => (
-                          <div key={request.id} className="p-3 rounded-lg border bg-card">
+                        {sentRequests.map(req => (
+                          <div key={req.id} className="p-3 rounded-lg border bg-card">
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center gap-2">
                                 <Avatar className="h-8 w-8">
-                                  {request.receiver?.profile_picture_url ? (
-                                    <AvatarImage 
-                                      src={request.receiver.profile_picture_url} 
-                                      alt={request.receiver.name || 'User'}
-                                    />
-                                  ) : null}
-                                  <AvatarFallback className="text-xs bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
-                                    {request.receiver?.name?.charAt(0)?.toUpperCase() || 'U'}
-                                  </AvatarFallback>
+                                  {req.receiver?.profile_picture_url && <AvatarImage src={req.receiver.profile_picture_url} />}
+                                  <AvatarFallback className="text-xs bg-primary/10 text-primary">{req.receiver?.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <p className="text-sm font-medium">{request.receiver?.name}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {formatDistanceToNow(new Date(request.created_at), { addSuffix: true })}
-                                  </p>
+                                  <p className="text-sm font-medium">{req.receiver?.name}</p>
+                                  <p className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}</p>
                                 </div>
                               </div>
-                              <Badge variant="outline" className="text-xs">
-                                Pending
-                              </Badge>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">Pending</Badge>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" onClick={() => handleRevokeRequest(req.id)}>
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -523,11 +506,8 @@ const FriendsMessagesTab = () => {
 
                   {pendingRequests.length === 0 && sentRequests.length === 0 && (
                     <div className="text-center py-8 px-4">
-                      <Clock className="w-8 h-8 text-muted-foreground/50 mx-auto mb-2" />
+                      <Clock className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
                       <p className="text-sm text-muted-foreground">No friend requests</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Search for players to connect with!
-                      </p>
                     </div>
                   )}
                 </div>
@@ -536,109 +516,118 @@ const FriendsMessagesTab = () => {
           </ScrollArea>
         </div>
 
-        {/* Conversation View */}
-        <div className="flex-1 flex flex-col">
-          {selectedConversationData ? (
+        {/* ── Conversation view ── */}
+        <div className={`flex-1 flex flex-col ${selectedConvId ? 'flex' : 'hidden lg:flex'}`}>
+          {selectedConv ? (
             <>
-              {/* Conversation Header */}
-              <div className="p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="flex items-center space-x-3">
-                  <Avatar className="h-10 w-10">
-                    {selectedConversationData.otherUser.profile_picture_url ? (
-                      <AvatarImage 
-                        src={selectedConversationData.otherUser.profile_picture_url} 
-                        alt={selectedConversationData.otherUser.name}
-                      />
-                    ) : null}
-                    <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-semibold">
-                      {selectedConversationData.otherUser.name.charAt(0).toUpperCase()}
+              {/* Header */}
+              <div className="p-4 border-b bg-background/95 backdrop-blur flex items-center gap-3">
+                <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8 shrink-0" onClick={() => setSelectedConvId(null)}>
+                  <ChevronLeft className="h-5 w-5" />
+                </Button>
+
+                <button
+                  className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
+                  onClick={() => {
+                    if (!selectedConv.is_group) {
+                      const other = selectedConv.members.find(m => m.user_id !== user?.id);
+                      if (other?.profile) setProfilePlayer(buildProfilePlayer(other.profile, other.user_id));
+                    }
+                  }}
+                >
+                  <Avatar className="h-9 w-9 shrink-0">
+                    {convAvatar && <AvatarImage src={convAvatar} alt={convName} />}
+                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                      {selectedConv.is_group ? <Users className="w-4 h-4" /> : convName.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="flex-1">
-                    <p className="font-semibold">{selectedConversationData.otherUser.name}</p>
-                    <p className="text-sm text-muted-foreground">{selectedConversationData.otherUser.email}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold truncate">{convName}</p>
+                    {selectedConv.is_group && (
+                      <p className="text-xs text-muted-foreground">{selectedConv.members.length} members</p>
+                    )}
                   </div>
-                  {selectedConversationData.isFriend && (
-                    <Badge variant="secondary">Friend</Badge>
-                  )}
-                </div>
+                </button>
+
+                {/* Match invite status badge for DMs */}
+                {!selectedConv.is_group && (() => {
+                  const otherId = selectedConv.members.find(m => m.user_id !== user?.id)?.user_id;
+                  const pendingInvite = invites.find(i =>
+                    i.status === 'pending' &&
+                    ((i.sender_id === user?.id && i.receiver_id === otherId) ||
+                     (i.sender_id === otherId && i.receiver_id === user?.id))
+                  );
+                  if (!pendingInvite) return null;
+                  const isSender = pendingInvite.sender_id === user?.id;
+                  return (
+                    <Badge variant="outline" className="text-xs text-orange-600 border-orange-300 shrink-0">
+                      {isSender ? '⏳ Invite pending' : '📬 Invite received'}
+                    </Badge>
+                  );
+                })()}
               </div>
 
               {/* Messages */}
               <ScrollArea className="flex-1 p-4">
-                <div className="space-y-4">
-                  {selectedConversationData.messages
-                    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-                    .map((message) => {
-                      const isOwnMessage = message.sender_id === user?.id;
-                      
-                      return (
-                        <div key={message.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                            isOwnMessage 
-                              ? 'bg-primary text-primary-foreground ml-12' 
-                              : 'bg-muted mr-12'
-                          }`}>
-                            {message.subject && (
-                              <p className={`text-xs font-medium mb-1 ${
-                                isOwnMessage ? 'text-primary-foreground/80' : 'text-muted-foreground'
-                              }`}>
-                                {message.subject}
-                              </p>
-                            )}
-                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                            <div className={`flex items-center justify-between mt-1 text-xs ${
-                              isOwnMessage ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                            }`}>
-                              <span>{format(new Date(message.created_at), 'HH:mm')}</span>
-                              {isOwnMessage && (
-                                <div className="flex items-center space-x-1">
-                                  {message.read ? (
-                                    <CheckCheck className="w-3 h-3" />
-                                  ) : (
-                                    <Check className="w-3 h-3" />
-                                  )}
-                                </div>
-                              )}
-                            </div>
+                <div className="space-y-3">
+                  {selectedConv.messages.map(msg => {
+                    const isOwn = msg.sender_id === user?.id;
+                    const senderName = msg.sender
+                      ? `${msg.sender.first_name || ''} ${msg.sender.last_name || ''}`.trim() || msg.sender.email
+                      : 'Unknown';
+
+                    return (
+                      <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                        {!isOwn && (
+                          <Avatar className="h-7 w-7 mr-2 mt-1 shrink-0">
+                            {msg.sender?.profile_picture_url && <AvatarImage src={msg.sender.profile_picture_url} />}
+                            <AvatarFallback className="text-xs bg-primary/10 text-primary">{senderName.charAt(0).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                        )}
+                        <div className={`max-w-[70%] ${isOwn ? 'ml-12' : 'mr-12'}`}>
+                          {/* Clickable sender name in group chats */}
+                          {!isOwn && selectedConv.is_group && (
+                            <button
+                              className="text-xs font-medium text-primary mb-0.5 hover:underline"
+                              onClick={() => {
+                                const member = selectedConv.members.find(m => m.user_id === msg.sender_id);
+                                if (member?.profile) setProfilePlayer(buildProfilePlayer(member.profile, member.user_id));
+                              }}
+                            >
+                              {senderName}
+                            </button>
+                          )}
+                          <div className={`px-4 py-2 rounded-2xl ${isOwn ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                            <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                            <p className={`text-xs mt-1 ${isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                              {format(new Date(msg.created_at), 'HH:mm')}
+                            </p>
                           </div>
                         </div>
-                      );
-                    })}
+                      </div>
+                    );
+                  })}
+                  <div ref={messagesEndRef} />
                 </div>
               </ScrollArea>
 
-              {/* Reply Form */}
-              <div className="p-4 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="flex items-end space-x-2">
-                  <div className="flex-1">
-                    <Textarea
-                      value={replyContent}
-                      onChange={(e) => setReplyContent(e.target.value)}
-                      placeholder={`Message ${selectedConversationData.otherUser.name}...`}
-                      rows={1}
-                      className="min-h-[40px] max-h-32 resize-none"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          if (replyContent.trim()) {
-                            handleSendReply();
-                          }
-                        }
-                      }}
-                    />
-                  </div>
-                  <Button
-                    onClick={handleSendReply}
-                    disabled={!replyContent.trim() || sending}
-                    size="sm"
-                    className="px-3 py-2 h-10"
-                  >
-                    {sending ? (
-                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <Send className="w-4 h-4" />
-                    )}
+              {/* Input */}
+              <div className="p-4 border-t bg-background/95 backdrop-blur">
+                <div className="flex items-end gap-2">
+                  <Textarea
+                    value={msgInput}
+                    onChange={e => setMsgInput(e.target.value)}
+                    placeholder={`Message ${convName}…`}
+                    rows={1}
+                    className="flex-1 min-h-[40px] max-h-32 resize-none"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (msgInput.trim()) handleSend(); }
+                    }}
+                  />
+                  <Button onClick={handleSend} disabled={!msgInput.trim() || sending} size="sm" className="h-10 px-3">
+                    {sending
+                      ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      : <Send className="w-4 h-4" />}
                   </Button>
                 </div>
               </div>
@@ -649,17 +638,10 @@ const FriendsMessagesTab = () => {
                 <MessageCircle className="w-16 h-16 text-muted-foreground/30 mx-auto" />
                 <div>
                   <p className="text-lg font-medium text-muted-foreground">Select a conversation</p>
-                  <p className="text-sm text-muted-foreground">
-                    Choose from your friends, conversations, or requests
-                  </p>
+                  <p className="text-sm text-muted-foreground">Choose from your conversations or find a player</p>
                 </div>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowPlayerSearch(true)}
-                  className="flex items-center space-x-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Find Players</span>
+                <Button variant="outline" onClick={() => setShowPlayerSearch(true)}>
+                  <Plus className="w-4 h-4 mr-2" />Find Players
                 </Button>
               </div>
             </div>
@@ -667,14 +649,24 @@ const FriendsMessagesTab = () => {
         </div>
       </div>
 
-      {/* Send Message Modal */}
-      <SendMessageModal 
-        player={selectedPlayer}
-        isOpen={showComposeModal}
-        onClose={() => {
-          setShowComposeModal(false);
-          setSelectedPlayer(null);
+      {/* Group create dialog */}
+      <GroupCreateDialog
+        open={showGroupCreate}
+        onClose={() => setShowGroupCreate(false)}
+        friends={friendsList}
+        onSubmit={async (name, memberIds) => {
+          const convId = await createGroupChat(name, memberIds);
+          setActiveView('conversations');
+          setSelectedConvId(convId);
+          toast.success('Group chat created!');
         }}
+      />
+
+      {/* Player profile modal */}
+      <PlayerProfileModal
+        player={profilePlayer}
+        isOpen={!!profilePlayer}
+        onClose={() => setProfilePlayer(null)}
       />
     </div>
   );

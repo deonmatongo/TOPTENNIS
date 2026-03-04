@@ -138,6 +138,11 @@ const NewDashboard = () => {
     icon: Trophy,
     description: "League history & progress"
   }, {
+    id: "register",
+    label: "Join a League",
+    icon: FileText,
+    description: "Browse & register for leagues"
+  }, {
     id: "schedule",
     label: "My Schedule",
     icon: Calendar,
@@ -149,22 +154,11 @@ const NewDashboard = () => {
     icon: Users,
     description: "Find an Opponent"
   }, {
-    id: "register",
-    label: "Join a League",
-    icon: FileText,
-    description: "League registration"
-  }, {
-    id: "messages",
-    label: "Messages",
-    icon: Mail,
-    description: "Conversations & chat",
-    badge: unreadMessagesCount > 0 ? unreadMessagesCount : null
-  }, {
     id: "social",
-    label: "Build your Network",
+    label: "Build Your Network",
     icon: MessageCircle,
-    description: "Friends & connections",
-    badge: getPendingRequestsCount() > 0 ? getPendingRequestsCount() : null
+    description: "Friends & messages",
+    badge: (getPendingRequestsCount() + unreadMessagesCount) > 0 ? (getPendingRequestsCount() + unreadMessagesCount) : null
   }, {
     id: "notifications",
     label: "Notifications",
@@ -213,7 +207,7 @@ const NewDashboard = () => {
       case 'register':
         return <RegisterTab />;
       case 'messages':
-        return <MessagesTab />;
+        return <FriendsMessagesTab />;
       case 'social':
         return <FriendsMessagesTab />;
       case 'notifications':

@@ -30,6 +30,7 @@ export interface OpponentProfile {
   city?: string;
   profile_picture_url?: string;
   networking_enabled?: boolean;
+  gender?: string | null;
 }
 
 export interface MatchWithResponse {
@@ -190,6 +191,7 @@ export const useMatchResponses = () => {
           usta_rating: stats?.usta_rating ?? undefined,
           competitiveness: stats?.competitiveness ?? undefined,
           age_range: stats?.age_range ?? undefined,
+          gender: stats?.gender ?? undefined,
         } : undefined;
 
         return {

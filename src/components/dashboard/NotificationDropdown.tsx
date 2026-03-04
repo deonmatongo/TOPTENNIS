@@ -16,8 +16,8 @@ import { Badge } from '@/components/ui/badge';
 import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import type { Notification } from '@/hooks/useNotifications';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { useMatchResponses } from '@/hooks/useMatchResponses';
-import { MatchResponseModal } from './MatchResponseModal';
+import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { InviteResponseDialog } from './InviteResponseDialog';
 
 const getNotificationIcon = (type: Notification['type']) => {
   switch (type) {
@@ -73,10 +73,10 @@ interface NotificationDropdownProps {
 const NotificationDropdown = ({ children }: NotificationDropdownProps) => {
   const navigate = useNavigate();
   const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification, isLoading } = useNotificationsContext();
-  const { pendingInvites, respondToMatch } = useMatchResponses();
+  const { invites } = useMatchInvites();
   const [isOpen, setIsOpen] = React.useState(false);
-  const [selectedMatch, setSelectedMatch] = React.useState<any>(null);
-  const [showMatchModal, setShowMatchModal] = React.useState(false);
+  const [selectedInvite, setSelectedInvite] = React.useState<any>(null);
+  const [showInviteDialog, setShowInviteDialog] = React.useState(false);
 
   // Notifications are only marked as read when the user clicks on them individually.
   // This keeps the counter accurate — it only decreases when a notification is actually opened.
@@ -86,13 +86,13 @@ const NotificationDropdown = ({ children }: NotificationDropdownProps) => {
       markAsRead(notification.id);
     }
     
-    // Check if this is a match invite/response notification
-    const matchTypes = ['match_invite', 'match_rescheduled', 'match_accepted'];
-    if (matchTypes.includes(notification.type) && notification.metadata?.match_id) {
-      const match = pendingInvites.find(m => m.id === notification.metadata.match_id);
-      if (match) {
-        setSelectedMatch(match);
-        setShowMatchModal(true);
+    // Check if this is a match invite notification — open the invite response dialog
+    const inviteTypes = ['match_invite', 'match_rescheduled'];
+    if (inviteTypes.includes(notification.type) && notification.metadata?.match_id) {
+      const invite = invites.find(i => i.id === notification.metadata.match_id);
+      if (invite && invite.status === 'pending') {
+        setSelectedInvite(invite);
+        setShowInviteDialog(true);
         setIsOpen(false);
         return;
       }
@@ -102,26 +102,6 @@ const NotificationDropdown = ({ children }: NotificationDropdownProps) => {
       navigate(notification.actionUrl);
       setIsOpen(false);
     }
-  };
-
-  const handleMatchRespond = (
-    action: 'accept' | 'decline' | 'propose',
-    proposedStart?: Date,
-    proposedEnd?: Date,
-    comment?: string
-  ) => {
-    if (!selectedMatch) return;
-
-    respondToMatch.mutate({
-      matchId: selectedMatch.id,
-      action,
-      proposedStart,
-      proposedEnd,
-      comment
-    });
-
-    setShowMatchModal(false);
-    setSelectedMatch(null);
   };
 
   const recentNotifications = notifications.slice(0, 12);
@@ -250,14 +230,13 @@ const NotificationDropdown = ({ children }: NotificationDropdownProps) => {
       </DropdownMenuContent>
     </DropdownMenu>
 
-    <MatchResponseModal
-      open={showMatchModal}
+    <InviteResponseDialog
+      open={showInviteDialog}
       onClose={() => {
-        setShowMatchModal(false);
-        setSelectedMatch(null);
+        setShowInviteDialog(false);
+        setSelectedInvite(null);
       }}
-      match={selectedMatch}
-      onRespond={handleMatchRespond}
+      invite={selectedInvite}
     />
     </>
   );

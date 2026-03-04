@@ -1,12 +1,63 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tables } from '@/integrations/supabase/types';
 
+type Player = Tables<'players'>;
+
 type MatchSuggestion = Tables<'match_suggestions'> & {
-  suggested_player?: Tables<'players'>;
+  suggested_player?: Player;
 };
+
+// ── Client-side scoring (mirrors the DB function logic) ───────────────────────
+// Used as a fallback when the DB has no stored suggestions yet.
+type PlayerLike = Pick<Player, 'skill_level' | 'competitiveness' | 'wins' | 'losses'> & Partial<Player>;
+
+function scoreCandidate(
+  me: { skill_level: number | null; competitiveness: string | null; wins: number | null; losses: number | null },
+  candidate: PlayerLike
+): { score: number; reasons: string[] } {
+  const mySkill = me.skill_level ?? 5;
+  const cSkill  = candidate.skill_level ?? 5;
+  const skillDiff = Math.abs(mySkill - cSkill);
+
+  const myTotal = (me.wins ?? 0) + (me.losses ?? 0);
+  const myWinRate = myTotal > 0 ? (me.wins ?? 0) / myTotal : 0.5;
+  const cTotal = (candidate.wins ?? 0) + (candidate.losses ?? 0);
+  const cWinRate = cTotal > 0 ? (candidate.wins ?? 0) / cTotal : 0.5;
+
+  // Skill proximity (40 pts)
+  const skillScore = skillDiff === 0 ? 40 : skillDiff === 1 ? 30 : skillDiff === 2 ? 18 : 8;
+
+  // Competitiveness match (20 pts)
+  const adjacent = (a: string | null, b: string | null) => {
+    const groups = [['casual', 'intermediate'], ['intermediate', 'competitive']];
+    return groups.some(g => g.includes(a ?? '') && g.includes(b ?? ''));
+  };
+  const compScore = candidate.competitiveness === me.competitiveness ? 20
+    : adjacent(candidate.competitiveness, me.competitiveness) ? 10 : 0;
+
+  // Activity score (20 pts) — linear up to 20 matches
+  const activityScore = Math.min(20, cTotal);
+
+  // Win-rate balance (10 pts)
+  const rateDiff = Math.abs(myWinRate - cWinRate);
+  const winRateScore = Math.max(0, Math.round(10 - rateDiff * 20));
+
+  const total = skillScore + compScore + activityScore + winRateScore;
+
+  const reasons: string[] = [];
+  if (skillScore >= 30) reasons.push('Similar skill level');
+  else if (skillScore >= 18) reasons.push('Close skill level');
+  if (compScore === 20) reasons.push('Matching play style');
+  else if (compScore === 10) reasons.push('Compatible play style');
+  if (activityScore >= 15) reasons.push('Very active player');
+  else if (activityScore >= 8) reasons.push('Active player');
+  if (winRateScore >= 8) reasons.push('Balanced match-up');
+
+  return { score: total, reasons };
+}
 
 export const useMatchSuggestions = (competitivenessFilter?: string, blockedUserIds: string[] = []) => {
   const { user } = useAuth();
@@ -14,277 +65,163 @@ export const useMatchSuggestions = (competitivenessFilter?: string, blockedUserI
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+  const blockedSet = new Set(blockedUserIds);
 
-    fetchMatchSuggestions();
-  }, [user]);
-
-  const fetchMatchSuggestions = async () => {
+  const fetchMatchSuggestions = useCallback(async () => {
+    if (!user) { setLoading(false); return; }
     try {
       setLoading(true);
-      console.log('Fetching match suggestions for user:', user?.id);
 
-      // First get the current player's ID
+      // Get current player profile
       const { data: playerData, error: playerError } = await supabase
         .from('players')
-        .select('id')
-        .eq('user_id', user?.id)
+        .select('id, skill_level, competitiveness, wins, losses')
+        .eq('user_id', user.id)
         .single();
 
-      if (playerError) {
-        console.error('Error fetching player:', playerError);
+      if (playerError || !playerData) {
         setError('Failed to fetch player profile');
         return;
       }
 
-      if (!playerData) {
-        console.log('No player profile found');
-        setSuggestions([]);
-        return;
-      }
-
-      // Fetch match suggestions with suggested player details - fix the relationship issue
-      const { data, error } = await supabase
+      // Fetch stored suggestions from DB
+      const { data, error: fetchErr } = await supabase
         .from('match_suggestions')
         .select(`
           *,
           suggested_player:players!match_suggestions_suggested_player_id_fkey(*)
         `)
         .eq('player_id', playerData.id)
+        .eq('status', 'pending')
         .order('compatibility_score', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching match suggestions:', error);
-        setError(error.message);
+      if (fetchErr) {
+        setError(fetchErr.message);
         return;
       }
 
-      console.log('Match suggestions data:', data);
-      
-      // If no data and competitivenessFilter is 'casual', use dummy data
-      if ((!data || data.length === 0) && competitivenessFilter === 'casual') {
-        const dummyCasualPlayers: MatchSuggestion[] = [
-          {
-            id: 'dummy-1',
-            player_id: playerData.id,
-            suggested_player_id: 'dummy-player-1',
-            compatibility_score: 92,
-            match_reasons: ['Similar skill level', 'Both prefer casual play', 'Close location'],
-            status: 'pending',
-            created_at: new Date().toISOString(),
-            suggested_player: {
-              id: 'dummy-player-1',
-              user_id: 'dummy-user-1',
-              name: 'Sarah Johnson',
-              email: 'sarah.johnson@example.com',
-              phone: '555-0101',
-              skill_level: 6,
-              competitiveness: 'casual',
-              age_range: '25-34',
-              gender: 'female',
-              city: 'Austin',
-              zip_code: '78701',
-              location: 'Austin, TX',
-              wins: 12,
-              losses: 8,
-              total_matches: 20,
-              current_streak: 2,
-              best_streak: 4,
-              hours_played: 15,
-              usta_rating: '3.5',
-              gender_preference: 'no-preference',
-              age_competition_preference: 'no-preference',
-              travel_distance: '0-10',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            }
-          },
-          {
-            id: 'dummy-2',
-            player_id: playerData.id,
-            suggested_player_id: 'dummy-player-2',
-            compatibility_score: 88,
-            match_reasons: ['Casual play style', 'Available weekends', 'Similar experience'],
-            status: 'pending',
-            created_at: new Date().toISOString(),
-            suggested_player: {
-              id: 'dummy-player-2',
-              user_id: 'dummy-user-2',
-              name: 'Mike Chen',
-              email: 'mike.chen@example.com',
-              phone: '555-0102',
-              skill_level: 5,
-              competitiveness: 'casual',
-              age_range: '35-44',
-              gender: 'male',
-              city: 'Austin',
-              zip_code: '78702',
-              location: 'Austin, TX',
-              wins: 15,
-              losses: 12,
-              total_matches: 27,
-              current_streak: 1,
-              best_streak: 3,
-              hours_played: 18,
-              usta_rating: '3.0',
-              gender_preference: 'no-preference',
-              age_competition_preference: 'within-bracket',
-              travel_distance: '0-15',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            }
-          },
-          {
-            id: 'dummy-3',
-            player_id: playerData.id,
-            suggested_player_id: 'dummy-player-3',
-            compatibility_score: 85,
-            match_reasons: ['Enjoys friendly matches', 'Similar schedule', 'Local player'],
-            status: 'pending',
-            created_at: new Date().toISOString(),
-            suggested_player: {
-              id: 'dummy-player-3',
-              user_id: 'dummy-user-3',
-              name: 'Emily Rodriguez',
-              email: 'emily.r@example.com',
-              phone: '555-0103',
-              skill_level: 6,
-              competitiveness: 'casual',
-              age_range: '25-34',
-              gender: 'female',
-              city: 'Austin',
-              zip_code: '78703',
-              location: 'Austin, TX',
-              wins: 18,
-              losses: 10,
-              total_matches: 28,
-              current_streak: 3,
-              best_streak: 5,
-              hours_played: 22,
-              usta_rating: '3.5',
-              gender_preference: 'no-preference',
-              age_competition_preference: 'below-bracket',
-              travel_distance: '0-20',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            }
-          },
-          {
-            id: 'dummy-4',
-            player_id: playerData.id,
-            suggested_player_id: 'dummy-player-4',
-            compatibility_score: 81,
-            match_reasons: ['Relaxed play style', 'Weekend availability', 'Good match'],
-            status: 'pending',
-            created_at: new Date().toISOString(),
-            suggested_player: {
-              id: 'dummy-player-4',
-              user_id: 'dummy-user-4',
-              name: 'James Wilson',
-              email: 'james.w@example.com',
-              phone: '555-0104',
-              skill_level: 5,
-              competitiveness: 'casual',
-              age_range: '45-54',
-              gender: 'male',
-              city: 'Austin',
-              zip_code: '78704',
-              location: 'Austin, TX',
-              wins: 10,
-              losses: 9,
-              total_matches: 19,
-              current_streak: 0,
-              best_streak: 2,
-              hours_played: 14,
-              usta_rating: '3.0',
-              gender_preference: 'no-preference',
-              age_competition_preference: 'no-preference',
-              travel_distance: '0-5',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            }
-          }
-        ];
-        
-        setSuggestions(dummyCasualPlayers);
-      } else {
-        const blockedSet = new Set(blockedUserIds);
-        const filtered = (data || []).filter(
-          (s: MatchSuggestion) => !blockedSet.has(s.suggested_player?.user_id ?? '')
-        );
-        setSuggestions(filtered);
+      // Filter out blocked/unfriended users
+      const dbSuggestions = (data || []).filter(
+        (s: MatchSuggestion) => !blockedSet.has(s.suggested_player?.user_id ?? '')
+      );
+
+      if (dbSuggestions.length > 0) {
+        setSuggestions(dbSuggestions);
+        return;
       }
+
+      // ── Fallback: client-side scoring ────────────────────────────────────
+      // DB has no stored suggestions yet (will be populated on generateSuggestions).
+      // Build live candidates from the players table so the UI is never empty.
+      const { data: allPlayers } = await supabase
+        .from('players')
+        .select('id, user_id, name, email, skill_level, competitiveness, wins, losses, total_matches, usta_rating, age_range, gender, location, city')
+        .neq('user_id', user.id);
+
+      if (!allPlayers || allPlayers.length === 0) {
+        setSuggestions([]);
+        return;
+      }
+
+      // Fetch profiles to check networking_enabled and blocked status
+      const userIds = allPlayers.map(p => p.user_id).filter(Boolean) as string[];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, networking_enabled')
+        .in('id', userIds);
+      const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+
+      // Fetch users who have blocked the current user (bidirectional)
+      const { data: blockedBy } = await (supabase as any)
+        .from('blocked_users')
+        .select('blocker_id')
+        .eq('blocked_user_id', user.id);
+      const blockedBySet = new Set(((blockedBy || []) as any[]).map((b: any) => b.blocker_id));
+
+      const candidates = allPlayers.filter(p => {
+        if (!p.user_id) return false;
+        if (blockedSet.has(p.user_id)) return false;
+        if (blockedBySet.has(p.user_id)) return false;
+        const profile = profileMap.get(p.user_id);
+        if (profile?.networking_enabled === false) return false;
+        const skillDiff = Math.abs((p.skill_level ?? 5) - (playerData.skill_level ?? 5));
+        if (skillDiff > 3) return false;
+        if (competitivenessFilter && p.competitiveness !== competitivenessFilter) return false;
+        return true;
+      });
+
+      const scored: MatchSuggestion[] = candidates
+        .map(c => {
+          const { score, reasons } = scoreCandidate(playerData, c);
+          return {
+            id: `live-${c.id}`,
+            player_id: playerData.id,
+            suggested_player_id: c.id,
+            compatibility_score: score,
+            match_reasons: reasons,
+            status: 'pending',
+            created_at: new Date().toISOString(),
+            suggested_player: c as unknown as Player,
+          } satisfies MatchSuggestion;
+        })
+        .filter(s => s.compatibility_score >= 20)
+        .sort((a, b) => b.compatibility_score - a.compatibility_score)
+        .slice(0, 10);
+
+      setSuggestions(scored);
     } catch (err) {
       console.error('Unexpected error:', err);
       setError('Failed to fetch match suggestions');
     } finally {
       setLoading(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, competitivenessFilter, blockedUserIds.join(',')]);
+
+  // Re-fetch whenever user, filter, or blocked list changes
+  useEffect(() => {
+    fetchMatchSuggestions();
+  }, [fetchMatchSuggestions]);
 
   const generateSuggestions = async () => {
-    try {
-      console.log('Generating match suggestions...');
-      
-      // Get current player ID
-      const { data: playerData, error: playerError } = await supabase
-        .from('players')
-        .select('id')
-        .eq('user_id', user?.id)
-        .single();
+    if (!user) throw new Error('Not authenticated');
 
-      if (playerError || !playerData) {
-        throw new Error('Player profile not found');
-      }
+    const { data: playerData, error: playerError } = await supabase
+      .from('players')
+      .select('id')
+      .eq('user_id', user.id)
+      .single();
 
-      // Call the generate_match_suggestions function with competitiveness filter
-      const { data, error } = await supabase.rpc('generate_match_suggestions', {
-        target_player_id: playerData.id,
-        competitiveness_filter: competitivenessFilter || null
-      });
+    if (playerError || !playerData) throw new Error('Player profile not found');
 
-      if (error) {
-        console.error('Error generating suggestions:', error);
-        throw error;
-      }
+    const { data, error } = await supabase.rpc('generate_match_suggestions', {
+      target_player_id: playerData.id,
+      competitiveness_filter: competitivenessFilter || null
+    });
 
-      console.log(`Generated ${data} match suggestions`);
-      
-      // Refresh the suggestions list
-      await fetchMatchSuggestions();
-      
-      return data;
-    } catch (err) {
-      console.error('Error generating match suggestions:', err);
-      throw err;
-    }
+    if (error) throw error;
+
+    await fetchMatchSuggestions();
+    return data as number;
   };
 
   const updateSuggestionStatus = async (suggestionId: string, status: string) => {
-    try {
-      const { error } = await supabase
-        .from('match_suggestions')
-        .update({ status })
-        .eq('id', suggestionId);
-
-      if (error) throw error;
-
-      // Update local state
-      setSuggestions(prev => 
-        prev.map(suggestion => 
-          suggestion.id === suggestionId 
-            ? { ...suggestion, status } 
-            : suggestion
-        )
-      );
-    } catch (err) {
-      console.error('Error updating suggestion status:', err);
-      throw err;
+    // Live (client-side) suggestions don't have a DB row — just remove locally
+    if (suggestionId.startsWith('live-')) {
+      setSuggestions(prev => prev.filter(s => s.id !== suggestionId));
+      return;
     }
+
+    const { error } = await supabase
+      .from('match_suggestions')
+      .update({ status })
+      .eq('id', suggestionId);
+
+    if (error) throw error;
+
+    setSuggestions(prev =>
+      prev.map(s => s.id === suggestionId ? { ...s, status } : s)
+    );
   };
 
   return {

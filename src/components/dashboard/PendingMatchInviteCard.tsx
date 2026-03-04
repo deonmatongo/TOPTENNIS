@@ -53,6 +53,7 @@ export const PendingMatchInviteCard = ({ match, onRespond }: PendingMatchInviteC
     networking_enabled: opponent.networking_enabled,
     first_name: opponent.first_name,
     last_name: opponent.last_name,
+    gender: opponent.gender,
   } : null;
 
   const handleCancel = async () => {

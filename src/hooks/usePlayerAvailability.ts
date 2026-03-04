@@ -50,6 +50,7 @@ export const usePlayerAvailability = (playerId?: string) => {
         .eq('is_available', true)
         .eq('is_blocked', false)
         .gte('date', new Date().toISOString().split('T')[0])
+        .or('privacy_level.eq.public,privacy_level.is.null')
         .order('date', { ascending: true })
         .order('start_time', { ascending: true });
 

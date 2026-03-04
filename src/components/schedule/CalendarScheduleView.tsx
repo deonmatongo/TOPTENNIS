@@ -602,7 +602,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
     return (
       <div className="border rounded-lg bg-card overflow-hidden">
         {/* Header with days */}
-        <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b sticky top-0 bg-card z-10">
+        <div className="grid grid-cols-[40px_repeat(7,minmax(40px,1fr))] sm:grid-cols-[60px_repeat(7,1fr)] border-b sticky top-0 bg-card z-10 overflow-x-auto">
           <div className="border-r"></div>
           {daysInWeek.map((day) => {
             const isCurrentDay = isToday(day);
@@ -610,15 +610,15 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
               <div
                 key={day.toISOString()}
                 className={cn(
-                  "px-2 py-3 text-center border-l",
+                  "px-1 sm:px-2 py-2 sm:py-3 text-center border-l",
                   isCurrentDay && "bg-blue-50 dark:bg-blue-950/20"
                 )}
               >
-                <div className="text-xs font-medium text-muted-foreground uppercase">
+                <div className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase">
                   {format(day, 'EEE')}
                 </div>
                 <div className={cn(
-                  "text-2xl font-semibold mt-1",
+                  "text-sm sm:text-2xl font-semibold mt-0.5 sm:mt-1",
                   isCurrentDay && "text-blue-600"
                 )}>
                   {format(day, 'd')}
@@ -629,12 +629,12 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
         </div>
 
         {/* Time grid */}
-        <div className="overflow-y-auto max-h-[600px] relative">
+        <div className="overflow-x-auto overflow-y-auto max-h-[600px] relative">
           {/* Hour rows */}
           {hours.map((hour) => {
             const timeString = `${String(hour).padStart(2, '0')}:00`;
             return (
-              <div key={hour} className="grid grid-cols-[60px_repeat(7,1fr)] border-b min-h-[50px]">
+              <div key={hour} className="grid grid-cols-[40px_repeat(7,minmax(40px,1fr))] sm:grid-cols-[60px_repeat(7,1fr)] border-b min-h-[50px]">
                 <div className="px-2 py-1 text-xs text-muted-foreground text-right border-r bg-muted/20">
                   {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
                 </div>
@@ -1189,7 +1189,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 )}
 
                 {/* Actions */}
-                <div className="flex gap-2 pt-4">
+                <div className="flex flex-col sm:flex-row gap-2 pt-4">
                   {selectedEvent.type === 'invite' && (
                     <>
                       <Button
@@ -1294,6 +1294,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
           first_name: sender.first_name,
           last_name: sender.last_name,
           profile_picture_url: sender.profile_picture_url || sender.avatar_url,
+          gender: sender.gender,
         };
         return (
           <PlayerProfileModal

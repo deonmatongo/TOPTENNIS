@@ -121,8 +121,9 @@ const OpponentProfileCard = ({ opponent, onViewFull }: { opponent: OpponentProfi
       </div>
 
       {/* Extra details */}
-      {(competitivenessLabel || ageRangeLabel) && (
+      {(competitivenessLabel || ageRangeLabel || opponent.gender) && (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          {opponent.gender && <span className="capitalize">{opponent.gender}</span>}
           {competitivenessLabel && <span>{competitivenessLabel}</span>}
           {ageRangeLabel && <span>Age: {ageRangeLabel}</span>}
         </div>

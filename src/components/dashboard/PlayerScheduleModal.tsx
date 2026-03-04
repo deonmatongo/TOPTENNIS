@@ -16,6 +16,7 @@ import type { SearchResult } from '@/hooks/usePlayerSearch';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 type SchedulePlayer = (SearchResult | Tables<'players'>) & {
   avatar_url?: string | null;
@@ -61,12 +62,8 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
   const opponentUserId = player ? ((player.user_id ?? player.id) || undefined) : undefined;
   const relationship = getRelationshipWith(opponentUserId);
   const isFriendOrSelf = relationship === 'friends' || opponentUserId === user?.id;
-  // Always fetch availability — the DB query filters by privacy_level for non-friends
-  const { availability: allAvailability } = usePlayerAvailability(opponentUserId);
-  // Non-friends only see public slots; friends/self see everything
-  const availability = isFriendOrSelf
-    ? allAvailability
-    : allAvailability.filter(slot => slot.privacy_level === 'public' || !slot.privacy_level);
+  // Fetch availability — private slots are excluded at both DB (RLS) and query level
+  const { availability } = usePlayerAvailability(opponentUserId);
   const { createBooking, isSlotBooked } = useMatchBookings();
 
   const incomingRequest = requests.find(r => r.status === 'pending' && r.sender_id === opponentUserId && r.receiver_id === user?.id);
@@ -152,6 +149,7 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
         message: message
       });
       
+      toast.success(`Match request sent to ${opponentName}!`);
       setShowBookingModal(false);
       setSelectedSlot(null);
       onClose();
@@ -243,7 +241,7 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
                       <Button variant="secondary" disabled>Request Sent</Button>
                     ) : (
                       <Button onClick={handleSendFriendRequest} disabled={!opponentUserId || opponentUserId === user?.id}>
-                        Add Friend
+                        Send a friend request
                       </Button>
                     )}
                   </CardContent>

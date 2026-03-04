@@ -159,6 +159,15 @@ const MatchSuggestions = ({ competitivenessFilter }: MatchSuggestionsProps) => {
                         </div>
                       )}
 
+                      {suggestion.suggested_player?.gender && (
+                        <div className="flex items-center space-x-2">
+                          <Users className="w-4 h-4 text-purple-500" />
+                          <span className="text-sm capitalize">
+                            {suggestion.suggested_player.gender}
+                          </span>
+                        </div>
+                      )}
+
                       {suggestion.suggested_player?.age_range && (
                         <div className="flex items-center space-x-2">
                           <Users className="w-4 h-4 text-green-500" />
@@ -224,6 +233,10 @@ const MatchSuggestions = ({ competitivenessFilter }: MatchSuggestionsProps) => {
         open={showScheduleModal}
         onClose={() => setShowScheduleModal(false)}
         player={selectedPlayer}
+        onInviteSent={() => {
+          setShowScheduleModal(false);
+          setSelectedPlayer(null);
+        }}
       />
     </div>
   );

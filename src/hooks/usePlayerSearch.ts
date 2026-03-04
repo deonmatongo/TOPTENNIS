@@ -16,6 +16,7 @@ export interface SearchResult {
   networking_enabled?: boolean;
   first_name?: string;
   last_name?: string;
+  gender?: string | null;
 }
 
 export const usePlayerSearch = (blockedUserIds: string[] = []) => {
@@ -28,8 +29,9 @@ export const usePlayerSearch = (blockedUserIds: string[] = []) => {
   // Fetch all players on mount (re-fetch when current user or blocked list changes)
   useEffect(() => {
     const fetchAllPlayers = async () => {
+      if (!user?.id) return;
       try {
-        // First get all players with more complete data
+        // Fetch players
         const { data: playersData, error: playersError } = await supabase
           .from('players')
           .select('id, user_id, name, email, skill_level, wins, losses, usta_rating, competitiveness, age_range, phone, gender')
@@ -37,10 +39,10 @@ export const usePlayerSearch = (blockedUserIds: string[] = []) => {
 
         if (playersError) throw playersError;
 
-        // Then get their networking preferences - handle null user_ids properly
         const userIds = playersData?.filter(p => p.user_id).map(p => p.user_id) || [];
-        
-        let profilesData = [];
+
+        // Fetch networking prefs + names
+        let profilesData: { id: string; networking_enabled: boolean; first_name: string | null; last_name: string | null }[] = [];
         if (userIds.length > 0) {
           const { data, error: profilesError } = await supabase
             .from('profiles')
@@ -50,47 +52,51 @@ export const usePlayerSearch = (blockedUserIds: string[] = []) => {
           if (profilesError) {
             console.warn('Error fetching profiles:', profilesError);
           } else {
-            profilesData = data || [];
+            profilesData = (data || []) as typeof profilesData;
           }
         }
 
-        // Combine the data - include all players, prioritizing those with networking enabled
+        // Fetch users who have blocked the current user (reverse block)
+        const { data: blockedByRows } = await (supabase as any)
+          .from('blocked_users')
+          .select('blocker_id')
+          .eq('blocked_user_id', user.id);
+        const blockedBySet = new Set(((blockedByRows || []) as any[]).map((b: any) => b.blocker_id));
+
         const blockedSet = new Set(blockedUserIds);
+
         const playersWithNetworking = (playersData || []).map(player => {
-          const profile = profilesData?.find(p => p.id === player.user_id);
+          const profile = profilesData.find(p => p.id === player.user_id);
           return {
             ...player,
-            networking_enabled: profile?.networking_enabled ?? true, // Default to true for compatibility
+            networking_enabled: profile?.networking_enabled ?? true,
             first_name: profile?.first_name,
-            last_name: profile?.last_name
+            last_name: profile?.last_name,
           };
         }).filter(player =>
           player.networking_enabled !== false &&
-          player.user_id !== user?.id &&
-          !blockedSet.has(player.user_id)
+          player.user_id !== user.id &&
+          !blockedSet.has(player.user_id) &&
+          !blockedBySet.has(player.user_id)
         );
-        
-        console.log(`Found ${playersWithNetworking.length} searchable players`);
+
         setAllPlayers(playersWithNetworking);
       } catch (error) {
         console.error('Error fetching players:', error);
-        // Fallback: try to get at least the players data
+        // Fallback: skip block-by check, still apply outbound blocks
         try {
           const { data: fallbackData } = await supabase
             .from('players')
             .select('id, user_id, name, email, skill_level, wins, losses, usta_rating, competitiveness, age_range, phone, gender')
             .order('name');
-          
+
           if (fallbackData) {
             const blockedSet = new Set(blockedUserIds);
-            const fallbackPlayers = fallbackData
-              .filter(player => player.user_id !== user?.id && !blockedSet.has(player.user_id))
-              .map(player => ({
-                ...player,
-                networking_enabled: true
-              }));
-            console.log(`Fallback: Found ${fallbackPlayers.length} players`);
-            setAllPlayers(fallbackPlayers);
+            setAllPlayers(
+              fallbackData
+                .filter(p => p.user_id !== user.id && !blockedSet.has(p.user_id))
+                .map(p => ({ ...p, networking_enabled: true }))
+            );
           }
         } catch (fallbackError) {
           console.error('Fallback fetch also failed:', fallbackError);

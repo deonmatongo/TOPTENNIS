@@ -57,6 +57,7 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
   const [divisionInfo, setDivisionInfo] = useState<DivisionInfo | null>(null);
   const [scoringMatch, setScoringMatch] = useState<any>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const navigate = useNavigate();
 
   // Helper functions defined early to avoid hoisting issues
   const getLeagueStatus = (league: any) => {
@@ -183,9 +184,9 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
                   </div>
                   <h3 className="text-xl font-semibold mb-2">No Active Leagues</h3>
                   <p className="text-muted-foreground mb-6">
-                    Join a league to compete with players at your skill level and track your progress
+                    Join a league to compete with players at your skill level and track your progress.
                   </p>
-                  <Button size="lg" className="bg-primary hover:bg-primary/90">
+                  <Button size="lg" className="bg-primary hover:bg-primary/90" onClick={() => navigate('/dashboard?tab=register')}>
                     <Trophy className="w-4 h-4 mr-2" />
                     Browse Available Leagues
                   </Button>
@@ -247,14 +248,40 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
               })}
             </div>
           )}
+          {/* Join a League prompt — shown below active leagues */}
+          {!showHistory && (
+            <Card className="border border-primary/20 bg-primary/5">
+              <CardContent className="p-5">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg shrink-0">
+                      <Trophy className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-foreground">Join a League</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Browse open leagues and compete at your skill level.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => navigate('/dashboard?tab=register')}
+                  >
+                    <ChevronRight className="w-4 h-4 mr-1" />
+                    Browse Leagues
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
       {/* Stats and match history sections removed - will be populated with real data from the league details view */}
     </div>
   );
-
-  const navigate = useNavigate();
 
   const handleScheduleMatch = (opponentId: string, opponentName: string) => {
     // Navigate to opponent's public availability page with league context

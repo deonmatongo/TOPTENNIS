@@ -163,12 +163,19 @@ const PlayerSearch = ({
                       <p className="font-medium text-foreground text-sm truncate">{player.name}</p>
                       <p className="text-xs text-muted-foreground truncate">{player.email}</p>
                     </div>
-                    <Badge
-                      variant="outline"
-                      className={`text-xs shrink-0 ${getSkillBadgeColor(player.skill_level)}`}
-                    >
-                      {getSkillLabel(player.skill_level)}
-                    </Badge>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {player.gender && (
+                        <Badge variant="secondary" className="text-xs">
+                          {player.gender.charAt(0).toUpperCase() + player.gender.slice(1)}
+                        </Badge>
+                      )}
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${getSkillBadgeColor(player.skill_level)}`}
+                      >
+                        {getSkillLabel(player.skill_level)}
+                      </Badge>
+                    </div>
                   </div>
                 ))}
               </div>

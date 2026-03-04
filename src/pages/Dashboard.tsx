@@ -25,6 +25,8 @@ import { useLeagueRegistrations } from "@/hooks/useLeagueRegistrations";
 import Header from "@/components/Header";
 import ScheduleTab from "@/components/dashboard/ScheduleTab";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Menu } from "lucide-react";
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -36,6 +38,7 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedLeague, setSelectedLeague] = useState("");
   const [selectedOpponent, setSelectedOpponent] = useState<{id?: string, name?: string} | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Set initial tab from URL parameter
   useEffect(() => {
@@ -153,14 +156,43 @@ const Dashboard = () => {
     <div className="min-h-screen bg-gray-50">
       <Header />
       <ReminderNotifications />
-      <div className="fixed top-24 right-8 z-50 max-w-md">
+      <div className="fixed top-24 right-4 sm:right-8 z-50 max-w-md">
         <NotificationPermissionPrompt />
       </div>
+
+      {/* Mobile sidebar toggle */}
+      <div className="lg:hidden fixed top-[5.25rem] left-4 z-40">
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-10 w-10 bg-card shadow-md border-border"
+          onClick={() => setSidebarOpen(true)}
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+      </div>
+
+      {/* Mobile backdrop overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       <div className="flex pt-20">
-        <DashboardSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-        
-        <div className="flex-1 ml-64">
-          <div className="p-8">
+        <DashboardSidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isMobile={true}
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+        />
+
+        {/* Desktop: sidebar always visible, offset content */}
+        {/* Mobile: no offset, full width */}
+        <div className="flex-1 lg:ml-64">
+          <div className="p-4 sm:p-6 lg:p-8 pt-16 lg:pt-8">
             {renderTabContent()}
           </div>
         </div>

@@ -204,6 +204,23 @@ export const useFriendRequests = () => {
     }
   };
 
+  const revokeFriendRequest = async (requestId: string) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('friend_requests')
+        .delete()
+        .eq('id', requestId)
+        .eq('sender_id', user.id)
+        .eq('status', 'pending');
+      if (error) throw error;
+      await fetchRequests();
+    } catch (err) {
+      console.error('Error revoking friend request:', err);
+      throw err;
+    }
+  };
+
   const getPendingRequestsCount = () => {
     if (!user) return 0;
     return requests.filter(req => req.receiver_id === user.id && req.status === 'pending').length;
@@ -256,6 +273,7 @@ export const useFriendRequests = () => {
     error,
     sendFriendRequest,
     updateRequestStatus,
+    revokeFriendRequest,
     getPendingRequestsCount,
     getRelationshipWith,
     refetch: fetchRequests

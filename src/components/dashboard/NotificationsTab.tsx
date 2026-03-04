@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import type { Notification } from '@/hooks/useNotifications';
 import { useNavigate } from 'react-router-dom';
-import { useMatchResponses } from '@/hooks/useMatchResponses';
-import { MatchResponseModal } from './MatchResponseModal';
+import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { InviteResponseDialog } from './InviteResponseDialog';
 const getNotificationIcon = (type: Notification['type']) => {
   switch (type) {
     case 'match_invite':
@@ -41,7 +41,7 @@ const getDestinationLabel = (type: Notification['type']): string | null => {
   switch (type) {
     case 'match_invite':
     case 'match_rescheduled':
-      return 'View in Schedule';
+      return 'Respond to Invite';
     case 'match_accepted':
     case 'match_confirmed':
     case 'match_declined':
@@ -98,15 +98,14 @@ const NotificationsTab = () => {
     markAsRead,
     markAllAsRead,
     removeNotification,
-    addNotification,
     isLoading
   } = useNotificationsContext();
-  const { pendingInvites, respondToMatch } = useMatchResponses();
+  const { invites } = useMatchInvites();
   const [filter, setFilter] = React.useState<'all' | 'unread' | 'read'>('all');
   const [typeFilter, setTypeFilter] = React.useState<string>('all');
   const [searchTerm, setSearchTerm] = React.useState('');
-  const [selectedMatch, setSelectedMatch] = React.useState<any>(null);
-  const [matchModalOpen, setMatchModalOpen] = React.useState(false);
+  const [selectedInvite, setSelectedInvite] = React.useState<any>(null);
+  const [inviteDialogOpen, setInviteDialogOpen] = React.useState(false);
 
   // Notifications are marked as read only when the user clicks on them individually.
   // This ensures the counter accurately reflects truly unseen notifications.
@@ -155,13 +154,13 @@ const NotificationsTab = () => {
       markAsRead(notification.id);
     }
 
-    // Try to open match invite modal for actionable invites
+    // Try to open invite response dialog for actionable invites
     const inviteModalTypes = ['match_invite', 'match_rescheduled'];
     if (inviteModalTypes.includes(notification.type) && notification.metadata?.match_id) {
-      const match = pendingInvites.find(m => m.id === notification.metadata.match_id);
-      if (match) {
-        setSelectedMatch(match);
-        setMatchModalOpen(true);
+      const invite = invites.find(i => i.id === notification.metadata.match_id);
+      if (invite && invite.status === 'pending') {
+        setSelectedInvite(invite);
+        setInviteDialogOpen(true);
         return;
       }
     }
@@ -172,55 +171,15 @@ const NotificationsTab = () => {
     }
   };
 
-  const handleMatchRespond = (
-    action: 'accept' | 'decline' | 'propose',
-    proposedStart?: Date,
-    proposedEnd?: Date,
-    comment?: string
-  ) => {
-    if (!selectedMatch) return;
-
-    respondToMatch.mutate({
-      matchId: selectedMatch.id,
-      action,
-      proposedStart,
-      proposedEnd,
-      comment
-    });
-
-    setMatchModalOpen(false);
-    setSelectedMatch(null);
-  };
-
-  // Demo function to simulate new notifications
-  const simulateNewNotification = () => {
-    const types = ['match_scheduled', 'match_result', 'achievement', 'match_suggestion', 'league_update'] as const;
-    const randomType = types[Math.floor(Math.random() * types.length)];
-    const messages = {
-      match_scheduled: 'Your match with Alex Rivera is scheduled for Friday at 3:00 PM',
-      match_result: 'Match result: You won against Lisa Chen 6-3, 7-5',
-      achievement: 'Achievement unlocked: 5-match winning streak!',
-      match_suggestion: '2 new players found that match your skill level',
-      league_update: 'You\'ve moved up to #3 in the Fall League standings!'
-    };
-    addNotification({
-      type: randomType,
-      title: randomType === 'match_scheduled' ? 'New Match Scheduled' : randomType === 'match_result' ? 'Match Result Updated' : randomType === 'achievement' ? 'Achievement Unlocked!' : randomType === 'match_suggestion' ? 'New Match Suggestions' : 'League Update',
-      message: messages[randomType],
-      read: false,
-      actionUrl: '/dashboard?tab=' + (randomType === 'match_suggestion' ? 'matching' : 'matches')
-    });
-  };
   return (
     <>
-      <MatchResponseModal
-        open={matchModalOpen}
+      <InviteResponseDialog
+        open={inviteDialogOpen}
         onClose={() => {
-          setMatchModalOpen(false);
-          setSelectedMatch(null);
+          setInviteDialogOpen(false);
+          setSelectedInvite(null);
         }}
-        match={selectedMatch}
-        onRespond={handleMatchRespond}
+        invite={selectedInvite}
       />
       
       <div className="space-y-4 sm:space-y-6">
@@ -244,13 +203,6 @@ const NotificationsTab = () => {
               <CheckCircle className="w-4 h-4" />
               <span className="hidden sm:inline">Mark all as read</span>
               <span className="sm:hidden">Mark all read</span>
-            </Button>
-            
-            {/* Demo button to simulate new notifications */}
-            <Button onClick={simulateNewNotification} variant="outline" className="flex items-center space-x-2 w-full sm:w-auto touch-target bg-primary/10 border-primary/20 hover:bg-primary/20" size="sm">
-              <Bell className="w-4 h-4" />
-              <span className="hidden sm:inline">Simulate New</span>
-              <span className="sm:hidden">+ New</span>
             </Button>
           </div>}
         
