@@ -30,6 +30,9 @@ const getNotificationIcon = (type: Notification['type']) => {
       return Users;
     case 'league_update':
       return TrendingUp;
+    case 'message_received':
+    case 'group_invite':
+      return Bell;
     default:
       return Bell;
   }
@@ -98,8 +101,16 @@ const NotificationDropdown = ({ children }: NotificationDropdownProps) => {
       }
     }
     
-    if (notification.actionUrl) {
-      navigate(notification.actionUrl);
+    // Navigate based on type
+    const dest = notification.actionUrl
+      ?? (notification.type === 'group_invite' || notification.type === 'message_received'
+        ? '/dashboard?tab=social'
+        : notification.type === 'friend_request' || notification.type === 'friend_accepted'
+        ? '/dashboard?tab=social'
+        : null);
+
+    if (dest) {
+      navigate(dest);
       setIsOpen(false);
     }
   };

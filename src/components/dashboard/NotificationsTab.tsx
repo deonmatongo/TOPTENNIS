@@ -31,6 +31,7 @@ const getNotificationIcon = (type: Notification['type']) => {
     case 'friend_accepted':
       return UserPlus;
     case 'message_received':
+    case 'group_invite':
       return MessageCircle;
     default:
       return Bell;
@@ -55,6 +56,7 @@ const getDestinationLabel = (type: Notification['type']): string | null => {
     case 'friend_accepted':
       return 'Go to Friends';
     case 'message_received':
+    case 'group_invite':
       return 'Open Messages';
     case 'league_update':
       return 'View Competition';
@@ -139,7 +141,8 @@ const NotificationsTab = () => {
       case 'friend_accepted':
         return '/dashboard?tab=friends';
       case 'message_received':
-        return '/dashboard?tab=messages';
+      case 'group_invite':
+        return '/dashboard?tab=social';
       case 'league_update':
         return '/dashboard?tab=competition';
       case 'achievement':
