@@ -176,30 +176,19 @@ export const useConversations = () => {
     return data as string;
   }, [user, fetchConversations]);
 
-  // Create a group chat
+  // Create a group chat via SECURITY DEFINER RPC to avoid RLS circular dependency
   const createGroupChat = useCallback(async (name: string, memberUserIds: string[]): Promise<string> => {
     if (!user) throw new Error('Not authenticated');
 
-    const db = supabase as any;
-    const { data: conv, error: convErr } = await db
-      .from('conversations')
-      .insert({ name, is_group: true, created_by: user.id })
-      .select()
-      .single();
+    const { data, error } = await (supabase as any).rpc('create_group_chat', {
+      p_name: name,
+      p_member_ids: memberUserIds,
+    });
 
-    if (convErr) throw convErr;
-
-    // Add creator as admin + all selected members
-    const membersToInsert = [
-      { conversation_id: conv.id, user_id: user.id, role: 'admin' },
-      ...memberUserIds.map((uid: string) => ({ conversation_id: conv.id, user_id: uid, role: 'member' })),
-    ];
-
-    const { error: memErr } = await db.from('conversation_members').insert(membersToInsert);
-    if (memErr) throw memErr;
+    if (error) throw error;
 
     await fetchConversations();
-    return conv.id;
+    return data as string;
   }, [user, fetchConversations]);
 
   // Add a member to a group
