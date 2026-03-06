@@ -562,6 +562,7 @@ const FriendsMessagesTab = () => {
                       const name = getConvName(conv, user?.id || '');
                       const avatar = getConvAvatar(conv, user?.id || '');
                       const isActive = selectedConvId === conv.id;
+                      const dmOther = !conv.is_group ? conv.members.find(m => m.user_id !== user?.id) : null;
                       return (
                         <div
                           key={conv.id}
@@ -570,12 +571,22 @@ const FriendsMessagesTab = () => {
                         >
                           <div className="flex items-center gap-3">
                             <div className="relative shrink-0">
-                              <Avatar className="h-10 w-10">
-                                {avatar && <AvatarImage src={avatar} alt={name} />}
-                                <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-semibold">
-                                  {conv.is_group ? <Users className="w-4 h-4" /> : name.charAt(0).toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
+                              <button
+                                className="rounded-full focus:outline-none"
+                                onClick={e => {
+                                  if (conv.is_group) return; // group info opens inside thread
+                                  e.stopPropagation();
+                                  if (dmOther?.profile) setProfilePlayer(buildProfilePlayer(dmOther.profile, dmOther.user_id));
+                                }}
+                                title={!conv.is_group ? `View ${name}'s profile` : undefined}
+                              >
+                                <Avatar className="h-10 w-10">
+                                  {avatar && <AvatarImage src={avatar} alt={name} />}
+                                  <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-semibold">
+                                    {conv.is_group ? <Users className="w-4 h-4" /> : name.charAt(0).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                              </button>
                               {conv.unreadCount > 0 && (
                                 <div className="absolute -top-1 -right-1 h-5 w-5 bg-primary rounded-full flex items-center justify-center">
                                   <span className="text-xs font-medium text-primary-foreground">{conv.unreadCount > 9 ? '9+' : conv.unreadCount}</span>
@@ -620,10 +631,18 @@ const FriendsMessagesTab = () => {
                         <div key={friend.id} className="p-3 rounded-lg hover:bg-accent/50 transition-colors">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                              <Avatar className="h-9 w-9">
-                                {fd?.profile_picture_url && <AvatarImage src={fd.profile_picture_url} alt={fd.name} />}
-                                <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">{fd?.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
-                              </Avatar>
+                              <button
+                                className="rounded-full focus:outline-none"
+                                onClick={() => {
+                                  if (fd) setProfilePlayer({ id: friendUserId, user_id: friendUserId, name: fd.name || 'Unknown', email: fd.email || '', skill_level: 0, wins: 0, losses: 0 });
+                                }}
+                                title={`View ${fd?.name}'s profile`}
+                              >
+                                <Avatar className="h-9 w-9">
+                                  {fd?.profile_picture_url && <AvatarImage src={fd.profile_picture_url} alt={fd.name} />}
+                                  <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">{fd?.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
+                                </Avatar>
+                              </button>
                               <div>
                                 <p className="font-medium text-sm">{fd?.name || 'Unknown'}</p>
                                 <p className="text-xs text-muted-foreground">{fd?.email}</p>
@@ -792,10 +811,19 @@ const FriendsMessagesTab = () => {
                         onMouseLeave={() => setHoveredMsgId(null)}
                       >
                         {!isOwn && (
-                          <Avatar className="h-7 w-7 mr-2 mt-1 shrink-0">
-                            {msg.sender?.profile_picture_url && <AvatarImage src={msg.sender.profile_picture_url} />}
-                            <AvatarFallback className="text-xs bg-primary/10 text-primary">{senderName.charAt(0).toUpperCase()}</AvatarFallback>
-                          </Avatar>
+                          <button
+                            className="shrink-0 mr-2 mt-1 rounded-full focus:outline-none"
+                            onClick={() => {
+                              const member = selectedConv.members.find(m => m.user_id === msg.sender_id);
+                              if (member?.profile) setProfilePlayer(buildProfilePlayer(member.profile, member.user_id));
+                            }}
+                            title={`View ${senderName}'s profile`}
+                          >
+                            <Avatar className="h-7 w-7">
+                              {msg.sender?.profile_picture_url && <AvatarImage src={msg.sender.profile_picture_url} />}
+                              <AvatarFallback className="text-xs bg-primary/10 text-primary">{senderName.charAt(0).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                          </button>
                         )}
                         <div className={`max-w-[70%] ${isOwn ? 'ml-12' : 'mr-12'}`}>
                           {/* Clickable sender name in group chats */}
