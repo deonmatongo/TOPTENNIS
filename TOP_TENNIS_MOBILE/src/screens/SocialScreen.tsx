@@ -227,7 +227,10 @@ export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                       </View>
                       <TouchableOpacity
                         style={styles.challengeBtn}
-                        onPress={() => navigation.navigate('Messages')}
+                        onPress={() => {
+                          const friendUserId = req.sender_id === user?.id ? req.receiver_id : req.sender_id;
+                          navigation.navigate('Messages', { openDMUserId: friendUserId });
+                        }}
                       >
                         <Ionicons name="chatbubble-outline" size={16} color={Colors.primary} />
                       </TouchableOpacity>

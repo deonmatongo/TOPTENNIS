@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useMatches } from '@/hooks/useMatches';
-import { useMessages } from '@/hooks/useMessages';
+import { useConversations } from '@/hooks/useConversations';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 
@@ -45,9 +45,9 @@ const Tab = createBottomTabNavigator();
 function TabNavigator() {
   const { unreadCount: notifCount } = useNotifications();
   const { pendingReceived } = useMatches();
-  const { conversations } = useMessages();
+  const { getTotalUnread } = useConversations();
   const { pendingReceived: friendRequests } = useFriendRequests();
-  const unreadMessages = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+  const unreadMessages = getTotalUnread();
   const totalSocialBadge = friendRequests.length;
 
   return (
@@ -129,6 +129,7 @@ function MoreNavigator() {
       <MoreStack.Screen name="JoinLeague" component={JoinLeagueScreen} options={{ animation: 'slide_from_right' }} />
       <MoreStack.Screen name="CasualMatch" component={CasualMatchScreen} options={{ animation: 'slide_from_right' }} />
       <MoreStack.Screen name="Social" component={SocialScreen} options={{ animation: 'slide_from_right' }} />
+      <MoreStack.Screen name="Messages" component={MessagesScreen} options={{ animation: 'slide_from_right' }} />
       <MoreStack.Screen name="Notifications" component={NotificationsScreen} options={{ animation: 'slide_from_right' }} />
       <MoreStack.Screen name="Dashboard" component={DashboardScreen} options={{ animation: 'slide_from_right' }} />
       <MoreStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ animation: 'slide_from_right' }} />
