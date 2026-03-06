@@ -24,7 +24,10 @@ import {
   Settings,
   UserMinus,
   Trash2,
+  Pencil,
+  UserCheck,
 } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { useBlockedUsers } from '@/hooks/useBlockedUsers';
 import { useAuth } from '@/contexts/AuthContext';
@@ -138,6 +141,193 @@ const GroupCreateDialog: React.FC<GroupCreateDialogProps> = ({ open, onClose, fr
   );
 };
 
+// ── Group Info Sheet ──────────────────────────────────────────────────────────
+
+interface GroupInfoSheetProps {
+  open: boolean;
+  onClose: () => void;
+  conv: Conversation;
+  currentUserId: string;
+  isAdmin: boolean;
+  friends: { userId: string; name: string; avatar?: string }[];
+  onRemoveMember: (uid: string) => Promise<void>;
+  onAddMember: (uid: string) => Promise<void>;
+  onRenameGroup: (name: string) => Promise<void>;
+  onViewProfile: (profile: NonNullable<Conversation['members'][0]['profile']>, uid: string) => void;
+}
+
+const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
+  open, onClose, conv, currentUserId, isAdmin, friends,
+  onRemoveMember, onAddMember, onRenameGroup, onViewProfile,
+}) => {
+  const [renaming, setRenaming] = useState(false);
+  const [newName, setNewName] = useState(conv.name || '');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [showAddMembers, setShowAddMembers] = useState(false);
+
+  const existingIds = new Set(conv.members.map(m => m.user_id));
+  const addableFriends = friends.filter(f => !existingIds.has(f.userId));
+
+  const getMemberName = (m: Conversation['members'][0]) => {
+    if (!m.profile) return 'Unknown';
+    return `${m.profile.first_name || ''} ${m.profile.last_name || ''}`.trim() || m.profile.email;
+  };
+
+  const handleRename = async () => {
+    if (!newName.trim()) return;
+    try {
+      await onRenameGroup(newName.trim());
+      setRenaming(false);
+      toast.success('Group renamed');
+    } catch {
+      toast.error('Failed to rename group');
+    }
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={v => !v && onClose()}>
+      <SheetContent side="right" className="w-80 sm:w-96 p-0 flex flex-col">
+        <SheetHeader className="p-4 border-b">
+          <SheetTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-primary" />
+            Group Info
+          </SheetTitle>
+        </SheetHeader>
+
+        <ScrollArea className="flex-1">
+          <div className="p-4 space-y-4">
+            {/* Group name */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Group Name</p>
+              {renaming ? (
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={newName}
+                    onChange={e => setNewName(e.target.value)}
+                    autoFocus
+                    maxLength={50}
+                    onKeyDown={e => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setRenaming(false); }}
+                  />
+                  <Button size="sm" onClick={handleRename}>Save</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setRenaming(false); setNewName(conv.name || ''); }}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
+                  <span className="flex-1 text-sm font-medium">{conv.name || 'Group Chat'}</span>
+                  {isAdmin && (
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setRenaming(true)}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Members */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Members ({conv.members.length})
+              </p>
+              <div className="space-y-1">
+                {conv.members.map(m => (
+                  <div key={m.user_id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                    <button
+                      className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                      onClick={() => m.profile && onViewProfile(m.profile, m.user_id)}
+                    >
+                      <Avatar className="h-8 w-8 shrink-0">
+                        {m.profile?.profile_picture_url && <AvatarImage src={m.profile.profile_picture_url} />}
+                        <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                          {getMemberName(m).charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">
+                          {getMemberName(m)}{m.user_id === currentUserId ? ' (you)' : ''}
+                        </p>
+                        {m.role === 'admin' && (
+                          <p className="text-xs text-primary font-medium">Admin</p>
+                        )}
+                      </div>
+                    </button>
+                    {isAdmin && m.user_id !== currentUserId && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive shrink-0"
+                        disabled={busy === m.user_id}
+                        onClick={async () => {
+                          setBusy(m.user_id);
+                          try { await onRemoveMember(m.user_id); toast.success('Member removed'); }
+                          catch { toast.error('Failed to remove member'); }
+                          finally { setBusy(null); }
+                        }}
+                        title="Remove member"
+                      >
+                        {busy === m.user_id
+                          ? <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          : <UserMinus className="w-3.5 h-3.5" />
+                        }
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Add members (admin only) */}
+            {isAdmin && addableFriends.length > 0 && (
+              <div className="space-y-2">
+                <button
+                  className="flex items-center gap-2 w-full text-xs font-semibold text-muted-foreground uppercase tracking-wide hover:text-primary transition-colors"
+                  onClick={() => setShowAddMembers(v => !v)}
+                >
+                  <UserCheck className="w-4 h-4" />
+                  Add Members
+                  <span className="ml-auto">{showAddMembers ? '▲' : '▼'}</span>
+                </button>
+                {showAddMembers && (
+                  <div className="space-y-1">
+                    {addableFriends.map(f => (
+                      <div key={f.userId} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
+                        <Avatar className="h-8 w-8 shrink-0">
+                          {f.avatar && <AvatarImage src={f.avatar} />}
+                          <AvatarFallback className="text-xs bg-primary/10 text-primary">{f.name.charAt(0).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <span className="flex-1 text-sm">{f.name}</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs shrink-0"
+                          disabled={busy === f.userId}
+                          onClick={async () => {
+                            setBusy(f.userId);
+                            try { await onAddMember(f.userId); toast.success(`${f.name} added`); }
+                            catch { toast.error('Failed to add member'); }
+                            finally { setBusy(null); }
+                          }}
+                        >
+                          {busy === f.userId
+                            ? <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            : <><Plus className="w-3 h-3 mr-1" />Add</>
+                          }
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </SheetContent>
+    </Sheet>
+  );
+};
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 const FriendsMessagesTab = () => {
@@ -149,12 +339,14 @@ const FriendsMessagesTab = () => {
   const [showPlayerSearch, setShowPlayerSearch] = useState(false);
   const [showGroupCreate, setShowGroupCreate] = useState(false);
   const [profilePlayer, setProfilePlayer] = useState<any | null>(null);
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { user } = useAuth();
   const { requests, loading: friendsLoading, updateRequestStatus, revokeFriendRequest, getPendingRequestsCount } = useFriendRequests();
   const { blockedUsers } = useBlockedUsers();
-  const { conversations, loading: convLoading, sendMessage, getOrCreateDM, createGroupChat, markConversationRead, getTotalUnread } = useConversations();
+  const { conversations, loading: convLoading, sendMessage, getOrCreateDM, createGroupChat, addMember, removeMember, deleteMessage, updateGroup, markConversationRead, getTotalUnread, getMyRole } = useConversations();
   const { invites } = useMatchInvites();
 
   const blockedIds = useMemo(() => new Set(blockedUsers.map(b => b.blocked_user_id)), [blockedUsers]);
@@ -244,6 +436,14 @@ const FriendsMessagesTab = () => {
       toast.success('Friend request revoked.');
     } catch {
       toast.error('Failed to revoke friend request');
+    }
+  };
+
+  const handleDeleteMessage = async (msgId: string) => {
+    try {
+      await deleteMessage(msgId);
+    } catch {
+      toast.error('Failed to delete message');
     }
   };
 
@@ -529,7 +729,9 @@ const FriendsMessagesTab = () => {
                 <button
                   className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
                   onClick={() => {
-                    if (!selectedConv.is_group) {
+                    if (selectedConv.is_group) {
+                      setShowGroupInfo(true);
+                    } else {
                       const other = selectedConv.members.find(m => m.user_id !== user?.id);
                       if (other?.profile) setProfilePlayer(buildProfilePlayer(other.profile, other.user_id));
                     }
@@ -544,10 +746,15 @@ const FriendsMessagesTab = () => {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold truncate">{convName}</p>
                     {selectedConv.is_group && (
-                      <p className="text-xs text-muted-foreground">{selectedConv.members.length} members</p>
+                      <p className="text-xs text-muted-foreground">{selectedConv.members.length} members · click to manage</p>
                     )}
                   </div>
                 </button>
+                {selectedConv.is_group && (
+                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setShowGroupInfo(true)}>
+                    <Settings className="w-4 h-4" />
+                  </Button>
+                )}
 
                 {/* Match invite status badge for DMs */}
                 {!selectedConv.is_group && (() => {
@@ -576,8 +783,14 @@ const FriendsMessagesTab = () => {
                       ? `${msg.sender.first_name || ''} ${msg.sender.last_name || ''}`.trim() || msg.sender.email
                       : 'Unknown';
 
+                    const canDelete = isOwn || getMyRole(selectedConv) === 'admin';
                     return (
-                      <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                      <div
+                        key={msg.id}
+                        className={`flex group ${isOwn ? 'justify-end' : 'justify-start'}`}
+                        onMouseEnter={() => canDelete && setHoveredMsgId(msg.id)}
+                        onMouseLeave={() => setHoveredMsgId(null)}
+                      >
                         {!isOwn && (
                           <Avatar className="h-7 w-7 mr-2 mt-1 shrink-0">
                             {msg.sender?.profile_picture_url && <AvatarImage src={msg.sender.profile_picture_url} />}
@@ -597,11 +810,22 @@ const FriendsMessagesTab = () => {
                               {senderName}
                             </button>
                           )}
-                          <div className={`px-4 py-2 rounded-2xl ${isOwn ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                            <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                            <p className={`text-xs mt-1 ${isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                              {format(new Date(msg.created_at), 'HH:mm')}
-                            </p>
+                          <div className="relative">
+                            <div className={`px-4 py-2 rounded-2xl ${isOwn ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                              <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                              <p className={`text-xs mt-1 ${isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                                {format(new Date(msg.created_at), 'HH:mm')}
+                              </p>
+                            </div>
+                            {hoveredMsgId === msg.id && canDelete && (
+                              <button
+                                className={`absolute top-1 ${isOwn ? '-left-8' : '-right-8'} p-1 rounded-full bg-background border shadow-sm hover:bg-destructive hover:text-white transition-colors`}
+                                onClick={() => handleDeleteMessage(msg.id)}
+                                title="Delete message"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -661,6 +885,22 @@ const FriendsMessagesTab = () => {
           toast.success('Group chat created!');
         }}
       />
+
+      {/* Group Info Sheet */}
+      {selectedConv?.is_group && (
+        <GroupInfoSheet
+          open={showGroupInfo}
+          onClose={() => setShowGroupInfo(false)}
+          conv={selectedConv}
+          currentUserId={user?.id || ''}
+          isAdmin={getMyRole(selectedConv) === 'admin'}
+          friends={friendsList}
+          onRemoveMember={uid => removeMember(selectedConv.id, uid)}
+          onAddMember={uid => addMember(selectedConv.id, uid)}
+          onRenameGroup={name => updateGroup(selectedConv.id, { name })}
+          onViewProfile={(profile, uid) => { setShowGroupInfo(false); setProfilePlayer(buildProfilePlayer(profile, uid)); }}
+        />
+      )}
 
       {/* Player profile modal */}
       <PlayerProfileModal

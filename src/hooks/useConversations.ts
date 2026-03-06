@@ -213,6 +213,16 @@ export const useConversations = () => {
     await fetchConversations();
   }, [fetchConversations]);
 
+  // Delete a message (own or admin deletes any)
+  const deleteMessage = useCallback(async (messageId: string) => {
+    const { error } = await (supabase as any)
+      .from('conversation_messages')
+      .delete()
+      .eq('id', messageId);
+    if (error) throw error;
+    await fetchConversations();
+  }, [fetchConversations]);
+
   // Update group name / avatar
   const updateGroup = useCallback(async (conversationId: string, updates: { name?: string; avatar_url?: string }) => {
     const { error } = await (supabase as any)
@@ -241,6 +251,12 @@ export const useConversations = () => {
   const getTotalUnread = useCallback(() => {
     return conversations.reduce((sum, c) => sum + c.unreadCount, 0);
   }, [conversations]);
+
+  const getMyRole = useCallback((conv: Conversation): 'admin' | 'member' | null => {
+    if (!user) return null;
+    const me = conv.members.find(m => m.user_id === user.id);
+    return me?.role ?? null;
+  }, [user]);
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }
@@ -292,9 +308,11 @@ export const useConversations = () => {
     createGroupChat,
     addMember,
     removeMember,
+    deleteMessage,
     updateGroup,
     markConversationRead,
     getTotalUnread,
+    getMyRole,
     refetch: fetchConversations,
   };
 };
