@@ -283,14 +283,11 @@ export const useConversations = () => {
       }, () => fetchConversations())
       .subscribe();
 
-    // Real-time: conversation updates (name/avatar changes)
+    // Real-time: conversation inserts (new group created) + updates (name/avatar changes)
     const convChannel = supabase
       .channel('conv-updates-realtime')
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'conversations',
-      }, () => fetchConversations())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations' }, () => fetchConversations())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, () => fetchConversations())
       .subscribe();
 
     return () => {

@@ -246,8 +246,8 @@ export const useConversations = () => {
 
     const convChannel = (supabase as any)
       .channel('mobile-conv-updates')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' },
-        () => fetchConversations())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations' }, () => fetchConversations())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, () => fetchConversations())
       .subscribe();
 
     return () => {
