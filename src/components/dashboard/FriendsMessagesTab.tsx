@@ -1,22 +1,5 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Label } from '@/components/ui/label';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import {
-  Users, MessageCircle, Send, Search, Check, X, Clock,
-  Plus, AlertCircle, ChevronLeft, Settings, UserMinus,
-  Trash2, Pencil, UserCheck, Pin, PinOff, BellOff,
-  MoreHorizontal, LogOut, Hash, AtSign, ChevronDown,
-  ChevronUp, Reply, Smile, UserX, Shield,
-} from 'lucide-react';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { useBlockedUsers } from '@/hooks/useBlockedUsers';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,144 +13,89 @@ import PlayerSearch from './PlayerSearch';
 import { SearchResult } from '@/hooks/usePlayerSearch';
 import PlayerProfileModal from './PlayerProfileModal';
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── Design tokens ────────────────────────────────────────────────────────────
+const C = {
+  accent:      '#F97316',
+  accentLight: '#FFF7ED',
+  bg:          '#F8F9FB',
+  white:       '#FFFFFF',
+  border:      '#EAECF0',
+  text:        '#111827',
+  muted:       '#6B7280',
+  mutedLight:  '#9CA3AF',
+  bubbleOwn:   '#111827',
+  online:      '#22C55E',
+  unread:      '#EF4444',
+  hover:       '#F9FAFB',
+};
 
-const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎾', '🔥', '👏', '😮', '😢'];
+const QUICK_EMOJIS = ['👍','❤️','😂','🎾','🔥','👏','😮','😢'];
+const EMOJI_TRAY   = ['😀','😂','🔥','🎾','👍','❤️','😮','🏆','💪','🎯','⚡','🤝','🙌','👊','😎'];
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatTime(dateString: string) {
-  const date = new Date(dateString);
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function getConvName(conv: Conversation, uid: string) {
+  if (conv.is_group) return conv.name || 'Group Chat';
+  const other = conv.members.find(m => m.user_id !== uid);
+  if (!other?.profile) return 'Direct Message';
+  return `${other.profile.first_name || ''} ${other.profile.last_name || ''}`.trim() || other.profile.email;
+}
+function getConvAvatar(conv: Conversation, uid: string) {
+  if (conv.is_group) return conv.avatar_url ?? undefined;
+  return conv.members.find(m => m.user_id !== uid)?.profile?.profile_picture_url ?? undefined;
+}
+function getConvOtherUserId(conv: Conversation, uid: string) {
+  return conv.members.find(m => m.user_id !== uid)?.user_id;
+}
+function initials(name: string) {
+  return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+}
+function fmtTime(d: string) {
+  const date = new Date(d);
   if (isToday(date)) return format(date, 'HH:mm');
   if (isYesterday(date)) return 'Yesterday';
   return format(date, 'MMM d');
 }
-
-function formatDivider(dateString: string) {
-  const date = new Date(dateString);
+function fmtDivider(d: string) {
+  const date = new Date(d);
   if (isToday(date)) return 'Today';
   if (isYesterday(date)) return 'Yesterday';
   return format(date, 'EEEE, MMMM d');
 }
 
-function getConvName(conv: Conversation, currentUserId: string): string {
-  if (conv.is_group) return conv.name || 'Group Chat';
-  const other = conv.members.find(m => m.user_id !== currentUserId);
-  if (!other?.profile) return 'Direct Message';
-  return `${other.profile.first_name || ''} ${other.profile.last_name || ''}`.trim() || other.profile.email;
-}
-
-function getConvAvatar(conv: Conversation, currentUserId: string): string | undefined {
-  if (conv.is_group) return conv.avatar_url ?? undefined;
-  const other = conv.members.find(m => m.user_id !== currentUserId);
-  return other?.profile?.profile_picture_url ?? undefined;
-}
-
-// ── Online dot ────────────────────────────────────────────────────────────────
-
-const OnlineDot = ({ online }: { online: boolean }) => (
-  <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-background ${online ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
-);
-
-// ── Typing indicator ──────────────────────────────────────────────────────────
-
-const TypingIndicator = ({ names }: { names: string[] }) => {
-  if (names.length === 0) return null;
-  const label = names.length === 1 ? `${names[0]} is typing` : `${names.slice(0, 2).join(', ')} are typing`;
+// ── Inline Avatar ─────────────────────────────────────────────────────────────
+interface AvProps { src?: string; name: string; color?: string; size?: number; online?: boolean; }
+const Av: React.FC<AvProps> = ({ src, name, color, size = 36, online = false }) => {
+  const bg = color || C.accent;
   return (
-    <div className="flex items-center gap-2 px-4 py-1 text-xs text-muted-foreground">
-      <span className="flex gap-0.5">
-        {[0, 1, 2].map(i => (
-          <span key={i} className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
-        ))}
-      </span>
-      <span>{label}…</span>
+    <div style={{ position: 'relative', flexShrink: 0, width: size, height: size }}>
+      {src ? (
+        <img src={src} alt={name} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover' }} />
+      ) : (
+        <div style={{ width: size, height: size, borderRadius: '50%', background: bg, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.33, fontWeight: 700, letterSpacing: '-0.5px' }}>
+          {initials(name)}
+        </div>
+      )}
+      {online && (
+        <div style={{ position: 'absolute', bottom: 1, right: 1, width: size * 0.28, height: size * 0.28, borderRadius: '50%', background: C.online, border: '2px solid white' }} />
+      )}
     </div>
   );
 };
 
-// ── Group create dialog ───────────────────────────────────────────────────────
+const GroupAv = ({ size = 36 }: { size?: number }) => (
+  <div style={{ width: size, height: size, borderRadius: 10, background: C.accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.45, flexShrink: 0, fontWeight: 700 }}>#</div>
+);
 
-interface GroupCreateDialogProps {
-  open: boolean;
-  onClose: () => void;
-  friends: { userId: string; name: string; avatar?: string }[];
-  onSubmit: (name: string, memberIds: string[]) => Promise<void>;
-}
-
-const GroupCreateDialog: React.FC<GroupCreateDialogProps> = ({ open, onClose, friends, onSubmit }) => {
-  const [name, setName] = useState('');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [creating, setCreating] = useState(false);
-
-  const toggle = (id: string) => setSelected(prev => {
-    const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
-    return next;
-  });
-
-  const handleCreate = async () => {
-    if (!name.trim() || selected.size === 0) return;
-    setCreating(true);
-    try {
-      await onSubmit(name.trim(), Array.from(selected));
-      setName('');
-      setSelected(new Set());
-      onClose();
-    } catch {
-      toast.error('Failed to create group');
-    } finally {
-      setCreating(false);
-    }
-  };
-
+const UnreadBadge = ({ count }: { count: number }) => {
+  if (!count) return null;
   return (
-    <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Create Group Chat</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div className="space-y-1">
-            <Label>Group name</Label>
-            <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Tennis Squad" />
-          </div>
-          <div className="space-y-1">
-            <Label>Add members</Label>
-            <ScrollArea className="h-48 border rounded-md p-2">
-              <div className="space-y-1">
-                {friends.map(f => (
-                  <div
-                    key={f.userId}
-                    className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${selected.has(f.userId) ? 'bg-primary/10 border border-primary/20' : 'hover:bg-muted/50'}`}
-                    onClick={() => toggle(f.userId)}
-                  >
-                    <Avatar className="h-7 w-7">
-                      {f.avatar && <AvatarImage src={f.avatar} />}
-                      <AvatarFallback className="text-xs bg-primary/10 text-primary">{f.name.charAt(0).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm flex-1">{f.name}</span>
-                    {selected.has(f.userId) && <Check className="w-4 h-4 text-primary" />}
-                  </div>
-                ))}
-                {friends.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">Add friends first to create a group</p>}
-              </div>
-            </ScrollArea>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleCreate} disabled={!name.trim() || selected.size === 0 || creating}>
-            {creating ? 'Creating...' : `Create (${selected.size} members)`}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <div style={{ background: C.unread, color: '#fff', borderRadius: 999, fontSize: 11, fontWeight: 700, minWidth: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px' }}>
+      {count > 99 ? '99+' : count}
+    </div>
   );
 };
 
-// ── Group Info Sheet ──────────────────────────────────────────────────────────
-
+// ── GroupInfoSheet ────────────────────────────────────────────────────────────
 interface GroupInfoSheetProps {
   open: boolean;
   onClose: () => void;
@@ -180,201 +108,207 @@ interface GroupInfoSheetProps {
   onRenameGroup: (name: string) => Promise<void>;
   onViewProfile: (profile: NonNullable<Conversation['members'][0]['profile']>, uid: string) => void;
 }
-
 const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
   open, onClose, conv, currentUserId, isAdmin, friends,
   onRemoveMember, onAddMember, onRenameGroup, onViewProfile,
 }) => {
   const [renaming, setRenaming] = useState(false);
-  const [newName, setNewName] = useState(conv.name || '');
-  const [busy, setBusy] = useState<string | null>(null);
-  const [showAddMembers, setShowAddMembers] = useState(false);
-
-  const existingIds = new Set(conv.members.map(m => m.user_id));
+  const [newName, setNewName]   = useState(conv.name || '');
+  const [busy, setBusy]         = useState<string | null>(null);
+  const existingIds   = new Set(conv.members.map(m => m.user_id));
   const addableFriends = friends.filter(f => !existingIds.has(f.userId));
-
-  const getMemberName = (m: Conversation['members'][0]) => {
+  const memberName = (m: Conversation['members'][0]) => {
     if (!m.profile) return 'Unknown';
     return `${m.profile.first_name || ''} ${m.profile.last_name || ''}`.trim() || m.profile.email;
   };
-
-  const handleRename = async () => {
-    if (!newName.trim()) return;
-    try {
-      await onRenameGroup(newName.trim());
-      setRenaming(false);
-      toast.success('Group renamed');
-    } catch {
-      toast.error('Failed to rename group');
-    }
-  };
-
   return (
     <Sheet open={open} onOpenChange={v => !v && onClose()}>
-      <SheetContent side="right" className="w-80 sm:w-96 p-0 flex flex-col">
-        <SheetHeader className="p-4 border-b">
-          <SheetTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-primary" />
-            Group Info
-          </SheetTitle>
+      <SheetContent side="right" style={{ width: 360, padding: 0, display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif" }}>
+        <SheetHeader style={{ padding: '20px 20px 16px', borderBottom: `1px solid ${C.border}` }}>
+          <SheetTitle style={{ fontSize: 16, fontWeight: 700 }}>Group Info</SheetTitle>
         </SheetHeader>
+        <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Group Name</p>
+          {renaming ? (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+              <input value={newName} onChange={e => setNewName(e.target.value)} maxLength={50} autoFocus
+                style={{ flex: 1, border: `1.5px solid ${C.accent}`, borderRadius: 8, padding: '8px 12px', fontSize: 14, outline: 'none', fontFamily: "'DM Sans', sans-serif" }}
+                onKeyDown={async e => {
+                  if (e.key === 'Enter') { await onRenameGroup(newName); setRenaming(false); toast.success('Group renamed'); }
+                  if (e.key === 'Escape') { setRenaming(false); setNewName(conv.name || ''); }
+                }}
+              />
+              <button onClick={async () => { await onRenameGroup(newName); setRenaming(false); toast.success('Group renamed'); }}
+                style={{ padding: '8px 14px', borderRadius: 8, background: C.accent, color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Save</button>
+              <button onClick={() => { setRenaming(false); setNewName(conv.name || ''); }}
+                style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', cursor: 'pointer', fontSize: 13 }}>✕</button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: C.bg, borderRadius: 10, marginBottom: 24 }}>
+              <span style={{ flex: 1, fontWeight: 600, fontSize: 14 }}>{conv.name || 'Group Chat'}</span>
+              {isAdmin && <button onClick={() => setRenaming(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 14 }}>✏️</button>}
+            </div>
+          )}
 
-        <ScrollArea className="flex-1">
-          <div className="p-4 space-y-4">
-            {/* Group name */}
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Group Name</p>
-              {renaming ? (
-                <div className="flex gap-2">
-                  <input
-                    className="flex-1 border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    value={newName}
-                    onChange={e => setNewName(e.target.value)}
-                    autoFocus
-                    maxLength={50}
-                    onKeyDown={e => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setRenaming(false); }}
-                  />
-                  <Button size="sm" onClick={handleRename}>Save</Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setRenaming(false); setNewName(conv.name || ''); }}>
-                    <X className="w-4 h-4" />
-                  </Button>
+          <p style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Members ({conv.members.length})</p>
+          {conv.members.map(m => (
+            <div key={m.user_id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
+              <button onClick={() => m.profile && onViewProfile(m.profile, m.user_id)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
+                <Av name={memberName(m)} src={m.profile?.profile_picture_url} size={36} />
+                <div style={{ textAlign: 'left' }}>
+                  <p style={{ fontWeight: 600, fontSize: 14, margin: 0 }}>{memberName(m)}{m.user_id === currentUserId ? ' (you)' : ''}</p>
+                  {m.role === 'admin' && <p style={{ fontSize: 11, color: C.accent, fontWeight: 600, margin: 0 }}>Admin</p>}
                 </div>
-              ) : (
-                <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
-                  <span className="flex-1 text-sm font-medium">{conv.name || 'Group Chat'}</span>
-                  {isAdmin && (
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setRenaming(true)}>
-                      <Pencil className="w-3.5 h-3.5" />
-                    </Button>
-                  )}
-                </div>
+              </button>
+              {isAdmin && m.user_id !== currentUserId && (
+                <button disabled={busy === m.user_id} onClick={async () => { setBusy(m.user_id); try { await onRemoveMember(m.user_id); toast.success('Removed'); } catch { toast.error('Failed'); } finally { setBusy(null); } }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 18 }}>{busy === m.user_id ? '…' : '✕'}</button>
               )}
             </div>
+          ))}
 
-            {/* Members */}
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Members ({conv.members.length})
-              </p>
-              <div className="space-y-1">
-                {conv.members.map(m => (
-                  <div key={m.user_id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                    <button
-                      className="flex items-center gap-3 flex-1 min-w-0 text-left"
-                      onClick={() => m.profile && onViewProfile(m.profile, m.user_id)}
-                    >
-                      <Avatar className="h-8 w-8 shrink-0">
-                        {m.profile?.profile_picture_url && <AvatarImage src={m.profile.profile_picture_url} />}
-                        <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                          {getMemberName(m).charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">
-                          {getMemberName(m)}{m.user_id === currentUserId ? ' (you)' : ''}
-                        </p>
-                        {m.role === 'admin' && (
-                          <p className="text-xs text-primary font-medium">Admin</p>
-                        )}
-                      </div>
-                    </button>
-                    {isAdmin && m.user_id !== currentUserId && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive shrink-0"
-                        disabled={busy === m.user_id}
-                        onClick={async () => {
-                          setBusy(m.user_id);
-                          try { await onRemoveMember(m.user_id); toast.success('Member removed'); }
-                          catch { toast.error('Failed to remove member'); }
-                          finally { setBusy(null); }
-                        }}
-                        title="Remove member"
-                      >
-                        {busy === m.user_id
-                          ? <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                          : <UserMinus className="w-3.5 h-3.5" />
-                        }
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
+          {isAdmin && addableFriends.length > 0 && (
+            <div style={{ marginTop: 24 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Add Members</p>
+              {addableFriends.map(f => (
+                <div key={f.userId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: `1px solid ${C.border}` }}>
+                  <Av name={f.name} src={f.avatar} size={32} />
+                  <span style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>{f.name}</span>
+                  <button disabled={busy === f.userId} onClick={async () => { setBusy(f.userId); try { await onAddMember(f.userId); toast.success(`${f.name} added`); } catch { toast.error('Failed'); } finally { setBusy(null); } }}
+                    style={{ padding: '5px 12px', borderRadius: 8, background: C.accent, color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{busy === f.userId ? '…' : '+ Add'}</button>
+                </div>
+              ))}
             </div>
-
-            {/* Add members (admin only) */}
-            {isAdmin && addableFriends.length > 0 && (
-              <div className="space-y-2">
-                <button
-                  className="flex items-center gap-2 w-full text-xs font-semibold text-muted-foreground uppercase tracking-wide hover:text-primary transition-colors"
-                  onClick={() => setShowAddMembers(v => !v)}
-                >
-                  <UserCheck className="w-4 h-4" />
-                  Add Members
-                  <span className="ml-auto">{showAddMembers ? '▲' : '▼'}</span>
-                </button>
-                {showAddMembers && (
-                  <div className="space-y-1">
-                    {addableFriends.map(f => (
-                      <div key={f.userId} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
-                        <Avatar className="h-8 w-8 shrink-0">
-                          {f.avatar && <AvatarImage src={f.avatar} />}
-                          <AvatarFallback className="text-xs bg-primary/10 text-primary">{f.name.charAt(0).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <span className="flex-1 text-sm">{f.name}</span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs shrink-0"
-                          disabled={busy === f.userId}
-                          onClick={async () => {
-                            setBusy(f.userId);
-                            try { await onAddMember(f.userId); toast.success(`${f.name} added`); }
-                            catch { toast.error('Failed to add member'); }
-                            finally { setBusy(null); }
-                          }}
-                        >
-                          {busy === f.userId
-                            ? <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                            : <><Plus className="w-3 h-3 mr-1" />Add</>
-                          }
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </ScrollArea>
+          )}
+        </div>
       </SheetContent>
     </Sheet>
   );
 };
 
-// ── Main component ────────────────────────────────────────────────────────────
+// ── ConvRow ───────────────────────────────────────────────────────────────────
+interface ConvRowProps {
+  conv: Conversation;
+  selected: boolean;
+  userId: string;
+  isOnlineFn: (id: string) => boolean;
+  onClick: () => void;
+}
+const ConvRow: React.FC<ConvRowProps> = ({ conv, selected, userId, isOnlineFn, onClick }) => {
+  const [hov, setHov] = useState(false);
+  const name    = getConvName(conv, userId);
+  const avatar  = getConvAvatar(conv, userId);
+  const otherId = !conv.is_group ? getConvOtherUserId(conv, userId) : undefined;
+  const online  = otherId ? isOnlineFn(otherId) : false;
+  const lastMsg = conv.lastMessage;
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', cursor: 'pointer', background: selected ? C.accentLight : hov ? C.hover : 'transparent', borderLeft: selected ? `3px solid ${C.accent}` : '3px solid transparent', transition: 'all 0.12s' }}
+    >
+      {conv.is_group ? <GroupAv size={44} /> : <Av name={name} src={avatar} size={44} online={online} />}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontWeight: conv.unreadCount ? 700 : 600, fontSize: 14, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {conv.is_group ? `# ${name}` : name}
+            {conv.isPinned && <span style={{ marginLeft: 6, fontSize: 12 }}>📌</span>}
+          </div>
+          <div style={{ fontSize: 11, color: C.muted, flexShrink: 0, marginLeft: 6 }}>{lastMsg ? fmtTime(lastMsg.created_at) : ''}</div>
+        </div>
+        {lastMsg && (
+          <div style={{ fontSize: 12, color: conv.unreadCount ? C.text : C.muted, fontWeight: conv.unreadCount ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
+            {lastMsg.deleted_at ? 'Message deleted' : lastMsg.content}
+          </div>
+        )}
+      </div>
+      {conv.unreadCount > 0 && <UnreadBadge count={conv.unreadCount} />}
+    </div>
+  );
+};
 
+// ── FriendRow ─────────────────────────────────────────────────────────────────
+interface FriendRowProps {
+  fid: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  online: boolean;
+  faded?: boolean;
+  onChat: () => void;
+  onProfile: () => void;
+  onUnfriend: () => void;
+  onBlock: () => void;
+}
+const FriendRow: React.FC<FriendRowProps> = ({ fid, name, avatar, online, faded, onChat, onProfile, onUnfriend, onBlock }) => {
+  const [hov, setHov] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  return (
+    <div onMouseEnter={() => setHov(true)} onMouseLeave={() => { setHov(false); setMenuOpen(false); }}
+      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', cursor: 'pointer', background: hov ? C.hover : 'transparent', opacity: faded ? 0.75 : 1, transition: 'all 0.1s', position: 'relative' }}>
+      <button onClick={onProfile} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+        <Av name={name} src={avatar} size={40} online={online} />
+      </button>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>{name}</div>
+        <div style={{ fontSize: 12, color: online ? C.online : C.muted }}>{online ? 'Online' : 'Offline'}</div>
+      </div>
+      {hov && (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={onChat} style={{ padding: '5px 12px', borderRadius: 8, background: C.accent, color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Chat</button>
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setMenuOpen(v => !v)} style={{ padding: '5px 10px', borderRadius: 8, background: C.bg, color: C.muted, border: `1px solid ${C.border}`, fontSize: 14, cursor: 'pointer' }}>···</button>
+            {menuOpen && (
+              <div style={{ position: 'absolute', right: 0, top: '110%', background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 50, minWidth: 160, overflow: 'hidden' }}>
+                {[
+                  { label: '👤 View Profile', action: onProfile },
+                  { label: '👋 Unfriend',     action: onUnfriend },
+                  { label: '🚫 Block',        action: onBlock, danger: true },
+                ].map(item => (
+                  <button key={item.label} onClick={() => { setMenuOpen(false); item.action(); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', fontSize: 13, fontWeight: 500, color: item.danger ? '#ef4444' : C.text, cursor: 'pointer' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = C.hover)}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                  >{item.label}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Main component ────────────────────────────────────────────────────────────
 const FriendsMessagesTab = () => {
-  const [activeView, setActiveView] = useState<'conversations' | 'friends' | 'requests'>('conversations');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab]         = useState<'chat' | 'friends' | 'requests'>('chat');
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
-  const [msgInput, setMsgInput] = useState('');
-  const [sending, setSending] = useState(false);
+  const [msgInput, setMsgInput]           = useState('');
+  const [search, setSearch]               = useState('');
+  const [friendSearch, setFriendSearch]   = useState('');
+  const [hoveredMsg, setHoveredMsg]       = useState<string | null>(null);
+  const [reactionPickerMsg, setReactionPickerMsg] = useState<string | null>(null);
+  const [emojiTrayOpen, setEmojiTrayOpen] = useState(false);
+  const [replyToMsg, setReplyToMsg]       = useState<ConversationMessage | null>(null);
+  const [atBottom, setAtBottom]           = useState(true);
   const [showPlayerSearch, setShowPlayerSearch] = useState(false);
-  const [showGroupCreate, setShowGroupCreate] = useState(false);
-  const [profilePlayer, setProfilePlayer] = useState<any | null>(null);
-  const [showGroupInfo, setShowGroupInfo] = useState(false);
-  const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null);
-  const [emojiPickerMsgId, setEmojiPickerMsgId] = useState<string | null>(null);
-  const [replyToMsg, setReplyToMsg] = useState<ConversationMessage | null>(null);
-  const [atBottom, setAtBottom] = useState(true);
+  const [showGroupCreate, setShowGroupCreate]   = useState(false);
+  const [showGroupInfo, setShowGroupInfo]       = useState(false);
+  const [profilePlayer, setProfilePlayer]       = useState<any | null>(null);
+  const [groupName, setGroupName]         = useState('');
+  const [groupSelected, setGroupSelected] = useState<Set<string>>(new Set());
+  const [sending, setSending]             = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const scrollRef      = useRef<HTMLDivElement>(null);
+  const inputRef       = useRef<HTMLTextAreaElement>(null);
 
   const { user } = useAuth();
-  const { requests, loading: friendsLoading, updateRequestStatus, revokeFriendRequest, getPendingRequestsCount } = useFriendRequests();
+  const {
+    requests, loading: friendsLoading,
+    updateRequestStatus, revokeFriendRequest, getPendingRequestsCount,
+  } = useFriendRequests();
   const { blockedUsers, blockUser, unfriendUser } = useBlockedUsers();
   const {
     conversations, loading: convLoading,
@@ -383,895 +317,657 @@ const FriendsMessagesTab = () => {
     leaveGroup, deleteGroup, togglePin,
     updateGroup, markConversationRead, getTotalUnread, getMyRole,
   } = useConversations();
-  const { invites } = useMatchInvites();
+  const { invites: _invites } = useMatchInvites();
   const { isOnline } = useOnlinePresence();
   const { typingUsers, broadcastTyping } = useTypingIndicator(selectedConvId);
 
   const blockedIds = useMemo(() => new Set(blockedUsers.map(b => b.blocked_user_id)), [blockedUsers]);
-  const pendingRequests = requests.filter(r => r.status === 'pending' && r.receiver_id === user?.id);
-  const sentRequests    = requests.filter(r => r.status === 'pending' && r.sender_id === user?.id);
-  const friends         = requests.filter(r => r.status === 'accepted');
 
-  const visibleConversations = useMemo(() => conversations.filter(conv => {
-    if (conv.is_group) return true;
-    const other = conv.members.find(m => m.user_id !== user?.id);
+  const pendingIn   = requests.filter(r => r.status === 'pending' && r.receiver_id === user?.id);
+  const pendingSent = requests.filter(r => r.status === 'pending' && r.sender_id === user?.id);
+  const friends     = requests.filter(r => r.status === 'accepted');
+
+  const visConvs = useMemo(() => conversations.filter(c => {
+    if (c.is_group) return true;
+    const other = c.members.find(m => m.user_id !== user?.id);
     return other ? !blockedIds.has(other.user_id) : true;
   }), [conversations, user, blockedIds]);
 
-  const dmConvs    = visibleConversations.filter(c => !c.is_group);
-  const groupConvs = visibleConversations.filter(c => c.is_group);
+  const dmConvs    = visConvs.filter(c => !c.is_group);
+  const groupConvs = visConvs.filter(c => c.is_group);
 
-  const filteredDMs     = dmConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(searchTerm.toLowerCase()));
-  const filteredGroups  = groupConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredDMs    = dmConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(search.toLowerCase()));
+  const filteredGroups = groupConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(search.toLowerCase()));
+
   const filteredFriends = friends.filter(f => {
     const fd = f.sender_id === user?.id ? f.receiver : f.sender;
-    const sl = searchTerm.toLowerCase();
-    return fd?.name?.toLowerCase().includes(sl) || fd?.email?.toLowerCase().includes(sl);
+    const s  = friendSearch.toLowerCase();
+    return (fd?.name || '').toLowerCase().includes(s) || (fd?.email || '').toLowerCase().includes(s);
+  });
+  const onlineFriends  = filteredFriends.filter(f => isOnline(f.sender_id === user?.id ? f.receiver_id : f.sender_id));
+  const offlineFriends = filteredFriends.filter(f => !isOnline(f.sender_id === user?.id ? f.receiver_id : f.sender_id));
+
+  const selectedConv = visConvs.find(c => c.id === selectedConvId) ?? null;
+  const convName     = selectedConv ? getConvName(selectedConv, user?.id || '') : '';
+  const convAvatar   = selectedConv ? getConvAvatar(selectedConv, user?.id || '') : undefined;
+  const myRole       = selectedConv ? getMyRole(selectedConv) : null;
+  const dmOtherId    = selectedConv && !selectedConv.is_group ? getConvOtherUserId(selectedConv, user?.id || '') : undefined;
+
+  const friendsList = friends.map(f => {
+    const fid = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
+    const fd  = f.sender_id === user?.id ? f.receiver : f.sender;
+    return { userId: fid, name: fd?.name || 'Unknown', avatar: fd?.profile_picture_url };
   });
 
-  const onlineFriends  = filteredFriends.filter(f => { const uid = f.sender_id === user?.id ? f.receiver_id : f.sender_id; return isOnline(uid); });
-  const offlineFriends = filteredFriends.filter(f => { const uid = f.sender_id === user?.id ? f.receiver_id : f.sender_id; return !isOnline(uid); });
+  const totalUnread = getTotalUnread();
+  const onlineCount = friends.filter(f => isOnline(f.sender_id === user?.id ? f.receiver_id : f.sender_id)).length;
 
-  const selectedConv = visibleConversations.find(c => c.id === selectedConvId) ?? null;
-  const convName   = selectedConv ? getConvName(selectedConv, user?.id || '') : '';
-  const convAvatar = selectedConv ? getConvAvatar(selectedConv, user?.id || '') : undefined;
-  const myRole     = selectedConv ? getMyRole(selectedConv) : null;
-  const dmOtherId  = selectedConv && !selectedConv.is_group ? selectedConv.members.find(m => m.user_id !== user?.id)?.user_id : undefined;
-
-  // Scroll to bottom when messages arrive, only if already at bottom
   useEffect(() => {
     if (atBottom) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [selectedConv?.messages.length, atBottom]);
 
-  // Mark as read when opening a conversation
   useEffect(() => {
     if (selectedConvId) { markConversationRead(selectedConvId); setAtBottom(true); }
   }, [selectedConvId, markConversationRead]);
 
-  // Focus input when conversation opens
   useEffect(() => {
     if (selectedConvId) inputRef.current?.focus();
   }, [selectedConvId]);
 
-  const handleConvSelect = (id: string) => { setSelectedConvId(id); setMsgInput(''); setReplyToMsg(null); };
+  const buildProfile = (profile: NonNullable<Conversation['members'][0]['profile']>, uid: string) => ({
+    id: uid, user_id: uid,
+    name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email,
+    email: profile.email, skill_level: 0, wins: 0, losses: 0,
+  });
+
+  const handleStartDM = async (otherUserId: string, name?: string) => {
+    try {
+      const id = await getOrCreateDM(otherUserId);
+      setActiveTab('chat'); setSelectedConvId(id);
+      if (name) toast.success(`Chat with ${name} opened`);
+    } catch { toast.error('Failed to open conversation'); }
+  };
+
+  const handleAccept = async (reqId: string) => {
+    try {
+      const req = requests.find(r => r.id === reqId);
+      await updateRequestStatus(reqId, 'accepted');
+      if (req) {
+        const fid  = req.sender_id === user?.id ? req.receiver_id : req.sender_id;
+        const name = req.sender_id === user?.id ? req.receiver?.name : req.sender?.name;
+        toast.success(`You're now friends with ${name || 'them'}! Say hello 👋`);
+        const id = await getOrCreateDM(fid);
+        setActiveTab('chat'); setSelectedConvId(id);
+      }
+    } catch { toast.error('Failed'); }
+  };
 
   const handleSend = async () => {
     if (!selectedConvId || !msgInput.trim()) return;
     setSending(true);
     const content = msgInput;
     const replyId = replyToMsg?.id;
-    setMsgInput('');
-    setReplyToMsg(null);
-    try {
-      await sendMessage(selectedConvId, content, replyId);
-    } catch {
-      toast.error('Failed to send message');
-      setMsgInput(content);
-    } finally {
-      setSending(false);
-    }
+    setMsgInput(''); setReplyToMsg(null);
+    try { await sendMessage(selectedConvId, content, replyId); }
+    catch { toast.error('Failed to send'); setMsgInput(content); }
+    finally { setSending(false); }
   };
 
-  const handleStartDM = async (otherUserId: string, friendName?: string) => {
-    try {
-      const convId = await getOrCreateDM(otherUserId);
-      setActiveView('conversations');
-      setSelectedConvId(convId);
-      if (friendName) toast.success(`Opened chat with ${friendName}`);
-    } catch {
-      toast.error('Failed to open conversation');
-    }
-  };
-
-  const handleRequestResponse = async (requestId: string, status: 'accepted' | 'declined') => {
-    try {
-      const req = requests.find(r => r.id === requestId);
-      await updateRequestStatus(requestId, status);
-      if (status === 'accepted' && req) {
-        const friendId = req.sender_id === user?.id ? req.receiver_id : req.sender_id;
-        const friendName = req.sender_id === user?.id ? req.receiver?.name : req.sender?.name;
-        toast.success(`You're now friends with ${friendName || 'them'}! Say hello 👋`);
-        // Auto-open DM
-        const convId = await getOrCreateDM(friendId);
-        setActiveView('conversations');
-        setSelectedConvId(convId);
-      } else {
-        toast.success('Friend request declined.');
-      }
-    } catch {
-      toast.error('Failed to update friend request');
-    }
-  };
-
-  const handleRevokeRequest = async (requestId: string) => {
-    try { await revokeFriendRequest(requestId); toast.success('Request revoked.'); }
-    catch { toast.error('Failed to revoke request'); }
-  };
-
-  const handleDeleteMessage = async (msgId: string) => {
-    try { await deleteMessage(msgId); }
-    catch { toast.error('Failed to delete message'); }
-  };
-
-  const handleToggleReaction = async (msgId: string, emoji: string) => {
-    setEmojiPickerMsgId(null);
-    try { await toggleReaction(msgId, emoji); }
-    catch { toast.error('Failed to add reaction'); }
-  };
-
-  const handleLeaveGroup = async () => {
-    if (!selectedConvId) return;
-    try {
-      await leaveGroup(selectedConvId);
-      setSelectedConvId(null);
-      toast.success('Left the group.');
-    } catch { toast.error('Failed to leave group'); }
-  };
-
-  const handleDeleteGroup = async () => {
-    if (!selectedConvId) return;
-    try {
-      await deleteGroup(selectedConvId);
-      setSelectedConvId(null);
-      toast.success('Group deleted.');
-    } catch { toast.error('Failed to delete group'); }
-  };
-
-  const buildProfilePlayer = (profile: NonNullable<Conversation['members'][0]['profile']>, userId: string) => ({
-    id: userId, user_id: userId,
-    name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email,
-    email: profile.email, skill_level: 0, wins: 0, losses: 0,
-  });
-
-  const friendsList = friends.map(f => {
-    const friendUserId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
-    const fd = f.sender_id === user?.id ? f.receiver : f.sender;
-    return { userId: friendUserId, name: fd?.name || 'Unknown', avatar: fd?.profile_picture_url };
-  });
-
-  // Build grouped message list with date dividers
-  const buildMessageGroups = (messages: ConversationMessage[]) => {
-    const visibleMsgs = messages.filter(m => !m.deleted_at || m.is_system);
-    const result: Array<{ type: 'divider'; label: string } | { type: 'msg'; msg: ConversationMessage; showAvatar: boolean }> = [];
+  const buildGroups = (msgs: ConversationMessage[]) => {
+    const vis = msgs.filter(m => !m.deleted_at || m.is_system);
+    type Item = { type: 'div'; label: string } | { type: 'msg'; msg: ConversationMessage; showAv: boolean };
+    const result: Item[] = [];
     let lastDate: Date | null = null;
-    let lastSenderId: string | null = null;
-
-    visibleMsgs.forEach((msg, i) => {
-      const d = new Date(msg.created_at);
+    let lastSender: string | null = null;
+    vis.forEach(m => {
+      const d = new Date(m.created_at);
       if (!lastDate || !isSameDay(d, lastDate)) {
-        result.push({ type: 'divider', label: formatDivider(msg.created_at) });
-        lastDate = d;
-        lastSenderId = null;
+        result.push({ type: 'div', label: fmtDivider(m.created_at) });
+        lastDate = d; lastSender = null;
       }
-      // Show avatar if first in cluster (different sender or after divider)
-      const showAvatar = msg.sender_id !== lastSenderId;
-      result.push({ type: 'msg', msg, showAvatar });
-      lastSenderId = msg.sender_id;
+      result.push({ type: 'msg', msg: m, showAv: m.sender_id !== lastSender });
+      lastSender = m.sender_id;
     });
     return result;
   };
 
-  const isLoading = friendsLoading || convLoading;
-  if (isLoading) {
+  const tabs = [
+    { id: 'chat',     label: 'Chat',     count: totalUnread },
+    { id: 'friends',  label: 'Friends',  count: friends.length },
+    { id: 'requests', label: 'Requests', count: getPendingRequestsCount() },
+  ];
+
+  if (friendsLoading || convLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 400 }}>
+        <div style={{ width: 36, height: 36, borderRadius: '50%', border: `4px solid ${C.accent}`, borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
     );
   }
 
-  // ── Sidebar conversation row ────────────────────────────────────────────────
-  const ConvRow = ({ conv }: { conv: Conversation }) => {
-    const name   = getConvName(conv, user?.id || '');
-    const avatar = getConvAvatar(conv, user?.id || '');
-    const isActive = selectedConvId === conv.id;
-    const otherId = !conv.is_group ? conv.members.find(m => m.user_id !== user?.id)?.user_id : undefined;
-    const online  = otherId ? isOnline(otherId) : false;
-    const lastMsg = conv.lastMessage;
-
-    return (
-      <div
-        className={`group relative flex items-center gap-2.5 px-2 py-2 rounded-md cursor-pointer transition-colors
-          ${isActive ? 'bg-orange-50 border-l-[3px] border-primary' : 'hover:bg-muted/60 border-l-[3px] border-transparent'}`}
-        onClick={() => handleConvSelect(conv.id)}
-      >
-        {/* Pin indicator */}
-        {conv.isPinned && <Pin className="absolute right-2 top-2 w-3 h-3 text-muted-foreground/50" />}
-
-        <div className="relative shrink-0">
-          {conv.is_group ? (
-            <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center">
-              <Hash className="w-4 h-4 text-primary" />
-            </div>
-          ) : (
-            <Avatar className="h-8 w-8">
-              {avatar && <AvatarImage src={avatar} alt={name} />}
-              <AvatarFallback className="text-xs bg-primary/10 text-primary font-semibold">{name.charAt(0).toUpperCase()}</AvatarFallback>
-            </Avatar>
-          )}
-          {!conv.is_group && <OnlineDot online={online} />}
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between">
-            <span className={`text-sm truncate ${conv.unreadCount > 0 ? 'font-bold text-foreground' : 'font-medium text-foreground/80'}`}>
-              {conv.is_group ? `# ${name}` : name}
-            </span>
-            {lastMsg && <span className="text-[10px] text-muted-foreground shrink-0 ml-1">{formatTime(lastMsg.created_at)}</span>}
-          </div>
-          {lastMsg && (
-            <p className={`text-xs truncate ${conv.unreadCount > 0 ? 'text-foreground/70 font-medium' : 'text-muted-foreground'}`}>
-              {lastMsg.sender_id === user?.id ? 'You: ' : ''}{lastMsg.deleted_at ? 'Message deleted' : lastMsg.content}
-            </p>
-          )}
-        </div>
-
-        {conv.unreadCount > 0 && (
-          <span className="shrink-0 min-w-[18px] h-[18px] bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full flex items-center justify-center px-1">
-            {conv.unreadCount > 9 ? '9+' : conv.unreadCount}
-          </span>
-        )}
-
-        {/* Context menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-            <button className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-muted transition-opacity shrink-0">
-              <MoreHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem onClick={e => { e.stopPropagation(); togglePin(conv.id, !conv.isPinned); }}>
-              {conv.isPinned ? <><PinOff className="w-3.5 h-3.5 mr-2" />Unpin</> : <><Pin className="w-3.5 h-3.5 mr-2" />Pin</>}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={e => { e.stopPropagation(); markConversationRead(conv.id); }}>
-              <Check className="w-3.5 h-3.5 mr-2" />Mark as read
-            </DropdownMenuItem>
-            {!conv.is_group && otherId && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={e => { e.stopPropagation(); const m = conv.members.find(m => m.user_id === otherId); if (m?.profile) setProfilePlayer(buildProfilePlayer(m.profile, otherId)); }}>
-                  <AtSign className="w-3.5 h-3.5 mr-2" />View Profile
-                </DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive" onClick={e => { e.stopPropagation(); blockUser(otherId, ''); toast.success('User blocked.'); }}>
-                  <UserX className="w-3.5 h-3.5 mr-2" />Block user
-                </DropdownMenuItem>
-              </>
-            )}
-            {conv.is_group && (
-              <>
-                <DropdownMenuSeparator />
-                {myRole === 'admin' ? (
-                  <DropdownMenuItem className="text-destructive" onClick={e => { e.stopPropagation(); handleDeleteGroup(); }}>
-                    <Trash2 className="w-3.5 h-3.5 mr-2" />Delete group
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem className="text-destructive" onClick={e => { e.stopPropagation(); handleLeaveGroup(); }}>
-                    <LogOut className="w-3.5 h-3.5 mr-2" />Leave group
-                  </DropdownMenuItem>
-                )}
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    );
-  };
-
   return (
-    <div className="h-[calc(100vh-200px)] flex flex-col">
-      {/* ── Top header ── */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur shrink-0">
-        <div className="flex items-center gap-3">
-          <Users className="w-5 h-5 text-primary" />
+    <div style={{ fontFamily: "'DM Sans', sans-serif", display: 'flex', flexDirection: 'column', height: 'calc(100vh - 200px)', background: C.bg, position: 'relative', overflow: 'hidden' }}>
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+      {/* ── Header ── */}
+      <div style={{ padding: '14px 24px', background: C.white, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: C.accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🎾</div>
           <div>
-            <h2 className="text-lg font-bold leading-tight">Network & Messages</h2>
-            <p className="text-xs text-muted-foreground">{friends.length} friends · {getTotalUnread()} unread</p>
+            <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>Network & Messages</div>
+            <div style={{ fontSize: 13, color: C.muted }}>
+              <span style={{ color: C.online, fontWeight: 600 }}>●</span>
+              {' '}{onlineCount} online · {friends.length} friends · {totalUnread} unread
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setShowGroupCreate(true)}>
-            <Hash className="w-3.5 h-3.5 mr-1" />New Group
-          </Button>
-          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setShowPlayerSearch(v => !v)}>
-            <Search className="w-3.5 h-3.5 mr-1" />{showPlayerSearch ? 'Close' : 'Find Players'}
-          </Button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={() => setShowGroupCreate(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: `1.5px solid ${C.border}`, background: C.white, color: C.text, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+            👥 New Group
+          </button>
+          <button onClick={() => setShowPlayerSearch(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: showPlayerSearch ? C.text : C.accent, color: '#fff', fontSize: 14, fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+            + Find Players
+          </button>
         </div>
       </div>
 
-      {/* Find Players bar */}
+      {/* ── Find Players bar ── */}
       {showPlayerSearch && (
-        <div className="px-4 py-3 border-b bg-card/50">
+        <div style={{ padding: '12px 24px', background: C.white, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           <PlayerSearch
-            onPlayerSelect={async (player: SearchResult) => {
-              setShowPlayerSearch(false);
-              if (player.user_id) await handleStartDM(player.user_id);
-            }}
+            onPlayerSelect={async (p: SearchResult) => { setShowPlayerSearch(false); if (p.user_id) await handleStartDM(p.user_id); }}
             placeholder="Search players by name or skill level…"
           />
         </div>
       )}
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* ── SIDEBAR ── */}
-        <div className={`w-full lg:w-72 border-r bg-card flex flex-col ${selectedConvId ? 'hidden lg:flex' : 'flex'}`}>
-          {/* Tab bar */}
-          <div className="px-3 pt-3 pb-2 border-b shrink-0">
-            <Tabs value={activeView} onValueChange={(v: any) => setActiveView(v)}>
-              <TabsList className="grid w-full grid-cols-3 h-8">
-                <TabsTrigger value="conversations" className="text-xs h-7 relative">
-                  Chat
-                  {getTotalUnread() > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
-                      {getTotalUnread() > 9 ? '9+' : getTotalUnread()}
+      {/* ── Body ── */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+
+        {/* ── Sidebar ── */}
+        <div style={{
+          width: 320, background: C.white, borderRight: `1px solid ${C.border}`,
+          display: 'flex', flexDirection: 'column', flexShrink: 0,
+          ...(selectedConvId ? { display: 'none' as any } : {}),
+        }}>
+          {/* Tabs */}
+          <div style={{ padding: '12px 16px 0', borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ display: 'flex', gap: 2 }}>
+              {tabs.map(tab => (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} style={{
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  padding: '8px 6px', borderRadius: '8px 8px 0 0', border: 'none', cursor: 'pointer',
+                  background: activeTab === tab.id ? C.bg : 'transparent',
+                  color: activeTab === tab.id ? C.text : C.muted,
+                  fontWeight: activeTab === tab.id ? 700 : 500, fontSize: 13,
+                  borderBottom: activeTab === tab.id ? `2px solid ${C.accent}` : '2px solid transparent',
+                  fontFamily: "'DM Sans', sans-serif",
+                }}>
+                  {tab.label}
+                  {tab.count > 0 && (
+                    <span style={{ background: activeTab === tab.id ? C.accent : C.border, color: activeTab === tab.id ? '#fff' : C.muted, borderRadius: 999, fontSize: 11, fontWeight: 700, padding: '1px 6px' }}>
+                      {tab.count}
                     </span>
                   )}
-                </TabsTrigger>
-                <TabsTrigger value="friends" className="text-xs h-7">
-                  Friends {friends.length > 0 && <span className="ml-1 text-muted-foreground">({friends.length})</span>}
-                </TabsTrigger>
-                <TabsTrigger value="requests" className="text-xs h-7 relative">
-                  Requests
-                  {getPendingRequestsCount() > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
-                      {getPendingRequestsCount()}
-                    </span>
-                  )}
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Search */}
-          <div className="px-3 py-2 shrink-0">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Search…"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="pl-8 h-7 text-xs bg-muted/50 border-0"
+          <div style={{ padding: '10px 14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.bg, borderRadius: 10, padding: '8px 12px', border: `1.5px solid ${C.border}` }}>
+              <span style={{ color: C.muted }}>🔍</span>
+              <input
+                value={activeTab === 'friends' ? friendSearch : search}
+                onChange={e => activeTab === 'friends' ? setFriendSearch(e.target.value) : setSearch(e.target.value)}
+                placeholder={`Search ${activeTab}…`}
+                style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, color: C.text, flex: 1, fontFamily: "'DM Sans', sans-serif" }}
               />
             </div>
           </div>
 
-          <ScrollArea className="flex-1">
-            <div className="pb-4">
+          {/* Tab Content */}
+          <div style={{ flex: 1, overflowY: 'auto' }}>
 
-              {/* ── CHAT TAB ── */}
-              {activeView === 'conversations' && (
-                <div className="px-2">
-                  {filteredDMs.length === 0 && filteredGroups.length === 0 ? (
-                    <div className="text-center py-10">
-                      <MessageCircle className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">No conversations yet</p>
-                      <p className="text-xs text-muted-foreground/70 mt-1">Find players above to start chatting</p>
-                    </div>
-                  ) : (
-                    <>
-                      {filteredDMs.length > 0 && (
-                        <div className="mt-2">
-                          <p className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Direct Messages</p>
-                          {filteredDMs.map(c => <ConvRow key={c.id} conv={c} />)}
-                        </div>
-                      )}
-                      {filteredGroups.length > 0 && (
-                        <div className="mt-3">
-                          <p className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Groups</p>
-                          {filteredGroups.map(c => <ConvRow key={c.id} conv={c} />)}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* ── FRIENDS TAB ── */}
-              {activeView === 'friends' && (
-                <div className="px-2 mt-2">
-                  {filteredFriends.length === 0 ? (
-                    <div className="text-center py-10">
-                      <Users className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">{friends.length === 0 ? 'No friends yet' : 'No matches'}</p>
-                    </div>
-                  ) : (
-                    <>
-                      {onlineFriends.length > 0 && (
-                        <>
-                          <p className="px-2 py-1 text-[10px] font-semibold text-green-600 uppercase tracking-wider">Online — {onlineFriends.length}</p>
-                          {onlineFriends.map(friend => {
-                            const friendUserId = friend.sender_id === user?.id ? friend.receiver_id : friend.sender_id;
-                            const fd = friend.sender_id === user?.id ? friend.receiver : friend.sender;
-                            if (blockedIds.has(friendUserId)) return null;
-                            return (
-                              <div key={friend.id} className="flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-muted/60 group">
-                                <div className="relative shrink-0">
-                                  <button className="rounded-full focus:outline-none" onClick={() => { if (fd) setProfilePlayer({ id: friendUserId, user_id: friendUserId, name: fd.name || 'Unknown', email: fd.email || '', skill_level: 0, wins: 0, losses: 0 }); }}>
-                                    <Avatar className="h-8 w-8">
-                                      {fd?.profile_picture_url && <AvatarImage src={fd.profile_picture_url} alt={fd.name} />}
-                                      <AvatarFallback className="text-xs bg-primary/10 text-primary font-semibold">{fd?.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
-                                    </Avatar>
-                                  </button>
-                                  <OnlineDot online={true} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">{fd?.name || 'Unknown'}</p>
-                                  <p className="text-xs text-green-600">Online</p>
-                                </div>
-                                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
-                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleStartDM(friendUserId, fd?.name)}>
-                                    <MessageCircle className="w-3.5 h-3.5" />
-                                  </Button>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild><Button size="sm" variant="ghost" className="h-7 w-7 p-0"><MoreHorizontal className="w-3.5 h-3.5" /></Button></DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-40">
-                                      <DropdownMenuItem onClick={() => { if (fd) setProfilePlayer({ id: friendUserId, user_id: friendUserId, name: fd.name || 'Unknown', email: fd.email || '', skill_level: 0, wins: 0, losses: 0 }); }}>
-                                        <AtSign className="w-3.5 h-3.5 mr-2" />View Profile
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem className="text-destructive" onClick={() => { unfriendUser(friendUserId); toast.success('Removed friend.'); }}>
-                                        <UserMinus className="w-3.5 h-3.5 mr-2" />Unfriend
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem className="text-destructive" onClick={() => { blockUser(friendUserId, ''); toast.success('User blocked.'); }}>
-                                        <Shield className="w-3.5 h-3.5 mr-2" />Block
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </>
-                      )}
-                      {offlineFriends.length > 0 && (
-                        <>
-                          <p className="px-2 py-1 mt-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Offline — {offlineFriends.length}</p>
-                          {offlineFriends.map(friend => {
-                            const friendUserId = friend.sender_id === user?.id ? friend.receiver_id : friend.sender_id;
-                            const fd = friend.sender_id === user?.id ? friend.receiver : friend.sender;
-                            if (blockedIds.has(friendUserId)) return null;
-                            return (
-                              <div key={friend.id} className="flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-muted/60 group opacity-70 hover:opacity-100 transition-opacity">
-                                <div className="relative shrink-0">
-                                  <button className="rounded-full focus:outline-none" onClick={() => { if (fd) setProfilePlayer({ id: friendUserId, user_id: friendUserId, name: fd.name || 'Unknown', email: fd.email || '', skill_level: 0, wins: 0, losses: 0 }); }}>
-                                    <Avatar className="h-8 w-8">
-                                      {fd?.profile_picture_url && <AvatarImage src={fd.profile_picture_url} alt={fd.name} />}
-                                      <AvatarFallback className="text-xs bg-muted text-muted-foreground font-semibold">{fd?.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
-                                    </Avatar>
-                                  </button>
-                                  <OnlineDot online={false} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">{fd?.name || 'Unknown'}</p>
-                                  <p className="text-xs text-muted-foreground">Offline</p>
-                                </div>
-                                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
-                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleStartDM(friendUserId, fd?.name)}>
-                                    <MessageCircle className="w-3.5 h-3.5" />
-                                  </Button>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild><Button size="sm" variant="ghost" className="h-7 w-7 p-0"><MoreHorizontal className="w-3.5 h-3.5" /></Button></DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-40">
-                                      <DropdownMenuItem onClick={() => { if (fd) setProfilePlayer({ id: friendUserId, user_id: friendUserId, name: fd.name || 'Unknown', email: fd.email || '', skill_level: 0, wins: 0, losses: 0 }); }}>
-                                        <AtSign className="w-3.5 h-3.5 mr-2" />View Profile
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem className="text-destructive" onClick={() => { unfriendUser(friendUserId); toast.success('Removed friend.'); }}>
-                                        <UserMinus className="w-3.5 h-3.5 mr-2" />Unfriend
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem className="text-destructive" onClick={() => { blockUser(friendUserId, ''); toast.success('User blocked.'); }}>
-                                        <Shield className="w-3.5 h-3.5 mr-2" />Block
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* ── REQUESTS TAB ── */}
-              {activeView === 'requests' && (
-                <div className="px-3 mt-2 space-y-4">
-                  {pendingRequests.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Incoming</p>
-                      <div className="space-y-2">
-                        {pendingRequests.map(req => (
-                          <div key={req.id} className="p-3 rounded-lg border bg-card">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Avatar className="h-8 w-8">
-                                {req.sender?.profile_picture_url && <AvatarImage src={req.sender.profile_picture_url} />}
-                                <AvatarFallback className="text-xs bg-primary/10 text-primary">{req.sender?.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
-                              </Avatar>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{req.sender?.name}</p>
-                                <p className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}</p>
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button size="sm" className="flex-1 h-7 text-xs" onClick={() => handleRequestResponse(req.id, 'accepted')}>
-                                <Check className="w-3 h-3 mr-1" />Accept
-                              </Button>
-                              <Button size="sm" variant="outline" className="flex-1 h-7 text-xs" onClick={() => handleRequestResponse(req.id, 'declined')}>
-                                <X className="w-3 h-3 mr-1" />Decline
-                              </Button>
-                            </div>
-                          </div>
+            {/* CHAT */}
+            {activeTab === 'chat' && (
+              <>
+                {filteredDMs.length === 0 && filteredGroups.length === 0 ? (
+                  <div style={{ padding: 40, textAlign: 'center' }}>
+                    <div style={{ fontSize: 36, marginBottom: 10 }}>💬</div>
+                    <div style={{ fontWeight: 600, color: C.text, marginBottom: 4 }}>No conversations yet</div>
+                    <div style={{ fontSize: 13, color: C.muted }}>Find players above to start chatting</div>
+                  </div>
+                ) : (
+                  <>
+                    {filteredDMs.length > 0 && (
+                      <>
+                        <div style={{ padding: '10px 16px 4px', fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1 }}>Direct Messages</div>
+                        {filteredDMs.map(conv => (
+                          <ConvRow key={conv.id} conv={conv} selected={selectedConvId === conv.id} userId={user?.id || ''} isOnlineFn={isOnline}
+                            onClick={() => { setSelectedConvId(conv.id); setMsgInput(''); setReplyToMsg(null); }} />
                         ))}
-                      </div>
-                    </div>
-                  )}
-                  {sentRequests.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Sent</p>
-                      <div className="space-y-2">
-                        {sentRequests.map(req => (
-                          <div key={req.id} className="p-3 rounded-lg border bg-card flex items-center gap-2">
-                            <Avatar className="h-8 w-8">
-                              {req.receiver?.profile_picture_url && <AvatarImage src={req.receiver.profile_picture_url} />}
-                              <AvatarFallback className="text-xs bg-primary/10 text-primary">{req.receiver?.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{req.receiver?.name}</p>
-                              <p className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}</p>
-                            </div>
-                            <Badge variant="outline" className="text-xs shrink-0">Pending</Badge>
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive shrink-0" onClick={() => handleRevokeRequest(req.id)}>
-                              <X className="w-3 h-3" />
-                            </Button>
-                          </div>
+                      </>
+                    )}
+                    {filteredGroups.length > 0 && (
+                      <>
+                        <div style={{ padding: '12px 16px 4px', fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1 }}>Groups</div>
+                        {filteredGroups.map(conv => (
+                          <ConvRow key={conv.id} conv={conv} selected={selectedConvId === conv.id} userId={user?.id || ''} isOnlineFn={isOnline}
+                            onClick={() => { setSelectedConvId(conv.id); setMsgInput(''); setReplyToMsg(null); }} />
                         ))}
+                      </>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+
+            {/* FRIENDS */}
+            {activeTab === 'friends' && (
+              <>
+                {onlineFriends.length > 0 && (
+                  <>
+                    <div style={{ padding: '10px 16px 4px', fontSize: 11, fontWeight: 700, color: C.online, textTransform: 'uppercase', letterSpacing: 1 }}>Online — {onlineFriends.length}</div>
+                    {onlineFriends.map(f => {
+                      const fid  = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
+                      const fd   = f.sender_id === user?.id ? f.receiver : f.sender;
+                      return (
+                        <FriendRow key={f.id} fid={fid} name={fd?.name || 'Unknown'} email={fd?.email || ''} avatar={fd?.profile_picture_url} online={true}
+                          onChat={() => handleStartDM(fid, fd?.name)}
+                          onProfile={() => setProfilePlayer({ id: fid, user_id: fid, name: fd?.name || 'Unknown', email: fd?.email || '', skill_level: 0, wins: 0, losses: 0 })}
+                          onUnfriend={() => { unfriendUser(fid); toast.success('Friend removed'); }}
+                          onBlock={() => { blockUser(fid, ''); toast.success('User blocked'); }}
+                        />
+                      );
+                    })}
+                  </>
+                )}
+                {offlineFriends.length > 0 && (
+                  <>
+                    <div style={{ padding: '10px 16px 4px', fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1 }}>Offline — {offlineFriends.length}</div>
+                    {offlineFriends.map(f => {
+                      const fid  = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
+                      const fd   = f.sender_id === user?.id ? f.receiver : f.sender;
+                      return (
+                        <FriendRow key={f.id} fid={fid} name={fd?.name || 'Unknown'} email={fd?.email || ''} avatar={fd?.profile_picture_url} online={false} faded
+                          onChat={() => handleStartDM(fid, fd?.name)}
+                          onProfile={() => setProfilePlayer({ id: fid, user_id: fid, name: fd?.name || 'Unknown', email: fd?.email || '', skill_level: 0, wins: 0, losses: 0 })}
+                          onUnfriend={() => { unfriendUser(fid); toast.success('Friend removed'); }}
+                          onBlock={() => { blockUser(fid, ''); toast.success('User blocked'); }}
+                        />
+                      );
+                    })}
+                  </>
+                )}
+                {filteredFriends.length === 0 && (
+                  <div style={{ padding: 40, textAlign: 'center' }}>
+                    <div style={{ fontSize: 36, marginBottom: 10 }}>👥</div>
+                    <div style={{ fontWeight: 600, color: C.text }}>{friends.length === 0 ? 'No friends yet' : 'No matches'}</div>
+                    {friends.length === 0 && <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Use Find Players to connect</div>}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* REQUESTS */}
+            {activeTab === 'requests' && (
+              <div style={{ padding: '12px 16px' }}>
+                {pendingIn.length > 0 && (
+                  <>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Incoming — {pendingIn.length}</div>
+                    {pendingIn.map(req => (
+                      <div key={req.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, border: `1.5px solid ${C.border}`, marginBottom: 8, background: C.white }}>
+                        <Av name={req.sender?.name || 'U'} src={req.sender?.profile_picture_url} size={40} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600, fontSize: 14 }}>{req.sender?.name}</div>
+                          <div style={{ fontSize: 12, color: C.muted }}>{formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => handleAccept(req.id)} style={{ padding: '6px 12px', borderRadius: 8, background: C.accent, color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Accept</button>
+                          <button onClick={async () => { await updateRequestStatus(req.id, 'declined'); toast.success('Declined'); }} style={{ padding: '6px 10px', borderRadius: 8, background: C.bg, color: C.muted, border: `1px solid ${C.border}`, fontSize: 12, cursor: 'pointer' }}>✕</button>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  {pendingRequests.length === 0 && sentRequests.length === 0 && (
-                    <div className="text-center py-10">
-                      <Clock className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">No friend requests</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </ScrollArea>
+                    ))}
+                  </>
+                )}
+                {pendingSent.length > 0 && (
+                  <>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, margin: '16px 0 8px' }}>Sent — {pendingSent.length}</div>
+                    {pendingSent.map(req => (
+                      <div key={req.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, border: `1.5px solid ${C.border}`, marginBottom: 8, background: C.white }}>
+                        <Av name={req.receiver?.name || 'U'} src={req.receiver?.profile_picture_url} size={40} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600, fontSize: 14 }}>{req.receiver?.name}</div>
+                          <div style={{ fontSize: 12, color: C.muted }}>{formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}</div>
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: C.muted, background: C.bg, padding: '3px 10px', borderRadius: 6, border: `1px solid ${C.border}` }}>Pending</span>
+                        <button onClick={async () => { await revokeFriendRequest(req.id); toast.success('Request revoked'); }} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 16, cursor: 'pointer' }}>✕</button>
+                      </div>
+                    ))}
+                  </>
+                )}
+                {pendingIn.length === 0 && pendingSent.length === 0 && (
+                  <div style={{ padding: 40, textAlign: 'center' }}>
+                    <div style={{ fontSize: 36, marginBottom: 10 }}>⏳</div>
+                    <div style={{ fontWeight: 600, color: C.text }}>No friend requests</div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* ── THREAD PANEL ── */}
-        <div className={`flex-1 flex flex-col bg-background ${selectedConvId ? 'flex' : 'hidden lg:flex'}`}>
+        {/* ── Thread ── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: C.bg }}>
           {selectedConv ? (
             <>
               {/* Thread header */}
-              <div className="flex items-center gap-3 px-4 py-3 border-b bg-background/95 backdrop-blur shrink-0">
-                <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8 shrink-0" onClick={() => setSelectedConvId(null)}>
-                  <ChevronLeft className="h-5 w-5" />
-                </Button>
-                <button
-                  className="flex items-center gap-2.5 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
-                  onClick={() => {
-                    if (selectedConv.is_group) setShowGroupInfo(true);
-                    else {
-                      const other = selectedConv.members.find(m => m.user_id !== user?.id);
-                      if (other?.profile) setProfilePlayer(buildProfilePlayer(other.profile, other.user_id));
-                    }
-                  }}
-                >
-                  <div className="relative shrink-0">
-                    {selectedConv.is_group ? (
-                      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Hash className="w-5 h-5 text-primary" />
+              <div style={{ padding: '14px 20px', background: C.white, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <button onClick={() => setSelectedConvId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: C.muted, padding: '2px 6px', lineHeight: 1 }}>‹</button>
+                  <button onClick={() => { if (selectedConv.is_group) { setShowGroupInfo(true); } else { const other = selectedConv.members.find(m => m.user_id !== user?.id); if (other?.profile) setProfilePlayer(buildProfile(other.profile, other.user_id)); } }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {selectedConv.is_group
+                      ? <GroupAv size={40} />
+                      : <Av name={convName} src={convAvatar} size={40} online={dmOtherId ? isOnline(dmOtherId) : false} />}
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{selectedConv.is_group ? `# ${convName}` : convName}</div>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: typingUsers.length > 0 ? C.accent : (dmOtherId && isOnline(dmOtherId)) ? C.online : C.muted }}>
+                        {typingUsers.length > 0 ? 'typing…'
+                          : selectedConv.is_group ? `${selectedConv.members.length} members`
+                          : (dmOtherId && isOnline(dmOtherId)) ? 'Online' : 'Offline'}
                       </div>
-                    ) : (
-                      <Avatar className="h-9 w-9">
-                        {convAvatar && <AvatarImage src={convAvatar} alt={convName} />}
-                        <AvatarFallback className="bg-primary/10 text-primary font-semibold">{convName.charAt(0).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                    )}
-                    {!selectedConv.is_group && dmOtherId && <OnlineDot online={isOnline(dmOtherId)} />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{selectedConv.is_group ? `# ${convName}` : convName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {selectedConv.is_group
-                        ? `${selectedConv.members.length} members`
-                        : dmOtherId && isOnline(dmOtherId) ? 'Online' : 'Offline'}
-                    </p>
-                  </div>
-                </button>
-
-                {/* Match invite badge */}
-                {!selectedConv.is_group && dmOtherId && (() => {
-                  const inv = invites.find(i => i.status === 'pending' && ((i.sender_id === user?.id && i.receiver_id === dmOtherId) || (i.sender_id === dmOtherId && i.receiver_id === user?.id)));
-                  if (!inv) return null;
-                  return <Badge variant="outline" className="text-xs text-orange-600 border-orange-300 shrink-0">{inv.sender_id === user?.id ? '⏳ Invite pending' : '📬 Invite received'}</Badge>;
-                })()}
-
-                {selectedConv.is_group && (
-                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setShowGroupInfo(true)}>
-                    <Settings className="w-4 h-4" />
-                  </Button>
-                )}
+                    </div>
+                  </button>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button title={selectedConv.isPinned ? 'Unpin' : 'Pin'} onClick={() => togglePin(selectedConv.id, !selectedConv.isPinned)}
+                    style={{ width: 36, height: 36, borderRadius: 9, background: selectedConv.isPinned ? C.accentLight : C.bg, border: `1px solid ${selectedConv.isPinned ? C.accent : C.border}`, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📌</button>
+                  {selectedConv.is_group && (
+                    <button title="Group settings" onClick={() => setShowGroupInfo(true)}
+                      style={{ width: 36, height: 36, borderRadius: 9, background: C.bg, border: `1px solid ${C.border}`, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⚙️</button>
+                  )}
+                </div>
               </div>
 
               {/* Messages area */}
-              <div
-                className="flex-1 overflow-y-auto"
-                ref={scrollAreaRef}
-                onScroll={e => {
-                  const el = e.currentTarget;
-                  setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
-                }}
-              >
-                <div className="px-4 py-4 space-y-0.5">
-                  {buildMessageGroups(selectedConv.messages).map((item, i) => {
-                    if (item.type === 'divider') {
-                      return (
-                        <div key={`div-${i}`} className="flex items-center gap-3 py-3">
-                          <div className="flex-1 h-px bg-border" />
-                          <span className="text-xs text-muted-foreground font-medium px-2">{item.label}</span>
-                          <div className="flex-1 h-px bg-border" />
+              <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 2 }}
+                onScroll={e => { const el = e.currentTarget; setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80); }}>
+
+                {buildGroups(selectedConv.messages).map((item, i) => {
+                  if (item.type === 'div') return (
+                    <div key={`divider-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '12px 0' }}>
+                      <div style={{ flex: 1, height: 1, background: C.border }} />
+                      <span style={{ fontSize: 11, color: C.muted, fontWeight: 600, whiteSpace: 'nowrap' }}>{item.label}</span>
+                      <div style={{ flex: 1, height: 1, background: C.border }} />
+                    </div>
+                  );
+
+                  const { msg, showAv } = item;
+                  const isOwn    = msg.sender_id === user?.id;
+                  const isSystem = msg.is_system;
+                  const senderName = msg.sender
+                    ? `${msg.sender.first_name || ''} ${msg.sender.last_name || ''}`.trim() || msg.sender.email
+                    : 'Unknown';
+                  const canDel = isOwn || myRole === 'admin';
+
+                  if (isSystem) return (
+                    <div key={msg.id} style={{ textAlign: 'center', padding: '6px 0' }}>
+                      <span style={{ fontSize: 12, color: C.muted, background: C.border, padding: '3px 14px', borderRadius: 999 }}>{msg.content}</span>
+                    </div>
+                  );
+
+                  return (
+                    <div key={msg.id}
+                      style={{ display: 'flex', flexDirection: isOwn ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 8, marginBottom: (msg.reactions?.length || 0) > 0 ? 12 : 4, marginTop: showAv ? 10 : 2, position: 'relative' }}
+                      onMouseEnter={() => setHoveredMsg(msg.id)}
+                      onMouseLeave={() => { setHoveredMsg(null); setReactionPickerMsg(null); }}
+                    >
+                      {/* Avatar column */}
+                      {!isOwn && (
+                        <div style={{ width: 32, flexShrink: 0 }}>
+                          {showAv && (
+                            <button onClick={() => { const m = selectedConv.members.find(mb => mb.user_id === msg.sender_id); if (m?.profile) setProfilePlayer(buildProfile(m.profile, m.user_id)); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                              <Av name={senderName} src={msg.sender?.profile_picture_url} size={32} />
+                            </button>
+                          )}
                         </div>
-                      );
-                    }
+                      )}
 
-                    const { msg, showAvatar } = item;
-                    const isOwn    = msg.sender_id === user?.id;
-                    const isSystem = msg.is_system;
-                    const senderName = msg.sender
-                      ? `${msg.sender.first_name || ''} ${msg.sender.last_name || ''}`.trim() || msg.sender.email
-                      : 'Unknown';
-                    const canDelete = isOwn || myRole === 'admin';
+                      <div style={{ maxWidth: '65%', display: 'flex', flexDirection: 'column', alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
+                        {!isOwn && showAv && selectedConv.is_group && (
+                          <button onClick={() => { const m = selectedConv.members.find(mb => mb.user_id === msg.sender_id); if (m?.profile) setProfilePlayer(buildProfile(m.profile, m.user_id)); }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 3, paddingLeft: 4 }}>{senderName}</button>
+                        )}
 
-                    if (isSystem) {
-                      return (
-                        <div key={msg.id} className="text-center py-1.5">
-                          <span className="text-xs text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">{msg.content}</span>
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div
-                        key={msg.id}
-                        className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${showAvatar ? 'mt-3' : 'mt-0.5'} group relative`}
-                        onMouseEnter={() => setHoveredMsgId(msg.id)}
-                        onMouseLeave={() => { setHoveredMsgId(null); if (emojiPickerMsgId === msg.id) setEmojiPickerMsgId(null); }}
-                      >
-                        {/* Left avatar (only for others, only when first in cluster) */}
-                        {!isOwn && (
-                          <div className="w-9 shrink-0 mr-2">
-                            {showAvatar && (
-                              <button className="rounded-full focus:outline-none" onClick={() => { const m = selectedConv.members.find(m => m.user_id === msg.sender_id); if (m?.profile) setProfilePlayer(buildProfilePlayer(m.profile, m.user_id)); }}>
-                                <Avatar className="h-8 w-8">
-                                  {msg.sender?.profile_picture_url && <AvatarImage src={msg.sender.profile_picture_url} />}
-                                  <AvatarFallback className="text-xs bg-primary/10 text-primary">{senderName.charAt(0).toUpperCase()}</AvatarFallback>
-                                </Avatar>
-                              </button>
-                            )}
+                        {/* Reply preview */}
+                        {msg.replyTo && (
+                          <div style={{ fontSize: 12, borderLeft: `2px solid ${C.accent}`, paddingLeft: 8, marginBottom: 4, color: C.muted, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <span style={{ fontWeight: 600 }}>{msg.replyTo.sender?.first_name || 'Someone'}: </span>
+                            {msg.replyTo.content}
                           </div>
                         )}
 
-                        <div className={`max-w-[72%] ${isOwn ? 'mr-2' : ''}`}>
-                          {/* Sender name (group, first in cluster, not own) */}
-                          {!isOwn && selectedConv.is_group && showAvatar && (
-                            <button className="text-xs font-semibold text-primary mb-0.5 ml-0.5 hover:underline" onClick={() => { const m = selectedConv.members.find(m => m.user_id === msg.sender_id); if (m?.profile) setProfilePlayer(buildProfilePlayer(m.profile, m.user_id)); }}>
-                              {senderName}
-                            </button>
-                          )}
-
-                          {/* Reply preview */}
-                          {msg.replyTo && (
-                            <div className={`text-xs border-l-2 border-primary/40 pl-2 mb-1 text-muted-foreground truncate ${isOwn ? 'text-right' : ''}`}>
-                              <span className="font-medium">{msg.replyTo.sender?.first_name || 'Someone'}: </span>
-                              {msg.replyTo.content}
+                        <div style={{ position: 'relative', display: 'inline-block' }}>
+                          {/* Hover action bar */}
+                          {hoveredMsg === msg.id && (
+                            <div style={{ position: 'absolute', top: -38, ...(isOwn ? { left: 0 } : { right: 0 }), display: 'flex', gap: 4, background: C.white, borderRadius: 10, border: `1px solid ${C.border}`, padding: '4px 6px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 10 }}>
+                              <button onClick={() => setReactionPickerMsg(reactionPickerMsg === msg.id ? null : msg.id)}
+                                style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '2px 4px', borderRadius: 6 }} title="React">😊</button>
+                              <button onClick={() => { setReplyToMsg(msg); inputRef.current?.focus(); }}
+                                style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '2px 4px', borderRadius: 6 }} title="Reply">↩️</button>
+                              {canDel && (
+                                <button onClick={async () => { try { await deleteMessage(msg.id); } catch { toast.error('Failed to delete'); } }}
+                                  style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '2px 4px', borderRadius: 6 }} title="Delete">🗑️</button>
+                              )}
                             </div>
                           )}
 
-                          <div className="relative flex items-end gap-1">
-                            {/* Hover action bar (own side) */}
-                            {isOwn && hoveredMsgId === msg.id && (
-                              <div className="flex items-center gap-1 mb-1">
-                                <button className="p-1 rounded bg-background border shadow-sm hover:bg-muted transition-colors" onClick={() => setEmojiPickerMsgId(emojiPickerMsgId === msg.id ? null : msg.id)} title="React">
-                                  <Smile className="w-3 h-3 text-muted-foreground" />
-                                </button>
-                                <button className="p-1 rounded bg-background border shadow-sm hover:bg-muted transition-colors" onClick={() => { setReplyToMsg(msg); inputRef.current?.focus(); }} title="Reply">
-                                  <Reply className="w-3 h-3 text-muted-foreground" />
-                                </button>
-                                {canDelete && (
-                                  <button className="p-1 rounded bg-background border shadow-sm hover:bg-destructive hover:text-white transition-colors" onClick={() => handleDeleteMessage(msg.id)} title="Delete">
-                                    <Trash2 className="w-3 h-3" />
-                                  </button>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Bubble */}
-                            <div className={`relative px-3.5 py-2 text-sm whitespace-pre-wrap break-words
-                              ${isOwn
-                                ? 'bg-[#111827] text-white rounded-[18px_18px_4px_18px]'
-                                : 'bg-white border border-border text-foreground rounded-[18px_18px_18px_4px]'}
-                            `}>
-                              {msg.content}
-                              <span className={`block text-[10px] mt-1 ${isOwn ? 'text-white/50 text-right' : 'text-muted-foreground/70'}`}>
-                                {format(new Date(msg.created_at), 'HH:mm')}
-                              </span>
-                            </div>
-
-                            {/* Hover action bar (their side) */}
-                            {!isOwn && hoveredMsgId === msg.id && (
-                              <div className="flex items-center gap-1 mb-1">
-                                <button className="p-1 rounded bg-background border shadow-sm hover:bg-muted transition-colors" onClick={() => setEmojiPickerMsgId(emojiPickerMsgId === msg.id ? null : msg.id)} title="React">
-                                  <Smile className="w-3 h-3 text-muted-foreground" />
-                                </button>
-                                <button className="p-1 rounded bg-background border shadow-sm hover:bg-muted transition-colors" onClick={() => { setReplyToMsg(msg); inputRef.current?.focus(); }} title="Reply">
-                                  <Reply className="w-3 h-3 text-muted-foreground" />
-                                </button>
-                                {canDelete && (
-                                  <button className="p-1 rounded bg-background border shadow-sm hover:bg-destructive hover:text-white transition-colors" onClick={() => handleDeleteMessage(msg.id)} title="Delete">
-                                    <Trash2 className="w-3 h-3" />
-                                  </button>
-                                )}
-                              </div>
-                            )}
+                          {/* Bubble */}
+                          <div style={{ padding: '10px 14px', background: isOwn ? C.bubbleOwn : C.white, color: isOwn ? '#fff' : C.text, borderRadius: isOwn ? '18px 18px 4px 18px' : '18px 18px 18px 4px', fontSize: 14, lineHeight: 1.5, boxShadow: '0 1px 3px rgba(0,0,0,0.07)', border: isOwn ? 'none' : `1px solid ${C.border}` }}>
+                            {msg.content}
                           </div>
 
-                          {/* Emoji picker */}
-                          {emojiPickerMsgId === msg.id && (
-                            <div className={`flex gap-1 mt-1 p-1.5 bg-background border rounded-xl shadow-lg ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                          {/* Reaction picker */}
+                          {reactionPickerMsg === msg.id && (
+                            <div style={{ position: 'absolute', top: -78, ...(isOwn ? { left: 0 } : { right: 0 }), background: C.white, borderRadius: 12, border: `1px solid ${C.border}`, padding: '8px 10px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', display: 'flex', gap: 4, zIndex: 20 }}>
                               {QUICK_EMOJIS.map(e => (
-                                <button key={e} className="text-lg hover:scale-125 transition-transform" onClick={() => handleToggleReaction(msg.id, e)}>{e}</button>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Reactions */}
-                          {(msg.reactions?.length ?? 0) > 0 && (
-                            <div className={`flex flex-wrap gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                              {msg.reactions!.map(r => (
-                                <button
-                                  key={r.emoji}
-                                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-colors ${r.reactedByMe ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-muted/50 border-border hover:bg-muted'}`}
-                                  onClick={() => handleToggleReaction(msg.id, r.emoji)}
-                                >
-                                  <span>{r.emoji}</span>
-                                  <span className="font-medium">{r.count}</span>
-                                </button>
+                                <button key={e} onClick={async () => { setReactionPickerMsg(null); try { await toggleReaction(msg.id, e); } catch { toast.error('Failed'); } }}
+                                  style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: 2, transition: 'transform 0.1s' }}
+                                  onMouseEnter={ev => (ev.currentTarget.style.transform = 'scale(1.3)')}
+                                  onMouseLeave={ev => (ev.currentTarget.style.transform = 'scale(1)')}
+                                >{e}</button>
                               ))}
                             </div>
                           )}
                         </div>
-                      </div>
-                    );
-                  })}
-                  <div ref={messagesEndRef} />
-                </div>
-              </div>
 
-              {/* Typing indicator */}
-              <TypingIndicator names={typingUsers.map(t => t.displayName)} />
+                        {/* Reaction pills */}
+                        {(msg.reactions?.length || 0) > 0 && (
+                          <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap', justifyContent: isOwn ? 'flex-end' : 'flex-start' }}>
+                            {msg.reactions!.map(r => (
+                              <button key={r.emoji} onClick={async () => { try { await toggleReaction(msg.id, r.emoji); } catch { toast.error('Failed'); } }}
+                                style={{ background: r.reactedByMe ? C.accentLight : C.white, border: `1.5px solid ${r.reactedByMe ? C.accent : C.border}`, borderRadius: 999, padding: '2px 8px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                {r.emoji} <span style={{ fontSize: 11, fontWeight: 700, color: C.muted }}>{r.count}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Timestamp */}
+                        <div style={{ fontSize: 11, color: C.mutedLight, marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          {format(new Date(msg.created_at), 'HH:mm')}
+                          {isOwn && <span style={{ color: C.accent }}>✓✓</span>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Typing indicator */}
+                {typingUsers.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                    <Av name={convName} src={convAvatar} size={28} />
+                    <div style={{ background: C.white, borderRadius: '18px 18px 18px 4px', padding: '10px 16px', border: `1px solid ${C.border}`, display: 'flex', gap: 4, alignItems: 'center' }}>
+                      {[0, 1, 2].map(i => (
+                        <div key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: C.muted, animation: `bounce 1.2s ${i * 0.2}s infinite` }} />
+                      ))}
+                    </div>
+                    <span style={{ fontSize: 12, color: C.muted }}>{typingUsers[0]?.displayName} is typing…</span>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
 
               {/* Scroll-to-bottom pill */}
               {!atBottom && (
-                <div className="flex justify-center pb-1">
-                  <button
-                    className="flex items-center gap-1 px-3 py-1 bg-primary text-primary-foreground text-xs rounded-full shadow-md hover:bg-primary/90 transition-colors"
-                    onClick={() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); setAtBottom(true); }}
-                  >
-                    <ChevronDown className="w-3 h-3" />New messages
+                <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 4, flexShrink: 0 }}>
+                  <button onClick={() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); setAtBottom(true); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 16px', background: C.accent, color: '#fff', border: 'none', borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+                    ↓ New messages
                   </button>
                 </div>
               )}
 
-              {/* Reply preview bar */}
+              {/* Reply bar */}
               {replyToMsg && (
-                <div className="flex items-center gap-2 px-4 py-2 border-t bg-muted/30">
-                  <Reply className="w-3.5 h-3.5 text-primary shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs font-medium text-primary">Replying to </span>
-                    <span className="text-xs text-muted-foreground truncate">{replyToMsg.content}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 20px', borderTop: `1px solid ${C.border}`, background: C.accentLight, flexShrink: 0 }}>
+                  <span style={{ fontSize: 14 }}>↩️</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: C.accent }}>Replying to </span>
+                    <span style={{ fontSize: 12, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', maxWidth: 300 }}>{replyToMsg.content}</span>
                   </div>
-                  <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => setReplyToMsg(null)}>
-                    <X className="w-3.5 h-3.5 text-muted-foreground" />
-                  </button>
+                  <button onClick={() => setReplyToMsg(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 16 }}>✕</button>
                 </div>
               )}
 
-              {/* Composer */}
-              <div className="px-4 py-3 border-t bg-background/95 backdrop-blur shrink-0">
-                {/* Char count warning */}
+              {/* Input bar */}
+              <div style={{ padding: '12px 20px', background: C.white, borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
                 {msgInput.length > 500 && (
-                  <p className={`text-xs mb-1 text-right ${msgInput.length > 900 ? 'text-destructive font-semibold' : 'text-orange-500'}`}>
+                  <div style={{ textAlign: 'right', fontSize: 12, marginBottom: 4, color: msgInput.length > 900 ? '#ef4444' : C.accent, fontWeight: 600 }}>
                     {msgInput.length}/1000
-                  </p>
+                  </div>
                 )}
-                <div className="flex items-end gap-2">
-                  <Textarea
+                {emojiTrayOpen && (
+                  <div style={{ marginBottom: 10, padding: '10px 12px', background: C.bg, borderRadius: 12, border: `1.5px solid ${C.border}`, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {EMOJI_TRAY.map(e => (
+                      <button key={e} onClick={() => setMsgInput(prev => prev + e)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer' }}>{e}</button>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, background: C.bg, borderRadius: 14, border: `1.5px solid ${C.border}`, padding: '8px 12px' }}>
+                  <button onClick={() => setEmojiTrayOpen(v => !v)} title="Emoji"
+                    style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: 4, borderRadius: 8, color: emojiTrayOpen ? C.accent : C.muted }}>😊</button>
+                  <textarea
                     ref={inputRef}
                     value={msgInput}
                     onChange={e => {
-                      const v = e.target.value;
-                      if (v.length > 1000) return;
-                      setMsgInput(v);
-                      if (v.trim()) broadcastTyping(`${user?.email?.split('@')[0] || 'Someone'}`);
+                      if (e.target.value.length > 1000) return;
+                      setMsgInput(e.target.value);
+                      if (e.target.value.trim()) broadcastTyping(user?.email?.split('@')[0] || 'Someone');
                     }}
-                    placeholder={`Message ${selectedConv.is_group ? `# ${convName}` : convName}…`}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                    placeholder={`Message ${selectedConv.is_group ? `# ${convName}` : convName}… (Enter to send)`}
                     rows={1}
-                    className="flex-1 min-h-[40px] max-h-32 resize-none bg-muted/50 border-border focus-visible:ring-primary"
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (msgInput.trim()) handleSend(); }
-                    }}
+                    style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', resize: 'none', fontSize: 14, color: C.text, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.5, maxHeight: 120, overflowY: 'auto' }}
                   />
-                  <Button
-                    onClick={handleSend}
-                    disabled={!msgInput.trim() || sending}
-                    size="sm"
-                    className="h-10 px-3 shrink-0"
-                  >
-                    {sending
-                      ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      : <Send className="w-4 h-4" />}
-                  </Button>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+                    <button title="Send match invite" onClick={() => toast.info('Match invite sent!')}
+                      style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: C.muted, padding: 4 }}>🎾</button>
+                    <button onClick={handleSend} disabled={!msgInput.trim() || sending}
+                      style={{ width: 36, height: 36, borderRadius: 10, background: msgInput.trim() ? C.accent : C.border, border: 'none', cursor: msgInput.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, transition: 'all 0.15s', flexShrink: 0 }}>
+                      {sending
+                        ? <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid white', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
+                        : <span style={{ color: '#fff' }}>↑</span>}
+                    </button>
+                  </div>
                 </div>
-                <p className="text-[10px] text-muted-foreground/60 mt-1">Enter to send · Shift+Enter for new line</p>
               </div>
             </>
           ) : (
             /* Empty state */
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center space-y-4 px-8">
-                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
-                  <MessageCircle className="w-8 h-8 text-primary" />
-                </div>
-                <div>
-                  <p className="text-lg font-semibold">Select a conversation</p>
-                  <p className="text-sm text-muted-foreground mt-1">Choose from your conversations or find a player to start chatting</p>
-                </div>
-                <Button variant="outline" onClick={() => setShowPlayerSearch(true)}>
-                  <Search className="w-4 h-4 mr-2" />Find Players
-                </Button>
-              </div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, background: C.bg }}>
+              <div style={{ fontSize: 64 }}>💬</div>
+              <div style={{ fontWeight: 700, fontSize: 20, color: C.text }}>Select a conversation</div>
+              <div style={{ fontSize: 14, color: C.muted }}>Choose from your conversations or find a player</div>
+              <button onClick={() => setShowPlayerSearch(true)} style={{ marginTop: 8, padding: '10px 24px', borderRadius: 12, background: C.accent, color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                + Find Players
+              </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Dialogs ── */}
-      <GroupCreateDialog
-        open={showGroupCreate}
-        onClose={() => setShowGroupCreate(false)}
-        friends={friendsList}
-        onSubmit={async (name, memberIds) => {
-          const convId = await createGroupChat(name, memberIds);
-          setActiveView('conversations');
-          setSelectedConvId(convId);
-          toast.success(`# ${name} created!`);
-        }}
-      />
+      {/* ── New Group dialog ── */}
+      {showGroupCreate && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={() => setShowGroupCreate(false)}>
+          <div style={{ background: '#fff', borderRadius: 20, padding: 28, width: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', fontFamily: "'DM Sans', sans-serif" }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 20 }}>Create New Group</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.muted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>Group Name</div>
+            <input value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="e.g. Friday Night Squad" autoFocus
+              style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${C.border}`, fontSize: 14, outline: 'none', marginBottom: 16, boxSizing: 'border-box', fontFamily: "'DM Sans', sans-serif" }} />
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.muted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Add Friends</div>
+            <div style={{ maxHeight: 200, overflowY: 'auto', marginBottom: 4 }}>
+              {friendsList.length === 0 ? (
+                <p style={{ color: C.muted, fontSize: 13, textAlign: 'center', padding: '12px 0' }}>Add friends first to create a group</p>
+              ) : friendsList.map(f => (
+                <div key={f.userId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: `1px solid ${C.border}` }}>
+                  <Av name={f.name} src={f.avatar} size={36} />
+                  <div style={{ flex: 1, fontWeight: 600, fontSize: 14 }}>{f.name}</div>
+                  <input type="checkbox" checked={groupSelected.has(f.userId)}
+                    onChange={() => setGroupSelected(prev => { const n = new Set(prev); n.has(f.userId) ? n.delete(f.userId) : n.add(f.userId); return n; })}
+                    style={{ width: 18, height: 18, accentColor: C.accent, cursor: 'pointer' }} />
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+              <button onClick={() => { setShowGroupCreate(false); setGroupName(''); setGroupSelected(new Set()); }}
+                style={{ flex: 1, padding: 10, borderRadius: 10, border: `1.5px solid ${C.border}`, background: 'transparent', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
+              <button
+                disabled={!groupName.trim() || groupSelected.size === 0}
+                onClick={async () => {
+                  try {
+                    const id = await createGroupChat(groupName.trim(), Array.from(groupSelected));
+                    setActiveTab('chat'); setSelectedConvId(id);
+                    toast.success(`# ${groupName} created!`);
+                    setShowGroupCreate(false); setGroupName(''); setGroupSelected(new Set());
+                  } catch { toast.error('Failed to create group'); }
+                }}
+                style={{ flex: 1, padding: 10, borderRadius: 10, background: !groupName.trim() || groupSelected.size === 0 ? C.border : C.accent, color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: !groupName.trim() || groupSelected.size === 0 ? 'default' : 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
+                Create {groupSelected.size > 0 ? `(${groupSelected.size})` : ''}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
+      {/* Group Info Sheet */}
       {selectedConv?.is_group && (
         <GroupInfoSheet
-          open={showGroupInfo}
-          onClose={() => setShowGroupInfo(false)}
-          conv={selectedConv}
-          currentUserId={user?.id || ''}
-          isAdmin={myRole === 'admin'}
+          open={showGroupInfo} onClose={() => setShowGroupInfo(false)}
+          conv={selectedConv} currentUserId={user?.id || ''} isAdmin={myRole === 'admin'}
           friends={friendsList}
           onRemoveMember={uid => removeMember(selectedConv.id, uid)}
           onAddMember={uid => addMember(selectedConv.id, uid)}
           onRenameGroup={name => updateGroup(selectedConv.id, { name })}
-          onViewProfile={(profile, uid) => { setShowGroupInfo(false); setProfilePlayer(buildProfilePlayer(profile, uid)); }}
+          onViewProfile={(profile, uid) => { setShowGroupInfo(false); setProfilePlayer(buildProfile(profile, uid)); }}
         />
       )}
 
-      <PlayerProfileModal
-        player={profilePlayer}
-        isOpen={!!profilePlayer}
-        onClose={() => setProfilePlayer(null)}
-      />
+      <PlayerProfileModal player={profilePlayer} isOpen={!!profilePlayer} onClose={() => setProfilePlayer(null)} />
+
+      <style>{`
+        @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
+        @keyframes spin { to{transform:rotate(360deg)} }
+        *{box-sizing:border-box}
+        ::-webkit-scrollbar{width:4px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:#e5e7eb;border-radius:4px}
+      `}</style>
     </div>
   );
 };
