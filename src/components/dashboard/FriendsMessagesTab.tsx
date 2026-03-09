@@ -1,43 +1,38 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
-import {
-  Users,
-  MessageCircle,
-  Send,
-  Search,
-  Check,
-  X,
-  Clock,
-  UserPlus,
-  Plus,
-  AlertCircle,
-  CheckCheck,
-  ChevronLeft,
-  Settings,
-  UserMinus,
-  Trash2,
-  Pencil,
-  UserCheck,
-} from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import {
+  Users, MessageCircle, Send, Search, Check, X, Clock,
+  Plus, AlertCircle, ChevronLeft, Settings, UserMinus,
+  Trash2, Pencil, UserCheck, Pin, PinOff, BellOff,
+  MoreHorizontal, LogOut, Hash, AtSign, ChevronDown,
+  ChevronUp, Reply, Smile, UserX, Shield,
+} from 'lucide-react';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { useBlockedUsers } from '@/hooks/useBlockedUsers';
 import { useAuth } from '@/contexts/AuthContext';
-import { useConversations, type Conversation } from '@/hooks/useConversations';
+import { useConversations, type Conversation, type ConversationMessage } from '@/hooks/useConversations';
 import { useMatchInvites } from '@/hooks/useMatchInvites';
-import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
+import { useTypingIndicator } from '@/hooks/useTypingIndicator';
+import { useOnlinePresence } from '@/hooks/useOnlinePresence';
+import { formatDistanceToNow, format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { toast } from 'sonner';
 import PlayerSearch from './PlayerSearch';
 import { SearchResult } from '@/hooks/usePlayerSearch';
 import PlayerProfileModal from './PlayerProfileModal';
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎾', '🔥', '👏', '😮', '😢'];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -46,6 +41,13 @@ function formatTime(dateString: string) {
   if (isToday(date)) return format(date, 'HH:mm');
   if (isYesterday(date)) return 'Yesterday';
   return format(date, 'MMM d');
+}
+
+function formatDivider(dateString: string) {
+  const date = new Date(dateString);
+  if (isToday(date)) return 'Today';
+  if (isYesterday(date)) return 'Yesterday';
+  return format(date, 'EEEE, MMMM d');
 }
 
 function getConvName(conv: Conversation, currentUserId: string): string {
@@ -60,6 +62,29 @@ function getConvAvatar(conv: Conversation, currentUserId: string): string | unde
   const other = conv.members.find(m => m.user_id !== currentUserId);
   return other?.profile?.profile_picture_url ?? undefined;
 }
+
+// ── Online dot ────────────────────────────────────────────────────────────────
+
+const OnlineDot = ({ online }: { online: boolean }) => (
+  <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-background ${online ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
+);
+
+// ── Typing indicator ──────────────────────────────────────────────────────────
+
+const TypingIndicator = ({ names }: { names: string[] }) => {
+  if (names.length === 0) return null;
+  const label = names.length === 1 ? `${names[0]} is typing` : `${names.slice(0, 2).join(', ')} are typing`;
+  return (
+    <div className="flex items-center gap-2 px-4 py-1 text-xs text-muted-foreground">
+      <span className="flex gap-0.5">
+        {[0, 1, 2].map(i => (
+          <span key={i} className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+        ))}
+      </span>
+      <span>{label}…</span>
+    </div>
+  );
+};
 
 // ── Group create dialog ───────────────────────────────────────────────────────
 
@@ -341,132 +366,192 @@ const FriendsMessagesTab = () => {
   const [profilePlayer, setProfilePlayer] = useState<any | null>(null);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null);
+  const [emojiPickerMsgId, setEmojiPickerMsgId] = useState<string | null>(null);
+  const [replyToMsg, setReplyToMsg] = useState<ConversationMessage | null>(null);
+  const [atBottom, setAtBottom] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const { user } = useAuth();
   const { requests, loading: friendsLoading, updateRequestStatus, revokeFriendRequest, getPendingRequestsCount } = useFriendRequests();
-  const { blockedUsers } = useBlockedUsers();
-  const { conversations, loading: convLoading, sendMessage, getOrCreateDM, createGroupChat, addMember, removeMember, deleteMessage, updateGroup, markConversationRead, getTotalUnread, getMyRole } = useConversations();
+  const { blockedUsers, blockUser, unfriendUser } = useBlockedUsers();
+  const {
+    conversations, loading: convLoading,
+    sendMessage, getOrCreateDM, createGroupChat,
+    addMember, removeMember, deleteMessage, toggleReaction,
+    leaveGroup, deleteGroup, togglePin,
+    updateGroup, markConversationRead, getTotalUnread, getMyRole,
+  } = useConversations();
   const { invites } = useMatchInvites();
+  const { isOnline } = useOnlinePresence();
+  const { typingUsers, broadcastTyping } = useTypingIndicator(selectedConvId);
 
   const blockedIds = useMemo(() => new Set(blockedUsers.map(b => b.blocked_user_id)), [blockedUsers]);
-
   const pendingRequests = requests.filter(r => r.status === 'pending' && r.receiver_id === user?.id);
   const sentRequests    = requests.filter(r => r.status === 'pending' && r.sender_id === user?.id);
   const friends         = requests.filter(r => r.status === 'accepted');
 
-  // Filter out conversations with blocked users
-  const visibleConversations = useMemo(() => {
-    return conversations.filter(conv => {
-      if (conv.is_group) return true;
-      const other = conv.members.find(m => m.user_id !== user?.id);
-      return other ? !blockedIds.has(other.user_id) : true;
-    });
-  }, [conversations, user, blockedIds]);
+  const visibleConversations = useMemo(() => conversations.filter(conv => {
+    if (conv.is_group) return true;
+    const other = conv.members.find(m => m.user_id !== user?.id);
+    return other ? !blockedIds.has(other.user_id) : true;
+  }), [conversations, user, blockedIds]);
 
-  const filteredConversations = visibleConversations.filter(conv => {
-    const name = getConvName(conv, user?.id || '').toLowerCase();
-    return name.includes(searchTerm.toLowerCase());
-  });
+  const dmConvs    = visibleConversations.filter(c => !c.is_group);
+  const groupConvs = visibleConversations.filter(c => c.is_group);
 
+  const filteredDMs     = dmConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredGroups  = groupConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredFriends = friends.filter(f => {
     const fd = f.sender_id === user?.id ? f.receiver : f.sender;
     const sl = searchTerm.toLowerCase();
     return fd?.name?.toLowerCase().includes(sl) || fd?.email?.toLowerCase().includes(sl);
   });
 
-  const selectedConv = visibleConversations.find(c => c.id === selectedConvId) ?? null;
+  const onlineFriends  = filteredFriends.filter(f => { const uid = f.sender_id === user?.id ? f.receiver_id : f.sender_id; return isOnline(uid); });
+  const offlineFriends = filteredFriends.filter(f => { const uid = f.sender_id === user?.id ? f.receiver_id : f.sender_id; return !isOnline(uid); });
 
-  // Scroll to bottom when messages change
+  const selectedConv = visibleConversations.find(c => c.id === selectedConvId) ?? null;
+  const convName   = selectedConv ? getConvName(selectedConv, user?.id || '') : '';
+  const convAvatar = selectedConv ? getConvAvatar(selectedConv, user?.id || '') : undefined;
+  const myRole     = selectedConv ? getMyRole(selectedConv) : null;
+  const dmOtherId  = selectedConv && !selectedConv.is_group ? selectedConv.members.find(m => m.user_id !== user?.id)?.user_id : undefined;
+
+  // Scroll to bottom when messages arrive, only if already at bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [selectedConv?.messages.length]);
+    if (atBottom) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [selectedConv?.messages.length, atBottom]);
 
   // Mark as read when opening a conversation
   useEffect(() => {
-    if (selectedConvId) markConversationRead(selectedConvId);
+    if (selectedConvId) { markConversationRead(selectedConvId); setAtBottom(true); }
   }, [selectedConvId, markConversationRead]);
 
-  const handleConvSelect = (id: string) => {
-    setSelectedConvId(id);
-    setMsgInput('');
-  };
+  // Focus input when conversation opens
+  useEffect(() => {
+    if (selectedConvId) inputRef.current?.focus();
+  }, [selectedConvId]);
+
+  const handleConvSelect = (id: string) => { setSelectedConvId(id); setMsgInput(''); setReplyToMsg(null); };
 
   const handleSend = async () => {
     if (!selectedConvId || !msgInput.trim()) return;
     setSending(true);
+    const content = msgInput;
+    const replyId = replyToMsg?.id;
+    setMsgInput('');
+    setReplyToMsg(null);
     try {
-      await sendMessage(selectedConvId, msgInput);
-      setMsgInput('');
+      await sendMessage(selectedConvId, content, replyId);
     } catch {
       toast.error('Failed to send message');
+      setMsgInput(content);
     } finally {
       setSending(false);
     }
   };
 
-  const handleStartDM = async (otherUserId: string) => {
+  const handleStartDM = async (otherUserId: string, friendName?: string) => {
     try {
       const convId = await getOrCreateDM(otherUserId);
       setActiveView('conversations');
       setSelectedConvId(convId);
+      if (friendName) toast.success(`Opened chat with ${friendName}`);
     } catch {
       toast.error('Failed to open conversation');
     }
   };
 
-  const handlePlayerSelect = async (player: SearchResult) => {
-    setShowPlayerSearch(false);
-    if (!player.user_id) return;
-    await handleStartDM(player.user_id);
-  };
-
   const handleRequestResponse = async (requestId: string, status: 'accepted' | 'declined') => {
     try {
+      const req = requests.find(r => r.id === requestId);
       await updateRequestStatus(requestId, status);
-      toast.success(status === 'accepted' ? 'Friend request accepted!' : 'Friend request declined.');
+      if (status === 'accepted' && req) {
+        const friendId = req.sender_id === user?.id ? req.receiver_id : req.sender_id;
+        const friendName = req.sender_id === user?.id ? req.receiver?.name : req.sender?.name;
+        toast.success(`You're now friends with ${friendName || 'them'}! Say hello 👋`);
+        // Auto-open DM
+        const convId = await getOrCreateDM(friendId);
+        setActiveView('conversations');
+        setSelectedConvId(convId);
+      } else {
+        toast.success('Friend request declined.');
+      }
     } catch {
       toast.error('Failed to update friend request');
     }
   };
 
   const handleRevokeRequest = async (requestId: string) => {
-    try {
-      await revokeFriendRequest(requestId);
-      toast.success('Friend request revoked.');
-    } catch {
-      toast.error('Failed to revoke friend request');
-    }
+    try { await revokeFriendRequest(requestId); toast.success('Request revoked.'); }
+    catch { toast.error('Failed to revoke request'); }
   };
 
   const handleDeleteMessage = async (msgId: string) => {
-    try {
-      await deleteMessage(msgId);
-    } catch {
-      toast.error('Failed to delete message');
-    }
+    try { await deleteMessage(msgId); }
+    catch { toast.error('Failed to delete message'); }
   };
 
-  // Build profile object for PlayerProfileModal from a conversation member profile
+  const handleToggleReaction = async (msgId: string, emoji: string) => {
+    setEmojiPickerMsgId(null);
+    try { await toggleReaction(msgId, emoji); }
+    catch { toast.error('Failed to add reaction'); }
+  };
+
+  const handleLeaveGroup = async () => {
+    if (!selectedConvId) return;
+    try {
+      await leaveGroup(selectedConvId);
+      setSelectedConvId(null);
+      toast.success('Left the group.');
+    } catch { toast.error('Failed to leave group'); }
+  };
+
+  const handleDeleteGroup = async () => {
+    if (!selectedConvId) return;
+    try {
+      await deleteGroup(selectedConvId);
+      setSelectedConvId(null);
+      toast.success('Group deleted.');
+    } catch { toast.error('Failed to delete group'); }
+  };
+
   const buildProfilePlayer = (profile: NonNullable<Conversation['members'][0]['profile']>, userId: string) => ({
-    id: userId,
-    user_id: userId,
+    id: userId, user_id: userId,
     name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email,
-    email: profile.email,
-    skill_level: 0,
-    wins: 0,
-    losses: 0,
+    email: profile.email, skill_level: 0, wins: 0, losses: 0,
   });
 
-  // Friends list for group create
   const friendsList = friends.map(f => {
     const friendUserId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
     const fd = f.sender_id === user?.id ? f.receiver : f.sender;
     return { userId: friendUserId, name: fd?.name || 'Unknown', avatar: fd?.profile_picture_url };
   });
 
-  const isLoading = friendsLoading || convLoading;
+  // Build grouped message list with date dividers
+  const buildMessageGroups = (messages: ConversationMessage[]) => {
+    const visibleMsgs = messages.filter(m => !m.deleted_at || m.is_system);
+    const result: Array<{ type: 'divider'; label: string } | { type: 'msg'; msg: ConversationMessage; showAvatar: boolean }> = [];
+    let lastDate: Date | null = null;
+    let lastSenderId: string | null = null;
 
+    visibleMsgs.forEach((msg, i) => {
+      const d = new Date(msg.created_at);
+      if (!lastDate || !isSameDay(d, lastDate)) {
+        result.push({ type: 'divider', label: formatDivider(msg.created_at) });
+        lastDate = d;
+        lastSenderId = null;
+      }
+      // Show avatar if first in cluster (different sender or after divider)
+      const showAvatar = msg.sender_id !== lastSenderId;
+      result.push({ type: 'msg', msg, showAvatar });
+      lastSenderId = msg.sender_id;
+    });
+    return result;
+  };
+
+  const isLoading = friendsLoading || convLoading;
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -475,197 +560,326 @@ const FriendsMessagesTab = () => {
     );
   }
 
-  const convName = selectedConv ? getConvName(selectedConv, user?.id || '') : '';
-  const convAvatar = selectedConv ? getConvAvatar(selectedConv, user?.id || '') : undefined;
+  // ── Sidebar conversation row ────────────────────────────────────────────────
+  const ConvRow = ({ conv }: { conv: Conversation }) => {
+    const name   = getConvName(conv, user?.id || '');
+    const avatar = getConvAvatar(conv, user?.id || '');
+    const isActive = selectedConvId === conv.id;
+    const otherId = !conv.is_group ? conv.members.find(m => m.user_id !== user?.id)?.user_id : undefined;
+    const online  = otherId ? isOnline(otherId) : false;
+    const lastMsg = conv.lastMessage;
+
+    return (
+      <div
+        className={`group relative flex items-center gap-2.5 px-2 py-2 rounded-md cursor-pointer transition-colors
+          ${isActive ? 'bg-orange-50 border-l-[3px] border-primary' : 'hover:bg-muted/60 border-l-[3px] border-transparent'}`}
+        onClick={() => handleConvSelect(conv.id)}
+      >
+        {/* Pin indicator */}
+        {conv.isPinned && <Pin className="absolute right-2 top-2 w-3 h-3 text-muted-foreground/50" />}
+
+        <div className="relative shrink-0">
+          {conv.is_group ? (
+            <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center">
+              <Hash className="w-4 h-4 text-primary" />
+            </div>
+          ) : (
+            <Avatar className="h-8 w-8">
+              {avatar && <AvatarImage src={avatar} alt={name} />}
+              <AvatarFallback className="text-xs bg-primary/10 text-primary font-semibold">{name.charAt(0).toUpperCase()}</AvatarFallback>
+            </Avatar>
+          )}
+          {!conv.is_group && <OnlineDot online={online} />}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between">
+            <span className={`text-sm truncate ${conv.unreadCount > 0 ? 'font-bold text-foreground' : 'font-medium text-foreground/80'}`}>
+              {conv.is_group ? `# ${name}` : name}
+            </span>
+            {lastMsg && <span className="text-[10px] text-muted-foreground shrink-0 ml-1">{formatTime(lastMsg.created_at)}</span>}
+          </div>
+          {lastMsg && (
+            <p className={`text-xs truncate ${conv.unreadCount > 0 ? 'text-foreground/70 font-medium' : 'text-muted-foreground'}`}>
+              {lastMsg.sender_id === user?.id ? 'You: ' : ''}{lastMsg.deleted_at ? 'Message deleted' : lastMsg.content}
+            </p>
+          )}
+        </div>
+
+        {conv.unreadCount > 0 && (
+          <span className="shrink-0 min-w-[18px] h-[18px] bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+            {conv.unreadCount > 9 ? '9+' : conv.unreadCount}
+          </span>
+        )}
+
+        {/* Context menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
+            <button className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-muted transition-opacity shrink-0">
+              <MoreHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem onClick={e => { e.stopPropagation(); togglePin(conv.id, !conv.isPinned); }}>
+              {conv.isPinned ? <><PinOff className="w-3.5 h-3.5 mr-2" />Unpin</> : <><Pin className="w-3.5 h-3.5 mr-2" />Pin</>}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={e => { e.stopPropagation(); markConversationRead(conv.id); }}>
+              <Check className="w-3.5 h-3.5 mr-2" />Mark as read
+            </DropdownMenuItem>
+            {!conv.is_group && otherId && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={e => { e.stopPropagation(); const m = conv.members.find(m => m.user_id === otherId); if (m?.profile) setProfilePlayer(buildProfilePlayer(m.profile, otherId)); }}>
+                  <AtSign className="w-3.5 h-3.5 mr-2" />View Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive" onClick={e => { e.stopPropagation(); blockUser(otherId, ''); toast.success('User blocked.'); }}>
+                  <UserX className="w-3.5 h-3.5 mr-2" />Block user
+                </DropdownMenuItem>
+              </>
+            )}
+            {conv.is_group && (
+              <>
+                <DropdownMenuSeparator />
+                {myRole === 'admin' ? (
+                  <DropdownMenuItem className="text-destructive" onClick={e => { e.stopPropagation(); handleDeleteGroup(); }}>
+                    <Trash2 className="w-3.5 h-3.5 mr-2" />Delete group
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem className="text-destructive" onClick={e => { e.stopPropagation(); handleLeaveGroup(); }}>
+                    <LogOut className="w-3.5 h-3.5 mr-2" />Leave group
+                  </DropdownMenuItem>
+                )}
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+  };
 
   return (
     <div className="h-[calc(100vh-200px)] flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-background/95 backdrop-blur">
-        <div className="flex items-center space-x-3">
-          <Users className="w-6 h-6 text-primary" />
+      {/* ── Top header ── */}
+      <div className="flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur shrink-0">
+        <div className="flex items-center gap-3">
+          <Users className="w-5 h-5 text-primary" />
           <div>
-            <h2 className="text-xl font-bold text-foreground">Network & Messages</h2>
-            <p className="text-sm text-muted-foreground">
-              {friends.length} friends · {getTotalUnread()} unread
-            </p>
+            <h2 className="text-lg font-bold leading-tight">Network & Messages</h2>
+            <p className="text-xs text-muted-foreground">{friends.length} friends · {getTotalUnread()} unread</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => setShowGroupCreate(true)}>
-            <Users className="w-4 h-4 mr-1" />
-            <span className="hidden sm:inline">New Group</span>
+          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setShowGroupCreate(true)}>
+            <Hash className="w-3.5 h-3.5 mr-1" />New Group
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setShowPlayerSearch(!showPlayerSearch)}>
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">{showPlayerSearch ? 'Close' : 'Find Players'}</span>
+          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setShowPlayerSearch(v => !v)}>
+            <Search className="w-3.5 h-3.5 mr-1" />{showPlayerSearch ? 'Close' : 'Find Players'}
           </Button>
         </div>
       </div>
 
-      {/* Player Search */}
+      {/* Find Players bar */}
       {showPlayerSearch && (
-        <div className="mx-4 mt-3 mb-0 p-4 border rounded-lg bg-card">
-          <div className="flex items-center gap-2 mb-3">
-            <Search className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Find players to message</span>
-          </div>
-          <PlayerSearch onPlayerSelect={handlePlayerSelect} placeholder="Search for players..." />
+        <div className="px-4 py-3 border-b bg-card/50">
+          <PlayerSearch
+            onPlayerSelect={async (player: SearchResult) => {
+              setShowPlayerSearch(false);
+              if (player.user_id) await handleStartDM(player.user_id);
+            }}
+            placeholder="Search players by name or skill level…"
+          />
         </div>
       )}
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <div className={`w-full lg:w-80 border-r bg-muted/30 flex flex-col ${selectedConvId ? 'hidden lg:flex' : 'flex'}`}>
-          <div className="p-3 border-b">
+        {/* ── SIDEBAR ── */}
+        <div className={`w-full lg:w-72 border-r bg-card flex flex-col ${selectedConvId ? 'hidden lg:flex' : 'flex'}`}>
+          {/* Tab bar */}
+          <div className="px-3 pt-3 pb-2 border-b shrink-0">
             <Tabs value={activeView} onValueChange={(v: any) => setActiveView(v)}>
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="conversations" className="text-xs">
-                  <MessageCircle className="w-3 h-3 mr-1" />
+              <TabsList className="grid w-full grid-cols-3 h-8">
+                <TabsTrigger value="conversations" className="text-xs h-7 relative">
                   Chat
-                  {getTotalUnread() > 0 && <Badge className="ml-1 text-xs h-4 px-1">{getTotalUnread()}</Badge>}
+                  {getTotalUnread() > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+                      {getTotalUnread() > 9 ? '9+' : getTotalUnread()}
+                    </span>
+                  )}
                 </TabsTrigger>
-                <TabsTrigger value="friends" className="text-xs">
-                  <Users className="w-3 h-3 mr-1" />
-                  Friends
-                  <Badge variant="secondary" className="ml-1 text-xs h-4 px-1">{friends.length}</Badge>
+                <TabsTrigger value="friends" className="text-xs h-7">
+                  Friends {friends.length > 0 && <span className="ml-1 text-muted-foreground">({friends.length})</span>}
                 </TabsTrigger>
-                <TabsTrigger value="requests" className="text-xs">
-                  <AlertCircle className="w-3 h-3 mr-1" />
+                <TabsTrigger value="requests" className="text-xs h-7 relative">
                   Requests
-                  {getPendingRequestsCount() > 0 && <Badge variant="destructive" className="ml-1 text-xs h-4 px-1">{getPendingRequestsCount()}</Badge>}
+                  {getPendingRequestsCount() > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+                      {getPendingRequestsCount()}
+                    </span>
+                  )}
                 </TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
 
-          <div className="p-3">
+          {/* Search */}
+          <div className="px-3 py-2 shrink-0">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9 bg-background h-8 text-sm" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Search…"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="pl-8 h-7 text-xs bg-muted/50 border-0"
+              />
             </div>
           </div>
 
           <ScrollArea className="flex-1">
-            <div className="px-2 pb-4">
-              {/* ── Conversations ── */}
+            <div className="pb-4">
+
+              {/* ── CHAT TAB ── */}
               {activeView === 'conversations' && (
-                <div className="space-y-1">
-                  {filteredConversations.length === 0 ? (
-                    <div className="text-center py-8 px-4">
-                      <MessageCircle className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+                <div className="px-2">
+                  {filteredDMs.length === 0 && filteredGroups.length === 0 ? (
+                    <div className="text-center py-10">
+                      <MessageCircle className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
                       <p className="text-sm text-muted-foreground">No conversations yet</p>
-                      <p className="text-xs text-muted-foreground mt-1">Find players above to start chatting</p>
+                      <p className="text-xs text-muted-foreground/70 mt-1">Find players above to start chatting</p>
                     </div>
                   ) : (
-                    filteredConversations.map(conv => {
-                      const name = getConvName(conv, user?.id || '');
-                      const avatar = getConvAvatar(conv, user?.id || '');
-                      const isActive = selectedConvId === conv.id;
-                      const dmOther = !conv.is_group ? conv.members.find(m => m.user_id !== user?.id) : null;
-                      return (
-                        <div
-                          key={conv.id}
-                          className={`p-3 rounded-lg cursor-pointer transition-all ${isActive ? 'bg-primary/10 border border-primary/20' : 'hover:bg-accent/30'}`}
-                          onClick={() => handleConvSelect(conv.id)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="relative shrink-0">
-                              <button
-                                className="rounded-full focus:outline-none"
-                                onClick={e => {
-                                  if (conv.is_group) return; // group info opens inside thread
-                                  e.stopPropagation();
-                                  if (dmOther?.profile) setProfilePlayer(buildProfilePlayer(dmOther.profile, dmOther.user_id));
-                                }}
-                                title={!conv.is_group ? `View ${name}'s profile` : undefined}
-                              >
-                                <Avatar className="h-10 w-10">
-                                  {avatar && <AvatarImage src={avatar} alt={name} />}
-                                  <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-semibold">
-                                    {conv.is_group ? <Users className="w-4 h-4" /> : name.charAt(0).toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
-                              </button>
-                              {conv.unreadCount > 0 && (
-                                <div className="absolute -top-1 -right-1 h-5 w-5 bg-primary rounded-full flex items-center justify-center">
-                                  <span className="text-xs font-medium text-primary-foreground">{conv.unreadCount > 9 ? '9+' : conv.unreadCount}</span>
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between mb-0.5">
-                                <p className={`text-sm truncate ${conv.unreadCount > 0 ? 'font-semibold' : 'font-medium'}`}>{name}</p>
-                                {conv.lastMessage && <span className="text-xs text-muted-foreground shrink-0 ml-1">{formatTime(conv.lastMessage.created_at)}</span>}
-                              </div>
-                              {conv.lastMessage && (
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {conv.lastMessage.sender_id === user?.id ? 'You: ' : ''}
-                                  {conv.lastMessage.content}
-                                </p>
-                              )}
-                              {conv.is_group && <Badge variant="secondary" className="text-xs mt-0.5">Group · {conv.members.length}</Badge>}
-                            </div>
-                          </div>
+                    <>
+                      {filteredDMs.length > 0 && (
+                        <div className="mt-2">
+                          <p className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Direct Messages</p>
+                          {filteredDMs.map(c => <ConvRow key={c.id} conv={c} />)}
                         </div>
-                      );
-                    })
+                      )}
+                      {filteredGroups.length > 0 && (
+                        <div className="mt-3">
+                          <p className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Groups</p>
+                          {filteredGroups.map(c => <ConvRow key={c.id} conv={c} />)}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
 
-              {/* ── Friends ── */}
+              {/* ── FRIENDS TAB ── */}
               {activeView === 'friends' && (
-                <div className="space-y-1">
+                <div className="px-2 mt-2">
                   {filteredFriends.length === 0 ? (
-                    <div className="text-center py-8 px-4">
-                      <Users className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+                    <div className="text-center py-10">
+                      <Users className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
                       <p className="text-sm text-muted-foreground">{friends.length === 0 ? 'No friends yet' : 'No matches'}</p>
                     </div>
                   ) : (
-                    filteredFriends.map(friend => {
-                      const friendUserId = friend.sender_id === user?.id ? friend.receiver_id : friend.sender_id;
-                      const fd = friend.sender_id === user?.id ? friend.receiver : friend.sender;
-                      if (blockedIds.has(friendUserId)) return null;
-                      return (
-                        <div key={friend.id} className="p-3 rounded-lg hover:bg-accent/50 transition-colors">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <button
-                                className="rounded-full focus:outline-none"
-                                onClick={() => {
-                                  if (fd) setProfilePlayer({ id: friendUserId, user_id: friendUserId, name: fd.name || 'Unknown', email: fd.email || '', skill_level: 0, wins: 0, losses: 0 });
-                                }}
-                                title={`View ${fd?.name}'s profile`}
-                              >
-                                <Avatar className="h-9 w-9">
-                                  {fd?.profile_picture_url && <AvatarImage src={fd.profile_picture_url} alt={fd.name} />}
-                                  <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">{fd?.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
-                                </Avatar>
-                              </button>
-                              <div>
-                                <p className="font-medium text-sm">{fd?.name || 'Unknown'}</p>
-                                <p className="text-xs text-muted-foreground">{fd?.email}</p>
+                    <>
+                      {onlineFriends.length > 0 && (
+                        <>
+                          <p className="px-2 py-1 text-[10px] font-semibold text-green-600 uppercase tracking-wider">Online — {onlineFriends.length}</p>
+                          {onlineFriends.map(friend => {
+                            const friendUserId = friend.sender_id === user?.id ? friend.receiver_id : friend.sender_id;
+                            const fd = friend.sender_id === user?.id ? friend.receiver : friend.sender;
+                            if (blockedIds.has(friendUserId)) return null;
+                            return (
+                              <div key={friend.id} className="flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-muted/60 group">
+                                <div className="relative shrink-0">
+                                  <button className="rounded-full focus:outline-none" onClick={() => { if (fd) setProfilePlayer({ id: friendUserId, user_id: friendUserId, name: fd.name || 'Unknown', email: fd.email || '', skill_level: 0, wins: 0, losses: 0 }); }}>
+                                    <Avatar className="h-8 w-8">
+                                      {fd?.profile_picture_url && <AvatarImage src={fd.profile_picture_url} alt={fd.name} />}
+                                      <AvatarFallback className="text-xs bg-primary/10 text-primary font-semibold">{fd?.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
+                                    </Avatar>
+                                  </button>
+                                  <OnlineDot online={true} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{fd?.name || 'Unknown'}</p>
+                                  <p className="text-xs text-green-600">Online</p>
+                                </div>
+                                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
+                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleStartDM(friendUserId, fd?.name)}>
+                                    <MessageCircle className="w-3.5 h-3.5" />
+                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild><Button size="sm" variant="ghost" className="h-7 w-7 p-0"><MoreHorizontal className="w-3.5 h-3.5" /></Button></DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-40">
+                                      <DropdownMenuItem onClick={() => { if (fd) setProfilePlayer({ id: friendUserId, user_id: friendUserId, name: fd.name || 'Unknown', email: fd.email || '', skill_level: 0, wins: 0, losses: 0 }); }}>
+                                        <AtSign className="w-3.5 h-3.5 mr-2" />View Profile
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem className="text-destructive" onClick={() => { unfriendUser(friendUserId); toast.success('Removed friend.'); }}>
+                                        <UserMinus className="w-3.5 h-3.5 mr-2" />Unfriend
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem className="text-destructive" onClick={() => { blockUser(friendUserId, ''); toast.success('User blocked.'); }}>
+                                        <Shield className="w-3.5 h-3.5 mr-2" />Block
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
                               </div>
-                            </div>
-                            <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => handleStartDM(friendUserId)}>
-                              <MessageCircle className="w-3 h-3 mr-1" />
-                              Chat
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })
+                            );
+                          })}
+                        </>
+                      )}
+                      {offlineFriends.length > 0 && (
+                        <>
+                          <p className="px-2 py-1 mt-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Offline — {offlineFriends.length}</p>
+                          {offlineFriends.map(friend => {
+                            const friendUserId = friend.sender_id === user?.id ? friend.receiver_id : friend.sender_id;
+                            const fd = friend.sender_id === user?.id ? friend.receiver : friend.sender;
+                            if (blockedIds.has(friendUserId)) return null;
+                            return (
+                              <div key={friend.id} className="flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-muted/60 group opacity-70 hover:opacity-100 transition-opacity">
+                                <div className="relative shrink-0">
+                                  <button className="rounded-full focus:outline-none" onClick={() => { if (fd) setProfilePlayer({ id: friendUserId, user_id: friendUserId, name: fd.name || 'Unknown', email: fd.email || '', skill_level: 0, wins: 0, losses: 0 }); }}>
+                                    <Avatar className="h-8 w-8">
+                                      {fd?.profile_picture_url && <AvatarImage src={fd.profile_picture_url} alt={fd.name} />}
+                                      <AvatarFallback className="text-xs bg-muted text-muted-foreground font-semibold">{fd?.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
+                                    </Avatar>
+                                  </button>
+                                  <OnlineDot online={false} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{fd?.name || 'Unknown'}</p>
+                                  <p className="text-xs text-muted-foreground">Offline</p>
+                                </div>
+                                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
+                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleStartDM(friendUserId, fd?.name)}>
+                                    <MessageCircle className="w-3.5 h-3.5" />
+                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild><Button size="sm" variant="ghost" className="h-7 w-7 p-0"><MoreHorizontal className="w-3.5 h-3.5" /></Button></DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-40">
+                                      <DropdownMenuItem onClick={() => { if (fd) setProfilePlayer({ id: friendUserId, user_id: friendUserId, name: fd.name || 'Unknown', email: fd.email || '', skill_level: 0, wins: 0, losses: 0 }); }}>
+                                        <AtSign className="w-3.5 h-3.5 mr-2" />View Profile
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem className="text-destructive" onClick={() => { unfriendUser(friendUserId); toast.success('Removed friend.'); }}>
+                                        <UserMinus className="w-3.5 h-3.5 mr-2" />Unfriend
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem className="text-destructive" onClick={() => { blockUser(friendUserId, ''); toast.success('User blocked.'); }}>
+                                        <Shield className="w-3.5 h-3.5 mr-2" />Block
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </>
+                      )}
+                    </>
                   )}
                 </div>
               )}
 
-              {/* ── Requests ── */}
+              {/* ── REQUESTS TAB ── */}
               {activeView === 'requests' && (
-                <div className="space-y-3 p-1">
+                <div className="px-3 mt-2 space-y-4">
                   {pendingRequests.length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">INCOMING</p>
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Incoming</p>
                       <div className="space-y-2">
                         {pendingRequests.map(req => (
                           <div key={req.id} className="p-3 rounded-lg border bg-card">
@@ -680,10 +894,10 @@ const FriendsMessagesTab = () => {
                               </div>
                             </div>
                             <div className="flex gap-2">
-                              <Button size="sm" className="flex-1 text-xs h-7" onClick={() => handleRequestResponse(req.id, 'accepted')}>
+                              <Button size="sm" className="flex-1 h-7 text-xs" onClick={() => handleRequestResponse(req.id, 'accepted')}>
                                 <Check className="w-3 h-3 mr-1" />Accept
                               </Button>
-                              <Button size="sm" variant="outline" className="flex-1 text-xs h-7" onClick={() => handleRequestResponse(req.id, 'declined')}>
+                              <Button size="sm" variant="outline" className="flex-1 h-7 text-xs" onClick={() => handleRequestResponse(req.id, 'declined')}>
                                 <X className="w-3 h-3 mr-1" />Decline
                               </Button>
                             </div>
@@ -692,40 +906,32 @@ const FriendsMessagesTab = () => {
                       </div>
                     </div>
                   )}
-
                   {sentRequests.length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">SENT</p>
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Sent</p>
                       <div className="space-y-2">
                         {sentRequests.map(req => (
-                          <div key={req.id} className="p-3 rounded-lg border bg-card">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Avatar className="h-8 w-8">
-                                  {req.receiver?.profile_picture_url && <AvatarImage src={req.receiver.profile_picture_url} />}
-                                  <AvatarFallback className="text-xs bg-primary/10 text-primary">{req.receiver?.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <p className="text-sm font-medium">{req.receiver?.name}</p>
-                                  <p className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="text-xs">Pending</Badge>
-                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" onClick={() => handleRevokeRequest(req.id)}>
-                                  <X className="w-3 h-3" />
-                                </Button>
-                              </div>
+                          <div key={req.id} className="p-3 rounded-lg border bg-card flex items-center gap-2">
+                            <Avatar className="h-8 w-8">
+                              {req.receiver?.profile_picture_url && <AvatarImage src={req.receiver.profile_picture_url} />}
+                              <AvatarFallback className="text-xs bg-primary/10 text-primary">{req.receiver?.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{req.receiver?.name}</p>
+                              <p className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}</p>
                             </div>
+                            <Badge variant="outline" className="text-xs shrink-0">Pending</Badge>
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive shrink-0" onClick={() => handleRevokeRequest(req.id)}>
+                              <X className="w-3 h-3" />
+                            </Button>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
-
                   {pendingRequests.length === 0 && sentRequests.length === 0 && (
-                    <div className="text-center py-8 px-4">
-                      <Clock className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+                    <div className="text-center py-10">
+                      <Clock className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
                       <p className="text-sm text-muted-foreground">No friend requests</p>
                     </div>
                   )}
@@ -735,165 +941,297 @@ const FriendsMessagesTab = () => {
           </ScrollArea>
         </div>
 
-        {/* ── Conversation view ── */}
-        <div className={`flex-1 flex flex-col ${selectedConvId ? 'flex' : 'hidden lg:flex'}`}>
+        {/* ── THREAD PANEL ── */}
+        <div className={`flex-1 flex flex-col bg-background ${selectedConvId ? 'flex' : 'hidden lg:flex'}`}>
           {selectedConv ? (
             <>
-              {/* Header */}
-              <div className="p-4 border-b bg-background/95 backdrop-blur flex items-center gap-3">
+              {/* Thread header */}
+              <div className="flex items-center gap-3 px-4 py-3 border-b bg-background/95 backdrop-blur shrink-0">
                 <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8 shrink-0" onClick={() => setSelectedConvId(null)}>
                   <ChevronLeft className="h-5 w-5" />
                 </Button>
-
                 <button
-                  className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
+                  className="flex items-center gap-2.5 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
                   onClick={() => {
-                    if (selectedConv.is_group) {
-                      setShowGroupInfo(true);
-                    } else {
+                    if (selectedConv.is_group) setShowGroupInfo(true);
+                    else {
                       const other = selectedConv.members.find(m => m.user_id !== user?.id);
                       if (other?.profile) setProfilePlayer(buildProfilePlayer(other.profile, other.user_id));
                     }
                   }}
                 >
-                  <Avatar className="h-9 w-9 shrink-0">
-                    {convAvatar && <AvatarImage src={convAvatar} alt={convName} />}
-                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                      {selectedConv.is_group ? <Users className="w-4 h-4" /> : convName.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{convName}</p>
-                    {selectedConv.is_group && (
-                      <p className="text-xs text-muted-foreground">{selectedConv.members.length} members · click to manage</p>
+                  <div className="relative shrink-0">
+                    {selectedConv.is_group ? (
+                      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <Hash className="w-5 h-5 text-primary" />
+                      </div>
+                    ) : (
+                      <Avatar className="h-9 w-9">
+                        {convAvatar && <AvatarImage src={convAvatar} alt={convName} />}
+                        <AvatarFallback className="bg-primary/10 text-primary font-semibold">{convName.charAt(0).toUpperCase()}</AvatarFallback>
+                      </Avatar>
                     )}
+                    {!selectedConv.is_group && dmOtherId && <OnlineDot online={isOnline(dmOtherId)} />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold truncate">{selectedConv.is_group ? `# ${convName}` : convName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedConv.is_group
+                        ? `${selectedConv.members.length} members`
+                        : dmOtherId && isOnline(dmOtherId) ? 'Online' : 'Offline'}
+                    </p>
                   </div>
                 </button>
+
+                {/* Match invite badge */}
+                {!selectedConv.is_group && dmOtherId && (() => {
+                  const inv = invites.find(i => i.status === 'pending' && ((i.sender_id === user?.id && i.receiver_id === dmOtherId) || (i.sender_id === dmOtherId && i.receiver_id === user?.id)));
+                  if (!inv) return null;
+                  return <Badge variant="outline" className="text-xs text-orange-600 border-orange-300 shrink-0">{inv.sender_id === user?.id ? '⏳ Invite pending' : '📬 Invite received'}</Badge>;
+                })()}
+
                 {selectedConv.is_group && (
                   <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setShowGroupInfo(true)}>
                     <Settings className="w-4 h-4" />
                   </Button>
                 )}
-
-                {/* Match invite status badge for DMs */}
-                {!selectedConv.is_group && (() => {
-                  const otherId = selectedConv.members.find(m => m.user_id !== user?.id)?.user_id;
-                  const pendingInvite = invites.find(i =>
-                    i.status === 'pending' &&
-                    ((i.sender_id === user?.id && i.receiver_id === otherId) ||
-                     (i.sender_id === otherId && i.receiver_id === user?.id))
-                  );
-                  if (!pendingInvite) return null;
-                  const isSender = pendingInvite.sender_id === user?.id;
-                  return (
-                    <Badge variant="outline" className="text-xs text-orange-600 border-orange-300 shrink-0">
-                      {isSender ? '⏳ Invite pending' : '📬 Invite received'}
-                    </Badge>
-                  );
-                })()}
               </div>
 
-              {/* Messages */}
-              <ScrollArea className="flex-1 p-4">
-                <div className="space-y-3">
-                  {selectedConv.messages.map(msg => {
-                    const isOwn = msg.sender_id === user?.id;
+              {/* Messages area */}
+              <div
+                className="flex-1 overflow-y-auto"
+                ref={scrollAreaRef}
+                onScroll={e => {
+                  const el = e.currentTarget;
+                  setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
+                }}
+              >
+                <div className="px-4 py-4 space-y-0.5">
+                  {buildMessageGroups(selectedConv.messages).map((item, i) => {
+                    if (item.type === 'divider') {
+                      return (
+                        <div key={`div-${i}`} className="flex items-center gap-3 py-3">
+                          <div className="flex-1 h-px bg-border" />
+                          <span className="text-xs text-muted-foreground font-medium px-2">{item.label}</span>
+                          <div className="flex-1 h-px bg-border" />
+                        </div>
+                      );
+                    }
+
+                    const { msg, showAvatar } = item;
+                    const isOwn    = msg.sender_id === user?.id;
+                    const isSystem = msg.is_system;
                     const senderName = msg.sender
                       ? `${msg.sender.first_name || ''} ${msg.sender.last_name || ''}`.trim() || msg.sender.email
                       : 'Unknown';
+                    const canDelete = isOwn || myRole === 'admin';
 
-                    const canDelete = isOwn || getMyRole(selectedConv) === 'admin';
+                    if (isSystem) {
+                      return (
+                        <div key={msg.id} className="text-center py-1.5">
+                          <span className="text-xs text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">{msg.content}</span>
+                        </div>
+                      );
+                    }
+
                     return (
                       <div
                         key={msg.id}
-                        className={`flex group ${isOwn ? 'justify-end' : 'justify-start'}`}
-                        onMouseEnter={() => canDelete && setHoveredMsgId(msg.id)}
-                        onMouseLeave={() => setHoveredMsgId(null)}
+                        className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${showAvatar ? 'mt-3' : 'mt-0.5'} group relative`}
+                        onMouseEnter={() => setHoveredMsgId(msg.id)}
+                        onMouseLeave={() => { setHoveredMsgId(null); if (emojiPickerMsgId === msg.id) setEmojiPickerMsgId(null); }}
                       >
+                        {/* Left avatar (only for others, only when first in cluster) */}
                         {!isOwn && (
-                          <button
-                            className="shrink-0 mr-2 mt-1 rounded-full focus:outline-none"
-                            onClick={() => {
-                              const member = selectedConv.members.find(m => m.user_id === msg.sender_id);
-                              if (member?.profile) setProfilePlayer(buildProfilePlayer(member.profile, member.user_id));
-                            }}
-                            title={`View ${senderName}'s profile`}
-                          >
-                            <Avatar className="h-7 w-7">
-                              {msg.sender?.profile_picture_url && <AvatarImage src={msg.sender.profile_picture_url} />}
-                              <AvatarFallback className="text-xs bg-primary/10 text-primary">{senderName.charAt(0).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-                          </button>
-                        )}
-                        <div className={`max-w-[70%] ${isOwn ? 'ml-12' : 'mr-12'}`}>
-                          {/* Clickable sender name in group chats */}
-                          {!isOwn && selectedConv.is_group && (
-                            <button
-                              className="text-xs font-medium text-primary mb-0.5 hover:underline"
-                              onClick={() => {
-                                const member = selectedConv.members.find(m => m.user_id === msg.sender_id);
-                                if (member?.profile) setProfilePlayer(buildProfilePlayer(member.profile, member.user_id));
-                              }}
-                            >
-                              {senderName}
-                            </button>
-                          )}
-                          <div className="relative">
-                            <div className={`px-4 py-2 rounded-2xl ${isOwn ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                              <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                              <p className={`text-xs mt-1 ${isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                                {format(new Date(msg.created_at), 'HH:mm')}
-                              </p>
-                            </div>
-                            {hoveredMsgId === msg.id && canDelete && (
-                              <button
-                                className={`absolute top-1 ${isOwn ? '-left-8' : '-right-8'} p-1 rounded-full bg-background border shadow-sm hover:bg-destructive hover:text-white transition-colors`}
-                                onClick={() => handleDeleteMessage(msg.id)}
-                                title="Delete message"
-                              >
-                                <Trash2 className="w-3 h-3" />
+                          <div className="w-9 shrink-0 mr-2">
+                            {showAvatar && (
+                              <button className="rounded-full focus:outline-none" onClick={() => { const m = selectedConv.members.find(m => m.user_id === msg.sender_id); if (m?.profile) setProfilePlayer(buildProfilePlayer(m.profile, m.user_id)); }}>
+                                <Avatar className="h-8 w-8">
+                                  {msg.sender?.profile_picture_url && <AvatarImage src={msg.sender.profile_picture_url} />}
+                                  <AvatarFallback className="text-xs bg-primary/10 text-primary">{senderName.charAt(0).toUpperCase()}</AvatarFallback>
+                                </Avatar>
                               </button>
                             )}
                           </div>
+                        )}
+
+                        <div className={`max-w-[72%] ${isOwn ? 'mr-2' : ''}`}>
+                          {/* Sender name (group, first in cluster, not own) */}
+                          {!isOwn && selectedConv.is_group && showAvatar && (
+                            <button className="text-xs font-semibold text-primary mb-0.5 ml-0.5 hover:underline" onClick={() => { const m = selectedConv.members.find(m => m.user_id === msg.sender_id); if (m?.profile) setProfilePlayer(buildProfilePlayer(m.profile, m.user_id)); }}>
+                              {senderName}
+                            </button>
+                          )}
+
+                          {/* Reply preview */}
+                          {msg.replyTo && (
+                            <div className={`text-xs border-l-2 border-primary/40 pl-2 mb-1 text-muted-foreground truncate ${isOwn ? 'text-right' : ''}`}>
+                              <span className="font-medium">{msg.replyTo.sender?.first_name || 'Someone'}: </span>
+                              {msg.replyTo.content}
+                            </div>
+                          )}
+
+                          <div className="relative flex items-end gap-1">
+                            {/* Hover action bar (own side) */}
+                            {isOwn && hoveredMsgId === msg.id && (
+                              <div className="flex items-center gap-1 mb-1">
+                                <button className="p-1 rounded bg-background border shadow-sm hover:bg-muted transition-colors" onClick={() => setEmojiPickerMsgId(emojiPickerMsgId === msg.id ? null : msg.id)} title="React">
+                                  <Smile className="w-3 h-3 text-muted-foreground" />
+                                </button>
+                                <button className="p-1 rounded bg-background border shadow-sm hover:bg-muted transition-colors" onClick={() => { setReplyToMsg(msg); inputRef.current?.focus(); }} title="Reply">
+                                  <Reply className="w-3 h-3 text-muted-foreground" />
+                                </button>
+                                {canDelete && (
+                                  <button className="p-1 rounded bg-background border shadow-sm hover:bg-destructive hover:text-white transition-colors" onClick={() => handleDeleteMessage(msg.id)} title="Delete">
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Bubble */}
+                            <div className={`relative px-3.5 py-2 text-sm whitespace-pre-wrap break-words
+                              ${isOwn
+                                ? 'bg-[#111827] text-white rounded-[18px_18px_4px_18px]'
+                                : 'bg-white border border-border text-foreground rounded-[18px_18px_18px_4px]'}
+                            `}>
+                              {msg.content}
+                              <span className={`block text-[10px] mt-1 ${isOwn ? 'text-white/50 text-right' : 'text-muted-foreground/70'}`}>
+                                {format(new Date(msg.created_at), 'HH:mm')}
+                              </span>
+                            </div>
+
+                            {/* Hover action bar (their side) */}
+                            {!isOwn && hoveredMsgId === msg.id && (
+                              <div className="flex items-center gap-1 mb-1">
+                                <button className="p-1 rounded bg-background border shadow-sm hover:bg-muted transition-colors" onClick={() => setEmojiPickerMsgId(emojiPickerMsgId === msg.id ? null : msg.id)} title="React">
+                                  <Smile className="w-3 h-3 text-muted-foreground" />
+                                </button>
+                                <button className="p-1 rounded bg-background border shadow-sm hover:bg-muted transition-colors" onClick={() => { setReplyToMsg(msg); inputRef.current?.focus(); }} title="Reply">
+                                  <Reply className="w-3 h-3 text-muted-foreground" />
+                                </button>
+                                {canDelete && (
+                                  <button className="p-1 rounded bg-background border shadow-sm hover:bg-destructive hover:text-white transition-colors" onClick={() => handleDeleteMessage(msg.id)} title="Delete">
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Emoji picker */}
+                          {emojiPickerMsgId === msg.id && (
+                            <div className={`flex gap-1 mt-1 p-1.5 bg-background border rounded-xl shadow-lg ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                              {QUICK_EMOJIS.map(e => (
+                                <button key={e} className="text-lg hover:scale-125 transition-transform" onClick={() => handleToggleReaction(msg.id, e)}>{e}</button>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Reactions */}
+                          {(msg.reactions?.length ?? 0) > 0 && (
+                            <div className={`flex flex-wrap gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                              {msg.reactions!.map(r => (
+                                <button
+                                  key={r.emoji}
+                                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-colors ${r.reactedByMe ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-muted/50 border-border hover:bg-muted'}`}
+                                  onClick={() => handleToggleReaction(msg.id, r.emoji)}
+                                >
+                                  <span>{r.emoji}</span>
+                                  <span className="font-medium">{r.count}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
                   })}
                   <div ref={messagesEndRef} />
                 </div>
-              </ScrollArea>
+              </div>
 
-              {/* Input */}
-              <div className="p-4 border-t bg-background/95 backdrop-blur">
+              {/* Typing indicator */}
+              <TypingIndicator names={typingUsers.map(t => t.displayName)} />
+
+              {/* Scroll-to-bottom pill */}
+              {!atBottom && (
+                <div className="flex justify-center pb-1">
+                  <button
+                    className="flex items-center gap-1 px-3 py-1 bg-primary text-primary-foreground text-xs rounded-full shadow-md hover:bg-primary/90 transition-colors"
+                    onClick={() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); setAtBottom(true); }}
+                  >
+                    <ChevronDown className="w-3 h-3" />New messages
+                  </button>
+                </div>
+              )}
+
+              {/* Reply preview bar */}
+              {replyToMsg && (
+                <div className="flex items-center gap-2 px-4 py-2 border-t bg-muted/30">
+                  <Reply className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-medium text-primary">Replying to </span>
+                    <span className="text-xs text-muted-foreground truncate">{replyToMsg.content}</span>
+                  </div>
+                  <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => setReplyToMsg(null)}>
+                    <X className="w-3.5 h-3.5 text-muted-foreground" />
+                  </button>
+                </div>
+              )}
+
+              {/* Composer */}
+              <div className="px-4 py-3 border-t bg-background/95 backdrop-blur shrink-0">
+                {/* Char count warning */}
+                {msgInput.length > 500 && (
+                  <p className={`text-xs mb-1 text-right ${msgInput.length > 900 ? 'text-destructive font-semibold' : 'text-orange-500'}`}>
+                    {msgInput.length}/1000
+                  </p>
+                )}
                 <div className="flex items-end gap-2">
                   <Textarea
+                    ref={inputRef}
                     value={msgInput}
-                    onChange={e => setMsgInput(e.target.value)}
-                    placeholder={`Message ${convName}…`}
+                    onChange={e => {
+                      const v = e.target.value;
+                      if (v.length > 1000) return;
+                      setMsgInput(v);
+                      if (v.trim()) broadcastTyping(`${user?.email?.split('@')[0] || 'Someone'}`);
+                    }}
+                    placeholder={`Message ${selectedConv.is_group ? `# ${convName}` : convName}…`}
                     rows={1}
-                    className="flex-1 min-h-[40px] max-h-32 resize-none"
+                    className="flex-1 min-h-[40px] max-h-32 resize-none bg-muted/50 border-border focus-visible:ring-primary"
                     onKeyDown={e => {
                       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (msgInput.trim()) handleSend(); }
                     }}
                   />
-                  <Button onClick={handleSend} disabled={!msgInput.trim() || sending} size="sm" className="h-10 px-3">
+                  <Button
+                    onClick={handleSend}
+                    disabled={!msgInput.trim() || sending}
+                    size="sm"
+                    className="h-10 px-3 shrink-0"
+                  >
                     {sending
                       ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                       : <Send className="w-4 h-4" />}
                   </Button>
                 </div>
+                <p className="text-[10px] text-muted-foreground/60 mt-1">Enter to send · Shift+Enter for new line</p>
               </div>
             </>
           ) : (
+            /* Empty state */
             <div className="flex-1 flex items-center justify-center">
-              <div className="text-center space-y-4">
-                <MessageCircle className="w-16 h-16 text-muted-foreground/30 mx-auto" />
+              <div className="text-center space-y-4 px-8">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+                  <MessageCircle className="w-8 h-8 text-primary" />
+                </div>
                 <div>
-                  <p className="text-lg font-medium text-muted-foreground">Select a conversation</p>
-                  <p className="text-sm text-muted-foreground">Choose from your conversations or find a player</p>
+                  <p className="text-lg font-semibold">Select a conversation</p>
+                  <p className="text-sm text-muted-foreground mt-1">Choose from your conversations or find a player to start chatting</p>
                 </div>
                 <Button variant="outline" onClick={() => setShowPlayerSearch(true)}>
-                  <Plus className="w-4 h-4 mr-2" />Find Players
+                  <Search className="w-4 h-4 mr-2" />Find Players
                 </Button>
               </div>
             </div>
@@ -901,7 +1239,7 @@ const FriendsMessagesTab = () => {
         </div>
       </div>
 
-      {/* Group create dialog */}
+      {/* ── Dialogs ── */}
       <GroupCreateDialog
         open={showGroupCreate}
         onClose={() => setShowGroupCreate(false)}
@@ -910,18 +1248,17 @@ const FriendsMessagesTab = () => {
           const convId = await createGroupChat(name, memberIds);
           setActiveView('conversations');
           setSelectedConvId(convId);
-          toast.success('Group chat created!');
+          toast.success(`# ${name} created!`);
         }}
       />
 
-      {/* Group Info Sheet */}
       {selectedConv?.is_group && (
         <GroupInfoSheet
           open={showGroupInfo}
           onClose={() => setShowGroupInfo(false)}
           conv={selectedConv}
           currentUserId={user?.id || ''}
-          isAdmin={getMyRole(selectedConv) === 'admin'}
+          isAdmin={myRole === 'admin'}
           friends={friendsList}
           onRemoveMember={uid => removeMember(selectedConv.id, uid)}
           onAddMember={uid => addMember(selectedConv.id, uid)}
@@ -930,7 +1267,6 @@ const FriendsMessagesTab = () => {
         />
       )}
 
-      {/* Player profile modal */}
       <PlayerProfileModal
         player={profilePlayer}
         isOpen={!!profilePlayer}

@@ -8,6 +8,7 @@ export interface ConversationMember {
   role: 'admin' | 'member';
   joined_at: string;
   last_read_at?: string | null;
+  is_pinned?: boolean;
   profile?: {
     id: string;
     first_name?: string | null;
@@ -17,6 +18,13 @@ export interface ConversationMember {
   };
 }
 
+export interface MessageReaction {
+  emoji: string;
+  count: number;
+  reactedByMe: boolean;
+  userIds: string[];
+}
+
 export interface ConversationMessage {
   id: string;
   conversation_id: string;
@@ -24,6 +32,9 @@ export interface ConversationMessage {
   content: string;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
+  is_system?: boolean;
+  reply_to_id?: string | null;
   sender?: {
     id: string;
     first_name?: string | null;
@@ -31,6 +42,8 @@ export interface ConversationMessage {
     email: string;
     profile_picture_url?: string | null;
   };
+  reactions?: MessageReaction[];
+  replyTo?: Pick<ConversationMessage, 'id' | 'content' | 'sender_id' | 'sender'>;
 }
 
 export interface Conversation {
@@ -45,6 +58,7 @@ export interface Conversation {
   messages: ConversationMessage[];
   lastMessage?: ConversationMessage;
   unreadCount: number;
+  isPinned?: boolean;
 }
 
 export const useConversations = () => {
@@ -56,10 +70,9 @@ export const useConversations = () => {
     if (!user) return;
     const db = supabase as any;
     try {
-      // Fetch conversations the user is a member of
       const { data: memberRows, error: memberErr } = await db
         .from('conversation_members')
-        .select('conversation_id, role, joined_at, last_read_at')
+        .select('conversation_id, role, joined_at, last_read_at, is_pinned')
         .eq('user_id', user.id);
 
       if (memberErr) throw memberErr;
@@ -71,7 +84,6 @@ export const useConversations = () => {
 
       const convIds = memberRows.map((r: any) => r.conversation_id);
 
-      // Fetch conversation rows
       const { data: convRows, error: convErr } = await db
         .from('conversations')
         .select('*')
@@ -80,24 +92,21 @@ export const useConversations = () => {
 
       if (convErr) throw convErr;
 
-      // Fetch all members for these conversations
       const { data: allMembers, error: memErr } = await db
         .from('conversation_members')
-        .select('conversation_id, user_id, role, joined_at, last_read_at')
+        .select('conversation_id, user_id, role, joined_at, last_read_at, is_pinned')
         .in('conversation_id', convIds);
 
       if (memErr) throw memErr;
 
-      // Collect all unique user IDs to batch-fetch profiles
       const userIds = Array.from(new Set((allMembers || []).map((m: any) => m.user_id)));
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, email, profile_picture_url')
         .in('id', userIds as string[]);
-
       const profileMap = new Map((profiles || []).map(p => [p.id, p]));
 
-      // Fetch messages for these conversations
+      // Fetch messages (exclude hard-deleted, include soft-deleted for rendering)
       const { data: allMessages, error: msgErr } = await db
         .from('conversation_messages')
         .select('*')
@@ -106,7 +115,6 @@ export const useConversations = () => {
 
       if (msgErr) throw msgErr;
 
-      // Fetch sender profiles for messages
       const senderIds = Array.from(new Set((allMessages || []).map((m: any) => m.sender_id)));
       const { data: senderProfiles } = await supabase
         .from('profiles')
@@ -114,36 +122,80 @@ export const useConversations = () => {
         .in('id', senderIds as string[]);
       const senderMap = new Map((senderProfiles || []).map(p => [p.id, p]));
 
-      // Build conversation objects
+      // Fetch all reactions for these conversations' messages
+      const msgIds = (allMessages || []).map((m: any) => m.id);
+      let reactionsMap = new Map<string, MessageReaction[]>();
+      if (msgIds.length > 0) {
+        const { data: allReactions } = await db
+          .from('message_reactions')
+          .select('message_id, user_id, emoji')
+          .in('message_id', msgIds);
+
+        (allReactions || []).forEach((r: any) => {
+          const list = reactionsMap.get(r.message_id) || [];
+          const existing = list.find(x => x.emoji === r.emoji);
+          if (existing) {
+            existing.count++;
+            existing.userIds.push(r.user_id);
+            if (r.user_id === user.id) existing.reactedByMe = true;
+          } else {
+            list.push({ emoji: r.emoji, count: 1, reactedByMe: r.user_id === user.id, userIds: [r.user_id] });
+          }
+          reactionsMap.set(r.message_id, list);
+        });
+      }
+
+      // Build message map for reply_to lookups
+      const msgMap = new Map((allMessages || []).map((m: any) => [m.id, m]));
+
       const built: Conversation[] = (convRows || []).map((conv: any) => {
         const myMembership = memberRows.find((r: any) => r.conversation_id === conv.id);
         const lastReadAt = myMembership?.last_read_at ? new Date(myMembership.last_read_at) : new Date(0);
 
         const convMessages: ConversationMessage[] = (allMessages || [])
           .filter((m: any) => m.conversation_id === conv.id)
-          .map((m: any) => ({
-            ...m,
-            sender: senderMap.get(m.sender_id),
-          }));
+          .map((m: any) => {
+            const replyToRaw = m.reply_to_id ? (msgMap.get(m.reply_to_id) as any) : null;
+            return {
+              ...m,
+              sender: senderMap.get(m.sender_id),
+              reactions: reactionsMap.get(m.id) || [],
+              replyTo: replyToRaw ? {
+                id: replyToRaw.id,
+                content: replyToRaw.content,
+                sender_id: replyToRaw.sender_id,
+                sender: senderMap.get(replyToRaw.sender_id),
+              } : undefined,
+            };
+          });
 
         const convMembers: ConversationMember[] = (allMembers || [])
           .filter((m: any) => m.conversation_id === conv.id)
-          .map((m: any) => ({
-            ...m,
-            profile: profileMap.get(m.user_id),
-          }));
+          .map((m: any) => ({ ...m, profile: profileMap.get(m.user_id) }));
 
+        // Unread = non-system, non-deleted messages by others since last read
         const unreadCount = convMessages.filter(
-          m => m.sender_id !== user.id && new Date(m.created_at) > lastReadAt
+          m => m.sender_id !== user.id && !m.is_system && !m.deleted_at && new Date(m.created_at) > lastReadAt
         ).length;
+
+        // Pinned = this user has pinned this conversation
+        const isPinned = myMembership?.is_pinned ?? false;
 
         return {
           ...conv,
           members: convMembers,
           messages: convMessages,
-          lastMessage: convMessages[convMessages.length - 1],
+          lastMessage: [...convMessages].reverse().find(m => !m.is_system),
           unreadCount,
+          isPinned,
         };
+      });
+
+      // Sort: pinned first, then by updated_at desc
+      built.sort((a, b) => {
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
       });
 
       setConversations(built);
@@ -154,15 +206,55 @@ export const useConversations = () => {
     }
   }, [user]);
 
-  // Send a message in a conversation
-  const sendMessage = useCallback(async (conversationId: string, content: string) => {
+  // Send a message — optimistic insert into local state immediately
+  const sendMessage = useCallback(async (
+    conversationId: string,
+    content: string,
+    replyToId?: string,
+  ) => {
     if (!user || !content.trim()) return;
-    const { error } = await (supabase as any).from('conversation_messages').insert({
+
+    const tempId = `temp-${Date.now()}`;
+    const tempMsg: ConversationMessage = {
+      id: tempId,
       conversation_id: conversationId,
       sender_id: user.id,
       content: content.trim(),
-    });
-    if (error) throw error;
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      is_system: false,
+      reply_to_id: replyToId ?? null,
+      reactions: [],
+    };
+
+    // Optimistic update
+    setConversations(prev => prev.map(c => {
+      if (c.id !== conversationId) return c;
+      return { ...c, messages: [...c.messages, tempMsg], lastMessage: tempMsg };
+    }));
+
+    const { data, error } = await (supabase as any).from('conversation_messages').insert({
+      conversation_id: conversationId,
+      sender_id: user.id,
+      content: content.trim(),
+      reply_to_id: replyToId ?? null,
+    }).select().single();
+
+    if (error) {
+      // Rollback optimistic
+      setConversations(prev => prev.map(c => {
+        if (c.id !== conversationId) return c;
+        return { ...c, messages: c.messages.filter(m => m.id !== tempId) };
+      }));
+      throw error;
+    }
+
+    // Replace temp with real message
+    setConversations(prev => prev.map(c => {
+      if (c.id !== conversationId) return c;
+      const messages = c.messages.map(m => m.id === tempId ? { ...tempMsg, id: data.id } : m);
+      return { ...c, messages, lastMessage: { ...tempMsg, id: data.id } };
+    }));
   }, [user]);
 
   // Get or create a 1-to-1 DM conversation with another user
@@ -213,15 +305,61 @@ export const useConversations = () => {
     await fetchConversations();
   }, [fetchConversations]);
 
-  // Delete a message (own or admin deletes any)
+  // Soft-delete a message
   const deleteMessage = useCallback(async (messageId: string) => {
+    // Optimistic
+    setConversations(prev => prev.map(c => ({
+      ...c,
+      messages: c.messages.map(m =>
+        m.id === messageId ? { ...m, deleted_at: new Date().toISOString() } : m
+      ),
+    })));
     const { error } = await (supabase as any)
       .from('conversation_messages')
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq('id', messageId);
-    if (error) throw error;
-    await fetchConversations();
+    if (error) {
+      await fetchConversations();
+      throw error;
+    }
   }, [fetchConversations]);
+
+  // Toggle emoji reaction via RPC
+  const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
+    if (!user) return;
+    await (supabase as any).rpc('toggle_reaction', { p_message_id: messageId, p_emoji: emoji });
+    await fetchConversations();
+  }, [user, fetchConversations]);
+
+  // Leave a group
+  const leaveGroup = useCallback(async (conversationId: string) => {
+    const { error } = await (supabase as any).rpc('leave_group', { p_conversation_id: conversationId });
+    if (error) throw error;
+    setConversations(prev => prev.filter(c => c.id !== conversationId));
+  }, []);
+
+  // Delete a group (admin only)
+  const deleteGroup = useCallback(async (conversationId: string) => {
+    const { error } = await (supabase as any).rpc('delete_group', { p_conversation_id: conversationId });
+    if (error) throw error;
+    setConversations(prev => prev.filter(c => c.id !== conversationId));
+  }, []);
+
+  // Pin / unpin a conversation for this user
+  const togglePin = useCallback(async (conversationId: string, pinned: boolean) => {
+    setConversations(prev => prev.map(c =>
+      c.id === conversationId ? { ...c, isPinned: pinned } : c
+    ).sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+    }));
+    await (supabase as any)
+      .from('conversation_members')
+      .update({ is_pinned: pinned })
+      .eq('conversation_id', conversationId)
+      .eq('user_id', user?.id);
+  }, [user]);
 
   // Update group name / avatar
   const updateGroup = useCallback(async (conversationId: string, updates: { name?: string; avatar_url?: string }) => {
@@ -290,10 +428,18 @@ export const useConversations = () => {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, () => fetchConversations())
       .subscribe();
 
+    // Real-time: message soft-deletes (UPDATE) and reactions
+    const reactChannel = supabase
+      .channel('conv-reactions-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => fetchConversations())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversation_messages' }, () => fetchConversations())
+      .subscribe();
+
     return () => {
       supabase.removeChannel(msgChannel);
       supabase.removeChannel(memChannel);
       supabase.removeChannel(convChannel);
+      supabase.removeChannel(reactChannel);
     };
   }, [user, fetchConversations]);
 
@@ -306,6 +452,10 @@ export const useConversations = () => {
     addMember,
     removeMember,
     deleteMessage,
+    toggleReaction,
+    leaveGroup,
+    deleteGroup,
+    togglePin,
     updateGroup,
     markConversationRead,
     getTotalUnread,
