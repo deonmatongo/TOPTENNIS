@@ -204,37 +204,73 @@ interface ConvRowProps {
   userId: string;
   isOnlineFn: (id: string) => boolean;
   onClick: () => void;
+  onPin: (pinned: boolean) => void;
+  onMarkRead: () => void;
+  onLeave?: () => void;
+  onDelete?: () => void;
 }
-const ConvRow: React.FC<ConvRowProps> = ({ conv, selected, userId, isOnlineFn, onClick }) => {
-  const [hov, setHov] = useState(false);
+const ConvRow: React.FC<ConvRowProps> = ({ conv, selected, userId, isOnlineFn, onClick, onPin, onMarkRead, onLeave, onDelete }) => {
+  const [hov, setHov]       = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const name    = getConvName(conv, userId);
   const avatar  = getConvAvatar(conv, userId);
   const otherId = !conv.is_group ? getConvOtherUserId(conv, userId) : undefined;
   const online  = otherId ? isOnlineFn(otherId) : false;
   const lastMsg = conv.lastMessage;
+
+  const menuItems = [
+    { label: conv.isPinned ? '📌 Unpin' : '📌 Pin', action: () => onPin(!conv.isPinned) },
+    { label: '✓ Mark as read', action: onMarkRead },
+    ...(conv.is_group && onLeave  ? [{ label: '🚪 Leave group',  action: onLeave,  danger: false }] : []),
+    ...(conv.is_group && onDelete ? [{ label: '🗑️ Delete group', action: onDelete, danger: true  }] : []),
+  ];
+
   return (
     <div
-      onClick={onClick}
       onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', cursor: 'pointer', background: selected ? C.accentLight : hov ? C.hover : 'transparent', borderLeft: selected ? `3px solid ${C.accent}` : '3px solid transparent', transition: 'all 0.12s' }}
+      onMouseLeave={() => { setHov(false); setMenuOpen(false); }}
+      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', cursor: 'pointer', background: selected ? C.accentLight : hov ? C.hover : 'transparent', borderLeft: selected ? `3px solid ${C.accent}` : '3px solid transparent', transition: 'all 0.12s', position: 'relative' }}
     >
-      {conv.is_group ? <GroupAv size={44} /> : <Av name={name} src={avatar} size={44} online={online} />}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontWeight: conv.unreadCount ? 700 : 600, fontSize: 14, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {conv.is_group ? `# ${name}` : name}
-            {conv.isPinned && <span style={{ marginLeft: 6, fontSize: 12 }}>📌</span>}
+      <div onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+        {conv.is_group ? <GroupAv size={44} /> : <Av name={name} src={avatar} size={44} online={online} />}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontWeight: conv.unreadCount ? 700 : 600, fontSize: 14, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {conv.is_group ? `# ${name}` : name}
+              {conv.isPinned && <span style={{ marginLeft: 6, fontSize: 12 }}>📌</span>}
+            </div>
+            <div style={{ fontSize: 11, color: C.muted, flexShrink: 0, marginLeft: 6 }}>{lastMsg ? fmtTime(lastMsg.created_at) : ''}</div>
           </div>
-          <div style={{ fontSize: 11, color: C.muted, flexShrink: 0, marginLeft: 6 }}>{lastMsg ? fmtTime(lastMsg.created_at) : ''}</div>
+          {lastMsg && (
+            <div style={{ fontSize: 12, color: conv.unreadCount ? C.text : C.muted, fontWeight: conv.unreadCount ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
+              {lastMsg.deleted_at ? 'Message deleted' : lastMsg.content}
+            </div>
+          )}
         </div>
-        {lastMsg && (
-          <div style={{ fontSize: 12, color: conv.unreadCount ? C.text : C.muted, fontWeight: conv.unreadCount ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
-            {lastMsg.deleted_at ? 'Message deleted' : lastMsg.content}
-          </div>
-        )}
+        {conv.unreadCount > 0 && !hov && <UnreadBadge count={conv.unreadCount} />}
       </div>
-      {conv.unreadCount > 0 && <UnreadBadge count={conv.unreadCount} />}
+
+      {/* Context menu trigger — shown on hover */}
+      {hov && (
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <button
+            onClick={e => { e.stopPropagation(); setMenuOpen(v => !v); }}
+            style={{ width: 28, height: 28, borderRadius: 7, background: selected ? C.accentLight : C.bg, border: `1px solid ${C.border}`, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}
+          >···</button>
+          {menuOpen && (
+            <div style={{ position: 'absolute', right: 0, top: '110%', background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 50, minWidth: 170, overflow: 'hidden' }}>
+              {menuItems.map(item => (
+                <button key={item.label}
+                  onClick={e => { e.stopPropagation(); setMenuOpen(false); item.action(); }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', fontSize: 13, fontWeight: 500, color: (item as any).danger ? '#ef4444' : C.text, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = C.hover)}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                >{item.label}</button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -562,7 +598,10 @@ const FriendsMessagesTab = () => {
                         <div style={{ padding: '10px 16px 4px', fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1 }}>Direct Messages</div>
                         {filteredDMs.map(conv => (
                           <ConvRow key={conv.id} conv={conv} selected={selectedConvId === conv.id} userId={user?.id || ''} isOnlineFn={isOnline}
-                            onClick={() => { setSelectedConvId(conv.id); setMsgInput(''); setReplyToMsg(null); }} />
+                            onClick={() => { setSelectedConvId(conv.id); setMsgInput(''); setReplyToMsg(null); }}
+                            onPin={pinned => { togglePin(conv.id, pinned); toast.success(pinned ? 'Pinned' : 'Unpinned'); }}
+                            onMarkRead={() => markConversationRead(conv.id)}
+                          />
                         ))}
                       </>
                     )}
@@ -571,7 +610,12 @@ const FriendsMessagesTab = () => {
                         <div style={{ padding: '12px 16px 4px', fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1 }}>Groups</div>
                         {filteredGroups.map(conv => (
                           <ConvRow key={conv.id} conv={conv} selected={selectedConvId === conv.id} userId={user?.id || ''} isOnlineFn={isOnline}
-                            onClick={() => { setSelectedConvId(conv.id); setMsgInput(''); setReplyToMsg(null); }} />
+                            onClick={() => { setSelectedConvId(conv.id); setMsgInput(''); setReplyToMsg(null); }}
+                            onPin={pinned => { togglePin(conv.id, pinned); toast.success(pinned ? 'Pinned' : 'Unpinned'); }}
+                            onMarkRead={() => markConversationRead(conv.id)}
+                            onLeave={async () => { try { await leaveGroup(conv.id); if (selectedConvId === conv.id) setSelectedConvId(null); toast.success('Left group'); } catch { toast.error('Failed to leave'); } }}
+                            onDelete={getMyRole(conv) === 'admin' ? async () => { try { await deleteGroup(conv.id); if (selectedConvId === conv.id) setSelectedConvId(null); toast.success('Group deleted'); } catch { toast.error('Failed to delete'); } } : undefined}
+                          />
                         ))}
                       </>
                     )}
