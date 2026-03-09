@@ -279,8 +279,32 @@ export const useConversations = () => {
 
     if (error) throw error;
 
-    await fetchConversations();
-    return data as string;
+    const newConvId = data as string;
+
+    // Optimistically add the group to local state immediately so the UI shows it
+    // without waiting for the refetch round-trip / replication lag.
+    const optimisticConv: Conversation = {
+      id: newConvId,
+      name,
+      avatar_url: null,
+      is_group: true,
+      created_by: user.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      members: [{ user_id: user.id, role: 'admin', joined_at: new Date().toISOString() }],
+      messages: [],
+      lastMessage: undefined,
+      unreadCount: 0,
+      isPinned: false,
+    };
+    setConversations(prev => [optimisticConv, ...prev]);
+
+    // Refetch immediately to get real data (members, system message, etc.)
+    fetchConversations();
+    // And once more after a short delay as a safety net for replication lag
+    setTimeout(() => fetchConversations(), 1500);
+
+    return newConvId;
   }, [user, fetchConversations]);
 
   // Add a member to a group
