@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { useBlockedUsers } from '@/hooks/useBlockedUsers';
@@ -30,6 +30,17 @@ const C = {
 };
 
 const QUICK_EMOJIS = ['👍','❤️','😂','🎾','🔥','👏','😮','😢'];
+
+// ── Responsive helper ────────────────────────────────────────────────────────
+function useWindowWidth() {
+  const [width, setWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1280);
+  useEffect(() => {
+    const handler = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return width;
+}
 const EMOJI_TRAY   = ['😀','😂','🔥','🎾','👍','❤️','😮','🏆','💪','🎯','⚡','🤝','🙌','👊','😎'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -299,6 +310,7 @@ const FriendsMessagesTab = () => {
   const [groupName, setGroupName]         = useState('');
   const [groupSelected, setGroupSelected] = useState<Set<string>>(new Set());
   const [sending, setSending]             = useState(false);
+  const isMobile = useWindowWidth() < 768;
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollRef      = useRef<HTMLDivElement>(null);
@@ -487,9 +499,12 @@ const FriendsMessagesTab = () => {
 
         {/* ── Sidebar ── */}
         <div style={{
-          width: 320, background: C.white, borderRight: `1px solid ${C.border}`,
-          display: 'flex', flexDirection: 'column', flexShrink: 0,
-          ...(selectedConvId ? { display: 'none' as any } : {}),
+          width: isMobile ? '100%' : 320,
+          background: C.white,
+          borderRight: isMobile ? 'none' : `1px solid ${C.border}`,
+          display: isMobile && selectedConvId ? 'none' : 'flex',
+          flexDirection: 'column',
+          flexShrink: 0,
         }}>
           {/* Tabs */}
           <div style={{ padding: '12px 16px 0', borderBottom: `1px solid ${C.border}` }}>
@@ -661,13 +676,13 @@ const FriendsMessagesTab = () => {
         </div>
 
         {/* ── Thread ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: C.bg }}>
+        <div style={{ flex: 1, display: isMobile && !selectedConvId ? 'none' : 'flex', flexDirection: 'column', overflow: 'hidden', background: C.bg }}>
           {selectedConv ? (
             <>
               {/* Thread header */}
               <div style={{ padding: '14px 20px', background: C.white, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <button onClick={() => setSelectedConvId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: C.muted, padding: '2px 6px', lineHeight: 1 }}>‹</button>
+                  {isMobile && <button onClick={() => setSelectedConvId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: C.muted, padding: '2px 6px', lineHeight: 1 }}>‹</button>}
                   <button onClick={() => { if (selectedConv.is_group) { setShowGroupInfo(true); } else { const other = selectedConv.members.find(m => m.user_id !== user?.id); if (other?.profile) setProfilePlayer(buildProfile(other.profile, other.user_id)); } }}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
                     {selectedConv.is_group
