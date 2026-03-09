@@ -384,8 +384,9 @@ const FriendsMessagesTab = () => {
   const dmConvs    = visConvs.filter(c => !c.is_group);
   const groupConvs = visConvs.filter(c => c.is_group);
 
-  const filteredDMs    = dmConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(search.toLowerCase()));
-  const filteredGroups = groupConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(search.toLowerCase()));
+  const sortPinned = (arr: Conversation[]) => [...arr].sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
+  const filteredDMs    = sortPinned(dmConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(search.toLowerCase())));
+  const filteredGroups = sortPinned(groupConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(search.toLowerCase())));
 
   const filteredFriends = friends.filter(f => {
     const fd = f.sender_id === user?.id ? f.receiver : f.sender;
@@ -421,6 +422,24 @@ const FriendsMessagesTab = () => {
   useEffect(() => {
     if (selectedConvId) inputRef.current?.focus();
   }, [selectedConvId]);
+
+  // Dismiss reaction picker on outside click
+  useEffect(() => {
+    if (!reactionPickerMsg) return;
+    const handler = () => setReactionPickerMsg(null);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [reactionPickerMsg]);
+
+  // Auto-grow textarea
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (e.target.value.length > 1000) return;
+    setMsgInput(e.target.value);
+    if (e.target.value.trim()) broadcastTyping(user?.email?.split('@')[0] || 'Someone');
+    const ta = e.target;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+  };
 
   const buildProfile = (profile: NonNullable<Conversation['members'][0]['profile']>, uid: string) => ({
     id: uid, user_id: uid,
@@ -924,11 +943,7 @@ const FriendsMessagesTab = () => {
                   <textarea
                     ref={inputRef}
                     value={msgInput}
-                    onChange={e => {
-                      if (e.target.value.length > 1000) return;
-                      setMsgInput(e.target.value);
-                      if (e.target.value.trim()) broadcastTyping(user?.email?.split('@')[0] || 'Someone');
-                    }}
+                    onChange={handleInputChange}
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                     placeholder={`Message ${selectedConv.is_group ? `# ${convName}` : convName}… (Enter to send)`}
                     rows={1}
