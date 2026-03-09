@@ -475,6 +475,7 @@ const FriendsMessagesTab = () => {
     const content = msgInput;
     const replyId = replyToMsg?.id;
     setMsgInput(''); setReplyToMsg(null);
+    if (inputRef.current) inputRef.current.style.height = 'auto';
     try { await sendMessage(selectedConvId, content, replyId); }
     catch { toast.error('Failed to send'); setMsgInput(content); }
     finally { setSending(false); }
