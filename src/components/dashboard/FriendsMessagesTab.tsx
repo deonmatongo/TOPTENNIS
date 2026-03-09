@@ -117,28 +117,97 @@ interface GroupInfoSheetProps {
   onRemoveMember: (uid: string) => Promise<void>;
   onAddMember: (uid: string) => Promise<void>;
   onRenameGroup: (name: string) => Promise<void>;
+  onSetAvatar: (file: File) => Promise<void>;
+  onSetMemberRole: (uid: string, role: 'admin' | 'member') => Promise<void>;
   onViewProfile: (profile: NonNullable<Conversation['members'][0]['profile']>, uid: string) => void;
 }
 const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
   open, onClose, conv, currentUserId, isAdmin, friends,
-  onRemoveMember, onAddMember, onRenameGroup, onViewProfile,
+  onRemoveMember, onAddMember, onRenameGroup, onSetAvatar, onSetMemberRole, onViewProfile,
 }) => {
-  const [renaming, setRenaming] = useState(false);
-  const [newName, setNewName]   = useState(conv.name || '');
-  const [busy, setBusy]         = useState<string | null>(null);
-  const existingIds   = new Set(conv.members.map(m => m.user_id));
+  const [renaming, setRenaming]       = useState(false);
+  const [newName, setNewName]         = useState(conv.name || '');
+  const [busy, setBusy]               = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [confirmRemove, setConfirmRemove]     = useState<string | null>(null);
+  const [memberMenu, setMemberMenu]   = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const existingIds    = new Set(conv.members.map(m => m.user_id));
   const addableFriends = friends.filter(f => !existingIds.has(f.userId));
+
   const memberName = (m: Conversation['members'][0]) => {
     if (!m.profile) return 'Unknown';
     return `${m.profile.first_name || ''} ${m.profile.last_name || ''}`.trim() || m.profile.email;
   };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarUploading(true);
+    try {
+      await onSetAvatar(file);
+      toast.success('Group photo updated');
+    } catch {
+      toast.error('Failed to upload photo');
+    } finally {
+      setAvatarUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const doRemove = async (uid: string) => {
+    setConfirmRemove(null);
+    setBusy(uid);
+    try { await onRemoveMember(uid); toast.success('Member removed'); }
+    catch { toast.error('Failed to remove'); }
+    finally { setBusy(null); }
+  };
+
+  const doSetRole = async (uid: string, role: 'admin' | 'member') => {
+    setMemberMenu(null);
+    setBusy(uid);
+    try {
+      await onSetMemberRole(uid, role);
+      toast.success(role === 'admin' ? 'Promoted to admin' : 'Demoted to member');
+    } catch { toast.error('Failed'); }
+    finally { setBusy(null); }
+  };
+
   return (
     <Sheet open={open} onOpenChange={v => !v && onClose()}>
-      <SheetContent side="right" style={{ width: 360, padding: 0, display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif" }}>
+      <SheetContent side="right" style={{ width: 380, padding: 0, display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif" }}>
         <SheetHeader style={{ padding: '20px 20px 16px', borderBottom: `1px solid ${C.border}` }}>
-          <SheetTitle style={{ fontSize: 16, fontWeight: 700 }}>Group Info</SheetTitle>
+          <SheetTitle style={{ fontSize: 16, fontWeight: 700 }}>Group Settings</SheetTitle>
         </SheetHeader>
+
         <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+
+          {/* ── Group Avatar ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 28 }}>
+            <div style={{ position: 'relative', marginBottom: 10 }}>
+              {conv.avatar_url ? (
+                <img src={conv.avatar_url} alt="group" style={{ width: 80, height: 80, borderRadius: 20, objectFit: 'cover', border: `3px solid ${C.border}` }} />
+              ) : (
+                <div style={{ width: 80, height: 80, borderRadius: 20, background: C.accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, fontWeight: 700, border: `3px solid ${C.border}` }}>#</div>
+              )}
+              {isAdmin && (
+                <button
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={avatarUploading}
+                  style={{ position: 'absolute', bottom: -6, right: -6, width: 28, height: 28, borderRadius: '50%', background: C.accent, border: '2px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 13 }}
+                  title="Change group photo"
+                >
+                  {avatarUploading ? <div style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid white', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} /> : '📷'}
+                </button>
+              )}
+              <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{conv.name || 'Group Chat'}</div>
+            <div style={{ fontSize: 13, color: C.muted }}>{conv.members.length} members</div>
+          </div>
+
+          {/* ── Group Name ── */}
           <p style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Group Name</p>
           {renaming ? (
             <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
@@ -161,23 +230,72 @@ const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
             </div>
           )}
 
+          {/* ── Members ── */}
           <p style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Members ({conv.members.length})</p>
-          {conv.members.map(m => (
-            <div key={m.user_id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
-              <button onClick={() => m.profile && onViewProfile(m.profile, m.user_id)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
-                <Av name={memberName(m)} src={m.profile?.profile_picture_url} size={36} />
-                <div style={{ textAlign: 'left' }}>
-                  <p style={{ fontWeight: 600, fontSize: 14, margin: 0 }}>{memberName(m)}{m.user_id === currentUserId ? ' (you)' : ''}</p>
-                  {m.role === 'admin' && <p style={{ fontSize: 11, color: C.accent, fontWeight: 600, margin: 0 }}>Admin</p>}
-                </div>
-              </button>
-              {isAdmin && m.user_id !== currentUserId && (
-                <button disabled={busy === m.user_id} onClick={async () => { setBusy(m.user_id); try { await onRemoveMember(m.user_id); toast.success('Removed'); } catch { toast.error('Failed'); } finally { setBusy(null); } }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 18 }}>{busy === m.user_id ? '…' : '✕'}</button>
-              )}
-            </div>
-          ))}
+          {conv.members.map(m => {
+            const name = memberName(m);
+            const isMe = m.user_id === currentUserId;
+            const isBusy = busy === m.user_id;
+            return (
+              <div key={m.user_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: `1px solid ${C.border}`, position: 'relative' }}>
+                {/* Avatar + name */}
+                <button onClick={() => m.profile && onViewProfile(m.profile, m.user_id)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, flex: 1, textAlign: 'left' }}>
+                  <Av name={name} src={m.profile?.profile_picture_url} size={38} />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>{name}{isMe ? ' (you)' : ''}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: m.role === 'admin' ? C.accent : C.muted, marginTop: 1 }}>
+                      {m.role === 'admin' ? '⭐ Admin' : 'Member'}
+                    </div>
+                  </div>
+                </button>
 
+                {/* Admin actions (not on self) */}
+                {isAdmin && !isMe && (
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      disabled={isBusy}
+                      onClick={() => setMemberMenu(memberMenu === m.user_id ? null : m.user_id)}
+                      style={{ width: 30, height: 30, borderRadius: 8, background: C.bg, border: `1px solid ${C.border}`, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}
+                    >{isBusy ? '…' : '···'}</button>
+
+                    {memberMenu === m.user_id && (
+                      <div style={{ position: 'absolute', right: 0, top: '110%', background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 50, minWidth: 190, overflow: 'hidden' }}>
+                        {/* Promote / demote */}
+                        {m.role === 'member' ? (
+                          <button onClick={() => doSetRole(m.user_id, 'admin')}
+                            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', fontSize: 13, fontWeight: 500, color: C.text, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
+                            onMouseEnter={e => (e.currentTarget.style.background = C.hover)}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                          >⭐ Promote to admin</button>
+                        ) : (
+                          <button onClick={() => doSetRole(m.user_id, 'member')}
+                            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', fontSize: 13, fontWeight: 500, color: C.text, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
+                            onMouseEnter={e => (e.currentTarget.style.background = C.hover)}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                          >↓ Demote to member</button>
+                        )}
+                        {/* View profile */}
+                        <button onClick={() => { setMemberMenu(null); m.profile && onViewProfile(m.profile, m.user_id); }}
+                          style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', fontSize: 13, fontWeight: 500, color: C.text, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
+                          onMouseEnter={e => (e.currentTarget.style.background = C.hover)}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                        >👤 View profile</button>
+                        {/* Remove */}
+                        <button onClick={() => { setMemberMenu(null); setConfirmRemove(m.user_id); }}
+                          style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', fontSize: 13, fontWeight: 500, color: '#ef4444', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
+                          onMouseEnter={e => (e.currentTarget.style.background = '#fef2f2')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                        >🚫 Remove from group</button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* ── Add Members ── */}
           {isAdmin && addableFriends.length > 0 && (
             <div style={{ marginTop: 24 }}>
               <p style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Add Members</p>
@@ -185,13 +303,35 @@ const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
                 <div key={f.userId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: `1px solid ${C.border}` }}>
                   <Av name={f.name} src={f.avatar} size={32} />
                   <span style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>{f.name}</span>
-                  <button disabled={busy === f.userId} onClick={async () => { setBusy(f.userId); try { await onAddMember(f.userId); toast.success(`${f.name} added`); } catch { toast.error('Failed'); } finally { setBusy(null); } }}
-                    style={{ padding: '5px 12px', borderRadius: 8, background: C.accent, color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{busy === f.userId ? '…' : '+ Add'}</button>
+                  <button disabled={busy === f.userId}
+                    onClick={async () => { setBusy(f.userId); try { await onAddMember(f.userId); toast.success(`${f.name} added`); } catch { toast.error('Failed'); } finally { setBusy(null); } }}
+                    style={{ padding: '5px 12px', borderRadius: 8, background: C.accent, color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
+                  >{busy === f.userId ? '…' : '+ Add'}</button>
                 </div>
               ))}
             </div>
           )}
         </div>
+
+        {/* ── Confirm Remove dialog ── */}
+        {confirmRemove && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}
+            onClick={() => setConfirmRemove(null)}>
+            <div style={{ background: C.white, borderRadius: 16, padding: 28, width: 320, boxShadow: '0 16px 48px rgba(0,0,0,0.2)', fontFamily: "'DM Sans', sans-serif" }}
+              onClick={e => e.stopPropagation()}>
+              <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 10 }}>Remove member?</div>
+              <div style={{ fontSize: 14, color: C.muted, marginBottom: 24 }}>
+                {memberName(conv.members.find(m => m.user_id === confirmRemove)!)} will be removed from the group.
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => setConfirmRemove(null)}
+                  style={{ flex: 1, padding: 10, borderRadius: 10, border: `1.5px solid ${C.border}`, background: 'transparent', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
+                <button onClick={() => doRemove(confirmRemove)}
+                  style={{ flex: 1, padding: 10, borderRadius: 10, background: '#ef4444', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Remove</button>
+              </div>
+            </div>
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );
@@ -363,7 +503,7 @@ const FriendsMessagesTab = () => {
     sendMessage, getOrCreateDM, createGroupChat,
     addMember, removeMember, deleteMessage, toggleReaction,
     leaveGroup, deleteGroup, togglePin,
-    updateGroup, markConversationRead, getTotalUnread, getMyRole,
+    updateGroup, markConversationRead, getTotalUnread, getMyRole, setMemberRole,
   } = useConversations();
   const { invites: _invites } = useMatchInvites();
   const { isOnline } = useOnlinePresence();
@@ -1029,6 +1169,16 @@ const FriendsMessagesTab = () => {
           onRemoveMember={uid => removeMember(selectedConv.id, uid)}
           onAddMember={uid => addMember(selectedConv.id, uid)}
           onRenameGroup={name => updateGroup(selectedConv.id, { name })}
+          onSetAvatar={async (file) => {
+            const { supabase } = await import('@/integrations/supabase/client');
+            const ext  = file.name.split('.').pop();
+            const path = `${selectedConv.id}/${Date.now()}.${ext}`;
+            const { error: upErr } = await (supabase as any).storage.from('group-avatars').upload(path, file, { upsert: true });
+            if (upErr) throw upErr;
+            const { data: urlData } = (supabase as any).storage.from('group-avatars').getPublicUrl(path);
+            await updateGroup(selectedConv.id, { avatar_url: urlData.publicUrl });
+          }}
+          onSetMemberRole={(uid, role) => setMemberRole(selectedConv.id, uid, role)}
           onViewProfile={(profile, uid) => { setShowGroupInfo(false); setProfilePlayer(buildProfile(profile, uid)); }}
         />
       )}

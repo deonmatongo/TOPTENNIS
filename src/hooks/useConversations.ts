@@ -385,6 +385,17 @@ export const useConversations = () => {
       .eq('user_id', user?.id);
   }, [user]);
 
+  // Promote or demote a group member (admin only)
+  const setMemberRole = useCallback(async (conversationId: string, targetUserId: string, role: 'admin' | 'member') => {
+    const { error } = await (supabase as any).rpc('set_member_role', {
+      p_conversation_id: conversationId,
+      p_target_user_id: targetUserId,
+      p_role: role,
+    });
+    if (error) throw error;
+    await fetchConversations();
+  }, [fetchConversations]);
+
   // Update group name / avatar
   const updateGroup = useCallback(async (conversationId: string, updates: { name?: string; avatar_url?: string }) => {
     const { error } = await (supabase as any)
@@ -484,6 +495,7 @@ export const useConversations = () => {
     markConversationRead,
     getTotalUnread,
     getMyRole,
+    setMemberRole,
     refetch: fetchConversations,
   };
 };
