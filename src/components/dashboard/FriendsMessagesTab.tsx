@@ -1659,8 +1659,6 @@ const FriendsMessagesTab = () => {
                     style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', resize: 'none', fontSize: 14, color: C.text, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.5, maxHeight: 120, overflowY: 'auto' }}
                   />
                   <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
-                    <button title="Send match invite" onClick={() => toast.info('Match invite sent!')}
-                      style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: C.muted, padding: 4 }}>🎾</button>
                     <button onClick={handleSend} disabled={!msgInput.trim() || sending}
                       style={{ width: 36, height: 36, borderRadius: 10, background: msgInput.trim() ? C.accent : C.border, border: 'none', cursor: msgInput.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, transition: 'all 0.15s', flexShrink: 0 }}>
                       {sending
