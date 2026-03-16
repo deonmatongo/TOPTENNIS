@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import confetti from 'canvas-confetti';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { useBlockedUsers } from '@/hooks/useBlockedUsers';
@@ -9,9 +10,9 @@ import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import { useOnlinePresence } from '@/hooks/useOnlinePresence';
 import { formatDistanceToNow, format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { toast } from 'sonner';
-import PlayerSearch from './PlayerSearch';
 import { SearchResult } from '@/hooks/usePlayerSearch';
 import PlayerProfileModal from './PlayerProfileModal';
+import { PlayerScheduleModal } from './PlayerScheduleModal';
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -93,8 +94,10 @@ const Av: React.FC<AvProps> = ({ src, name, color, size = 36, online = false }) 
   );
 };
 
-const GroupAv = ({ size = 36 }: { size?: number }) => (
-  <div style={{ width: size, height: size, borderRadius: 10, background: C.accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.45, flexShrink: 0, fontWeight: 700 }}>#</div>
+const GroupAv = ({ size = 36, emoji, name }: { size?: number; emoji?: string; name?: string }) => (
+  <div style={{ width: size, height: size, borderRadius: Math.round(size * 0.27), background: name ? avatarColorForName(name) : C.accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.45, flexShrink: 0, fontWeight: 700, color: emoji ? undefined : '#fff' }}>
+    {emoji || '#'}
+  </div>
 );
 
 const UnreadBadge = ({ count }: { count: number }) => {
@@ -103,6 +106,177 @@ const UnreadBadge = ({ count }: { count: number }) => {
     <div style={{ background: C.unread, color: '#fff', borderRadius: 999, fontSize: 11, fontWeight: 700, minWidth: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px' }}>
       {count > 99 ? '99+' : count}
     </div>
+  );
+};
+
+// ── GroupMatchRequestSheet ────────────────────────────────────────────────────
+interface GroupMatchRequestSheetProps {
+  open: boolean;
+  onClose: () => void;
+  conv: Conversation;
+  currentUserId: string;
+  onConfirm: (players: SearchResult[]) => void;
+}
+const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
+  open, onClose, conv, currentUserId, onConfirm,
+}) => {
+  const otherMembers = conv.members.filter(m => m.user_id !== currentUserId);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Reset selection whenever the sheet opens
+  useEffect(() => { if (open) setSelected(new Set()); }, [open]);
+
+  const memberName = (m: Conversation['members'][0]) =>
+    m.profile
+      ? `${m.profile.first_name || ''} ${m.profile.last_name || ''}`.trim() || m.profile.email
+      : 'Unknown';
+
+  const toggle = (uid: string) =>
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(uid) ? next.delete(uid) : next.add(uid);
+      return next;
+    });
+
+  const allSelected = otherMembers.length > 0 && selected.size === otherMembers.length;
+
+  const toggleAll = () =>
+    setSelected(allSelected ? new Set() : new Set(otherMembers.map(m => m.user_id)));
+
+  const handleConfirm = () => {
+    const players: SearchResult[] = otherMembers
+      .filter(m => selected.has(m.user_id))
+      .map(m => ({
+        id: m.user_id,
+        user_id: m.user_id,
+        name: memberName(m),
+        email: m.profile?.email || '',
+        skill_level: 0,
+        wins: 0,
+        losses: 0,
+        first_name: m.profile?.first_name ?? undefined,
+        last_name: m.profile?.last_name ?? undefined,
+      }));
+    onClose();
+    onConfirm(players);
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={v => !v && onClose()}>
+      <SheetContent side="right" style={{ width: 380, padding: 0, display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif" }}>
+        <SheetHeader style={{ padding: '20px 20px 14px', borderBottom: `1px solid ${C.border}` }}>
+          <SheetTitle style={{ fontSize: 16, fontWeight: 700 }}>🎾 Request Match</SheetTitle>
+          <p style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
+            Select the members you want to challenge. You'll pick a time slot for each one.
+          </p>
+        </SheetHeader>
+
+        {/* Select All row */}
+        {otherMembers.length > 1 && (
+          <div
+            onClick={toggleAll}
+            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: `1px solid ${C.border}`, cursor: 'pointer', background: allSelected ? C.accentLight : 'transparent' }}
+          >
+            <div style={{
+              width: 22, height: 22, borderRadius: 6, border: `2px solid ${allSelected ? C.accent : C.border}`,
+              background: allSelected ? C.accent : C.white,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s',
+            }}>
+              {allSelected && <span style={{ color: '#fff', fontSize: 13, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Select all ({otherMembers.length})</span>
+          </div>
+        )}
+
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {otherMembers.length === 0 ? (
+            <div style={{ padding: '40px 0', textAlign: 'center' }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>👥</div>
+              <div style={{ fontWeight: 600, color: C.text }}>No other members</div>
+              <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Add members to the group first</div>
+            </div>
+          ) : (
+            otherMembers.map(m => {
+              const name = memberName(m);
+              const isChecked = selected.has(m.user_id);
+              return (
+                <div
+                  key={m.user_id}
+                  onClick={() => toggle(m.user_id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '13px 20px', borderBottom: `1px solid ${C.border}`,
+                    cursor: 'pointer', transition: 'background 0.1s',
+                    background: isChecked ? C.accentLight : 'transparent',
+                  }}
+                >
+                  {/* Checkbox */}
+                  <div style={{
+                    width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                    border: `2px solid ${isChecked ? C.accent : C.border}`,
+                    background: isChecked ? C.accent : C.white,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'all 0.15s',
+                  }}>
+                    {isChecked && <span style={{ color: '#fff', fontSize: 13, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+                  </div>
+
+                  <Av name={name} src={m.profile?.profile_picture_url ?? undefined} size={40} />
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                    <div style={{ fontSize: 12, color: C.muted, fontWeight: 500, marginTop: 2 }}>
+                      {m.role === 'admin' ? '⭐ Admin' : 'Member'}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '16px 20px', borderTop: `1px solid ${C.border}`, background: C.white, flexShrink: 0 }}>
+          {otherMembers.length > 0 && (
+            <>
+              {selected.size > 0 ? (
+                <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, fontWeight: 500 }}>
+                  {selected.size} player{selected.size !== 1 ? 's' : ''} selected — you'll set a time slot for each one.
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>Tap members above to select them.</div>
+              )}
+              <button
+                disabled={selected.size === 0}
+                onClick={handleConfirm}
+                style={{
+                  width: '100%', padding: '11px 0', borderRadius: 10,
+                  background: selected.size > 0 ? C.accent : C.border,
+                  color: selected.size > 0 ? '#fff' : C.muted,
+                  border: 'none', fontSize: 14, fontWeight: 700,
+                  cursor: selected.size > 0 ? 'pointer' : 'not-allowed',
+                  fontFamily: "'DM Sans', sans-serif", transition: 'all 0.15s',
+                }}
+              >
+                {selected.size === 0 ? 'Select players to continue' : `Continue with ${selected.size} player${selected.size !== 1 ? 's' : ''} →`}
+              </button>
+            </>
+          )}
+          <button
+            onClick={onClose}
+            style={{
+              width: '100%', padding: '10px 0', borderRadius: 10,
+              border: 'none', background: 'transparent',
+              fontSize: 13, fontWeight: 600, color: C.muted,
+              cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
+              marginTop: otherMembers.length > 0 ? 8 : 0,
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 };
 
@@ -337,6 +511,389 @@ const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
   );
 };
 
+// ── Preset group emoji avatars ────────────────────────────────────────────────
+const PRESET_EMOJIS = ['🎾', '⚽', '🏀', '🎯', '🏆', '⚡', '🔥', '🤝'];
+const AVATAR_COLORS = ['#F97316','#8B5CF6','#06B6D4','#10B981','#F59E0B','#EF4444','#EC4899','#6366F1'];
+function avatarColorForName(name: string) {
+  let h = 0; for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+
+// ── Step indicator ─────────────────────────────────────────────────────────────
+const StepDots: React.FC<{ step: number; labels: string[] }> = ({ step, labels }) => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, marginBottom: 24 }}>
+    {labels.map((label, i) => (
+      <React.Fragment key={i}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: i <= step ? C.accent : C.border, color: i <= step ? '#fff' : C.muted, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, transition: 'all 0.2s' }}>{i + 1}</div>
+          <div style={{ fontSize: 10, fontWeight: 600, color: i <= step ? C.accent : C.muted, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
+        </div>
+        {i < labels.length - 1 && (
+          <div style={{ width: 40, height: 2, background: i < step ? C.accent : C.border, margin: '0 4px', marginBottom: 16, transition: 'all 0.2s', flexShrink: 0 }} />
+        )}
+      </React.Fragment>
+    ))}
+  </div>
+);
+
+// ── NewGroupModal ─────────────────────────────────────────────────────────────
+interface NewGroupModalProps {
+  open: boolean;
+  onClose: () => void;
+  friends: { userId: string; name: string; avatar?: string; skill?: string }[];
+  existingGroupNames: string[];
+  isOnlineFn: (id: string) => boolean;
+  isMobile: boolean;
+  onSuccess: (convId: string, groupName: string) => void;
+  createGroupChat: (name: string, members: string[], opts?: { description?: string; group_type?: 'private' | 'open'; avatar_emoji?: string }) => Promise<string>;
+}
+const NewGroupModal: React.FC<NewGroupModalProps> = ({
+  open, onClose, friends, existingGroupNames, isOnlineFn, isMobile, onSuccess, createGroupChat,
+}) => {
+  const [step, setStep]                   = useState(0);
+  const [name, setName]                   = useState('');
+  const [description, setDescription]    = useState('');
+  const [groupType, setGroupType]         = useState<'private' | 'open'>('private');
+  const [avatarEmoji, setAvatarEmoji]     = useState('🎾');
+  const [memberSearch, setMemberSearch]   = useState('');
+  const [selected, setSelected]           = useState<Set<string>>(new Set());
+  const [creating, setCreating]           = useState(false);
+  const [showDiscard, setShowDiscard]     = useState(false);
+
+  const MAX_MEMBERS = 50;
+  const nameLen       = name.trim().length;
+  const nameTaken     = existingGroupNames.some(n => n.toLowerCase() === name.trim().toLowerCase());
+  const nameValid     = nameLen >= 2 && nameLen <= 40;
+  const memberCount   = selected.size + 1; // +1 for creator
+  const memberOverLimit = memberCount > MAX_MEMBERS;
+
+  const resetAndClose = () => {
+    setStep(0); setName(''); setDescription(''); setGroupType('private');
+    setAvatarEmoji('🎾'); setSelected(new Set()); setMemberSearch(''); setCreating(false);
+    setShowDiscard(false); onClose();
+  };
+
+  const tryClose = () => {
+    if (name.trim() || selected.size > 0 || description.trim()) { setShowDiscard(true); } else { resetAndClose(); }
+  };
+
+  const onlineFriends  = friends.filter(f => isOnlineFn(f.userId));
+  const offlineFriends = friends.filter(f => !isOnlineFn(f.userId));
+  const filterFriends  = (arr: typeof friends) => arr.filter(f => f.name.toLowerCase().includes(memberSearch.toLowerCase()));
+
+  const handleCreate = async () => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const id = await createGroupChat(name.trim(), Array.from(selected), {
+        description: description.trim() || undefined,
+        group_type: groupType,
+        avatar_emoji: avatarEmoji,
+      });
+      resetAndClose();
+      confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 }, colors: ['#F97316', '#ffffff', '#111827'] });
+      onSuccess(id, name.trim());
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to create group');
+      setCreating(false);
+    }
+  };
+
+  if (!open) return null;
+
+  const modalStyle: React.CSSProperties = isMobile
+    ? { position: 'fixed', inset: 0, background: C.white, zIndex: 200, display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif", overflowY: 'auto' }
+    : { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 };
+  const cardStyle: React.CSSProperties = isMobile
+    ? { flex: 1, padding: 24, display: 'flex', flexDirection: 'column' }
+    : { background: C.white, borderRadius: 20, padding: 32, width: '100%', maxWidth: 460, boxShadow: '0 24px 64px rgba(0,0,0,0.22)', fontFamily: "'DM Sans', sans-serif", maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' };
+
+  return (
+    <div style={modalStyle} onClick={isMobile ? undefined : tryClose}>
+      <div style={cardStyle} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div style={{ fontWeight: 700, fontSize: isMobile ? 20 : 18, color: C.text }}>Create a Group</div>
+          <button onClick={tryClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: C.muted, padding: '2px 6px', lineHeight: 1, borderRadius: 8 }}>✕</button>
+        </div>
+
+        <StepDots step={step} labels={['Details', 'Members', 'Review']} />
+
+        {/* ── Step 0: Details ── */}
+        {step === 0 && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {/* Avatar picker */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 72, height: 72, borderRadius: 18, background: avatarColorForName(name || 'G'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', transition: 'background 0.2s' }}>
+                {avatarEmoji}
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                {PRESET_EMOJIS.map(e => (
+                  <button key={e} onClick={() => setAvatarEmoji(e)}
+                    style={{ width: 36, height: 36, borderRadius: 10, background: avatarEmoji === e ? C.accentLight : C.bg, border: `2px solid ${avatarEmoji === e ? C.accent : C.border}`, fontSize: 18, cursor: 'pointer', transition: 'all 0.15s' }}>
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Name */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Group Name <span style={{ color: C.accent }}>*</span></label>
+                <span style={{ fontSize: 12, color: nameLen > 35 ? C.accent : C.muted }}>{nameLen}/40</span>
+              </div>
+              <input value={name} onChange={e => setName(e.target.value.slice(0, 40))} autoFocus placeholder='e.g. "Friday Night Squad"'
+                style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: `1.5px solid ${nameTaken ? '#ef4444' : nameValid ? C.accent : C.border}`, fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: "'DM Sans', sans-serif", color: C.text }} />
+              {nameTaken && <div style={{ fontSize: 12, color: '#ef4444', marginTop: 5 }}>⚠ You already have a group with this name</div>}
+            </div>
+
+            {/* Description */}
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 700, color: C.text, display: 'block', marginBottom: 6 }}>Description <span style={{ color: C.muted, fontWeight: 400 }}>(optional)</span></label>
+              <input value={description} onChange={e => setDescription(e.target.value.slice(0, 120))} placeholder="What's this group for?"
+                style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: `1.5px solid ${C.border}`, fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: "'DM Sans', sans-serif", color: C.text }} />
+            </div>
+
+            {/* Group type */}
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 700, color: C.text, display: 'block', marginBottom: 8 }}>Group Type</label>
+              {(['private', 'open'] as const).map(t => (
+                <label key={t} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${groupType === t ? C.accent : C.border}`, background: groupType === t ? C.accentLight : C.white, cursor: 'pointer', marginBottom: 8, transition: 'all 0.15s' }}>
+                  <input type="radio" checked={groupType === t} onChange={() => setGroupType(t)} style={{ accentColor: C.accent, width: 16, height: 16 }} />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: C.text, textTransform: 'capitalize' }}>{t === 'private' ? '🔒 Private' : '🌐 Open'}</div>
+                    <div style={{ fontSize: 12, color: C.muted }}>{t === 'private' ? 'Only invited members can join' : 'Any friend can join'}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 10, marginTop: 'auto', paddingTop: 8 }}>
+              <button onClick={tryClose} style={{ flex: 1, padding: 12, borderRadius: 12, border: `1.5px solid ${C.border}`, background: 'transparent', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
+              <button disabled={!nameValid || nameTaken} onClick={() => setStep(1)}
+                style={{ flex: 2, padding: 12, borderRadius: 12, background: nameValid && !nameTaken ? C.accent : C.border, color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: nameValid && !nameTaken ? 'pointer' : 'default', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.15s' }}>
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 1: Members ── */}
+        {step === 1 && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Search */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.bg, borderRadius: 10, padding: '9px 12px', border: `1.5px solid ${C.border}` }}>
+              <span style={{ color: C.muted }}>🔍</span>
+              <input value={memberSearch} onChange={e => setMemberSearch(e.target.value)} autoFocus placeholder="Search friends…"
+                style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, color: C.text, flex: 1, fontFamily: "'DM Sans', sans-serif" }} />
+            </div>
+
+            {/* Counter */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: C.muted, fontWeight: 500 }}>
+                {selected.size === 0 && <span style={{ color: C.muted }}>You can always add members later</span>}
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: memberCount >= 40 ? C.accent : C.muted }}>
+                {memberCount} / {MAX_MEMBERS} members
+              </span>
+            </div>
+
+            {/* Friends list */}
+            <div style={{ flex: 1, overflowY: 'auto', maxHeight: isMobile ? '45vh' : 280, borderRadius: 10, border: `1px solid ${C.border}` }}>
+              {friends.length === 0 ? (
+                <div style={{ padding: 32, textAlign: 'center', color: C.muted, fontSize: 13 }}>Add friends first to invite to the group</div>
+              ) : (
+                <>
+                  {filterFriends(onlineFriends).length > 0 && (
+                    <>
+                      <div style={{ padding: '8px 14px 4px', fontSize: 11, fontWeight: 700, color: C.online, textTransform: 'uppercase', letterSpacing: 1, background: C.white }}>Online — {filterFriends(onlineFriends).length}</div>
+                      {filterFriends(onlineFriends).map(f => <MemberPickRow key={f.userId} f={f} selected={selected.has(f.userId)} disabled={memberOverLimit && !selected.has(f.userId)} online onToggle={() => setSelected(prev => { const n = new Set(prev); n.has(f.userId) ? n.delete(f.userId) : n.add(f.userId); return n; })} />)}
+                    </>
+                  )}
+                  {filterFriends(offlineFriends).length > 0 && (
+                    <>
+                      <div style={{ padding: '8px 14px 4px', fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, background: C.white }}>Offline — {filterFriends(offlineFriends).length}</div>
+                      {filterFriends(offlineFriends).map(f => <MemberPickRow key={f.userId} f={f} selected={selected.has(f.userId)} disabled={memberOverLimit && !selected.has(f.userId)} online={false} onToggle={() => setSelected(prev => { const n = new Set(prev); n.has(f.userId) ? n.delete(f.userId) : n.add(f.userId); return n; })} />)}
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Pill chips */}
+            {selected.size > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '8px 0' }}>
+                {Array.from(selected).map(uid => {
+                  const f = friends.find(x => x.userId === uid);
+                  if (!f) return null;
+                  return (
+                    <div key={uid} style={{ display: 'flex', alignItems: 'center', gap: 5, background: C.accentLight, border: `1px solid ${C.accent}`, borderRadius: 999, padding: '4px 10px 4px 6px', fontSize: 12, fontWeight: 600, color: C.text }}>
+                      <Av name={f.name} src={f.avatar} size={18} />
+                      {f.name.split(' ')[0]}
+                      <button onClick={() => setSelected(prev => { const n = new Set(prev); n.delete(uid); return n; })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 14, padding: 0, lineHeight: 1, marginLeft: 2 }}>✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
+              <button onClick={() => setStep(0)} style={{ flex: 1, padding: 12, borderRadius: 12, border: `1.5px solid ${C.border}`, background: 'transparent', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>← Back</button>
+              <button onClick={() => setStep(2)} style={{ flex: 2, padding: 12, borderRadius: 12, background: C.accent, color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Next →</button>
+            </div>
+            <button onClick={tryClose} style={{ width: '100%', padding: '10px 0', borderRadius: 12, border: 'none', background: 'transparent', fontSize: 13, fontWeight: 600, color: C.muted, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>Cancel &amp; discard</button>
+          </div>
+        )}
+
+        {/* ── Step 2: Review ── */}
+        {step === 2 && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {/* Summary card */}
+            <div style={{ background: C.accentLight, borderRadius: 14, padding: '16px 18px', border: `1.5px solid ${C.border}`, display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: avatarColorForName(name), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, flexShrink: 0 }}>{avatarEmoji}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 16, color: C.text, marginBottom: 2 }}>{name}</div>
+                <div style={{ fontSize: 12, color: C.muted, marginBottom: description ? 6 : 0 }}>
+                  {groupType === 'private' ? '🔒 Private' : '🌐 Open'} · {memberCount} member{memberCount !== 1 ? 's' : ''}
+                </div>
+                {description && <div style={{ fontSize: 13, color: C.text, fontStyle: 'italic' }}>"{description}"</div>}
+              </div>
+            </div>
+
+            {/* Members list */}
+            {selected.size > 0 && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Members being added ({selected.size})</div>
+                <div style={{ maxHeight: isMobile ? '30vh' : 180, overflowY: 'auto', borderRadius: 10, border: `1px solid ${C.border}` }}>
+                  {Array.from(selected).map(uid => {
+                    const f = friends.find(x => x.userId === uid);
+                    if (!f) return null;
+                    return (
+                      <div key={uid} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderBottom: `1px solid ${C.border}` }}>
+                        <Av name={f.name} src={f.avatar} size={32} online={isOnlineFn(f.userId)} />
+                        <div style={{ flex: 1, fontWeight: 500, fontSize: 13, color: C.text }}>{f.name}</div>
+                        {isOnlineFn(f.userId) && <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.online, display: 'inline-block' }} />}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Notification note */}
+            <div style={{ fontSize: 12, color: C.muted, background: C.bg, borderRadius: 10, padding: '10px 14px', border: `1px solid ${C.border}` }}>
+              ⚠ They'll each receive an in-app notification when the group is created.
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 10, marginTop: 'auto', paddingTop: 4 }}>
+              <button onClick={() => setStep(1)} style={{ flex: 1, padding: 12, borderRadius: 12, border: `1.5px solid ${C.border}`, background: 'transparent', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>← Back</button>
+              <button disabled={creating} onClick={handleCreate}
+                style={{ flex: 2, padding: 12, borderRadius: 12, background: creating ? C.border : C.accent, color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: creating ? 'default' : 'pointer', fontFamily: "'DM Sans', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                {creating
+                  ? <><div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid white', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} /> Creating…</>
+                  : `Create Group ${avatarEmoji}`}
+              </button>
+            </div>
+            {!creating && (
+              <button onClick={tryClose} style={{ width: '100%', padding: '10px 0', borderRadius: 12, border: 'none', background: 'transparent', fontSize: 13, fontWeight: 600, color: C.muted, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>Cancel &amp; discard</button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Discard confirm */}
+      {showDiscard && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}>
+          <div style={{ background: C.white, borderRadius: 16, padding: 28, width: 300, boxShadow: '0 16px 48px rgba(0,0,0,0.2)', fontFamily: "'DM Sans', sans-serif" }}>
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 10, color: C.text }}>Discard group?</div>
+            <div style={{ fontSize: 14, color: C.muted, marginBottom: 24 }}>Your progress will be lost.</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setShowDiscard(false)} style={{ flex: 1, padding: 10, borderRadius: 10, border: `1.5px solid ${C.border}`, background: 'transparent', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Keep editing</button>
+              <button onClick={resetAndClose} style={{ flex: 1, padding: 10, borderRadius: 10, background: '#ef4444', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Discard</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── MemberPickRow (used inside NewGroupModal) ─────────────────────────────────
+interface MemberPickRowProps {
+  f: { userId: string; name: string; avatar?: string; skill?: string };
+  selected: boolean; disabled: boolean; online: boolean;
+  onToggle: () => void;
+}
+const MemberPickRow: React.FC<MemberPickRowProps> = ({ f, selected, disabled, online, onToggle }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderBottom: `1px solid ${C.border}`, background: selected ? C.accentLight : C.white, transition: 'background 0.12s' }}>
+    <Av name={f.name} src={f.avatar} size={36} online={online} />
+    <div style={{ flex: 1 }}>
+      <div style={{ fontWeight: 600, fontSize: 13, color: C.text }}>{f.name}</div>
+      {f.skill && <div style={{ fontSize: 11, color: C.muted }}>{f.skill}</div>}
+    </div>
+    <button onClick={onToggle} disabled={disabled && !selected}
+      style={{ width: 32, height: 32, borderRadius: 10, background: selected ? C.accent : disabled ? C.border : C.bg, border: `1.5px solid ${selected ? C.accent : C.border}`, color: selected ? '#fff' : C.muted, fontSize: 16, cursor: disabled && !selected ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', flexShrink: 0 }}>
+      {selected ? '✓' : '+'}
+    </button>
+  </div>
+);
+
+// ── GroupOnboardingBanner ─────────────────────────────────────────────────────
+interface GroupOnboardingBannerProps {
+  convId: string; convName: string; avatarEmoji?: string; isCreator: boolean;
+  inviterName?: string; memberCount: number;
+  onViewMembers: () => void;
+}
+const GroupOnboardingBanner: React.FC<GroupOnboardingBannerProps> = ({
+  convId, convName, avatarEmoji, isCreator, inviterName, memberCount, onViewMembers,
+}) => {
+  const key = `dismissed_onboarding_${convId}`;
+  const [dismissed, setDismissed] = useState(() => !!localStorage.getItem(key));
+  const [collapsing, setCollapsing] = useState(false);
+
+  const dismiss = () => {
+    setCollapsing(true);
+    setTimeout(() => { localStorage.setItem(key, '1'); setDismissed(true); }, 300);
+  };
+
+  if (dismissed) return null;
+
+  return (
+    <div style={{ overflow: 'hidden', transition: 'max-height 0.3s ease, opacity 0.3s', maxHeight: collapsing ? 0 : 200, opacity: collapsing ? 0 : 1, flexShrink: 0 }}>
+      <div style={{ margin: '12px 20px', background: C.accentLight, borderLeft: `4px solid ${C.accent}`, borderRadius: 12, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        <div style={{ fontSize: 28, lineHeight: 1 }}>{avatarEmoji || '🎾'}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {isCreator ? (
+            <>
+              <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 2 }}>You created {convName}</div>
+              <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>You're the admin · {memberCount} member{memberCount !== 1 ? 's' : ''}</div>
+              <div style={{ fontSize: 12, color: C.text, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div>✓ Invite more friends via <span style={{ color: C.accent, fontWeight: 600 }}>⚙ Settings</span></div>
+                <div>✓ Set a group description</div>
+                <div>✓ Send your first message below 👋</div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 2 }}>👋 {inviterName || 'Someone'} added you to {convName}</div>
+              <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>
+                {memberCount} member{memberCount !== 1 ? 's' : ''}
+              </div>
+              <button onClick={onViewMembers} style={{ fontSize: 12, fontWeight: 600, color: C.accent, background: 'none', border: `1px solid ${C.accent}`, borderRadius: 8, padding: '4px 10px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>View Members</button>
+            </>
+          )}
+        </div>
+        <button onClick={dismiss} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 16, padding: 2, flexShrink: 0, lineHeight: 1 }} title="Got it">✕</button>
+      </div>
+    </div>
+  );
+};
+
 // ── ConvRow ───────────────────────────────────────────────────────────────────
 interface ConvRowProps {
   conv: Conversation;
@@ -372,7 +929,7 @@ const ConvRow: React.FC<ConvRowProps> = ({ conv, selected, userId, isOnlineFn, o
       style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', cursor: 'pointer', background: selected ? C.accentLight : hov ? C.hover : 'transparent', borderLeft: selected ? `3px solid ${C.accent}` : '3px solid transparent', transition: 'all 0.12s', position: 'relative' }}
     >
       <div onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
-        {conv.is_group ? <GroupAv size={44} /> : <Av name={name} src={avatar} size={44} online={online} />}
+        {conv.is_group ? <GroupAv size={44} emoji={(conv as any).avatar_emoji} name={name} /> : <Av name={name} src={avatar} size={44} online={online} />}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontWeight: conv.unreadCount ? 700 : 600, fontSize: 14, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -479,13 +1036,14 @@ const FriendsMessagesTab = () => {
   const [emojiTrayOpen, setEmojiTrayOpen] = useState(false);
   const [replyToMsg, setReplyToMsg]       = useState<ConversationMessage | null>(null);
   const [atBottom, setAtBottom]           = useState(true);
-  const [showPlayerSearch, setShowPlayerSearch] = useState(false);
   const [showGroupCreate, setShowGroupCreate]   = useState(false);
   const [showGroupInfo, setShowGroupInfo]       = useState(false);
+  const [showGroupMatchRequest, setShowGroupMatchRequest] = useState(false);
+  const [matchRequestQueue, setMatchRequestQueue] = useState<SearchResult[]>([]);
+  const [matchRequestTarget, setMatchRequestTarget] = useState<SearchResult | null>(null);
   const [profilePlayer, setProfilePlayer]       = useState<any | null>(null);
-  const [groupName, setGroupName]         = useState('');
-  const [groupSelected, setGroupSelected] = useState<Set<string>>(new Set());
   const [sending, setSending]             = useState(false);
+  const [newGroupConvId, setNewGroupConvId] = useState<string | null>(null);
   const isMobile = useWindowWidth() < 768;
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -661,7 +1219,6 @@ const FriendsMessagesTab = () => {
       {/* ── Header ── */}
       <div style={{ padding: '14px 24px', background: C.white, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: C.accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🎾</div>
           <div>
             <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>Network & Messages</div>
             <div style={{ fontSize: 13, color: C.muted }}>
@@ -672,23 +1229,10 @@ const FriendsMessagesTab = () => {
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={() => setShowGroupCreate(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: `1.5px solid ${C.border}`, background: C.white, color: C.text, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-            👥 New Group
-          </button>
-          <button onClick={() => setShowPlayerSearch(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: showPlayerSearch ? C.text : C.accent, color: '#fff', fontSize: 14, fontWeight: 600, border: 'none', cursor: 'pointer' }}>
-            + Find Players
+            👥 Create New Group
           </button>
         </div>
       </div>
-
-      {/* ── Find Players bar ── */}
-      {showPlayerSearch && (
-        <div style={{ padding: '12px 24px', background: C.white, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
-          <PlayerSearch
-            onPlayerSelect={async (p: SearchResult) => { setShowPlayerSearch(false); if (p.user_id) await handleStartDM(p.user_id); }}
-            placeholder="Search players by name or skill level…"
-          />
-        </div>
-      )}
 
       {/* ── Body ── */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -749,7 +1293,7 @@ const FriendsMessagesTab = () => {
                   <div style={{ padding: 40, textAlign: 'center' }}>
                     <div style={{ fontSize: 36, marginBottom: 10 }}>💬</div>
                     <div style={{ fontWeight: 600, color: C.text, marginBottom: 4 }}>No conversations yet</div>
-                    <div style={{ fontSize: 13, color: C.muted }}>Find players above to start chatting</div>
+                    <div style={{ fontSize: 13, color: C.muted }}>Start a new conversation with a friend</div>
                   </div>
                 ) : (
                   <>
@@ -777,6 +1321,10 @@ const FriendsMessagesTab = () => {
                             onDelete={getMyRole(conv) === 'admin' ? async () => { try { await deleteGroup(conv.id); if (selectedConvId === conv.id) setSelectedConvId(null); toast.success('Group deleted'); } catch { toast.error('Failed to delete'); } } : undefined}
                           />
                         ))}
+                        <button onClick={() => setShowGroupCreate(true)} style={{ display: 'block', width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13, color: C.muted, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}
+                          onMouseEnter={e => { e.currentTarget.style.color = C.accent; }} onMouseLeave={e => { e.currentTarget.style.color = C.muted; }}>
+                          + Create a group
+                        </button>
                       </>
                     )}
                   </>
@@ -825,7 +1373,7 @@ const FriendsMessagesTab = () => {
                   <div style={{ padding: 40, textAlign: 'center' }}>
                     <div style={{ fontSize: 36, marginBottom: 10 }}>👥</div>
                     <div style={{ fontWeight: 600, color: C.text }}>{friends.length === 0 ? 'No friends yet' : 'No matches'}</div>
-                    {friends.length === 0 && <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Use Find Players to connect</div>}
+                    {friends.length === 0 && <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Send a friend request to start connecting</div>}
                   </div>
                 )}
               </>
@@ -890,7 +1438,7 @@ const FriendsMessagesTab = () => {
                   <button onClick={() => { if (selectedConv.is_group) { setShowGroupInfo(true); } else { const other = selectedConv.members.find(m => m.user_id !== user?.id); if (other?.profile) setProfilePlayer(buildProfile(other.profile, other.user_id)); } }}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
                     {selectedConv.is_group
-                      ? <GroupAv size={40} />
+                      ? <GroupAv size={40} emoji={(selectedConv as any).avatar_emoji} name={convName} />
                       : <Av name={convName} src={convAvatar} size={40} online={dmOtherId ? isOnline(dmOtherId) : false} />}
                     <div style={{ textAlign: 'left' }}>
                       <div style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{selectedConv.is_group ? `# ${convName}` : convName}</div>
@@ -906,11 +1454,31 @@ const FriendsMessagesTab = () => {
                   <button title={selectedConv.isPinned ? 'Unpin' : 'Pin'} onClick={() => togglePin(selectedConv.id, !selectedConv.isPinned)}
                     style={{ width: 36, height: 36, borderRadius: 9, background: selectedConv.isPinned ? C.accentLight : C.bg, border: `1px solid ${selectedConv.isPinned ? C.accent : C.border}`, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📌</button>
                   {selectedConv.is_group && (
-                    <button title="Group settings" onClick={() => setShowGroupInfo(true)}
-                      style={{ width: 36, height: 36, borderRadius: 9, background: C.bg, border: `1px solid ${C.border}`, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⚙️</button>
+                    <>
+                      <button title="Request Match" onClick={() => setShowGroupMatchRequest(true)}
+                        style={{ height: 36, padding: '0 12px', borderRadius: 9, background: C.accent, border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, color: '#fff', fontFamily: "'DM Sans', sans-serif" }}>🎾 Request Match</button>
+                      <button title="Group settings" onClick={() => setShowGroupInfo(true)}
+                        style={{ width: 36, height: 36, borderRadius: 9, background: C.bg, border: `1px solid ${C.border}`, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⚙️</button>
+                    </>
                   )}
                 </div>
               </div>
+
+              {/* Onboarding banner for new/joined groups */}
+              {selectedConv.is_group && (
+                <GroupOnboardingBanner
+                  convId={selectedConv.id}
+                  convName={convName}
+                  avatarEmoji={(selectedConv as any).avatar_emoji || '🎾'}
+                  isCreator={selectedConv.created_by === user?.id}
+                  inviterName={(() => {
+                    const creator = selectedConv.members.find(m => m.user_id === selectedConv.created_by);
+                    return creator?.profile ? `${creator.profile.first_name || ''} ${creator.profile.last_name || ''}`.trim() || creator.profile.email : undefined;
+                  })()}
+                  memberCount={selectedConv.members.length}
+                  onViewMembers={() => setShowGroupInfo(true)}
+                />
+              )}
 
               {/* Messages area */}
               <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 2 }}
@@ -1086,7 +1654,7 @@ const FriendsMessagesTab = () => {
                     value={msgInput}
                     onChange={handleInputChange}
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                    placeholder={`Message ${selectedConv.is_group ? `# ${convName}` : convName}… (Enter to send)`}
+                    placeholder={newGroupConvId === selectedConvId ? 'Say hello to the group! 👋' : `Message ${selectedConv.is_group ? `# ${convName}` : convName}… (Enter to send)`}
                     rows={1}
                     style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', resize: 'none', fontSize: 14, color: C.text, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.5, maxHeight: 120, overflowY: 'auto' }}
                   />
@@ -1108,57 +1676,64 @@ const FriendsMessagesTab = () => {
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, background: C.bg }}>
               <div style={{ fontSize: 64 }}>💬</div>
               <div style={{ fontWeight: 700, fontSize: 20, color: C.text }}>Select a conversation</div>
-              <div style={{ fontSize: 14, color: C.muted }}>Choose from your conversations or find a player</div>
-              <button onClick={() => setShowPlayerSearch(true)} style={{ marginTop: 8, padding: '10px 24px', borderRadius: 12, background: C.accent, color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-                + Find Players
-              </button>
+              <div style={{ fontSize: 14, color: C.muted }}>Choose a conversation from the sidebar</div>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── New Group dialog ── */}
-      {showGroupCreate && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={() => setShowGroupCreate(false)}>
-          <div style={{ background: '#fff', borderRadius: 20, padding: 28, width: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', fontFamily: "'DM Sans', sans-serif" }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 20 }}>Create New Group</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.muted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>Group Name</div>
-            <input value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="e.g. Friday Night Squad" autoFocus
-              style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${C.border}`, fontSize: 14, outline: 'none', marginBottom: 16, boxSizing: 'border-box', fontFamily: "'DM Sans', sans-serif" }} />
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.muted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Add Friends</div>
-            <div style={{ maxHeight: 200, overflowY: 'auto', marginBottom: 4 }}>
-              {friendsList.length === 0 ? (
-                <p style={{ color: C.muted, fontSize: 13, textAlign: 'center', padding: '12px 0' }}>Add friends first to create a group</p>
-              ) : friendsList.map(f => (
-                <div key={f.userId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: `1px solid ${C.border}` }}>
-                  <Av name={f.name} src={f.avatar} size={36} />
-                  <div style={{ flex: 1, fontWeight: 600, fontSize: 14 }}>{f.name}</div>
-                  <input type="checkbox" checked={groupSelected.has(f.userId)}
-                    onChange={() => setGroupSelected(prev => { const n = new Set(prev); n.has(f.userId) ? n.delete(f.userId) : n.add(f.userId); return n; })}
-                    style={{ width: 18, height: 18, accentColor: C.accent, cursor: 'pointer' }} />
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-              <button onClick={() => { setShowGroupCreate(false); setGroupName(''); setGroupSelected(new Set()); }}
-                style={{ flex: 1, padding: 10, borderRadius: 10, border: `1.5px solid ${C.border}`, background: 'transparent', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
-              <button
-                disabled={!groupName.trim() || groupSelected.size === 0}
-                onClick={async () => {
-                  try {
-                    const id = await createGroupChat(groupName.trim(), Array.from(groupSelected));
-                    setActiveTab('chat'); setSelectedConvId(id);
-                    toast.success(`# ${groupName} created!`);
-                    setShowGroupCreate(false); setGroupName(''); setGroupSelected(new Set());
-                  } catch { toast.error('Failed to create group'); }
-                }}
-                style={{ flex: 1, padding: 10, borderRadius: 10, background: !groupName.trim() || groupSelected.size === 0 ? C.border : C.accent, color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: !groupName.trim() || groupSelected.size === 0 ? 'default' : 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
-                Create {groupSelected.size > 0 ? `(${groupSelected.size})` : ''}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* ── Group Match Request sheet ── */}
+      {selectedConv?.is_group && (
+        <GroupMatchRequestSheet
+          open={showGroupMatchRequest}
+          onClose={() => setShowGroupMatchRequest(false)}
+          conv={selectedConv}
+          currentUserId={user?.id || ''}
+          onConfirm={players => {
+            if (players.length === 0) return;
+            const [first, ...rest] = players;
+            setMatchRequestQueue(rest);
+            setMatchRequestTarget(first);
+          }}
+        />
       )}
+
+      {/* ── PlayerScheduleModal triggered from group match request ── */}
+      <PlayerScheduleModal
+        open={!!matchRequestTarget}
+        onClose={() => {
+          // Advance to next queued player, if any
+          const [next, ...rest] = matchRequestQueue;
+          setMatchRequestQueue(rest ?? []);
+          setMatchRequestTarget(next ?? null);
+        }}
+        player={matchRequestTarget}
+        onInviteSent={() => {
+          toast.success(`Match invite sent to ${matchRequestTarget?.name}!`);
+          // Advance queue
+          const [next, ...rest] = matchRequestQueue;
+          setMatchRequestQueue(rest ?? []);
+          setMatchRequestTarget(next ?? null);
+        }}
+      />
+
+      {/* ── New Group wizard ── */}
+      <NewGroupModal
+        open={showGroupCreate}
+        onClose={() => setShowGroupCreate(false)}
+        friends={friendsList}
+        existingGroupNames={groupConvs.map(c => c.name || '')}
+        isOnlineFn={isOnline}
+        isMobile={isMobile}
+        createGroupChat={createGroupChat}
+        onSuccess={(convId, gName) => {
+          setActiveTab('chat');
+          setSelectedConvId(convId);
+          setNewGroupConvId(convId);
+          setTimeout(() => inputRef.current?.focus(), 300);
+          toast.success(`# ${gName} created! 🎾`, { duration: 4000 });
+        }}
+      />
 
       {/* Group Info Sheet */}
       {selectedConv?.is_group && (
@@ -1189,9 +1764,9 @@ const FriendsMessagesTab = () => {
         @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
         @keyframes spin { to{transform:rotate(360deg)} }
         *{box-sizing:border-box}
-        ::-webkit-scrollbar{width:4px}
+        ::-webkit-scrollbar{width:8px;height:8px}
         ::-webkit-scrollbar-track{background:transparent}
-        ::-webkit-scrollbar-thumb{background:#e5e7eb;border-radius:4px}
+        ::-webkit-scrollbar-thumb{background:#F97316;border-radius:999px;border:2px solid transparent;background-clip:padding-box}
       `}</style>
     </div>
   );

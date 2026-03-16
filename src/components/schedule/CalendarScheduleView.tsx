@@ -15,6 +15,7 @@ import {
   Trash2,
   Globe
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useUserAvailability } from '@/hooks/useUserAvailability';
 import { useMatchInvites } from '@/hooks/useMatchInvites';
 import { useNotificationsContext } from '@/contexts/NotificationsContext';
@@ -87,6 +88,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   const [cancellingMatch, setCancellingMatch] = useState<string | null>(null);
   const [showInviterProfile, setShowInviterProfile] = useState(false);
 
+  const { user } = useAuth();
   const { availability, deleteAvailability, createAvailability, updateAvailability, fetchAvailability } = useUserAvailability();
   const { invites, getPendingInvites, getConfirmedInvites, respondToInvite, deleteInvite, cancelInvite } = useMatchInvites();
   const { notifications, markAsRead } = useNotificationsContext();
@@ -117,9 +119,27 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
       grouped[dateKey] = [];
     });
 
+    // Build a fast lookup of confirmed-match time ranges keyed by date
+    const confirmedRangesByDate: Record<string, Array<{ start: number; end: number }>> = {};
+    confirmedMatches?.forEach(match => {
+      if (match.status === 'accepted' && match.date && match.start_time && match.end_time) {
+        const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+        if (!confirmedRangesByDate[match.date]) confirmedRangesByDate[match.date] = [];
+        confirmedRangesByDate[match.date].push({ start: toMin(match.start_time), end: toMin(match.end_time) });
+      }
+    });
+
+    const overlapsConfirmedMatch = (date: string, startTime: string, endTime: string): boolean => {
+      const ranges = confirmedRangesByDate[date];
+      if (!ranges?.length) return false;
+      const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+      const s = toMin(startTime); const e = toMin(endTime);
+      return ranges.some(r => s < r.end && e > r.start);
+    };
+
     // Add availability slots
     availability?.forEach(slot => {
-      if (slot.is_available && !slot.is_blocked) {
+      if (slot.is_available && !slot.is_blocked && !overlapsConfirmedMatch(slot.date, slot.start_time, slot.end_time)) {
         const dateKey = slot.date;
         if (grouped[dateKey]) {
           // Convert times to user's timezone if different from slot's timezone
@@ -153,11 +173,9 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
       if (match.status === 'accepted' && match.date) {
         const dateKey = match.date;
         if (grouped[dateKey]) {
-          const opponent = match.sender_id !== match.receiver_id 
-            ? (match.sender || match.receiver)
-            : match.receiver;
-          const opponentName = opponent 
-            ? `${opponent.first_name || ''} ${opponent.last_name || ''}`.trim() 
+          const opponentProfile = match.sender_id === user?.id ? match.receiver : match.sender;
+          const opponentName = opponentProfile
+            ? `${opponentProfile.first_name || ''} ${opponentProfile.last_name || ''}`.trim() || 'Unknown'
             : 'Unknown';
 
           // Convert times to user's timezone if different from match's timezone
@@ -324,7 +342,10 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   };
 
   const getHeaderTitle = () => {
-    if (viewMode === 'week') {
+    if (viewMode === 'day') {
+      if (isToday(currentDate)) return 'Today';
+      return format(currentDate, 'EEEE, MMMM d');
+    } else if (viewMode === 'week') {
       const start = startOfWeek(currentDate, { weekStartsOn: 0 });
       const end = endOfWeek(currentDate, { weekStartsOn: 0 });
       return `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`;

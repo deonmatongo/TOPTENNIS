@@ -30,53 +30,8 @@ export const useRealtimeNotifications = () => {
       }
     });
 
-    // Subscribe to match invite changes
-    const unsubscribeInvites = subscribeToTable('match_invites', (payload) => {
-      if (payload.eventType === 'INSERT') {
-        const invite = payload.new;
-        if (invite.receiver_id === user.id) {
-          toast.info('New match invitation!', {
-            description: `You have a new match invitation to respond to`,
-            duration: 5000,
-            action: {
-              label: 'View',
-              onClick: () => window.location.href = '/dashboard?tab=matching',
-            },
-          });
-        } else if (invite.sender_id === user.id) {
-          toast.success('Match invitation sent!', {
-            description: 'Your invitation has been delivered',
-            duration: 3000,
-          });
-        }
-      } else if (payload.eventType === 'UPDATE') {
-        const invite = payload.new;
-        if (invite.receiver_id === user.id || invite.sender_id === user.id) {
-          const action = invite.status === 'accepted' ? 'accepted' : 'declined';
-          const otherUser = invite.receiver_id === user.id ? invite.sender_id : invite.receiver_id;
-          
-          if (invite.status === 'accepted') {
-            toast.success('Match invitation accepted!', {
-              description: `Your match has been scheduled`,
-              duration: 5000,
-              action: {
-                label: 'View',
-                onClick: () => window.location.href = '/dashboard?tab=matches',
-              },
-            });
-          } else if (invite.status === 'declined') {
-            toast.info('Match invitation declined', {
-              description: `The invitation was declined`,
-              duration: 3000,
-            });
-          }
-        }
-      }
-    });
-
     return () => {
       unsubscribeAvailability();
-      unsubscribeInvites();
     };
   }, [user, subscribeToTable]);
 

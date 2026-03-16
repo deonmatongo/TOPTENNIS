@@ -87,6 +87,8 @@ export const useNotifications = () => {
   // Stable ref for injectRealtimeRow so the subscription useEffect never needs
   // to re-run (and tear down the channel) when callbacks change.
   const injectRealtimeRowRef = useRef<(row: any) => void>(() => {});
+  // Deduplication set: tracks notification row IDs for which push+sound have already fired
+  const notifiedRowIds = useRef<Set<string>>(new Set());
 
   const injectRealtimeRow = useCallback((row: any) => {
     const incoming = transformRow(row);
@@ -99,18 +101,23 @@ export const useNotifications = () => {
       return newList;
     });
 
-    playNotificationSound(0.5).catch(err =>
-      console.warn('Failed to play notification sound:', err)
-    );
+    // Only fire push + sound once per unique notification row ID
+    if (!notifiedRowIds.current.has(incoming.id)) {
+      notifiedRowIds.current.add(incoming.id);
 
-    if (isSupportedRef.current) {
-      sendNotificationRef.current(incoming.title, {
-        body: incoming.message,
-        tag: incoming.id,
-        requireInteraction: false,
-        icon: '/favicon.ico',
-        clickUrl: incoming.actionUrl,
-      });
+      playNotificationSound(0.5).catch(err =>
+        console.warn('Failed to play notification sound:', err)
+      );
+
+      if (isSupportedRef.current) {
+        sendNotificationRef.current(incoming.title, {
+          body: incoming.message,
+          tag: incoming.id,
+          requireInteraction: false,
+          icon: '/favicon.ico',
+          clickUrl: incoming.actionUrl,
+        });
+      }
     }
   }, [transformRow, updateUnreadCount]);
 

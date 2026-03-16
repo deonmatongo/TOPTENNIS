@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Calendar, Clock, Users, Send, Check, X, Plus, ChevronLeft, ChevronRight, CalendarDays, MapPin, Edit, Trash2, Ban } from 'lucide-react';
+import { Calendar, Clock, Users, Send, Check, X, Plus, ChevronLeft, ChevronRight, CalendarDays, MapPin, Edit, Trash2, Ban, Info } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserAvailability } from '@/hooks/useUserAvailability';
 import { useMatchInvites } from '@/hooks/useMatchInvites';
@@ -54,6 +54,24 @@ export const OutlookCalendar: React.FC<OutlookCalendarProps> = ({
     endTime: string;
     availabilityId?: string;
   } | null>(null);
+  const BANNER_KEY = 'request_match_onboarding_dismissed';
+  const [bannerDismissed, setBannerDismissed] = useState<boolean>(() => {
+    try { return localStorage.getItem(BANNER_KEY) === 'true'; } catch { return false; }
+  });
+  const [focusedDay, setFocusedDay] = useState<Date | null>(null);
+  const slotsRef = useRef<HTMLDivElement>(null);
+
+  const handleDismissBanner = () => {
+    setBannerDismissed(true);
+    try { localStorage.setItem(BANNER_KEY, 'true'); } catch {}
+  };
+
+  const handleDayHeaderClick = (day: Date) => {
+    if (isOwnCalendar) return;
+    setFocusedDay(prev => prev && isSameDay(prev, day) ? null : day);
+    setTimeout(() => slotsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  };
+
   const [selectedSlots, setSelectedSlots] = useState<Array<{
     date: Date;
     startTime: string;
@@ -484,6 +502,24 @@ export const OutlookCalendar: React.FC<OutlookCalendarProps> = ({
         </div>
       </div>
 
+      {/* Onboarding banner - only for Request Match view, dismissible, localStorage-persisted */}
+      {!isOwnCalendar && !bannerDismissed && (
+        <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40 px-4 py-3">
+          <Info className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" />
+          <p className="flex-1 text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
+            <span className="font-semibold">How to request a match: </span>
+            Select a date to view available time slots. Tap a slot to send a match invite. The opponent will be notified to confirm.
+          </p>
+          <button
+            onClick={handleDismissBanner}
+            aria-label="Dismiss"
+            className="shrink-0 rounded-md p-1 text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 hover:text-blue-600 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Selected Slots Bar - Only for viewing other players */}
       {!isOwnCalendar && selectedSlots.length > 0 && (
         <Card className="border-blue-300 bg-blue-50/50">
@@ -616,10 +652,28 @@ export const OutlookCalendar: React.FC<OutlookCalendarProps> = ({
                   <div className="p-2 text-sm font-medium text-center bg-muted rounded">
                     Time
                   </div>
-                  {displayDays.map(day => <div key={day.toISOString()} className="p-2 text-sm font-medium text-center bg-muted rounded">
-                      <div>{format(day, 'EEE')}</div>
-                      <div className="text-xs text-muted-foreground">{format(day, 'MMM d')}</div>
-                    </div>)}
+                  {displayDays.map(day => {
+                    const isFocused = !isOwnCalendar && focusedDay && isSameDay(focusedDay, day);
+                    return (
+                      <div
+                        key={day.toISOString()}
+                        onClick={() => handleDayHeaderClick(day)}
+                        className={[
+                          'p-2 text-sm font-medium text-center rounded transition-colors',
+                          !isOwnCalendar ? 'cursor-pointer select-none' : '',
+                          isFocused
+                            ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-1'
+                            : !isOwnCalendar
+                              ? 'bg-muted hover:bg-primary/20'
+                              : 'bg-muted',
+                        ].join(' ')}
+                      >
+                        <div>{format(day, 'EEE')}</div>
+                        <div className={`text-xs ${isFocused ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>{format(day, 'MMM d')}</div>
+                        {!isOwnCalendar && <div className={`text-xs mt-0.5 ${isFocused ? 'text-primary-foreground/70' : 'text-primary/60'}`}>{isFocused ? '▲ slots' : 'tap'}</div>}
+                      </div>
+                    );
+                  })}
 
                   {/* Time slots */}
                   {timeSlots.map(slot => [/* Time label */
@@ -767,6 +821,84 @@ export const OutlookCalendar: React.FC<OutlookCalendarProps> = ({
               </ScrollArea>
             </CardContent>
           </Card>
+
+          {/* Inline day slots panel — appears when a day header is tapped in request-match view */}
+          {!isOwnCalendar && focusedDay && (
+            <div ref={slotsRef} className="mt-4 animate-in slide-in-from-top-2 duration-200">
+              <Card className="border-primary/30">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <CalendarDays className="w-4 h-4 text-primary" />
+                      {format(focusedDay, 'EEEE, MMMM d')} — Available Slots
+                    </CardTitle>
+                    <Button variant="ghost" size="sm" onClick={() => setFocusedDay(null)} className="h-7 w-7 p-0">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const dateStr = format(focusedDay, 'yyyy-MM-dd');
+                    const daySlots = timeSlots.filter(slot => {
+                      const av = getSlotAvailability(focusedDay, slot.start, slot.end);
+                      const booked = isSlotBooked(dateStr, slot.start, slot.end);
+                      return av?.is_available && !booked;
+                    });
+
+                    if (daySlots.length === 0) {
+                      return (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Clock className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                          <p className="text-sm">No available slots on this day.</p>
+                          <p className="text-xs mt-1">Try a different date.</p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        {daySlots.map(slot => {
+                          const av = getSlotAvailability(focusedDay, slot.start, slot.end);
+                          const isSelected = selectedSlots.some(
+                            s => isSameDay(s.date, focusedDay) && s.startTime === slot.start
+                          );
+                          return (
+                            <button
+                              key={slot.start}
+                              onClick={() => handleSlotClick(focusedDay, slot.start, slot.end)}
+                              className={[
+                                'flex flex-col items-center justify-center rounded-lg border-2 px-3 py-3 text-sm font-medium transition-all',
+                                isSelected
+                                  ? 'border-primary bg-primary text-primary-foreground shadow-md scale-105'
+                                  : 'border-green-300 bg-green-50 text-green-800 hover:border-primary hover:bg-primary/10 hover:text-primary dark:bg-green-900/20 dark:text-green-300',
+                              ].join(' ')}
+                            >
+                              <Clock className="w-4 h-4 mb-1 opacity-70" />
+                              <span>{slot.start.slice(0, 5)}</span>
+                              <span className="text-xs opacity-70">– {slot.end.slice(0, 5)}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+
+                  {selectedSlots.some(s => isSameDay(s.date, focusedDay)) && (
+                    <div className="mt-4 flex items-center justify-between rounded-lg bg-primary/10 px-4 py-3">
+                      <span className="text-sm font-medium text-primary">
+                        {selectedSlots.filter(s => isSameDay(s.date, focusedDay)).length} slot(s) selected for this day
+                      </span>
+                      <Button size="sm" onClick={handleBookMultipleSlots} className="gap-1">
+                        <Send className="w-3 h-3" />
+                        Send Invite
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}

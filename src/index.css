@@ -159,6 +159,40 @@
   }
 }
 
+/* ── Global scrollbar styling ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #F97316 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #F97316;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #ea6c0a;
+}
+
+/* Preserve scrollbar-hide utility */
+.scrollbar-hide {
+  scrollbar-width: none !important;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none !important;
+}
+
 @layer utilities {
   /* Gradient backgrounds */
   .bg-gradient-primary {

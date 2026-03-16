@@ -24,7 +24,10 @@ import {
   MessageCircle,
   Ban,
   UserMinus,
-  ShieldAlert
+  ShieldAlert,
+  Clock,
+  Check,
+  X as XIcon
 } from 'lucide-react';
 import { SearchResult } from '@/hooks/usePlayerSearch';
 import { toast } from 'sonner';
@@ -33,23 +36,39 @@ import { PlayerScheduleModal } from './PlayerScheduleModal';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { useBlockedUsers } from '@/hooks/useBlockedUsers';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { format, parseISO } from 'date-fns';
+
+interface PendingInvite {
+  id: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  court_location?: string;
+  message?: string;
+}
 
 interface PlayerProfileModalProps {
   player: SearchResult | null;
   isOpen: boolean;
   onClose: () => void;
+  pendingInvite?: PendingInvite | null;
+  onInviteResponded?: () => void;
 }
 
-const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps) => {
+const PlayerProfileModal = ({ player, isOpen, onClose, pendingInvite, onInviteResponded }: PlayerProfileModalProps) => {
   const [showSendMessage, setShowSendMessage] = useState(false);
   const [showScheduleMatch, setShowScheduleMatch] = useState(false);
   const [showBlockDialog, setShowBlockDialog] = useState(false);
   const [showUnfriendDialog, setShowUnfriendDialog] = useState(false);
   const [blockReason, setBlockReason] = useState('');
   const [isActioning, setIsActioning] = useState(false);
+  const [inviteResponse, setInviteResponse] = useState<'accepted' | 'declined' | null>(null);
+  const [isRespondingToInvite, setIsRespondingToInvite] = useState(false);
   const { user } = useAuth();
   const { sendFriendRequest, updateRequestStatus, getRelationshipWith, requests, refetch: refetchFriends } = useFriendRequests();
   const { blockUser, unfriendUser } = useBlockedUsers();
+  const { respondToInvite } = useMatchInvites();
   
   if (!player) return null;
 
@@ -164,6 +183,20 @@ const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps
     }
   };
 
+  const handleRespondToInvite = async (response: 'accepted' | 'declined') => {
+    if (!pendingInvite) return;
+    setIsRespondingToInvite(true);
+    try {
+      await respondToInvite(pendingInvite.id, response);
+      setInviteResponse(response);
+      onInviteResponded?.();
+    } catch (e) {
+      toast.error('Failed to respond to invite');
+    } finally {
+      setIsRespondingToInvite(false);
+    }
+  };
+
   return (
     <>
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -198,6 +231,61 @@ const PlayerProfileModal = ({ player, isOpen, onClose }: PlayerProfileModalProps
         </DialogHeader>
 
         <div className="space-y-4 sm:space-y-6">
+          {/* Pending match invite banner */}
+          {pendingInvite && (
+            <div className="rounded-lg border border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/40 p-4 space-y-3">
+              <p className="text-sm font-semibold text-orange-800 dark:text-orange-200">Pending Match Invitation</p>
+              <div className="space-y-1.5 text-sm text-orange-700 dark:text-orange-300">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 shrink-0" />
+                  <span>{format(parseISO(pendingInvite.date), 'EEEE, MMMM d, yyyy')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 shrink-0" />
+                  <span>{pendingInvite.start_time?.slice(0, 5)} – {pendingInvite.end_time?.slice(0, 5)}</span>
+                </div>
+                {pendingInvite.court_location && (
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 shrink-0" />
+                    <span>{pendingInvite.court_location}</span>
+                  </div>
+                )}
+                {pendingInvite.message && (
+                  <p className="italic text-xs mt-1 opacity-80">"{pendingInvite.message}"</p>
+                )}
+              </div>
+              {inviteResponse ? (
+                <p className={`text-sm font-semibold ${
+                  inviteResponse === 'accepted' ? 'text-green-600' : 'text-muted-foreground'
+                }`}>
+                  {inviteResponse === 'accepted' ? '✓ Invite accepted' : '✗ Invite declined'}
+                </p>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => handleRespondToInvite('accepted')}
+                    disabled={isRespondingToInvite}
+                  >
+                    <Check className="w-3.5 h-3.5 mr-1.5" />
+                    {isRespondingToInvite ? 'Accepting...' : 'Accept'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 border-orange-300 text-orange-700 hover:bg-orange-100 dark:text-orange-300 dark:border-orange-700"
+                    onClick={() => handleRespondToInvite('declined')}
+                    disabled={isRespondingToInvite}
+                  >
+                    <XIcon className="w-3.5 h-3.5 mr-1.5" />
+                    Decline
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Quick Stats */}
           <div className="grid grid-cols-3 gap-2 sm:gap-4">
             <Card className="bg-gradient-primary/5 border-primary/20">

@@ -232,7 +232,7 @@ export const useFriendRequests = () => {
     // Set up real-time subscription for friend requests
     if (user) {
       const channel = supabase
-        .channel('friend-requests-changes')
+        .channel(`friend-requests-changes-${user.id}`)
         .on(
           'postgres_changes',
           {

@@ -269,20 +269,26 @@ export const useConversations = () => {
   }, [user, fetchConversations]);
 
   // Create a group chat via SECURITY DEFINER RPC to avoid RLS circular dependency
-  const createGroupChat = useCallback(async (name: string, memberUserIds: string[]): Promise<string> => {
+  const createGroupChat = useCallback(async (
+    name: string,
+    memberUserIds: string[],
+    opts?: { description?: string; group_type?: 'private' | 'open'; avatar_emoji?: string },
+  ): Promise<string> => {
     if (!user) throw new Error('Not authenticated');
 
     const { data, error } = await (supabase as any).rpc('create_group_chat', {
       p_name: name,
       p_member_ids: memberUserIds,
+      p_description:   opts?.description   ?? null,
+      p_group_type:    opts?.group_type     ?? 'private',
+      p_avatar_emoji:  opts?.avatar_emoji   ?? null,
     });
 
     if (error) throw error;
 
     const newConvId = data as string;
 
-    // Optimistically add the group to local state immediately so the UI shows it
-    // without waiting for the refetch round-trip / replication lag.
+    // Optimistically add the group to local state immediately
     const optimisticConv: Conversation = {
       id: newConvId,
       name,

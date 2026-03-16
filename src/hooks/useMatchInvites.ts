@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRealtime } from '@/contexts/RealtimeContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,6 +50,8 @@ export const useMatchInvites = () => {
   const [invites, setInvites] = useState<MatchInvite[]>([]);
   const [loading, setLoading] = useState(true);
   const { sendNotification } = useBrowserNotifications();
+  // Deduplication set: tracks invite IDs for which a notification has already fired
+  const notifiedIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) {
@@ -68,8 +70,9 @@ export const useMatchInvites = () => {
         if (payload.eventType === 'INSERT') {
           const newInvite = payload.new as any;
           
-          // Only show notification if current user is receiver
-          if (newInvite.receiver_id === user.id) {
+          // Only show notification if current user is receiver and not already notified
+          if (newInvite.receiver_id === user.id && !notifiedIds.current.has(`insert:${newInvite.id}`)) {
+            notifiedIds.current.add(`insert:${newInvite.id}`);
             // Fetch sender's profile for the notification message
             const { data: senderProfile } = await supabase
               .from('profiles')
@@ -98,7 +101,9 @@ export const useMatchInvites = () => {
           const updatedInvite = payload.new as any;
           
           // Check if status changed
-          if (oldInvite.status !== updatedInvite.status) {
+          const dedupeKey = `update:${updatedInvite.id}:${updatedInvite.status}`;
+          if (oldInvite.status !== updatedInvite.status && !notifiedIds.current.has(dedupeKey)) {
+            notifiedIds.current.add(dedupeKey);
             // Fetch the other party's profile for the notification message
             const otherUserId = updatedInvite.receiver_id === user.id
               ? updatedInvite.sender_id
@@ -306,16 +311,33 @@ export const useMatchInvites = () => {
 
     // OPTIMISTIC UPDATE: Update UI immediately for instant feedback
     const previousInvites = [...invites];
-    const optimisticInvites = invites.map(inv => 
-      inv.id === inviteId 
-        ? { 
-            ...inv, 
-            status, 
-            response_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        : inv
-    );
+
+    // Helper: check if two invites overlap the same slot on the same date
+    const overlapsAccepted = (inv: typeof invite) => {
+      if (inv.id === inviteId) return false;
+      if (inv.status !== 'pending') return false;
+      if (inv.date !== invite.date) return false;
+      // Must involve the current user (as sender or receiver) so only their own slots lock
+      if (inv.sender_id !== user.id && inv.receiver_id !== user.id) return false;
+      const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+      const invStart = toMin(inv.start_time); const invEnd = toMin(inv.end_time);
+      const accStart = toMin(invite.start_time); const accEnd = toMin(invite.end_time);
+      return invStart < accEnd && invEnd > accStart;
+    };
+
+    const conflictingIds = status === 'accepted'
+      ? invites.filter(overlapsAccepted).map(inv => inv.id)
+      : [];
+
+    const optimisticInvites = invites.map(inv => {
+      if (inv.id === inviteId) {
+        return { ...inv, status, response_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+      }
+      if (conflictingIds.includes(inv.id)) {
+        return { ...inv, status: 'declined' as const, response_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+      }
+      return inv;
+    });
     setInvites(optimisticInvites);
     
     // Show success message immediately
@@ -376,8 +398,18 @@ export const useMatchInvites = () => {
       if (status === 'accepted') {
         createConversation(invite).catch(convError => {
           logger.error('Error creating conversation', { error: convError, inviteId });
-          // Don't fail the whole operation if conversation creation fails
         });
+
+        // Persist conflicting invite declines to DB in background (double-booking prevention)
+        if (conflictingIds.length > 0) {
+          supabase
+            .from('match_invites')
+            .update({ status: 'declined', response_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+            .in('id', conflictingIds)
+            .then(({ error }) => {
+              if (error) logger.error('Error auto-declining conflicting invites', { error, conflictingIds });
+            });
+        }
       }
       
       // Refresh invites in background to get latest data

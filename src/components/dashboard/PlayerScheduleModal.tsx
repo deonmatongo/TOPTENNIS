@@ -168,21 +168,28 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
 
   const opponentName = player?.name || 'Player';
 
-  // Get dates with availability
+  // Get dates with availability — exclude dates where every slot is booked
   const availabilityDates = useMemo(() => {
-    return availability
+    const dateMap = new Map<string, boolean>();
+    availability
       ?.filter(slot => slot.is_available && !slot.is_blocked)
-      .map(slot => parseISO(slot.date)) || [];
-  }, [availability]);
+      .forEach(slot => {
+        if (dateMap.has(slot.date)) return; // already marked as having a free slot
+        const booked = isSlotBooked(slot.date, slot.start_time, slot.end_time, opponentUserId);
+        if (!booked) dateMap.set(slot.date, true);
+      });
+    return Array.from(dateMap.keys()).map(d => parseISO(d));
+  }, [availability, isSlotBooked, opponentUserId]);
 
-  // Get slots for selected date
+  // Get slots for selected date — exclude already-booked slots
   const selectedDateSlots = useMemo(() => {
     return availability?.filter(slot => 
       slot.is_available && 
       !slot.is_blocked && 
-      isSameDay(parseISO(slot.date), selectedDate)
+      isSameDay(parseISO(slot.date), selectedDate) &&
+      !isSlotBooked(slot.date, slot.start_time, slot.end_time, opponentUserId)
     ) || [];
-  }, [availability, selectedDate]);
+  }, [availability, selectedDate, isSlotBooked, opponentUserId]);
 
   return (
     <>
@@ -279,7 +286,7 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
                             className="w-full text-left p-3 rounded-lg border hover:bg-accent transition-colors"
                           >
                             <div className="font-medium">
-                              {slot.start_time} - {slot.end_time}
+                              {slot.start_time.slice(0, 5)} – {slot.end_time.slice(0, 5)}
                             </div>
                             {slot.notes && (
                               <div className="text-sm text-muted-foreground mt-1">
