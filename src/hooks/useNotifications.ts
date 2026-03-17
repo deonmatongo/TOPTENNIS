@@ -170,8 +170,7 @@ export const useNotifications = () => {
     fetchNotificationsRef.current = fetchNotifications;
   }, [fetchNotifications]);
 
-  // Initial fetch + real-time subscription — only re-runs when user.id changes.
-  // All callbacks are accessed via stable refs to prevent channel churn.
+  // Enhanced real-time subscription with reconnection handling
   useEffect(() => {
     if (!user) {
       setIsLoading(false);
@@ -183,6 +182,7 @@ export const useNotifications = () => {
 
     fetchNotificationsRef.current();
 
+    // Create notification channel with enhanced error handling
     const channel = supabase
       .channel(`notifications-${user.id}`)
       .on(
@@ -246,12 +246,49 @@ export const useNotifications = () => {
       )
       .subscribe((status) => {
         console.log('📡 Notification channel status:', status);
+        
+        // Handle reconnection scenarios
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Notification channel connected');
+          // On reconnection, check for missed notifications
+          if (hasLoadedRef.current) {
+            syncMissedNotifications();
+          }
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          console.warn('⚠️ Notification channel disconnected, will auto-reconnect');
+        }
       });
+
+    // Function to sync missed notifications after reconnection
+    const syncMissedNotifications = async () => {
+      try {
+        // Get the latest notification timestamp we have
+        const latestNotification = notifications[0];
+        const latestTimestamp = latestNotification?.createdAt?.toISOString();
+        
+        if (latestTimestamp) {
+          // Fetch any notifications created after our latest one
+          const { data: missedNotifications, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('user_id', user.id)
+            .gt('created_at', latestTimestamp)
+            .order('created_at', { ascending: false });
+          
+          if (!error && missedNotifications?.length > 0) {
+            console.log(`🔄 Syncing ${missedNotifications.length} missed notifications`);
+            missedNotifications.forEach(row => injectRealtimeRowRef.current(row));
+          }
+        }
+      } catch (error) {
+        console.error('Error syncing missed notifications:', error);
+      }
+    };
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id]); // Only user.id — stable refs handle everything else
+  }, [user?.id, notifications]); // Include notifications for syncMissedNotifications
 
   const markAsRead = useCallback(async (notificationId: string) => {
     if (!user) return;

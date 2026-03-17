@@ -10,6 +10,7 @@ import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import { MessagesProvider } from "@/contexts/MessagesContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminRoute from "@/components/admin/AdminRoute";
+import RealtimeNotificationsManager from "@/components/RealtimeNotificationsManager";
 import { logger } from "@/utils/logger";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -47,6 +48,7 @@ const App: React.FC = () => {
         <RealtimeProvider>
           <NotificationsProvider>
             <MessagesProvider>
+              <RealtimeNotificationsManager />
               <TooltipProvider>
               <Toaster />
               <Sonner />
