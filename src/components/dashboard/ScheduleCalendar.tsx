@@ -137,34 +137,24 @@ export const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
   return (
     <div className="bg-card rounded-xl border shadow-sm p-6 animate-fade-in">
       {/* Navigation Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={onPrevMonth} 
-            className="h-8 w-8 hover:bg-muted transition-colors"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={onToday} 
-            className="h-8 px-3 text-sm font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
-          >
-            Today
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={onNextMonth} 
-            className="h-8 w-8 hover:bg-muted transition-colors"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-        <h2 className="text-xl font-semibold">{format(currentDate, 'MMMM yyyy')}</h2>
+      <div className="flex items-center justify-center mb-6 gap-2">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={onPrevMonth} 
+          className="h-8 w-8 hover:bg-muted transition-colors"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <h2 className="text-xl font-semibold w-40 text-center">{format(currentDate, 'MMMM yyyy')}</h2>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={onNextMonth} 
+          className="h-8 w-8 hover:bg-muted transition-colors"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
       </div>
 
       {/* Weekday Headers */}
