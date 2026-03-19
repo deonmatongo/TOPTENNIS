@@ -116,15 +116,29 @@ export const useMessages = () => {
         ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim()
         : 'Someone';
 
-      await supabase.from('notifications').insert({
-        user_id: receiverId,          // receiver only
-        type: 'message_received',
-        title: 'New Message',
-        message: `${senderName} sent you a message`,
-        read: false,
-        action_url: '/dashboard?tab=messages',
-        metadata: { sender_id: user.id },
-      });
+      // Server-side idempotency check - prevent duplicate message notifications
+      const existingNotification = await supabase
+        .from('notifications')
+        .select('id')
+        .eq('user_id', receiverId)
+        .eq('type', 'message_received')
+        .eq('metadata->>sender_id', user.id)
+        .gte('created_at', new Date(Date.now() - 60000).toISOString()) // Check last minute
+        .single();
+      
+      if (!existingNotification) {
+        await supabase.from('notifications').insert({
+          user_id: receiverId,          // receiver only
+          type: 'message_received',
+          title: 'New Message',
+          message: `${senderName} sent you a message`,
+          read: false,
+          action_url: '/dashboard?tab=messages',
+          metadata: { sender_id: user.id },
+        });
+      } else {
+        console.log('🔄 Skipping duplicate message notification from sender_id:', user.id);
+      }
 
       await fetchMessages();
       return true;

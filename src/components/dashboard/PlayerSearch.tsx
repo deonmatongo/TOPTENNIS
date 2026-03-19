@@ -153,8 +153,7 @@ const PlayerSearch = ({
                 {searchResults.map((player) => (
                   <div
                     key={player.id}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-accent/50 cursor-pointer transition-colors"
-                    onClick={() => handlePlayerSelect(player)}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-accent/50 transition-colors"
                   >
                     <div className="w-8 h-8 shrink-0 bg-gradient-primary rounded-full flex items-center justify-center text-primary-foreground font-bold text-sm">
                       {player.name.charAt(0).toUpperCase()}
@@ -175,6 +174,18 @@ const PlayerSearch = ({
                       >
                         {getSkillLabel(player.skill_level)}
                       </Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePlayerSelect(player);
+                        }}
+                        className="h-6 px-2 text-xs text-primary hover:text-primary/80 gap-1"
+                      >
+                        <User className="h-3 w-3" />
+                        Profile
+                      </Button>
                     </div>
                   </div>
                 ))}

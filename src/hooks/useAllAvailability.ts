@@ -36,7 +36,13 @@ export const useAllAvailability = () => {
         },
         (payload) => {
           console.log('Real-time all availability update:', payload);
-          fetchAllAvailability();
+          // Check if booking_status changed to 'booked' - if so, remove from availability immediately
+          if (payload.eventType === 'UPDATE' && payload.new.booking_status === 'booked') {
+            console.log('🔒 Global slot booked - removing from all availability:', payload.new.id);
+            setAllAvailability(prev => prev.filter(slot => slot.id !== payload.new.id));
+          } else {
+            fetchAllAvailability();
+          }
         }
       )
       .subscribe();
@@ -58,6 +64,7 @@ export const useAllAvailability = () => {
         `)
         .eq('is_available', true)
         .eq('is_blocked', false)
+        .neq('booking_status', 'booked')
         .or('privacy_level.eq.public,privacy_level.is.null')
         .gte('date', new Date().toISOString().split('T')[0])
         .order('date', { ascending: true })

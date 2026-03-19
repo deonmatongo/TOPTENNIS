@@ -29,8 +29,14 @@ export const usePlayerAvailability = (playerId?: string) => {
           filter: `user_id=eq.${playerId}`
         },
         (payload) => {
-          console.log('Real-time opponent availability update:', payload);
-          fetchPlayerAvailability(playerId);
+          console.log('Real-time player availability update:', payload);
+          // Check if booking_status changed to 'booked' - if so, remove from availability immediately
+          if (payload.eventType === 'UPDATE' && payload.new.booking_status === 'booked') {
+            console.log(' Player slot booked - removing from availability:', payload.new.id);
+            setAvailability(prev => prev.filter(slot => slot.id !== payload.new.id));
+          } else {
+            fetchPlayerAvailability(playerId);
+          }
         }
       )
       .subscribe();
@@ -48,7 +54,7 @@ export const usePlayerAvailability = (playerId?: string) => {
         .select('*')
         .eq('user_id', playerUserId)
         .eq('is_available', true)
-        .eq('is_blocked', false)
+        .neq('booking_status', 'booked')  // Exclude booked slots
         .gte('date', new Date().toISOString().split('T')[0])
         .or('privacy_level.eq.public,privacy_level.is.null')
         .order('date', { ascending: true })

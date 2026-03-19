@@ -138,16 +138,28 @@ export const useFriendRequests = () => {
         ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim()
         : 'Someone';
 
-      // Notify the receiver
-      await supabase.from('notifications').insert({
-        user_id: receiverId,
-        type: 'friend_request',
-        title: 'New Friend Request',
-        message: `${senderName} sent you a friend request`,
-        read: false,
-        action_url: '/dashboard?tab=friends',
-        metadata: { sender_id: user.id },
-      });
+      // Server-side idempotency check - prevent duplicate notifications
+      const existingNotification = await supabase
+        .from('notifications')
+        .select('id')
+        .eq('user_id', receiverId)
+        .eq('type', 'friend_request')
+        .eq('metadata->>sender_id', user.id)
+        .single();
+      
+      if (!existingNotification) {
+        await supabase.from('notifications').insert({
+          user_id: receiverId,
+          type: 'friend_request',
+          title: 'New Friend Request',
+          message: `${senderName} sent you a friend request`,
+          read: false,
+          action_url: '/dashboard?tab=friends',
+          metadata: { sender_id: user.id },
+        });
+      } else {
+        console.log('🔄 Skipping duplicate friend request notification for sender_id:', user.id);
+      }
 
       await fetchRequests();
       return true;
@@ -185,16 +197,30 @@ export const useFriendRequests = () => {
           ? `${receiverProfile.first_name || ''} ${receiverProfile.last_name || ''}`.trim()
           : 'Someone';
 
-        // Notify the original sender that their request was accepted
-        await supabase.from('notifications').insert({
-          user_id: request.sender_id,
-          type: 'friend_request',
-          title: 'Friend Request Accepted',
-          message: `${receiverName} accepted your friend request`,
-          read: false,
-          action_url: '/dashboard?tab=friends',
-          metadata: { receiver_id: user.id },
-        });
+        // Server-side idempotency check - prevent duplicate acceptance notifications
+        const existingAcceptNotification = await supabase
+          .from('notifications')
+          .select('id')
+          .eq('user_id', request.sender_id)
+          .eq('type', 'friend_request')
+          .eq('title', 'Friend Request Accepted')
+          .eq('metadata->>receiver_id', user.id)
+          .eq('metadata->>request_id', requestId)
+          .single();
+        
+        if (!existingAcceptNotification) {
+          await supabase.from('notifications').insert({
+            user_id: request.sender_id,
+            type: 'friend_request',
+            title: 'Friend Request Accepted',
+            message: `${receiverName} accepted your friend request`,
+            read: false,
+            action_url: '/dashboard?tab=friends',
+            metadata: { receiver_id: user.id, request_id: requestId },
+          });
+        } else {
+          console.log('🔄 Skipping duplicate friend request acceptance notification for request_id:', requestId);
+        }
       }
 
       await fetchRequests();

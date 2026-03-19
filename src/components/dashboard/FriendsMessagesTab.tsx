@@ -165,7 +165,7 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
     <Sheet open={open} onOpenChange={v => !v && onClose()}>
       <SheetContent side="right" style={{ width: 380, padding: 0, display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif" }}>
         <SheetHeader style={{ padding: '20px 20px 14px', borderBottom: `1px solid ${C.border}` }}>
-          <SheetTitle style={{ fontSize: 16, fontWeight: 700 }}>🎾 Request Match</SheetTitle>
+          <SheetTitle style={{ fontSize: 16, fontWeight: 700 }}>Request Match</SheetTitle>
           <p style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
             Select the members you want to challenge. You'll pick a time slot for each one.
           </p>
@@ -577,8 +577,17 @@ const NewGroupModal: React.FC<NewGroupModalProps> = ({
     if (name.trim() || selected.size > 0 || description.trim()) { setShowDiscard(true); } else { resetAndClose(); }
   };
 
-  const onlineFriends  = friends.filter(f => isOnlineFn(f.userId));
-  const offlineFriends = friends.filter(f => !isOnlineFn(f.userId));
+  // Memoized online status for friends to prevent repeated calls
+  const friendsOnlineStatus = useMemo(() => {
+    const statusMap = new Map<string, boolean>();
+    friends.forEach(f => {
+      statusMap.set(f.userId, isOnlineFn(f.userId));
+    });
+    return statusMap;
+  }, [friends, isOnlineFn]);
+
+  const onlineFriends  = friends.filter(f => friendsOnlineStatus.get(f.userId));
+  const offlineFriends = friends.filter(f => !friendsOnlineStatus.get(f.userId));
   const filterFriends  = (arr: typeof friends) => arr.filter(f => f.name.toLowerCase().includes(memberSearch.toLowerCase()));
 
   const handleCreate = async () => {
@@ -1091,8 +1100,14 @@ const FriendsMessagesTab = () => {
     const s  = friendSearch.toLowerCase();
     return (fd?.name || '').toLowerCase().includes(s) || (fd?.email || '').toLowerCase().includes(s);
   });
-  const onlineFriends  = filteredFriends.filter(f => isOnline(f.sender_id === user?.id ? f.receiver_id : f.sender_id));
-  const offlineFriends = filteredFriends.filter(f => !isOnline(f.sender_id === user?.id ? f.receiver_id : f.sender_id));
+  const onlineFriends  = filteredFriends.filter(f => {
+    const friendId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
+    return friendId ? onlineStatusMap.get(friendId) : false;
+  });
+  const offlineFriends = filteredFriends.filter(f => {
+    const friendId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
+    return friendId ? !onlineStatusMap.get(friendId) : true;
+  });
 
   const selectedConv = visConvs.find(c => c.id === selectedConvId) ?? null;
   const convName     = selectedConv ? getConvName(selectedConv, user?.id || '') : '';
@@ -1106,8 +1121,23 @@ const FriendsMessagesTab = () => {
     return { userId: fid, name: fd?.name || 'Unknown', avatar: fd?.profile_picture_url };
   });
 
+  // Memoized online status calculations to prevent repeated calls
+  const onlineStatusMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    friends.forEach(f => {
+      const friendId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
+      if (friendId) {
+        map.set(friendId, isOnline(friendId));
+      }
+    });
+    return map;
+  }, [friends, user?.id, isOnline]);
+
   const totalUnread = getTotalUnread();
-  const onlineCount = friends.filter(f => isOnline(f.sender_id === user?.id ? f.receiver_id : f.sender_id)).length;
+  const onlineCount = friends.filter(f => {
+    const friendId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
+    return friendId ? onlineStatusMap.get(friendId) : false;
+  }).length;
 
   useEffect(() => {
     if (atBottom) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1229,7 +1259,7 @@ const FriendsMessagesTab = () => {
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={() => setShowGroupCreate(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: `1.5px solid ${C.border}`, background: C.white, color: C.text, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-            👥 Create New Group
+            Create New Group
           </button>
         </div>
       </div>
@@ -1439,13 +1469,13 @@ const FriendsMessagesTab = () => {
                     style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
                     {selectedConv.is_group
                       ? <GroupAv size={40} emoji={(selectedConv as any).avatar_emoji} name={convName} />
-                      : <Av name={convName} src={convAvatar} size={40} online={dmOtherId ? isOnline(dmOtherId) : false} />}
+                      : <Av name={convName} src={convAvatar} size={40} online={dmOtherId ? onlineStatusMap.get(dmOtherId) || false : false} />}
                     <div style={{ textAlign: 'left' }}>
                       <div style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{selectedConv.is_group ? `# ${convName}` : convName}</div>
-                      <div style={{ fontSize: 12, fontWeight: 500, color: typingUsers.length > 0 ? C.accent : (dmOtherId && isOnline(dmOtherId)) ? C.online : C.muted }}>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: typingUsers.length > 0 ? C.accent : (dmOtherId && onlineStatusMap.get(dmOtherId)) ? C.online : C.muted }}>
                         {typingUsers.length > 0 ? 'typing…'
                           : selectedConv.is_group ? `${selectedConv.members.length} members`
-                          : (dmOtherId && isOnline(dmOtherId)) ? 'Online' : 'Offline'}
+                          : (dmOtherId && onlineStatusMap.get(dmOtherId)) ? 'Online' : 'Offline'}
                       </div>
                     </div>
                   </button>
@@ -1456,7 +1486,7 @@ const FriendsMessagesTab = () => {
                   {selectedConv.is_group && (
                     <>
                       <button title="Request Match" onClick={() => setShowGroupMatchRequest(true)}
-                        style={{ height: 36, padding: '0 12px', borderRadius: 9, background: C.accent, border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, color: '#fff', fontFamily: "'DM Sans', sans-serif" }}>🎾 Request Match</button>
+                        style={{ height: 36, padding: '0 12px', borderRadius: 9, background: C.accent, border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, color: '#fff', fontFamily: "'DM Sans', sans-serif" }}>Request Match</button>
                       <button title="Group settings" onClick={() => setShowGroupInfo(true)}
                         style={{ width: 36, height: 36, borderRadius: 9, background: C.bg, border: `1px solid ${C.border}`, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⚙️</button>
                     </>
@@ -1729,7 +1759,7 @@ const FriendsMessagesTab = () => {
           setSelectedConvId(convId);
           setNewGroupConvId(convId);
           setTimeout(() => inputRef.current?.focus(), 300);
-          toast.success(`# ${gName} created! 🎾`, { duration: 4000 });
+          toast.success(`# ${gName} created!`, { duration: 4000 });
         }}
       />
 
@@ -1762,9 +1792,6 @@ const FriendsMessagesTab = () => {
         @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
         @keyframes spin { to{transform:rotate(360deg)} }
         *{box-sizing:border-box}
-        ::-webkit-scrollbar{width:8px;height:8px}
-        ::-webkit-scrollbar-track{background:transparent}
-        ::-webkit-scrollbar-thumb{background:#F97316;border-radius:999px;border:2px solid transparent;background-clip:padding-box}
       `}</style>
     </div>
   );

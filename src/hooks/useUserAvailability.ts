@@ -26,6 +26,7 @@ export const useUserAvailability = () => {
         .from('user_availability')
         .select('*')
         .eq('user_id', user.id)
+        .neq('booking_status', 'booked')  // Exclude booked slots
         .order('date', { ascending: true });
 
       if (error) throw error;
@@ -51,8 +52,14 @@ export const useUserAvailability = () => {
     const unsubscribe = subscribeToUserChanges((payload) => {
       console.log('🔄 Real-time availability update received:', payload);
       if (payload.table === 'user_availability') {
-        console.log('✅ Refetching availability due to real-time update');
-        fetchAvailability();
+        // Check if booking_status changed to 'booked' - if so, remove from availability immediately
+        if (payload.eventType === 'UPDATE' && payload.new.booking_status === 'booked') {
+          console.log('🔒 Slot booked - removing from availability:', payload.new.id);
+          setAvailability(prev => prev.filter(slot => slot.id !== payload.new.id));
+        } else {
+          console.log('✅ Refetching availability due to real-time update');
+          fetchAvailability();
+        }
       }
     });
 
@@ -106,6 +113,7 @@ export const useUserAvailability = () => {
         .insert({
           user_id: user.id,
           ...availabilityData,
+          booking_status: 'available',  // Set default booking status
         })
         .select()
         .single();

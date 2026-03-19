@@ -1250,6 +1250,7 @@ export type Database = {
       }
       user_availability: {
         Row: {
+          booking_status: string | null
           created_at: string
           date: string
           end_time: string
@@ -1265,6 +1266,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          booking_status?: string | null
           created_at?: string
           date: string
           end_time: string
@@ -1280,6 +1282,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          booking_status?: string | null
           created_at?: string
           date?: string
           end_time?: string

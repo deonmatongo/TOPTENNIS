@@ -36,6 +36,9 @@ export const useNotifications = () => {
     setUnreadCount(count);
   }, []);
 
+  // Track notification IDs to prevent duplicates
+  const notificationIdsRef = useRef<Set<string>>(new Set());
+  
   // Add new notification and update unread count atomically
   const addNotification = useCallback((notification: Omit<Notification, 'id' | 'createdAt'>) => {
     const newNotification: Notification = {
@@ -45,20 +48,43 @@ export const useNotifications = () => {
     };
     
     setNotifications(prev => {
-      // Check for duplicates based on title, message, and type within a time window
+      // 1. Check for exact ID match (most reliable)
+      if (prev.some(n => n.id === newNotification.id)) {
+        console.log('🔄 Skipping duplicate notification by ID:', newNotification.id);
+        return prev;
+      }
+      
+      // 2. Check for duplicates based on content and time window
       const timeWindow = 10000; // 10 seconds
-      const isDuplicate = prev.some(n => 
+      const isContentDuplicate = prev.some(n => 
         n.title === newNotification.title && 
         n.message === newNotification.message &&
         n.type === newNotification.type &&
         Math.abs(n.createdAt.getTime() - newNotification.createdAt.getTime()) < timeWindow
       );
       
-      if (isDuplicate) {
-        console.log('🔄 Skipping duplicate notification:', newNotification.title);
+      if (isContentDuplicate) {
+        console.log('🔄 Skipping duplicate notification by content:', newNotification.title);
         return prev;
       }
       
+      // 3. Check metadata-based duplicates (for match invites, friend requests)
+      if (notification.metadata) {
+        const metadataKey = `${notification.type}-${JSON.stringify(notification.metadata)}`;
+        if (notificationIdsRef.current.has(metadataKey)) {
+          console.log('🔄 Skipping duplicate notification by metadata:', metadataKey);
+          return prev;
+        }
+        notificationIdsRef.current.add(metadataKey);
+        
+        // Cleanup old metadata keys (keep last 100)
+        if (notificationIdsRef.current.size > 100) {
+          const oldKeys = Array.from(notificationIdsRef.current).slice(0, 50);
+          oldKeys.forEach(key => notificationIdsRef.current.delete(key));
+        }
+      }
+      
+      console.log('✅ Adding new notification:', newNotification.title);
       const newList = [newNotification, ...prev];
       // Update unread count in the same state update to prevent race conditions
       updateUnreadCount(newList);
@@ -93,9 +119,27 @@ export const useNotifications = () => {
   const injectRealtimeRow = useCallback((row: any) => {
     const incoming = transformRow(row);
     setNotifications(prev => {
+      // Enhanced deduplication check
       if (prev.some(n => n.id === incoming.id)) {
+        console.log('🔄 Skipping duplicate realtime notification by ID:', incoming.id);
         return prev;
       }
+      
+      // Additional content-based check for safety
+      const timeWindow = 5000; // 5 seconds for realtime
+      const isRecentDuplicate = prev.some(n => 
+        n.title === incoming.title && 
+        n.message === incoming.message &&
+        n.type === incoming.type &&
+        Math.abs(n.createdAt.getTime() - incoming.createdAt.getTime()) < timeWindow
+      );
+      
+      if (isRecentDuplicate) {
+        console.log('🔄 Skipping recent duplicate realtime notification:', incoming.title);
+        return prev;
+      }
+      
+      console.log('✅ Adding realtime notification:', incoming.title);
       const newList = [incoming, ...prev];
       updateUnreadCount(newList);
       return newList;

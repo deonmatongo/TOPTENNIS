@@ -130,17 +130,9 @@
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 25 95% 53%;
   }
-
-  /* Hide scrollbar for webkit browsers */
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
 }
+
+  /* Hide scrollbar for webkit browsers - handled in global section below */
 
 @layer base {
   * {
@@ -166,8 +158,8 @@
 }
 
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 *::-webkit-scrollbar-track {
@@ -176,13 +168,17 @@
 
 *::-webkit-scrollbar-thumb {
   background-color: #F97316;
-  border-radius: 999px;
+  border-radius: 10px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 *::-webkit-scrollbar-thumb:hover {
   background-color: #ea6c0a;
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background-color: #dc5d0a;
 }
 
 /* Preserve scrollbar-hide utility */
@@ -394,3 +390,5 @@
     background-position: 200% 0;
   }
 }
+
+

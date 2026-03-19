@@ -178,6 +178,8 @@ const PlayerProfileModal = ({ player, isOpen, onClose, pendingInvite, onInviteRe
     try {
       await updateRequestStatus(incomingRequest.id, status);
       toast.success(status === 'accepted' ? 'Friend request accepted' : 'Friend request declined');
+      // Close modal after successful action
+      setTimeout(() => onClose(), 1000);
     } catch (e) {
       toast.error('Failed to update friend request');
     }
@@ -190,6 +192,8 @@ const PlayerProfileModal = ({ player, isOpen, onClose, pendingInvite, onInviteRe
       await respondToInvite(pendingInvite.id, response);
       setInviteResponse(response);
       onInviteResponded?.();
+      // Close modal after successful action
+      setTimeout(() => onClose(), 1000);
     } catch (e) {
       toast.error('Failed to respond to invite');
     } finally {

@@ -2,7 +2,6 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useRealtime } from '@/contexts/RealtimeContext';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import { useBrowserNotifications } from './useBrowserNotifications';
 import { playNotificationSound } from '@/utils/notificationSound';
 
@@ -30,7 +29,6 @@ interface NotificationEvent {
 export const useRealtimeNotifications = () => {
   const { subscribeToTable, subscribeToUserChanges, broadcastUpdate, isConnected } = useRealtime();
   const { user } = useAuth();
-  const { addNotification } = useNotificationsContext();
   const { sendNotification, isSupported, permission } = useBrowserNotifications();
   
   // Track processed events to prevent duplicates

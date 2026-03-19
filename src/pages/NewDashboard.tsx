@@ -9,8 +9,8 @@ import { useLeagueRegistrations } from "@/hooks/useLeagueRegistrations";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNotificationsContext } from "@/contexts/NotificationsContext";
 import { useFriendRequests } from "@/hooks/useFriendRequests";
-import { useMessagesContext } from "@/contexts/MessagesContext";
 import { useMatchInvitesCount } from "@/hooks/useMatchInvitesCount";
+import { useConversations } from "@/hooks/useConversations";
 import { Home, Calendar, User, FileText, BarChart3, Trophy, Users, Bell, Search, Settings, LogOut, Menu, X, Zap, TrendingUp, Target, MessageCircle, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -66,7 +66,7 @@ const NewDashboard = () => {
   const {
     getPendingRequestsCount
   } = useFriendRequests();
-  const { getUnreadCount } = useMessagesContext();
+  const { getTotalUnread } = useConversations();
   const pendingMatchInvites = useMatchInvitesCount();
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState('profile');
@@ -119,7 +119,7 @@ const NewDashboard = () => {
   }, [playerLoading, player, navigate]);
 
   // Calculate unread messages count (must be before any early returns)
-  const unreadMessagesCount = getUnreadCount();
+  const unreadMessagesCount = getTotalUnread();
   
   // Menu items with reactive badges (must be before any early returns)
   const menuItems = useMemo(() => [{
