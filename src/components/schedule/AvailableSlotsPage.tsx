@@ -28,7 +28,7 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack, 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [userTimezone, setUserTimezone] = useState<string>('America/New_York'); // Default to Eastern Time
   const [convertedSlots, setConvertedSlots] = useState<Record<string, boolean>>({}); // Track which slots are converted
-  const { availability, loading, deleteAvailability, fetchAvailability } = useUserAvailability();
+  const { availability, loading, error, deleteAvailability, fetchAvailability } = useUserAvailability();
 
   const availableSlots = availability?.filter(slot => {
     const isAvailable = slot.is_available && !slot.is_blocked;
@@ -68,7 +68,7 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack, 
       setRefreshKey(prev => prev + 1);
       console.log('Manual refresh completed');
     } catch (error) {
-      console.error('Error refreshing availability:', error);
+      console.error('Manual refresh failed:', error);
     } finally {
       setIsRefreshing(false);
     }
@@ -249,6 +249,36 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack, 
           </div>
         </div>
       </div>
+
+      {/* Error State */}
+      {error && (
+        <div className="p-4 md:p-6">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center justify-center text-center py-8">
+                <div className="text-red-500 mb-4">
+                  <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h3 className="text-lg font-semibold">Unable to load availability</h3>
+                </div>
+                <p className="text-gray-600 mb-4 max-w-md">
+                  {error}
+                </p>
+                <button
+                  onClick={() => {
+                    console.log('Manual retry from error state');
+                    fetchAvailability();
+                  }}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                >
+                  Retry
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Content */}
       <div className="p-4 md:p-6 space-y-6">

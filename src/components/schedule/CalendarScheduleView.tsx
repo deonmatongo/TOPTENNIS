@@ -89,7 +89,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   const [showInviterProfile, setShowInviterProfile] = useState(false);
 
   const { user } = useAuth();
-  const { availability, deleteAvailability, createAvailability, updateAvailability, fetchAvailability } = useUserAvailability();
+  const { availability, loading, error, deleteAvailability, createAvailability, updateAvailability, fetchAvailability } = useUserAvailability();
   const { invites, getPendingInvites, getConfirmedInvites, respondToInvite, deleteInvite, cancelInvite } = useMatchInvites();
   const { notifications, markAsRead } = useNotificationsContext();
   const { timezone, updateTimezone } = useUserTimezone();

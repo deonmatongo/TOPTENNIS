@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRealtime } from '@/contexts/RealtimeContext';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
@@ -12,16 +12,37 @@ export const useUserAvailability = () => {
   const { user } = useAuth();
   const [availability, setAvailability] = useState<UserAvailability[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const hasErrorRef = useRef(false);
 
   const { subscribeToUserChanges } = useRealtime();
   const { notifyAvailabilityUpdate } = useRealtimeNotifications();
 
   // Define fetchAvailability before useEffect to avoid 'used before declaration' error
   const fetchAvailability = useCallback(async () => {
-    if (!user) return;
+    // Step 1: Authentication verification
+    console.log('Step 1: Fetch triggered for userId:', user?.id);
+    console.log('Step 2: Auth token present:', !!user);
+    
+    // Strict auth guard
+    if (!user?.id) {
+      console.warn('Availability fetch blocked — auth not ready');
+      setLoading(false);
+      return;
+    }
+
+    // Prevent fetching if already in error state
+    if (hasErrorRef.current) {
+      console.warn('Availability fetch blocked — error state active');
+      setLoading(false);
+      return;
+    }
     
     try {
-      console.log('📥 Fetching availability for user:', user.id);
+      console.log('Step 3: Query params:', { userId: user.id, excludeBooked: true });
+      setLoading(true);
+      setError(null);
+      
       const { data, error } = await supabase
         .from('user_availability')
         .select('*')
@@ -29,27 +50,87 @@ export const useUserAvailability = () => {
         .neq('booking_status', 'booked')  // Exclude booked slots
         .order('date', { ascending: true });
 
-      if (error) throw error;
-      console.log('✅ Availability fetched:', data?.length || 0, 'slots');
-      setAvailability(data || []);
+      console.log('Step 4: Raw response:', { data, error });
+
+      if (error) {
+        console.error('Step 5: Database error:', error);
+        throw error;
+      }
+
+      console.log('Step 5: Parsed data:', data);
+      
+      // Step 6: Data shape validation
+      if (!data) {
+        console.warn('Availability data is null');
+        setAvailability([]);
+        return;
+      }
+
+      if (!Array.isArray(data)) {
+        console.warn('Availability data is not an array:', data);
+        setAvailability([]);
+        return;
+      }
+
+      console.log('✅ Availability fetched successfully:', data.length, 'slots');
+      setAvailability(data);
+      
+      // Reset error state on success
+      hasErrorRef.current = false;
+      setError(null);
+      
     } catch (error) {
       console.error('❌ Error fetching availability:', error);
-      toast.error('Failed to load availability');
+      
+      // Set error state to prevent automatic retries
+      hasErrorRef.current = true;
+      setError('Failed to load availability');
+      
+      // Show user-friendly error with retry option
+      toast.error('Failed to load availability', {
+        action: {
+          label: 'Retry',
+          onClick: () => {
+            console.log('Manual retry triggered by user');
+            hasErrorRef.current = false;
+            setError(null);
+            fetchAvailability();
+          },
+        },
+        duration: 5000,
+      });
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user?.id]); // Only depend on user ID, not the entire user object
+
+  // Use refs to prevent dependency changes from triggering re-renders
+  const subscribeToUserChangesRef = useRef(subscribeToUserChanges);
+  
+  // Update refs when functions change
+  useEffect(() => {
+    subscribeToUserChangesRef.current = subscribeToUserChanges;
+  }, [subscribeToUserChanges]);
 
   useEffect(() => {
-    if (!user) {
+    console.log('useUserAvailability useEffect triggered');
+    
+    if (!user?.id) {
+      console.log('User not available, setting loading to false');
       setLoading(false);
+      setError(null);
       return;
     }
 
-    fetchAvailability();
+    // Only fetch if not in error state
+    if (!hasErrorRef.current) {
+      fetchAvailability();
+    } else {
+      setLoading(false);
+    }
 
     // Set up real-time subscription using context
-    const unsubscribe = subscribeToUserChanges((payload) => {
+    const unsubscribe = subscribeToUserChangesRef.current((payload) => {
       console.log('🔄 Real-time availability update received:', payload);
       if (payload.table === 'user_availability') {
         // Check if booking_status changed to 'booked' - if so, remove from availability immediately
@@ -57,16 +138,29 @@ export const useUserAvailability = () => {
           console.log('🔒 Slot booked - removing from availability:', payload.new.id);
           setAvailability(prev => prev.filter(slot => slot.id !== payload.new.id));
         } else {
-          console.log('✅ Refetching availability due to real-time update');
-          fetchAvailability();
+          console.log('✅ Real-time update - checking if refetch needed');
+          // Only refetch if not in error state and it's a meaningful change
+          if (!hasErrorRef.current && 
+              (payload.eventType === 'INSERT' || 
+               payload.eventType === 'DELETE' ||
+               (payload.eventType === 'UPDATE' && payload.new.booking_status !== 'booked'))) {
+            // Debounce the refetch to prevent rapid successive calls
+            setTimeout(() => {
+              if (!hasErrorRef.current) {
+                console.log('✅ Refetching availability due to real-time update');
+                fetchAvailability();
+              }
+            }, 500);
+          }
         }
       }
     });
 
     return () => {
+      console.log('Cleaning up availability subscription');
       unsubscribe();
     };
-  }, [user, subscribeToUserChanges, fetchAvailability]);
+  }, [user?.id]); // Only depend on user ID, not on functions that might change
 
   const createAvailability = async (availabilityData: {
     date: string;
@@ -135,9 +229,13 @@ export const useUserAvailability = () => {
       toast.success('Availability updated');
       notifyAvailabilityUpdate(data, 'created');
       
-      // Force a refetch to ensure we have the latest data
-      console.log('🔄 Forcing refetch to sync with database');
-      await fetchAvailability();
+      // Force a refetch to ensure we have the latest data (only if not in error state)
+      if (!hasErrorRef.current) {
+        console.log('🔄 Forcing refetch to sync with database');
+        await fetchAvailability();
+      } else {
+        console.log('Skipping refetch due to error state');
+      }
       
       return data;
     } catch (error) {
@@ -200,6 +298,7 @@ export const useUserAvailability = () => {
   return {
     availability,
     loading,
+    error,
     createAvailability,
     updateAvailability,
     deleteAvailability,
