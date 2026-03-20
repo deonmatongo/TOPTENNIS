@@ -1072,6 +1072,18 @@ const FriendsMessagesTab = () => {
   const { user } = useAuth();
   console.log('🔍 FriendsMessagesTab: Auth user:', user?.id || 'No user');
   
+  // Early return if no user - this is a common crash cause
+  if (!user) {
+    console.log('🔍 FriendsMessagesTab: No user found, returning loading state');
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+        <div style={{ fontSize: '24px', marginBottom: '16px' }}>👤</div>
+        <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>Loading user data...</div>
+        <div style={{ fontSize: '14px' }}>Please wait while we set up your network</div>
+      </div>
+    );
+  }
+  
   console.log('🔍 FriendsMessagesTab: Getting friend requests');
   const {
     requests, loading: friendsLoading,
@@ -1093,6 +1105,18 @@ const FriendsMessagesTab = () => {
   } = useConversations();
   console.log('🔍 FriendsMessagesTab: Conversations loaded, count:', conversations?.length || 0);
   
+  // Early return if conversations are still loading
+  if (convLoading) {
+    console.log('🔍 FriendsMessagesTab: Conversations still loading, showing loading state');
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+        <div style={{ fontSize: '24px', marginBottom: '16px' }}>💬</div>
+        <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>Loading conversations...</div>
+        <div style={{ fontSize: '14px' }}>Setting up your messaging</div>
+      </div>
+    );
+  }
+  
   console.log('🔍 FriendsMessagesTab: Getting match invites');
   const { invites: _invites } = useMatchInvites();
   
@@ -1102,12 +1126,12 @@ const FriendsMessagesTab = () => {
   console.log('🔍 FriendsMessagesTab: Getting typing indicator');
   const { typingUsers, broadcastTyping } = useTypingIndicator(selectedConvId);
 
-  const blockedIds = useMemo(() => new Set(blockedUsers.map(b => b.blocked_user_id)), [blockedUsers]);
+  const blockedIds = useMemo(() => new Set((blockedUsers || []).map(b => b.blocked_user_id)), [blockedUsers]);
   console.log('🔍 FriendsMessagesTab: Blocked IDs created:', blockedIds.size);
 
-  const pendingIn   = requests.filter(r => r.status === 'pending' && r.receiver_id === user?.id);
-  const pendingSent = requests.filter(r => r.status === 'pending' && r.sender_id === user?.id);
-  const friends     = requests.filter(r => r.status === 'accepted');
+  const pendingIn   = (requests || []).filter(r => r.status === 'pending' && r.receiver_id === user?.id);
+  const pendingSent = (requests || []).filter(r => r.status === 'pending' && r.sender_id === user?.id);
+  const friends     = (requests || []).filter(r => r.status === 'accepted');
   console.log('🔍 FriendsMessagesTab: Requests processed - pendingIn:', pendingIn.length, 'pendingSent:', pendingSent.length, 'friends:', friends.length);
 
   const visConvs = useMemo(() => (conversations || []).filter(c => {
@@ -1125,6 +1149,25 @@ const FriendsMessagesTab = () => {
   const filteredDMs    = sortPinned(dmConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(search.toLowerCase())));
   const filteredGroups = sortPinned(groupConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(search.toLowerCase())));
   console.log('🔍 FriendsMessagesTab: Filtered conversations - DMs:', filteredDMs.length, 'Groups:', filteredGroups.length);
+
+  // Memoized online status calculations to prevent repeated calls
+  const onlineStatusMap = useMemo(() => {
+    console.log('🔍 FriendsMessagesTab: Calculating online status map...');
+    const map = new Map<string, boolean>();
+    (friends || []).forEach(f => {
+      const friendId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
+      if (friendId && isOnline) {
+        try {
+          map.set(friendId, isOnline(friendId));
+        } catch (err) {
+          console.error('❌ FriendsMessagesTab: Error checking online status:', err);
+          map.set(friendId, false);
+        }
+      }
+    });
+    console.log('🔍 FriendsMessagesTab: Online status map created with', map.size, 'entries');
+    return map;
+  }, [friends, user?.id, isOnline]);
 
   const filteredFriends = (friends || []).filter(f => {
     const fd = f.sender_id === user?.id ? f.receiver : f.sender;
@@ -1156,20 +1199,6 @@ const FriendsMessagesTab = () => {
     return { userId: fid, name: fd?.name || 'Unknown', avatar: fd?.profile_picture_url };
   });
   console.log('🔍 FriendsMessagesTab: Friends list created:', friendsList.length);
-
-  // Memoized online status calculations to prevent repeated calls
-  const onlineStatusMap = useMemo(() => {
-    console.log('🔍 FriendsMessagesTab: Calculating online status map...');
-    const map = new Map<string, boolean>();
-    (friends || []).forEach(f => {
-      const friendId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
-      if (friendId) {
-        map.set(friendId, isOnline(friendId));
-      }
-    });
-    console.log('🔍 FriendsMessagesTab: Online status map created with', map.size, 'entries');
-    return map;
-  }, [friends, user?.id, isOnline]);
 
   const totalUnread = getTotalUnread();
   const onlineCount = (friends || []).filter(f => {
