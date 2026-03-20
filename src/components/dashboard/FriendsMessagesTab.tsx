@@ -1035,10 +1035,11 @@ const FriendRow: React.FC<FriendRowProps> = ({ fid, name, avatar, online, faded,
 
 // ── Main component ────────────────────────────────────────────────────────────
 const FriendsMessagesTab = () => {
-  console.log('🔍 FriendsMessagesTab: Component rendering start');
+  console.log('🚀 FriendsMessagesTab: COMPONENT STARTED RENDERING!');
+  console.log('🚀 FriendsMessagesTab: Current timestamp:', new Date().toISOString());
   
   try {
-    console.log('🔍 FriendsMessagesTab: Initializing state and hooks');
+    console.log('🔍 FriendsMessagesTab: Component rendering start');
     
   const [activeTab, setActiveTab]         = useState<'chat' | 'friends' | 'requests'>('chat');
   console.log('🔍 FriendsMessagesTab: activeTab state initialized');
@@ -1867,7 +1868,7 @@ const FriendsMessagesTab = () => {
       `}</style>
     </div>
   );
-  console.log('🔍 FriendsMessagesTab: Component rendered successfully');
+  console.log('🚀 FriendsMessagesTab: COMPONENT FINISHED RENDERING SUCCESSFULLY!');
   } catch (error) {
     console.error('❌ FriendsMessagesTab: Component crashed:', {
       error,
