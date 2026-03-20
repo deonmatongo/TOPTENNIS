@@ -236,7 +236,7 @@ const NewDashboard = () => {
         );
       case 'social':
         return (
-          <ComponentErrorBoundary componentName="FriendsMessagesTab">
+          <ComponentErrorBoundary componentName="BuildYourNetworkTab">
             <FriendsMessagesTab />
           </ComponentErrorBoundary>
         );

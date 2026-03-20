@@ -1035,6 +1035,9 @@ const FriendRow: React.FC<FriendRowProps> = ({ fid, name, avatar, online, faded,
 
 // ── Main component ────────────────────────────────────────────────────────────
 const FriendsMessagesTab = () => {
+  console.log('🔍 FriendsMessagesTab: Component rendering');
+  
+  try {
   const [activeTab, setActiveTab]         = useState<'chat' | 'friends' | 'requests'>('chat');
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
   const [msgInput, setMsgInput]           = useState('');
@@ -1082,9 +1085,9 @@ const FriendsMessagesTab = () => {
   const pendingSent = requests.filter(r => r.status === 'pending' && r.sender_id === user?.id);
   const friends     = requests.filter(r => r.status === 'accepted');
 
-  const visConvs = useMemo(() => conversations.filter(c => {
+  const visConvs = useMemo(() => (conversations || []).filter(c => {
     if (c.is_group) return true;
-    const other = c.members.find(m => m.user_id !== user?.id);
+    const other = c.members?.find(m => m.user_id !== user?.id);
     return other ? !blockedIds.has(other.user_id) : true;
   }), [conversations, user, blockedIds]);
 
@@ -1095,7 +1098,7 @@ const FriendsMessagesTab = () => {
   const filteredDMs    = sortPinned(dmConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(search.toLowerCase())));
   const filteredGroups = sortPinned(groupConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(search.toLowerCase())));
 
-  const filteredFriends = friends.filter(f => {
+  const filteredFriends = (friends || []).filter(f => {
     const fd = f.sender_id === user?.id ? f.receiver : f.sender;
     const s  = friendSearch.toLowerCase();
     return (fd?.name || '').toLowerCase().includes(s) || (fd?.email || '').toLowerCase().includes(s);
@@ -1115,7 +1118,7 @@ const FriendsMessagesTab = () => {
   const myRole       = selectedConv ? getMyRole(selectedConv) : null;
   const dmOtherId    = selectedConv && !selectedConv.is_group ? getConvOtherUserId(selectedConv, user?.id || '') : undefined;
 
-  const friendsList = friends.map(f => {
+  const friendsList = (friends || []).map(f => {
     const fid = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
     const fd  = f.sender_id === user?.id ? f.receiver : f.sender;
     return { userId: fid, name: fd?.name || 'Unknown', avatar: fd?.profile_picture_url };
@@ -1124,7 +1127,7 @@ const FriendsMessagesTab = () => {
   // Memoized online status calculations to prevent repeated calls
   const onlineStatusMap = useMemo(() => {
     const map = new Map<string, boolean>();
-    friends.forEach(f => {
+    (friends || []).forEach(f => {
       const friendId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
       if (friendId) {
         map.set(friendId, isOnline(friendId));
@@ -1134,7 +1137,7 @@ const FriendsMessagesTab = () => {
   }, [friends, user?.id, isOnline]);
 
   const totalUnread = getTotalUnread();
-  const onlineCount = friends.filter(f => {
+  const onlineCount = (friends || []).filter(f => {
     const friendId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
     return friendId ? onlineStatusMap.get(friendId) : false;
   }).length;
@@ -1750,7 +1753,7 @@ const FriendsMessagesTab = () => {
         open={showGroupCreate}
         onClose={() => setShowGroupCreate(false)}
         friends={friendsList}
-        existingGroupNames={groupConvs.map(c => c.name || '')}
+        existingGroupNames={(groupConvs || []).map(c => c.name || '')}
         isOnlineFn={isOnline}
         isMobile={isMobile}
         createGroupChat={createGroupChat}
@@ -1795,6 +1798,23 @@ const FriendsMessagesTab = () => {
       `}</style>
     </div>
   );
+  } catch (error) {
+    console.error('❌ FriendsMessagesTab: Component crashed:', {
+      error,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      errorStack: error instanceof Error ? error.stack : null,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Fallback UI
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+        <div style={{ fontSize: '24px', marginBottom: '16px' }}>💬</div>
+        <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>Network temporarily unavailable</div>
+        <div style={{ fontSize: '14px' }}>Please refresh the page to try again</div>
+      </div>
+    );
+  }
 };
 
 export default FriendsMessagesTab;
