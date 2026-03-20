@@ -1301,7 +1301,9 @@ const FriendsMessagesTab = () => {
     { id: 'requests', label: 'Requests', count: getPendingRequestsCount() },
   ];
 
-  if (friendsLoading || convLoading) {
+  // Only return loading spinner on initial load, not for ongoing loading states
+  if (convLoading && !conversations) {
+    console.log('🔍 FriendsMessagesTab: Initial load, showing spinner');
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 400 }}>
         <div style={{ width: 36, height: 36, borderRadius: '50%', border: `4px solid ${C.accent}`, borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
