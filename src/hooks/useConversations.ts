@@ -67,22 +67,39 @@ export const useConversations = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchConversations = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      console.warn('fetchConversations: No user found');
+      setLoading(false);
+      return;
+    }
+    
     const db = supabase as any;
+    setLoading(true);
+    
     try {
+      console.log('🔄 Fetching conversations for user:', user.id);
+      
       const { data: memberRows, error: memberErr } = await db
         .from('conversation_members')
         .select('conversation_id, role, joined_at, last_read_at, is_pinned')
         .eq('user_id', user.id);
 
-      if (memberErr) throw memberErr;
+      console.log('📋 Member rows:', memberRows?.length || 0);
+      
+      if (memberErr) {
+        console.error('❌ Member rows error:', memberErr);
+        throw memberErr;
+      }
+      
       if (!memberRows || memberRows.length === 0) {
+        console.log('📭 No conversations found for user');
         setConversations([]);
         setLoading(false);
         return;
       }
 
       const convIds = memberRows.map((r: any) => r.conversation_id);
+      console.log('🔍 Conversation IDs to fetch:', convIds);
 
       const { data: convRows, error: convErr } = await db
         .from('conversations')
@@ -90,21 +107,38 @@ export const useConversations = () => {
         .in('id', convIds)
         .order('updated_at', { ascending: false });
 
-      if (convErr) throw convErr;
+      console.log('📝 Conversation rows:', convRows?.length || 0);
+      
+      if (convErr) {
+        console.error('❌ Conversation rows error:', convErr);
+        throw convErr;
+      }
 
       const { data: allMembers, error: memErr } = await db
         .from('conversation_members')
         .select('conversation_id, user_id, role, joined_at, last_read_at, is_pinned')
         .in('conversation_id', convIds);
 
-      if (memErr) throw memErr;
-
+      if (memErr) {
+        console.error('❌ All members error:', memErr);
+        throw memErr;
+      }
+      
       const userIds = Array.from(new Set((allMembers || []).map((m: any) => m.user_id)));
-      const { data: profiles } = await supabase
+      console.log('👥 User IDs for profiles:', userIds);
+      
+      const { data: profiles, error: profileErr } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, email, profile_picture_url')
         .in('id', userIds as string[]);
+        
+      if (profileErr) {
+        console.error('❌ Profiles error:', profileErr);
+        throw profileErr;
+      }
+      
       const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+      console.log('👤 Profile map created:', profileMap.size);
 
       // Fetch messages (exclude hard-deleted, include soft-deleted for rendering)
       const { data: allMessages, error: msgErr } = await db
@@ -113,24 +147,48 @@ export const useConversations = () => {
         .in('conversation_id', convIds)
         .order('created_at', { ascending: true });
 
-      if (msgErr) throw msgErr;
-
+      if (msgErr) {
+        console.error('❌ Messages error:', msgErr);
+        throw msgErr;
+      }
+      
+      console.log('💬 Messages fetched:', allMessages?.length || 0);
+      
       const senderIds = Array.from(new Set((allMessages || []).map((m: any) => m.sender_id)));
-      const { data: senderProfiles } = await supabase
+      console.log('📤 Sender IDs:', senderIds.length);
+      
+      const { data: senderProfiles, error: senderErr } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, email, profile_picture_url')
         .in('id', senderIds as string[]);
+        
+      if (senderErr) {
+        console.error('❌ Sender profiles error:', senderErr);
+        throw senderErr;
+      }
+      
       const senderMap = new Map((senderProfiles || []).map(p => [p.id, p]));
+      console.log('📤 Sender map created:', senderMap.size);
 
       // Fetch all reactions for these conversations' messages
       const msgIds = (allMessages || []).map((m: any) => m.id);
       let reactionsMap = new Map<string, MessageReaction[]>();
+      
       if (msgIds.length > 0) {
-        const { data: allReactions } = await db
+        console.log('😀 Fetching reactions for', msgIds.length, 'messages');
+        
+        const { data: allReactions, error: reactionsErr } = await db
           .from('message_reactions')
           .select('message_id, user_id, emoji')
           .in('message_id', msgIds);
 
+        if (reactionsErr) {
+          console.error('❌ Reactions error:', reactionsErr);
+          throw reactionsErr;
+        }
+        
+        console.log('😀 Reactions fetched:', allReactions?.length || 0);
+        
         (allReactions || []).forEach((r: any) => {
           const list = reactionsMap.get(r.message_id) || [];
           const existing = list.find(x => x.emoji === r.emoji);
@@ -198,9 +256,32 @@ export const useConversations = () => {
         return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
       });
 
+      console.log('✅ Successfully built', built.length, 'conversations');
       setConversations(built);
     } catch (err) {
-      console.error('Error fetching conversations:', err);
+      console.error('❌ Error fetching conversations:', {
+        error: err,
+        errorMessage: err instanceof Error ? err.message : 'Unknown error',
+        errorStack: err instanceof Error ? err.stack : null,
+        userId: user?.id,
+        timestamp: new Date().toISOString(),
+        url: window.location.href
+      });
+      
+      // Show user-friendly error message
+      toast.error('Failed to load conversations. Please try again.', {
+        duration: 5000,
+        action: {
+          label: 'Retry',
+          onClick: () => {
+            console.log('User retrying conversation fetch');
+            fetchConversations();
+          },
+        },
+      });
+      
+      // Set empty state on error
+      setConversations([]);
     } finally {
       setLoading(false);
     }
@@ -438,8 +519,39 @@ export const useConversations = () => {
   }, [user]);
 
   useEffect(() => {
-    if (!user) { setLoading(false); return; }
-    fetchConversations();
+    if (!user) { 
+      console.log('useConversations: No user found, skipping initialization');
+      setLoading(false); 
+      return; 
+    }
+    
+    console.log('useConversations: Initializing conversations for user:', user.id);
+    
+    try {
+      fetchConversations();
+    } catch (err) {
+      console.error('useConversations: Error during initialization:', {
+        error: err,
+        errorMessage: err instanceof Error ? err.message : 'Unknown error',
+        userId: user.id,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Show user-friendly error
+      toast.error('Failed to initialize conversations. Please refresh the page.', {
+        duration: 5000,
+        action: {
+          label: 'Retry',
+          onClick: () => {
+            console.log('User retrying conversation initialization');
+            fetchConversations();
+          },
+        },
+      });
+      
+      // Set loading to false on error
+      setLoading(false);
+    }
 
     // Real-time: listen for new messages
     const msgChannel = supabase
@@ -448,8 +560,20 @@ export const useConversations = () => {
         event: 'INSERT',
         schema: 'public',
         table: 'conversation_messages',
-      }, () => fetchConversations())
-      .subscribe();
+      }, () => {
+        console.log('📨 Real-time: New message received');
+        try {
+          fetchConversations();
+        } catch (err) {
+          console.error('❌ Error fetching conversations after new message:', err);
+        }
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.error('❌ Message channel error:', status);
+          toast.error('Real-time messaging disconnected. Please refresh the page.');
+        }
+      });
 
     // Real-time: listen for membership changes (add/remove)
     const memChannel = supabase
@@ -459,22 +583,72 @@ export const useConversations = () => {
         schema: 'public',
         table: 'conversation_members',
         filter: `user_id=eq.${user.id}`,
-      }, () => fetchConversations())
-      .subscribe();
+      }, () => {
+        console.log('👥 Real-time: Membership change received');
+        try {
+          fetchConversations();
+        } catch (err) {
+          console.error('❌ Error fetching conversations after membership change:', err);
+        }
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.error('❌ Membership channel error:', status);
+          toast.error('Real-time membership updates disconnected. Please refresh the page.');
+        }
+      });
 
     // Real-time: conversation inserts (new group created) + updates (name/avatar changes)
     const convChannel = supabase
       .channel('conv-updates-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations' }, () => fetchConversations())
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, () => fetchConversations())
-      .subscribe();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations' }, () => {
+        console.log('📝 Real-time: Conversation created');
+        try {
+          fetchConversations();
+        } catch (err) {
+          console.error('❌ Error fetching conversations after conversation created:', err);
+        }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, () => {
+        console.log('📝 Real-time: Conversation updated');
+        try {
+          fetchConversations();
+        } catch (err) {
+          console.error('❌ Error fetching conversations after conversation updated:', err);
+        }
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.error('❌ Conversation channel error:', status);
+          toast.error('Real-time conversation updates disconnected. Please refresh the page.');
+        }
+      });
 
     // Real-time: message soft-deletes (UPDATE) and reactions
     const reactChannel = supabase
       .channel('conv-reactions-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => fetchConversations())
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversation_messages' }, () => fetchConversations())
-      .subscribe();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => {
+        console.log('😀 Real-time: Message reaction changed');
+        try {
+          fetchConversations();
+        } catch (err) {
+          console.error('❌ Error fetching conversations after reaction change:', err);
+        }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversation_messages' }, () => {
+        console.log('💬 Real-time: Message updated');
+        try {
+          fetchConversations();
+        } catch (err) {
+          console.error('❌ Error fetching conversations after message updated:', err);
+        }
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.error('❌ Reaction channel error:', status);
+          toast.error('Real-time reaction updates disconnected. Please refresh the page.');
+        }
+      });
 
     return () => {
       supabase.removeChannel(msgChannel);

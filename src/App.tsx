@@ -42,6 +42,42 @@ const queryClient = new QueryClient({
 const App: React.FC = () => {
   logger.debug('App component rendering');
   
+  // Add global error handlers to catch unhandled errors
+  React.useEffect(() => {
+    // Handle unhandled promise rejections
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      logger.error('Unhandled promise rejection:', {
+        reason: event.reason,
+        stack: event.reason?.stack,
+        timestamp: new Date().toISOString()
+      });
+      // Prevent the default browser behavior
+      event.preventDefault();
+    };
+
+    // Handle unhandled JavaScript errors
+    const handleError = (event: ErrorEvent) => {
+      logger.error('Global JavaScript error:', {
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        stack: event.error?.stack,
+        timestamp: new Date().toISOString()
+      });
+    };
+
+    // Add event listeners
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    window.addEventListener('error', handleError);
+
+    // Cleanup function
+    return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      window.removeEventListener('error', handleError);
+    };
+  }, []);
+  
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

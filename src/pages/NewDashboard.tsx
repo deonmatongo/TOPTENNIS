@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ComponentErrorBoundary } from "@/components/ui/ComponentErrorBoundary";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import PlayerSearch from "@/components/dashboard/PlayerSearch";
 import PlayerProfileModal from "@/components/dashboard/PlayerProfileModal";
@@ -188,32 +189,75 @@ const NewDashboard = () => {
   const renderActiveTab = () => {
     switch (activeTab) {
       case 'profile':
-        return <ProfileTab player={player} />;
-      case 'performance':
-        return <PerformanceTab player={player} matches={matches} />;
-      case 'my-leagues':
-        return <MyLeaguesTab 
-          player={player} 
-          registrations={registrations}
-          onNavigateToSchedule={(opponentId, opponentName) => {
-            setActiveTab('schedule');
-            // You can pass additional state here if needed
-          }}
-        />;
+        return (
+          <ComponentErrorBoundary componentName="ProfileTab">
+            <ProfileTab player={player} />
+          </ComponentErrorBoundary>
+        );
       case 'schedule':
-        return <ScheduleTab player={player} matches={matches} matchesLoading={matchesLoading} />;
-      case 'matching':
-        return <MatchingTab />;
+        return (
+          <ComponentErrorBoundary componentName="MatchesCalendarTab">
+            <MatchesCalendarTab 
+              player={player} 
+              matches={matches} 
+              matchesLoading={matchesLoading} 
+              selectedLeague={selectedLeague}
+            />
+          </ComponentErrorBoundary>
+        );
+      case 'competition':
+        return (
+          <ComponentErrorBoundary componentName="CompetitionTab">
+            <CompetitionTab 
+              player={player} 
+              leaderboard={leaderboard} 
+              leaderboardLoading={leaderboardLoading} 
+              selectedLeague={selectedLeague}
+            />
+          </ComponentErrorBoundary>
+        );
+      case 'performance':
+        return (
+          <ComponentErrorBoundary componentName="PerformanceTab">
+            <PerformanceTab player={player} matches={matches} />
+          </ComponentErrorBoundary>
+        );
       case 'register':
-        return <RegisterTab />;
+        return (
+          <ComponentErrorBoundary componentName="RegisterTab">
+            <RegisterTab />
+          </ComponentErrorBoundary>
+        );
       case 'messages':
-        return <FriendsMessagesTab />;
+        return (
+          <ComponentErrorBoundary componentName="FriendsMessagesTab">
+            <FriendsMessagesTab />
+          </ComponentErrorBoundary>
+        );
       case 'social':
-        return <FriendsMessagesTab />;
+        return (
+          <ComponentErrorBoundary componentName="FriendsMessagesTab">
+            <FriendsMessagesTab />
+          </ComponentErrorBoundary>
+        );
       case 'notifications':
-        return <NotificationsTab />;
+        return (
+          <ComponentErrorBoundary componentName="NotificationsTab">
+            <NotificationsTab />
+          </ComponentErrorBoundary>
+        );
       default:
-        return <ProfileTab player={player} />;
+        return (
+          <ComponentErrorBoundary componentName="OverviewTab">
+            <OverviewTab 
+              player={player} 
+              matches={matches} 
+              leaderboard={leaderboard} 
+              selectedLeague={selectedLeague} 
+              setSelectedLeague={setSelectedLeague}
+            />
+          </ComponentErrorBoundary>
+        );
     }
   };
   const currentTab = menuItems.find(item => item.id === activeTab);
