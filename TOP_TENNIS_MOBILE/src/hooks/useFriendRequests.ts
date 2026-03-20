@@ -38,12 +38,21 @@ export function useFriendRequests() {
   };
 
   const updateRequestStatus = async (requestId: string, status: 'accepted' | 'declined') => {
-    const { error, count } = await supabase
+    const { error } = await supabase
       .from('friend_requests')
       .update({ status })
       .eq('id', requestId)
       .select();
-    console.log('updateRequestStatus result:', { error, count, requestId, status, userId: user?.id });
+    if (error) throw error;
+    await fetchRequests();
+  };
+
+  const cancelRequest = async (requestId: string) => {
+    const { error } = await supabase
+      .from('friend_requests')
+      .delete()
+      .eq('id', requestId)
+      .eq('sender_id', user!.id);
     if (error) throw error;
     await fetchRequests();
   };
@@ -53,5 +62,5 @@ export function useFriendRequests() {
   const pendingSent = requests.filter(r => r.sender_id === user?.id && r.status === 'pending');
   const friends = requests.filter(r => r.status === 'accepted');
 
-  return { requests, loading, pendingReceived, pendingSent, friends, sendFriendRequest, updateRequestStatus, getPendingRequestsCount, refetch: fetchRequests };
+  return { requests, loading, pendingReceived, pendingSent, friends, sendFriendRequest, updateRequestStatus, cancelRequest, getPendingRequestsCount, refetch: fetchRequests };
 }

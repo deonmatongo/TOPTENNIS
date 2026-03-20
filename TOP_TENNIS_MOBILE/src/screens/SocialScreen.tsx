@@ -17,7 +17,7 @@ type Tab = 'requests' | 'friends' | 'find';
 
 export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuth();
-  const { pendingReceived, pendingSent, friends, loading, updateRequestStatus, sendFriendRequest, refetch } = useFriendRequests();
+  const { pendingReceived, pendingSent, friends, loading, updateRequestStatus, cancelRequest, sendFriendRequest, refetch } = useFriendRequests();
   const [activeTab, setActiveTab] = useState<Tab>('requests');
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -62,6 +62,19 @@ export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     } finally {
       setSending(null);
     }
+  };
+
+  const handleCancelRequest = async (requestId: string) => {
+    Alert.alert('Cancel Request', 'Cancel this friend request?', [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Cancel Request', style: 'destructive',
+        onPress: async () => {
+          try { await cancelRequest(requestId); }
+          catch (e: any) { Alert.alert('Error', e?.message || 'Failed to cancel request.'); }
+        },
+      },
+    ]);
   };
 
   const handleRespond = async (requestId: string, status: 'accepted' | 'declined') => {
@@ -178,9 +191,9 @@ export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                             <Text style={styles.requestName}>{req.receiver?.name || 'Unknown'}</Text>
                             <Text style={styles.requestMeta}>Pending response</Text>
                           </View>
-                          <View style={[styles.pendingBadge]}>
-                            <Text style={styles.pendingText}>Pending</Text>
-                          </View>
+                          <TouchableOpacity style={styles.cancelBtn} onPress={() => handleCancelRequest(req.id)}>
+                            <Ionicons name="close" size={16} color={Colors.error} />
+                          </TouchableOpacity>
                         </View>
                       ))}
                     </>
@@ -268,7 +281,7 @@ export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                         </View>
                       ) : (
                         <View style={styles.addBtn}>
-                          <Ionicons name="chevron-forward" size={16} color="#fff" />
+                          <Ionicons name="person-add-outline" size={16} color="#fff" />
                         </View>
                       )}
                     </TouchableOpacity>
@@ -320,8 +333,7 @@ const styles = StyleSheet.create({
   requestActions: { flexDirection: 'row', gap: Spacing.sm },
   acceptBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.success, alignItems: 'center', justifyContent: 'center' },
   declineBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.errorLight, alignItems: 'center', justifyContent: 'center' },
-  pendingBadge: { backgroundColor: Colors.warningLight, paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: Radius.full },
-  pendingText: { fontSize: FontSize.xs, color: Colors.warning, fontWeight: FontWeight.semibold },
+  cancelBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.errorLight, alignItems: 'center', justifyContent: 'center' },
 
   friendCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border },
   friendInfo: { flex: 1, gap: 4 },
