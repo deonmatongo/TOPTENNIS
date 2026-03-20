@@ -1035,10 +1035,14 @@ const FriendRow: React.FC<FriendRowProps> = ({ fid, name, avatar, online, faded,
 
 // ── Main component ────────────────────────────────────────────────────────────
 const FriendsMessagesTab = () => {
-  console.log('🔍 FriendsMessagesTab: Component rendering');
+  console.log('🔍 FriendsMessagesTab: Component rendering start');
   
   try {
+    console.log('🔍 FriendsMessagesTab: Initializing state and hooks');
+    
   const [activeTab, setActiveTab]         = useState<'chat' | 'friends' | 'requests'>('chat');
+  console.log('🔍 FriendsMessagesTab: activeTab state initialized');
+  
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
   const [msgInput, setMsgInput]           = useState('');
   const [search, setSearch]               = useState('');
@@ -1058,16 +1062,28 @@ const FriendsMessagesTab = () => {
   const [newGroupConvId, setNewGroupConvId] = useState<string | null>(null);
   const isMobile = useWindowWidth() < 768;
 
+  console.log('🔍 FriendsMessagesTab: All state initialized');
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollRef      = useRef<HTMLDivElement>(null);
   const inputRef       = useRef<HTMLTextAreaElement>(null);
 
+  console.log('🔍 FriendsMessagesTab: Getting auth user');
   const { user } = useAuth();
+  console.log('🔍 FriendsMessagesTab: Auth user:', user?.id || 'No user');
+  
+  console.log('🔍 FriendsMessagesTab: Getting friend requests');
   const {
     requests, loading: friendsLoading,
     updateRequestStatus, revokeFriendRequest, getPendingRequestsCount,
   } = useFriendRequests();
+  console.log('🔍 FriendsMessagesTab: Friend requests loaded, count:', requests?.length || 0);
+  
+  console.log('🔍 FriendsMessagesTab: Getting blocked users');
   const { blockedUsers, blockUser, unfriendUser } = useBlockedUsers();
+  console.log('🔍 FriendsMessagesTab: Blocked users loaded, count:', blockedUsers?.length || 0);
+  
+  console.log('🔍 FriendsMessagesTab: Getting conversations');
   const {
     conversations, loading: convLoading,
     sendMessage, getOrCreateDM, createGroupChat,
@@ -1075,34 +1091,48 @@ const FriendsMessagesTab = () => {
     leaveGroup, deleteGroup, togglePin,
     updateGroup, markConversationRead, getTotalUnread, getMyRole, setMemberRole,
   } = useConversations();
+  console.log('🔍 FriendsMessagesTab: Conversations loaded, count:', conversations?.length || 0);
+  
+  console.log('🔍 FriendsMessagesTab: Getting match invites');
   const { invites: _invites } = useMatchInvites();
+  
+  console.log('🔍 FriendsMessagesTab: Getting online presence');
   const { isOnline } = useOnlinePresence();
+  
+  console.log('🔍 FriendsMessagesTab: Getting typing indicator');
   const { typingUsers, broadcastTyping } = useTypingIndicator(selectedConvId);
 
   const blockedIds = useMemo(() => new Set(blockedUsers.map(b => b.blocked_user_id)), [blockedUsers]);
+  console.log('🔍 FriendsMessagesTab: Blocked IDs created:', blockedIds.size);
 
   const pendingIn   = requests.filter(r => r.status === 'pending' && r.receiver_id === user?.id);
   const pendingSent = requests.filter(r => r.status === 'pending' && r.sender_id === user?.id);
   const friends     = requests.filter(r => r.status === 'accepted');
+  console.log('🔍 FriendsMessagesTab: Requests processed - pendingIn:', pendingIn.length, 'pendingSent:', pendingSent.length, 'friends:', friends.length);
 
   const visConvs = useMemo(() => (conversations || []).filter(c => {
     if (c.is_group) return true;
     const other = c.members?.find(m => m.user_id !== user?.id);
     return other ? !blockedIds.has(other.user_id) : true;
   }), [conversations, user, blockedIds]);
+  console.log('🔍 FriendsMessagesTab: Visible conversations calculated:', visConvs.length);
 
   const dmConvs    = visConvs.filter(c => !c.is_group);
   const groupConvs = visConvs.filter(c => c.is_group);
+  console.log('🔍 FriendsMessagesTab: DM/Group conversations split - DMs:', dmConvs.length, 'Groups:', groupConvs.length);
 
   const sortPinned = (arr: Conversation[]) => [...arr].sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
   const filteredDMs    = sortPinned(dmConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(search.toLowerCase())));
   const filteredGroups = sortPinned(groupConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(search.toLowerCase())));
+  console.log('🔍 FriendsMessagesTab: Filtered conversations - DMs:', filteredDMs.length, 'Groups:', filteredGroups.length);
 
   const filteredFriends = (friends || []).filter(f => {
     const fd = f.sender_id === user?.id ? f.receiver : f.sender;
     const s  = friendSearch.toLowerCase();
     return (fd?.name || '').toLowerCase().includes(s) || (fd?.email || '').toLowerCase().includes(s);
   });
+  console.log('🔍 FriendsMessagesTab: Filtered friends:', filteredFriends.length);
+  
   const onlineFriends  = filteredFriends.filter(f => {
     const friendId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
     return friendId ? onlineStatusMap.get(friendId) : false;
@@ -1111,21 +1141,25 @@ const FriendsMessagesTab = () => {
     const friendId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
     return friendId ? !onlineStatusMap.get(friendId) : true;
   });
+  console.log('🔍 FriendsMessagesTab: Online/offline friends - Online:', onlineFriends.length, 'Offline:', offlineFriends.length);
 
   const selectedConv = visConvs.find(c => c.id === selectedConvId) ?? null;
   const convName     = selectedConv ? getConvName(selectedConv, user?.id || '') : '';
   const convAvatar   = selectedConv ? getConvAvatar(selectedConv, user?.id || '') : undefined;
   const myRole       = selectedConv ? getMyRole(selectedConv) : null;
   const dmOtherId    = selectedConv && !selectedConv.is_group ? getConvOtherUserId(selectedConv, user?.id || '') : undefined;
+  console.log('🔍 FriendsMessagesTab: Selected conversation processed:', selectedConvId, convName);
 
   const friendsList = (friends || []).map(f => {
     const fid = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
     const fd  = f.sender_id === user?.id ? f.receiver : f.sender;
     return { userId: fid, name: fd?.name || 'Unknown', avatar: fd?.profile_picture_url };
   });
+  console.log('🔍 FriendsMessagesTab: Friends list created:', friendsList.length);
 
   // Memoized online status calculations to prevent repeated calls
   const onlineStatusMap = useMemo(() => {
+    console.log('🔍 FriendsMessagesTab: Calculating online status map...');
     const map = new Map<string, boolean>();
     (friends || []).forEach(f => {
       const friendId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
@@ -1133,6 +1167,7 @@ const FriendsMessagesTab = () => {
         map.set(friendId, isOnline(friendId));
       }
     });
+    console.log('🔍 FriendsMessagesTab: Online status map created with', map.size, 'entries');
     return map;
   }, [friends, user?.id, isOnline]);
 
@@ -1141,6 +1176,7 @@ const FriendsMessagesTab = () => {
     const friendId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
     return friendId ? onlineStatusMap.get(friendId) : false;
   }).length;
+  console.log('🔍 FriendsMessagesTab: Totals calculated - Total unread:', totalUnread, 'Online count:', onlineCount);
 
   useEffect(() => {
     if (atBottom) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1798,6 +1834,7 @@ const FriendsMessagesTab = () => {
       `}</style>
     </div>
   );
+  console.log('🔍 FriendsMessagesTab: Component rendered successfully');
   } catch (error) {
     console.error('❌ FriendsMessagesTab: Component crashed:', {
       error,
