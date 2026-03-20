@@ -1149,6 +1149,7 @@ const FriendsMessagesTab = () => {
   const filteredDMs    = sortPinned(dmConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(search.toLowerCase())));
   const filteredGroups = sortPinned(groupConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(search.toLowerCase())));
   console.log('🔍 FriendsMessagesTab: Filtered conversations - DMs:', filteredDMs.length, 'Groups:', filteredGroups.length);
+  console.log('🔍 FriendsMessagesTab: Search term:', search, 'Active tab:', activeTab);
 
   // Memoized online status calculations to prevent repeated calls
   const onlineStatusMap = useMemo(() => {
@@ -1302,6 +1303,7 @@ const FriendsMessagesTab = () => {
   ];
 
   // Only return loading spinner on initial load, not for ongoing loading states
+  console.log('🔍 FriendsMessagesTab: Loading state check - convLoading:', convLoading, 'conversations:', conversations, 'conversations exists:', !!conversations);
   if (convLoading && !conversations) {
     console.log('🔍 FriendsMessagesTab: Initial load, showing spinner');
     return (
