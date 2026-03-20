@@ -553,102 +553,170 @@ export const useConversations = () => {
       setLoading(false);
     }
 
-    // Real-time: listen for new messages
-    const msgChannel = supabase
-      .channel('conv-messages-realtime')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'conversation_messages',
-      }, () => {
-        console.log('📨 Real-time: New message received');
-        try {
-          fetchConversations();
-        } catch (err) {
-          console.error('❌ Error fetching conversations after new message:', err);
-        }
-      })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          console.error('❌ Message channel error:', status);
-          toast.error('Real-time messaging disconnected. Please refresh the page.');
-        }
-      });
+    // Reconnection helper with exponential backoff
+    const createReconnectingChannel = (channelName: string, maxRetries = 5) => {
+      let retries = 0;
+      let reconnectTimeout: NodeJS.Timeout;
 
-    // Real-time: listen for membership changes (add/remove)
-    const memChannel = supabase
-      .channel('conv-members-realtime')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'conversation_members',
-        filter: `user_id=eq.${user.id}`,
-      }, () => {
-        console.log('👥 Real-time: Membership change received');
-        try {
-          fetchConversations();
-        } catch (err) {
-          console.error('❌ Error fetching conversations after membership change:', err);
+      const reconnect = () => {
+        if (retries >= maxRetries) {
+          console.error(`❌ ${channelName}: Max retries reached, giving up`);
+          return;
         }
-      })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          console.error('❌ Membership channel error:', status);
-          toast.error('Real-time membership updates disconnected. Please refresh the page.');
-        }
-      });
 
-    // Real-time: conversation inserts (new group created) + updates (name/avatar changes)
-    const convChannel = supabase
-      .channel('conv-updates-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations' }, () => {
-        console.log('📝 Real-time: Conversation created');
-        try {
-          fetchConversations();
-        } catch (err) {
-          console.error('❌ Error fetching conversations after conversation created:', err);
-        }
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, () => {
-        console.log('📝 Real-time: Conversation updated');
-        try {
-          fetchConversations();
-        } catch (err) {
-          console.error('❌ Error fetching conversations after conversation updated:', err);
-        }
-      })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          console.error('❌ Conversation channel error:', status);
-          toast.error('Real-time conversation updates disconnected. Please refresh the page.');
-        }
-      });
+        const delay = Math.min(1000 * 2 ** retries, 30000);
+        retries++;
+        
+        console.log(`🔄 ${channelName}: Attempting reconnect (${retries}/${maxRetries}) in ${delay}ms`);
+        
+        reconnectTimeout = setTimeout(() => {
+          // Re-create the channel subscription
+          if (channelName === 'conv-messages-realtime') setupMsgChannel();
+          if (channelName === 'conv-members-realtime') setupMemChannel();
+          if (channelName === 'conv-updates-realtime') setupConvChannel();
+          if (channelName === 'conv-reactions-realtime') setupReactChannel();
+        }, delay);
+      };
 
-    // Real-time: message soft-deletes (UPDATE) and reactions
-    const reactChannel = supabase
-      .channel('conv-reactions-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => {
-        console.log('😀 Real-time: Message reaction changed');
-        try {
-          fetchConversations();
-        } catch (err) {
-          console.error('❌ Error fetching conversations after reaction change:', err);
-        }
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversation_messages' }, () => {
-        console.log('💬 Real-time: Message updated');
-        try {
-          fetchConversations();
-        } catch (err) {
-          console.error('❌ Error fetching conversations after message updated:', err);
-        }
-      })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          console.error('❌ Reaction channel error:', status);
-          toast.error('Real-time reaction updates disconnected. Please refresh the page.');
-        }
-      });
+      return { reconnect, resetRetries: () => { retries = 0; clearTimeout(reconnectTimeout); }, getRetries: () => retries };
+    };
+
+    // Channel setup functions
+    let msgChannel: any, memChannel: any, convChannel: any, reactChannel: any;
+    const msgReconnector = createReconnectingChannel('conv-messages-realtime');
+    const memReconnector = createReconnectingChannel('conv-members-realtime');
+    const convReconnector = createReconnectingChannel('conv-updates-realtime');
+    const reactReconnector = createReconnectingChannel('conv-reactions-realtime');
+
+    const setupMsgChannel = () => {
+      msgChannel = supabase
+        .channel('conv-messages-realtime')
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversation_messages',
+        }, () => {
+          console.log('📨 Real-time: New message received');
+          msgReconnector.resetRetries();
+          try {
+            fetchConversations();
+          } catch (err) {
+            console.error('❌ Error fetching conversations after new message:', err);
+          }
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Message channel subscribed');
+            msgReconnector.resetRetries();
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            console.error('❌ Message channel error:', status);
+            msgReconnector.reconnect();
+          }
+        });
+    };
+
+    const setupMemChannel = () => {
+      memChannel = supabase
+        .channel('conv-members-realtime')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'conversation_members',
+          filter: `user_id=eq.${user.id}`,
+        }, () => {
+          console.log('👥 Real-time: Membership change received');
+          memReconnector.resetRetries();
+          try {
+            fetchConversations();
+          } catch (err) {
+            console.error('❌ Error fetching conversations after membership change:', err);
+          }
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Membership channel subscribed');
+            memReconnector.resetRetries();
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            console.error('❌ Membership channel error:', status);
+            memReconnector.reconnect();
+          }
+        });
+    };
+
+    const setupConvChannel = () => {
+      convChannel = supabase
+        .channel('conv-updates-realtime')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations' }, () => {
+          console.log('📝 Real-time: Conversation created');
+          convReconnector.resetRetries();
+          try {
+            fetchConversations();
+          } catch (err) {
+            console.error('❌ Error fetching conversations after conversation created:', err);
+          }
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, () => {
+          console.log('📝 Real-time: Conversation updated');
+          convReconnector.resetRetries();
+          try {
+            fetchConversations();
+          } catch (err) {
+            console.error('❌ Error fetching conversations after conversation updated:', err);
+          }
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Conversation channel subscribed');
+            convReconnector.resetRetries();
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            console.error('❌ Conversation channel error:', status);
+            convReconnector.reconnect();
+          }
+        });
+    };
+
+    const setupReactChannel = () => {
+      reactChannel = supabase
+        .channel('conv-reactions-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => {
+          console.log('😀 Real-time: Message reaction changed');
+          reactReconnector.resetRetries();
+          try {
+            fetchConversations();
+          } catch (err) {
+            console.error('❌ Error fetching conversations after reaction change:', err);
+          }
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversation_messages' }, () => {
+          console.log('💬 Real-time: Message updated');
+          reactReconnector.resetRetries();
+          try {
+            fetchConversations();
+          } catch (err) {
+            console.error('❌ Error fetching conversations after message updated:', err);
+          }
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Reaction channel subscribed');
+            reactReconnector.resetRetries();
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            console.error('❌ Reaction channel error:', status);
+            // Only show error to user after multiple failed attempts
+            if (reactReconnector.getRetries() >= 3) {
+              toast.error('Real-time reaction updates disconnected. Please refresh the page.');
+            } else {
+              reactReconnector.reconnect();
+            }
+          }
+        });
+    };
+
+    // Initial setup
+    setupMsgChannel();
+    setupMemChannel();
+    setupConvChannel();
+    setupReactChannel();
 
     return () => {
       supabase.removeChannel(msgChannel);
