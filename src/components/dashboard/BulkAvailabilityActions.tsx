@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useUserAvailability } from '@/hooks/useUserAvailability';
+import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
 import { toast } from 'sonner';
 import { Trash2, Copy, CheckSquare } from 'lucide-react';
 import { format, addWeeks, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
@@ -17,7 +17,7 @@ export const BulkAvailabilityActions = ({
   onClearSelection,
   currentWeekStart,
 }: BulkAvailabilityActionsProps) => {
-  const { availability, deleteAvailability, createAvailability } = useUserAvailability();
+  const { availability, deleteAvailability, createAvailability } = useAvailabilityContext();
   const [loading, setLoading] = useState(false);
 
   const handleBulkDelete = async () => {

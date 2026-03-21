@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import type { Notification } from '@/hooks/useNotifications';
 import { useNavigate } from 'react-router-dom';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import { InviteResponseDialog } from './InviteResponseDialog';
 const getNotificationIcon = (type: Notification['type']) => {
   switch (type) {
@@ -102,7 +102,7 @@ const NotificationsTab = () => {
     removeNotification,
     isLoading
   } = useNotificationsContext();
-  const { invites } = useMatchInvites();
+  const { invites } = useMatchInvitesContext();
   const [filter, setFilter] = React.useState<'all' | 'unread' | 'read'>('all');
   const [typeFilter, setTypeFilter] = React.useState<string>('all');
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -139,7 +139,7 @@ const NotificationsTab = () => {
         return '/dashboard?tab=matching';
       case 'friend_request':
       case 'friend_accepted':
-        return '/dashboard?tab=friends';
+        return '/dashboard?tab=social';
       case 'message_received':
       case 'group_invite':
         return '/dashboard?tab=social';

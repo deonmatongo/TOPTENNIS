@@ -4,7 +4,6 @@ import { useRealtime } from '@/contexts/RealtimeContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
-import { useBrowserNotifications } from './useBrowserNotifications';
 import { logger } from '@/utils/logger';
 
 export interface PlayerProfile {
@@ -50,21 +49,15 @@ export const useMatchInvites = () => {
   const [invites, setInvites] = useState<MatchInvite[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { sendNotification } = useBrowserNotifications();
-  // Deduplication set: tracks invite IDs for which a notification has already fired
+  // Deduplication set: tracks invite IDs for which a toast has already fired
   const notifiedIds = useRef<Set<string>>(new Set());
   // Track if we're in an error state to prevent automatic retries
   const hasErrorRef = useRef(false);
 
   // Use refs to prevent dependency changes from triggering re-renders
-  const sendNotificationRef = useRef(sendNotification);
   const subscribeToUserChangesRef = useRef(subscribeToUserChanges);
-  
+
   // Update refs when functions change
-  useEffect(() => {
-    sendNotificationRef.current = sendNotification;
-  }, [sendNotification]);
-  
   useEffect(() => {
     subscribeToUserChangesRef.current = subscribeToUserChanges;
   }, [subscribeToUserChanges]);
@@ -111,12 +104,6 @@ export const useMatchInvites = () => {
               const message = `New match invite from ${senderName}!`;
               
               toast.info(message, { duration: 5000 });
-              
-              sendNotificationRef.current('New Match Invite', {
-                body: message,
-                tag: newInvite.id,
-                clickUrl: '/dashboard?tab=schedule',
-              });
             } catch (error) {
               logger.warn('Failed to fetch sender profile for notification', { error });
             }
@@ -149,29 +136,11 @@ export const useMatchInvites = () => {
                 : 'Opponent';
 
               if (updatedInvite.status === 'accepted' && updatedInvite.receiver_id === user.id) {
-                const message = `${otherName} accepted your match invite`;
-                toast.success(message, { duration: 5000 });
-                sendNotificationRef.current('Match Invite Accepted', {
-                  body: message,
-                  tag: updatedInvite.id,
-                  clickUrl: '/dashboard?tab=schedule',
-                });
+                toast.success(`${otherName} accepted your match invite`, { duration: 5000 });
               } else if (updatedInvite.status === 'declined' && updatedInvite.receiver_id === user.id) {
-                const message = `${otherName} declined your match invite`;
-                toast.info(message, { duration: 5000 });
-                sendNotificationRef.current('Match Invite Declined', {
-                  body: message,
-                  tag: updatedInvite.id,
-                  clickUrl: '/dashboard?tab=schedule',
-                });
+                toast.info(`${otherName} declined your match invite`, { duration: 5000 });
               } else if (updatedInvite.status === 'cancelled') {
-                const message = `${otherName} cancelled the match`;
-                toast.info(message, { duration: 5000 });
-                sendNotificationRef.current('Match Cancelled', {
-                  body: message,
-                  tag: updatedInvite.id,
-                  clickUrl: '/dashboard?tab=schedule',
-                });
+                toast.info(`${otherName} cancelled the match`, { duration: 5000 });
               }
             } catch (error) {
               logger.warn('Failed to fetch other user profile for notification', { error });
@@ -179,18 +148,12 @@ export const useMatchInvites = () => {
           }
         }
         
-        // This prevents recursive fetch calls
-        if (payload.eventType === 'INSERT' || 
-            (payload.eventType === 'UPDATE' && 
+        // Refresh on insert or meaningful status change
+        if (payload.eventType === 'INSERT' ||
+            (payload.eventType === 'UPDATE' &&
              payload.old?.status !== payload.new?.status)) {
-          // Debounce the refresh to prevent rapid successive calls
-          setTimeout(() => {
-            if (!hasErrorRef.current) {
-              fetchInvites();
-            } else {
-              setError("An error occurred. Please try again.");
-            }
-          }, 500);
+          // Debounce to prevent rapid successive calls
+          setTimeout(() => fetchInvites(), 500);
         }
       }
     });
@@ -255,7 +218,7 @@ export const useMatchInvites = () => {
       setLoading(false);
       return;
     }
-    
+
     // Network connectivity check
     if (!isOnline()) {
       console.warn('Cannot fetch match invites: Network offline');
@@ -263,6 +226,10 @@ export const useMatchInvites = () => {
       setLoading(false);
       return;
     }
+
+    // Reset error gate at the start of every fresh fetch so that a single
+    // past error never permanently disables real-time live updates.
+    hasErrorRef.current = false;
     
     try {
       logger.info('Fetching match invites for user:', { userId: user.id });

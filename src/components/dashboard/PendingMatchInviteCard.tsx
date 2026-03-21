@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import PlayerProfileModal from './PlayerProfileModal';
 
 interface PendingMatchInviteCardProps {
@@ -30,7 +30,7 @@ export const PendingMatchInviteCard = ({ match, onRespond }: PendingMatchInviteC
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const { cancelInvite } = useMatchInvites();
+  const { cancelInvite } = useMatchInvitesContext();
   const matchDate = match.proposed_start ? parseISO(match.proposed_start) : parseISO(match.match_date);
   const isProposedTime = !!match.proposed_start;
 

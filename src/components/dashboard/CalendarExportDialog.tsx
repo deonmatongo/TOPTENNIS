@@ -9,8 +9,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Download, ExternalLink } from 'lucide-react';
-import { useUserAvailability } from '@/hooks/useUserAvailability';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import { downloadICS, generateGoogleCalendarUrl, generateOutlookUrl } from '@/utils/calendarExport';
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -25,8 +25,8 @@ export const CalendarExportDialog = ({
   open,
   onClose,
 }: CalendarExportDialogProps) => {
-  const { availability } = useUserAvailability();
-  const { invites } = useMatchInvites();
+  const { availability } = useAvailabilityContext();
+  const { invites } = useMatchInvitesContext();
   const [includeAvailability, setIncludeAvailability] = useState(true);
   const [includeMatches, setIncludeMatches] = useState(true);
 

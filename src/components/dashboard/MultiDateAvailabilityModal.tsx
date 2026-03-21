@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
-import { useUserAvailability } from '@/hooks/useUserAvailability';
+import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
 import { format, addDays, eachDayOfInterval } from 'date-fns';
 import { CalendarIcon, Clock } from 'lucide-react';
 import { toast } from 'sonner';
@@ -27,7 +27,7 @@ export const MultiDateAvailabilityModal = ({
   open, 
   onClose,
 }: MultiDateAvailabilityModalProps) => {
-  const { createAvailability } = useUserAvailability();
+  const { createAvailability } = useAvailabilityContext();
   const [loading, setLoading] = useState(false);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [formData, setFormData] = useState({

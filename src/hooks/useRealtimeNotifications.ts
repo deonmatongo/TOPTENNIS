@@ -2,7 +2,6 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useRealtime } from '@/contexts/RealtimeContext';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { useBrowserNotifications } from './useBrowserNotifications';
 import { playNotificationSound } from '@/utils/notificationSound';
 
 // Real-time notification event types
@@ -29,8 +28,6 @@ interface NotificationEvent {
 export const useRealtimeNotifications = () => {
   const { subscribeToTable, subscribeToUserChanges, broadcastUpdate, isConnected } = useRealtime();
   const { user } = useAuth();
-  const { sendNotification, isSupported, permission } = useBrowserNotifications();
-  
   // Track processed events to prevent duplicates
   const processedEvents = useRef<Set<string>>(new Set());
   
@@ -59,75 +56,13 @@ export const useRealtimeNotifications = () => {
     
     // Handle different event types with appropriate UI feedback
     switch (event.type) {
+      // match_invite_sent/accepted/declined toasts are handled by useMatchInvites
+      // browser notifications for match_invite_* come from useNotifications (notifications table)
       case 'match_invite_sent':
-        if (event.data.receiver_id === user?.id) {
-          toast.info('New match invitation received!', {
-            description: `From ${event.data.sender_name || 'Someone'}`,
-            duration: 5000,
-            action: {
-              label: 'View',
-              onClick: () => window.location.href = '/dashboard?tab=schedule',
-            },
-          });
-          
-          // Play notification sound
-          playNotificationSound(0.5).catch(err => 
-            console.warn('Failed to play notification sound:', err)
-          );
-          
-          // Send browser notification if permitted
-          if (isSupported && permission === 'granted') {
-            sendNotification('New Match Invitation', {
-              body: `From ${event.data.sender_name || 'Someone'}`,
-              tag: eventId,
-              clickUrl: '/dashboard?tab=schedule',
-            });
-          }
-        }
-        break;
-        
       case 'match_invite_accepted':
-        if (event.data.sender_id === user?.id) {
-          toast.success('Match invitation accepted!', {
-            description: `${event.data.accepter_name || 'Your opponent'} accepted your match`,
-            duration: 5000,
-            action: {
-              label: 'View',
-              onClick: () => window.location.href = '/dashboard?tab=schedule',
-            },
-          });
-          
-          playNotificationSound(0.3).catch(err => 
-            console.warn('Failed to play notification sound:', err)
-          );
-          
-          if (isSupported && permission === 'granted') {
-            sendNotification('Match Accepted', {
-              body: `${event.data.accepter_name || 'Your opponent'} accepted your match`,
-              tag: eventId,
-              clickUrl: '/dashboard?tab=schedule',
-            });
-          }
-        }
-        break;
-        
       case 'match_invite_declined':
-        if (event.data.sender_id === user?.id) {
-          toast.info('Match invitation declined', {
-            description: `${event.data.decliner_name || 'Your opponent'} declined the match`,
-            duration: 5000,
-          });
-          
-          if (isSupported && permission === 'granted') {
-            sendNotification('Match Declined', {
-              body: `${event.data.decliner_name || 'Your opponent'} declined the match`,
-              tag: eventId,
-              clickUrl: '/dashboard?tab=schedule',
-            });
-          }
-        }
         break;
-        
+
       case 'friend_request_sent':
         if (event.data.receiver_id === user?.id) {
           toast.info('New friend request!', {
@@ -138,64 +73,36 @@ export const useRealtimeNotifications = () => {
               onClick: () => window.location.href = '/dashboard?tab=social',
             },
           });
-          
-          playNotificationSound(0.4).catch(err => 
+          playNotificationSound(0.4).catch(err =>
             console.warn('Failed to play notification sound:', err)
           );
-          
-          if (isSupported && permission === 'granted') {
-            sendNotification('New Friend Request', {
-              body: `From ${event.data.sender_name || 'Someone'}`,
-              tag: eventId,
-              clickUrl: '/dashboard?tab=social',
-            });
-          }
         }
         break;
-        
+
       case 'friend_request_accepted':
         if (event.data.sender_id === user?.id) {
           toast.success('Friend request accepted!', {
             description: `${event.data.accepter_name || 'Someone'} accepted your request`,
             duration: 5000,
           });
-          
-          playNotificationSound(0.3).catch(err => 
+          playNotificationSound(0.3).catch(err =>
             console.warn('Failed to play notification sound:', err)
           );
-          
-          if (isSupported && permission === 'granted') {
-            sendNotification('Friend Request Accepted', {
-              body: `${event.data.accepter_name || 'Someone'} accepted your request`,
-              tag: eventId,
-              clickUrl: '/dashboard?tab=social',
-            });
-          }
         }
         break;
         
       case 'message_received':
         if (event.data.receiver_id === user?.id) {
-          // Only show toast for messages from non-current conversations
           toast.info('New message received', {
             description: `From ${event.data.sender_name || 'Someone'}`,
             duration: 3000,
           });
-          
-          playNotificationSound(0.2).catch(err => 
+          playNotificationSound(0.2).catch(err =>
             console.warn('Failed to play notification sound:', err)
           );
-          
-          if (isSupported && permission === 'granted') {
-            sendNotification('New Message', {
-              body: `From ${event.data.sender_name || 'Someone'}`,
-              tag: eventId,
-              clickUrl: '/dashboard?tab=messages',
-            });
-          }
         }
         break;
-        
+
       case 'group_invite_sent':
         if (event.data.receiver_id === user?.id) {
           toast.info('Group invitation received!', {
@@ -206,18 +113,9 @@ export const useRealtimeNotifications = () => {
               onClick: () => window.location.href = '/dashboard?tab=messages',
             },
           });
-          
-          playNotificationSound(0.4).catch(err => 
+          playNotificationSound(0.4).catch(err =>
             console.warn('Failed to play notification sound:', err)
           );
-          
-          if (isSupported && permission === 'granted') {
-            sendNotification('Group Invitation', {
-              body: `Join ${event.data.group_name || 'a group'}`,
-              tag: eventId,
-              clickUrl: '/dashboard?tab=messages',
-            });
-          }
         }
         break;
         
@@ -231,7 +129,7 @@ export const useRealtimeNotifications = () => {
         }
         break;
     }
-  }, [user?.id, getEventId, isSupported, permission, sendNotification]);
+  }, [user?.id, getEventId]);
 
   useEffect(() => {
     if (!user || !isConnected) return;

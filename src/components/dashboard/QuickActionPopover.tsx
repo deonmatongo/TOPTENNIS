@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Check, X, Clock, MoreVertical } from 'lucide-react';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -13,7 +13,7 @@ interface QuickActionPopoverProps {
 }
 
 export const QuickActionPopover = ({ invite, children }: QuickActionPopoverProps) => {
-  const { respondToInvite, proposeNewTime } = useMatchInvites();
+  const { respondToInvite, proposeNewTime } = useMatchInvitesContext();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 

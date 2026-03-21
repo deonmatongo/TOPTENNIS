@@ -154,7 +154,7 @@ export const useFriendRequests = () => {
           title: 'New Friend Request',
           message: `${senderName} sent you a friend request`,
           read: false,
-          action_url: '/dashboard?tab=friends',
+          action_url: '/dashboard?tab=social',
           metadata: { sender_id: user.id },
         });
       } else {
@@ -213,7 +213,7 @@ export const useFriendRequests = () => {
             title: 'Friend Request Accepted',
             message: `${receiverName} accepted your friend request`,
             read: false,
-            action_url: '/dashboard?tab=friends',
+            action_url: '/dashboard?tab=social',
             metadata: { receiver_id: user.id, request_id: requestId },
           });
         } else {

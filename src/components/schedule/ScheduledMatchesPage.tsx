@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar, Clock, MapPin, User, Trash2, XCircle, Globe } from 'lucide-react';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { convertTimeBetweenTimezones, getTimezoneDisplayName } from '@/utils/timezoneConversion';
 import { format, isPast, isFuture, parseISO } from 'date-fns';
@@ -31,7 +31,7 @@ interface ScheduledMatchesPageProps {
 }
 
 export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBack }) => {
-  const { invites, getConfirmedInvites, deleteInvite, cancelInvite } = useMatchInvites();
+  const { invites, getConfirmedInvites, deleteInvite, cancelInvite } = useMatchInvitesContext();
   const { timezone } = useUserTimezone();
   const [selectedMatch, setSelectedMatch] = useState<any>(null);
   const [deletingMatch, setDeletingMatch] = useState<string | null>(null);

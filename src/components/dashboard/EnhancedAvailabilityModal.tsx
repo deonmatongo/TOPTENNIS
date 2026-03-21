@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useUserAvailability } from '@/hooks/useUserAvailability';
+import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
 import { useConflictDetection } from '@/hooks/useConflictDetection';
 import { toast } from 'sonner';
 import { generateRecurringSlots, encodeRecurrenceRule, RecurrencePattern, RecurrenceRule } from '@/utils/recurringAvailability';
@@ -23,7 +23,7 @@ interface EnhancedAvailabilityModalProps {
   selectedDate?: Date;
   selectedStartTime?: string;
   selectedEndTime?: string;
-  availabilityActions?: Pick<ReturnType<typeof useUserAvailability>, 'createAvailability' | 'updateAvailability'>;
+  availabilityActions?: Pick<ReturnType<typeof useAvailabilityContext>, 'createAvailability' | 'updateAvailability'>;
 }
 
 export const EnhancedAvailabilityModal = ({
@@ -36,7 +36,7 @@ export const EnhancedAvailabilityModal = ({
   selectedEndTime,
   availabilityActions,
 }: EnhancedAvailabilityModalProps) => {
-  const fallbackAvailabilityActions = useUserAvailability();
+  const fallbackAvailabilityActions = useAvailabilityContext();
   const createAvailability = availabilityActions?.createAvailability ?? fallbackAvailabilityActions.createAvailability;
   const updateAvailability = availabilityActions?.updateAvailability ?? fallbackAvailabilityActions.updateAvailability;
   const { checkConflict } = useConflictDetection();

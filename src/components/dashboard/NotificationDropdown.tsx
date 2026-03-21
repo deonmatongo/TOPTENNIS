@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import type { Notification } from '@/hooks/useNotifications';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { InviteResponseDialog } from './InviteResponseDialog';
 import PlayerProfileModal from './PlayerProfileModal';
@@ -82,7 +82,7 @@ interface NotificationDropdownProps {
 const NotificationDropdown = ({ children }: NotificationDropdownProps) => {
   const navigate = useNavigate();
   const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification, isLoading } = useNotificationsContext();
-  const { invites, respondToInvite } = useMatchInvites();
+  const { invites, respondToInvite } = useMatchInvitesContext();
   const { requests, updateRequestStatus } = useFriendRequests();
   const [isOpen, setIsOpen] = React.useState(false);
   const [selectedInvite, setSelectedInvite] = React.useState<any>(null);

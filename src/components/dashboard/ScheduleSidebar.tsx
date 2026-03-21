@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tables } from '@/integrations/supabase/types';
-import { useUserAvailability } from '@/hooks/useUserAvailability';
+import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
 import { cn } from '@/lib/utils';
 import {
   AlertDialog,
@@ -48,7 +48,7 @@ export const ScheduleSidebar: React.FC<ScheduleSidebarProps> = ({
   userId,
   onAddAvailability,
 }) => {
-  const { deleteAvailability } = useUserAvailability();
+  const { deleteAvailability } = useAvailabilityContext();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [slotToDelete, setSlotToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);

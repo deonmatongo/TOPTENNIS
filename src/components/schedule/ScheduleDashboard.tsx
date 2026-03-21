@@ -3,8 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Mail, ChevronRight, CalendarCheck, Users } from 'lucide-react';
-import { useUserAvailability } from '@/hooks/useUserAvailability';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import type { Match } from '@/hooks/useMatches';
 import { format, isFuture, parseISO } from 'date-fns';
 
@@ -15,8 +15,8 @@ interface ScheduleDashboardProps {
 }
 
 export const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({ matches = [], onNavigate, preSelectedOpponent }) => {
-  const { availability } = useUserAvailability();
-  const { invites, getPendingInvites, getConfirmedInvites } = useMatchInvites();
+  const { availability } = useAvailabilityContext();
+  const { invites, getPendingInvites, getConfirmedInvites } = useMatchInvitesContext();
 
   const availableSlots = availability?.filter(slot => slot.is_available && !slot.is_blocked) || [];
   const pendingInvites = getPendingInvites();

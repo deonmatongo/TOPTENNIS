@@ -9,8 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Calendar, Clock, Users, Send, Check, X, Plus, ChevronLeft, ChevronRight, CalendarDays, MapPin, Edit, Trash2, Ban, Info } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUserAvailability } from '@/hooks/useUserAvailability';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import { usePlayerAvailability } from '@/hooks/usePlayerAvailability';
 import { useMatchBookings } from '@/hooks/useMatchBookings';
 import { AvailabilityModal } from './AvailabilityModal';
@@ -85,7 +85,7 @@ export const OutlookCalendar: React.FC<OutlookCalendarProps> = ({
     createAvailability,
     updateAvailability,
     deleteAvailability
-  } = useUserAvailability();
+  } = useAvailabilityContext();
   const {
     availability: playerAvailability
   } = usePlayerAvailability(viewingPlayer?.user_id || viewingPlayer?.id);
@@ -93,7 +93,7 @@ export const OutlookCalendar: React.FC<OutlookCalendarProps> = ({
     getPendingInvites,
     respondToInvite,
     sendInvite
-  } = useMatchInvites();
+  } = useMatchInvitesContext();
   const {
     bookings,
     createBooking,

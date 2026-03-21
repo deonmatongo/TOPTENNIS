@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Plus, ChevronLeft, ChevronRight, Trash2, MapPin, RefreshCw, Edit } from 'lucide-react';
-import { useUserAvailability } from '@/hooks/useUserAvailability';
+import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
 import { EnhancedAvailabilityModal } from '@/components/dashboard/EnhancedAvailabilityModal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { TimezoneSelect } from '@/components/ui/TimezoneSelect';
@@ -28,7 +28,7 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack, 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [userTimezone, setUserTimezone] = useState<string>('America/New_York'); // Default to Eastern Time
   const [convertedSlots, setConvertedSlots] = useState<Record<string, boolean>>({}); // Track which slots are converted
-  const { availability, loading, error, deleteAvailability, fetchAvailability } = useUserAvailability();
+  const { availability, loading, error, deleteAvailability, fetchAvailability } = useAvailabilityContext();
 
   const availableSlots = availability?.filter(slot => {
     const isAvailable = slot.is_available && !slot.is_blocked;

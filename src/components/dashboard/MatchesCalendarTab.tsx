@@ -24,7 +24,7 @@ import {
   Zap
 } from 'lucide-react';
 import { format, isToday, isTomorrow, isThisWeek, parseISO } from 'date-fns';
-import { useUserAvailability } from '@/hooks/useUserAvailability';
+import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
 import { useLeagueRegistrations } from '@/hooks/useLeagueRegistrations';
 import { AvailabilityModal } from './AvailabilityModal';
 import ScheduleMatchModal from '@/components/ScheduleMatchModal';
@@ -51,7 +51,7 @@ const MatchesCalendarTab = ({ player, matches, matchesLoading, selectedLeague }:
   const [selectedMatch, setSelectedMatch] = useState<any>(null);
 
   const { registrations } = useLeagueRegistrations();
-  const { availability, loading: availabilityLoading, deleteAvailability } = useUserAvailability();
+  const { availability, loading: availabilityLoading, deleteAvailability } = useAvailabilityContext();
 
   // Process matches for the user
   const userMatches = useMemo(() => {

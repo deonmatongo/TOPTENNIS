@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { format, addDays, startOfWeek, isSameDay } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useUserAvailability } from '@/hooks/useUserAvailability';
+import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Trash2, AlertCircle, Clock } from 'lucide-react';
@@ -12,7 +12,7 @@ import { RecurringAvailabilityEditDialog } from '@/components/dashboard/Recurrin
 import { ConflictWarningBanner } from '@/components/dashboard/ConflictWarningBanner';
 import { QuickActionPopover } from '@/components/dashboard/QuickActionPopover';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import { useScheduleSettings } from '@/hooks/useScheduleSettings';
 import { differenceInHours } from 'date-fns';
 import { 
@@ -83,8 +83,8 @@ export const AvailabilityGrid: React.FC<AvailabilityGridProps> = ({
   showWeekday = true,
 }) => {
   const { user } = useAuth();
-  const { availability, createAvailability, deleteAvailability, updateAvailability, loading } = useUserAvailability();
-  const { invites, respondToInvite, proposeNewTime } = useMatchInvites();
+  const { availability, createAvailability, deleteAvailability, updateAvailability, loading } = useAvailabilityContext();
+  const { invites, respondToInvite, proposeNewTime } = useMatchInvitesContext();
   const { settings: scheduleSettings } = useScheduleSettings();
   
   const [selecting, setSelecting] = useState(false);

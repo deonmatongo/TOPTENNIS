@@ -8,6 +8,9 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { RealtimeProvider } from "@/contexts/RealtimeContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import { MessagesProvider } from "@/contexts/MessagesContext";
+import { MatchInvitesProvider } from "@/contexts/MatchInvitesContext";
+import { ConversationsProvider } from "@/contexts/ConversationsContext";
+import { AvailabilityProvider } from "@/contexts/AvailabilityContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminRoute from "@/components/admin/AdminRoute";
 import RealtimeNotificationsManager from "@/components/RealtimeNotificationsManager";
@@ -83,6 +86,9 @@ const App: React.FC = () => {
       <AuthProvider>
         <RealtimeProvider>
           <NotificationsProvider>
+            <MatchInvitesProvider>
+            <AvailabilityProvider>
+            <ConversationsProvider>
             <MessagesProvider>
               <RealtimeNotificationsManager />
               <TooltipProvider>
@@ -132,6 +138,9 @@ const App: React.FC = () => {
               </BrowserRouter>
             </TooltipProvider>
             </MessagesProvider>
+            </ConversationsProvider>
+            </AvailabilityProvider>
+            </MatchInvitesProvider>
           </NotificationsProvider>
         </RealtimeProvider>
       </AuthProvider>

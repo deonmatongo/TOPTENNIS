@@ -9,7 +9,7 @@ import {
 import { Calendar, Clock } from 'lucide-react';
 import { AvailableSlotsList } from './AvailableSlotsList';
 import { BookingModal } from './BookingModal';
-import { useUserAvailability } from '@/hooks/useUserAvailability';
+import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
 import { useMatchBookings } from '@/hooks/useMatchBookings';
 import { format } from 'date-fns';
 type MatchBooking = {
@@ -43,7 +43,7 @@ export const ProposeNewTimeModal: React.FC<ProposeNewTimeModalProps> = ({
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
   
-  const { availability } = useUserAvailability();
+  const { availability } = useAvailabilityContext();
   const { proposeNewTime, isSlotBooked } = useMatchBookings();
 
   const handleSelectSlots = (slots: any[]) => {

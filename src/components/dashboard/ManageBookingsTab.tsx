@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, MapPin, User, X, Check, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, differenceInHours } from 'date-fns';
 import { useMatchBookings } from '@/hooks/useMatchBookings';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ManageBookingsFilters } from './ManageBookingsFilters';
@@ -24,7 +24,7 @@ import {
 export const ManageBookingsTab = () => {
   const { user } = useAuth();
   const { bookings, acceptBooking, declineBooking, cancelBooking, loading: bookingsLoading } = useMatchBookings();
-  const { invites, respondToInvite, cancelInvite, loading: invitesLoading } = useMatchInvites();
+  const { invites, respondToInvite, cancelInvite, loading: invitesLoading } = useMatchInvitesContext();
   const [cancelTarget, setCancelTarget] = useState<{ type: 'booking' | 'invite', id: string } | null>(null);
   
   // Filter states

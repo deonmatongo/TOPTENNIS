@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 
-import { useUserAvailability } from '@/hooks/useUserAvailability';
+import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
 import { format } from 'date-fns';
 
 interface AvailabilityModalProps {
@@ -36,7 +36,7 @@ export const AvailabilityModal = ({
   selectedStartTime,
   selectedEndTime
 }: AvailabilityModalProps) => {
-  const { createAvailability, updateAvailability } = useUserAvailability();
+  const { createAvailability, updateAvailability } = useAvailabilityContext();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     date: '',

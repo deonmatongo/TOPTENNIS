@@ -14,6 +14,8 @@ export const useGlobalPresence = () => {
   const pendingUpdates = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const lastUpdateTime = useRef<Map<string, number>>(new Map());
   const heartbeatInterval = useRef<NodeJS.Timeout | null>(null);
+  // Ref so debouncedUpdate can read the latest stableOnlineUserIds without being re-created
+  const stableOnlineUserIdsRef = useRef<Set<string>>(new Set());
 
   // Debounce time in milliseconds - wait this long before confirming status change
   const DEBOUNCE_TIME = 3000; // 3 seconds
@@ -22,9 +24,12 @@ export const useGlobalPresence = () => {
   // Heartbeat interval to maintain presence
   const HEARTBEAT_INTERVAL = 30000; // 30 seconds
 
+  // Keep the ref in sync without adding it to any callback deps
+  useEffect(() => { stableOnlineUserIdsRef.current = stableOnlineUserIds; }, [stableOnlineUserIds]);
+
   const debouncedUpdate = useCallback((userIds: Set<string>) => {
     const now = Date.now();
-    const currentIds = stableOnlineUserIds;
+    const currentIds = stableOnlineUserIdsRef.current;
     
     // Find users who changed status
     const newlyOnline = new Set<string>();
@@ -88,7 +93,7 @@ export const useGlobalPresence = () => {
       
       pendingUpdates.current.set(id, timeout);
     });
-  }, [stableOnlineUserIds]);
+  }, []); // stable — reads stableOnlineUserIds via ref
 
   const startHeartbeat = useCallback(() => {
     if (heartbeatInterval.current) {

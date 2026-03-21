@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { CalendarViewSelector, CalendarView } from './CalendarViewSelector';
 import { EnhancedAvailabilityModal } from './EnhancedAvailabilityModal';
 import { downloadICS } from '@/utils/icsExport';
-import { useUserAvailability } from '@/hooks/useUserAvailability';
+import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
 import { useMatchBookings } from '@/hooks/useMatchBookings';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,7 +22,7 @@ export const EnhancedCalendar = () => {
   const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
 
-  const { availability, deleteAvailability, loading: availabilityLoading } = useUserAvailability();
+  const { availability, deleteAvailability, loading: availabilityLoading } = useAvailabilityContext();
   const { bookings, loading: bookingsLoading } = useMatchBookings();
 
   // Set up real-time subscriptions for calendar updates

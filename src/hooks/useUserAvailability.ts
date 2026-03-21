@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRealtime } from '@/contexts/RealtimeContext';
-import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
@@ -16,93 +15,49 @@ export const useUserAvailability = () => {
   const hasErrorRef = useRef(false);
 
   const { subscribeToUserChanges } = useRealtime();
-  const { notifyAvailabilityUpdate } = useRealtimeNotifications();
 
   // Define fetchAvailability before useEffect to avoid 'used before declaration' error
   const fetchAvailability = useCallback(async () => {
-    // Step 1: Authentication verification
-    console.log('Step 1: Fetch triggered for userId:', user?.id);
-    console.log('Step 2: Auth token present:', !!user);
-    
-    // Strict auth guard
     if (!user?.id) {
-      console.warn('Availability fetch blocked — auth not ready');
       setLoading(false);
       return;
     }
 
-    // Prevent fetching if already in error state
-    if (hasErrorRef.current) {
-      console.warn('Availability fetch blocked — error state active');
-      setLoading(false);
-      return;
-    }
-    
+    // Reset error gate on every explicit fetch so a past error never permanently
+    // blocks future loads (same pattern used in useMatchInvites).
+    hasErrorRef.current = false;
+
     try {
-      console.log('Step 3: Query params:', { userId: user.id, excludeBooked: true });
       setLoading(true);
       setError(null);
-      
+
       const { data, error } = await supabase
         .from('user_availability')
         .select('*')
         .eq('user_id', user.id)
-        .neq('booking_status', 'booked')  // Exclude booked slots
+        .neq('booking_status', 'booked')
         .order('date', { ascending: true });
 
-      console.log('Step 4: Raw response:', { data, error });
+      if (error) throw error;
 
-      if (error) {
-        console.error('Step 5: Database error:', error);
-        throw error;
-      }
+      setAvailability(data ?? []);
 
-      console.log('Step 5: Parsed data:', data);
-      
-      // Step 6: Data shape validation
-      if (!data) {
-        console.warn('Availability data is null');
-        setAvailability([]);
-        return;
-      }
-
-      if (!Array.isArray(data)) {
-        console.warn('Availability data is not an array:', data);
-        setAvailability([]);
-        return;
-      }
-
-      console.log('✅ Availability fetched successfully:', data.length, 'slots');
-      setAvailability(data);
-      
-      // Reset error state on success
-      hasErrorRef.current = false;
-      setError(null);
-      
-    } catch (error) {
-      console.error('❌ Error fetching availability:', error);
-      
-      // Set error state to prevent automatic retries
+    } catch (err) {
+      console.error('Error fetching availability:', err);
       hasErrorRef.current = true;
       setError('Failed to load availability');
-      
-      // Show user-friendly error with retry option
+
       toast.error('Failed to load availability', {
         action: {
           label: 'Retry',
-          onClick: () => {
-            console.log('Manual retry triggered by user');
-            hasErrorRef.current = false;
-            setError(null);
-            fetchAvailability();
-          },
+          onClick: () => fetchAvailability(),
         },
         duration: 5000,
       });
     } finally {
       setLoading(false);
     }
-  }, [user?.id]); // Only depend on user ID, not the entire user object
+  }, [user?.id]);
 
   // Use refs to prevent dependency changes from triggering re-renders
   const subscribeToUserChangesRef = useRef(subscribeToUserChanges);
@@ -113,54 +68,42 @@ export const useUserAvailability = () => {
   }, [subscribeToUserChanges]);
 
   useEffect(() => {
-    console.log('useUserAvailability useEffect triggered');
-    
     if (!user?.id) {
-      console.log('User not available, setting loading to false');
       setLoading(false);
       setError(null);
       return;
     }
 
-    // Only fetch if not in error state
-    if (!hasErrorRef.current) {
-      fetchAvailability();
-    } else {
-      setLoading(false);
-    }
+    fetchAvailability();
 
-    // Set up real-time subscription using context
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
     const unsubscribe = subscribeToUserChangesRef.current((payload) => {
-      console.log('🔄 Real-time availability update received:', payload);
-      if (payload.table === 'user_availability') {
-        // Check if booking_status changed to 'booked' - if so, remove from availability immediately
-        if (payload.eventType === 'UPDATE' && payload.new.booking_status === 'booked') {
-          console.log('🔒 Slot booked - removing from availability:', payload.new.id);
-          setAvailability(prev => prev.filter(slot => slot.id !== payload.new.id));
-        } else {
-          console.log('✅ Real-time update - checking if refetch needed');
-          // Only refetch if not in error state and it's a meaningful change
-          if (!hasErrorRef.current && 
-              (payload.eventType === 'INSERT' || 
-               payload.eventType === 'DELETE' ||
-               (payload.eventType === 'UPDATE' && payload.new.booking_status !== 'booked'))) {
-            // Debounce the refetch to prevent rapid successive calls
-            setTimeout(() => {
-              if (!hasErrorRef.current) {
-                console.log('✅ Refetching availability due to real-time update');
-                fetchAvailability();
-              }
-            }, 500);
-          }
-        }
+      if (payload.table !== 'user_availability') return;
+
+      // Slot just got booked — remove it immediately without a full refetch
+      if (payload.eventType === 'UPDATE' && payload.new?.booking_status === 'booked') {
+        setAvailability(prev => prev.filter(slot => slot.id !== payload.new.id));
+        return;
+      }
+
+      // For INSERT / DELETE / other UPDATEs, debounce a full refetch
+      if (!hasErrorRef.current &&
+          (payload.eventType === 'INSERT' ||
+           payload.eventType === 'DELETE' ||
+           payload.eventType === 'UPDATE')) {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          if (!hasErrorRef.current) fetchAvailability();
+        }, 500);
       }
     });
 
     return () => {
-      console.log('Cleaning up availability subscription');
       unsubscribe();
+      if (debounceTimer) clearTimeout(debounceTimer);
     };
-  }, [user?.id]); // Only depend on user ID, not on functions that might change
+  }, [user?.id, fetchAvailability]);
 
   const createAvailability = async (availabilityData: {
     date: string;
@@ -196,8 +139,7 @@ export const useUserAvailability = () => {
       ...availabilityData,
     } as UserAvailability;
 
-    console.log('⚡ Optimistic update: Adding availability to UI immediately');
-    setAvailability(prev => [...prev, optimisticData].sort((a, b) => 
+    setAvailability(prev => [...prev, optimisticData].sort((a, b) =>
       new Date(a.date).getTime() - new Date(b.date).getTime()
     ));
 
@@ -207,36 +149,22 @@ export const useUserAvailability = () => {
         .insert({
           user_id: user.id,
           ...availabilityData,
-          booking_status: 'available',  // Set default booking status
+          booking_status: 'available',
         })
         .select()
         .single();
 
       if (error) {
-        console.error('❌ Database insert failed, rolling back optimistic update');
-        // Rollback optimistic update on error
         setAvailability(prev => prev.filter(item => item.id !== tempId));
         throw error;
       }
-      
-      console.log('✅ Database insert successful, replacing optimistic data with real data');
-      // Replace optimistic data with real data
-      setAvailability(prev => 
+
+      setAvailability(prev =>
         prev.map(item => item.id === tempId ? data : item)
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       );
-      
+
       toast.success('Availability updated');
-      notifyAvailabilityUpdate(data, 'created');
-      
-      // Force a refetch to ensure we have the latest data (only if not in error state)
-      if (!hasErrorRef.current) {
-        console.log('🔄 Forcing refetch to sync with database');
-        await fetchAvailability();
-      } else {
-        console.log('Skipping refetch due to error state');
-      }
-      
       return data;
     } catch (error) {
       console.error('Error creating availability:', error);
@@ -261,7 +189,6 @@ export const useUserAvailability = () => {
       );
       
       toast.success('Availability updated');
-      notifyAvailabilityUpdate(data, 'updated');
       return data;
     } catch (error) {
       console.error('Error updating availability:', error);
@@ -272,9 +199,6 @@ export const useUserAvailability = () => {
 
   const deleteAvailability = async (id: string) => {
     try {
-      // Get the availability data before deletion for notification
-      const availabilityToDelete = availability.find(item => item.id === id);
-      
       const { error } = await supabase
         .from('user_availability')
         .delete()
@@ -284,10 +208,6 @@ export const useUserAvailability = () => {
       
       setAvailability(prev => prev.filter(item => item.id !== id));
       toast.success('Availability removed');
-      
-      if (availabilityToDelete) {
-        notifyAvailabilityUpdate(availabilityToDelete, 'deleted');
-      }
     } catch (error) {
       console.error('Error deleting availability:', error);
       toast.error('Failed to remove availability');

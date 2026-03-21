@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ChevronLeft, Calendar, MapPin, Clock, Check, X, Mail, AlertCircle, Send, Trash2, User } from 'lucide-react';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import { format, parseISO, formatDistanceToNow, isPast } from 'date-fns';
 import { toast } from 'sonner';
 import {
@@ -24,7 +24,7 @@ interface PendingInvitesPageProps {
 }
 
 export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }) => {
-  const { invites, getPendingInvites, respondToInvite, deleteInvite, getOldInvites } = useMatchInvites();
+  const { invites, getPendingInvites, respondToInvite, deleteInvite, getOldInvites } = useMatchInvitesContext();
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
   const [actionType, setActionType] = useState<'accept' | 'decline' | 'delete' | null>(null);
   const [selectedInvite, setSelectedInvite] = useState<any | null>(null);

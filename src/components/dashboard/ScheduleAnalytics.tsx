@@ -1,15 +1,15 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useUserAvailability } from '@/hooks/useUserAvailability';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Calendar, TrendingUp, Clock, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, differenceInHours, differenceInMinutes } from 'date-fns';
 
 export const ScheduleAnalytics = () => {
-  const { availability } = useUserAvailability();
-  const { invites } = useMatchInvites();
+  const { availability } = useAvailabilityContext();
+  const { invites } = useMatchInvitesContext();
 
   const analytics = useMemo(() => {
     // Calculate total available hours

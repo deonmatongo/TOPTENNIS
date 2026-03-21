@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Compatibility shim for legacy match_bookings-based code.
@@ -15,7 +15,7 @@ export const useMatchBookings = () => {
     proposeNewTime,
     acceptProposedTime,
     isSlotBooked,
-  } = useMatchInvites();
+  } = useMatchInvitesContext();
 
   // Map invites to legacy "booking" objects
   const bookings = useMemo(() => {

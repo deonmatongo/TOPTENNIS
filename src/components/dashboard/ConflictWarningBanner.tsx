@@ -1,13 +1,13 @@
 import React, { useMemo } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle, Clock } from 'lucide-react';
-import { useUserAvailability } from '@/hooks/useUserAvailability';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import { Badge } from '@/components/ui/badge';
 
 export const ConflictWarningBanner = () => {
-  const { availability } = useUserAvailability();
-  const { invites } = useMatchInvites();
+  const { availability } = useAvailabilityContext();
+  const { invites } = useMatchInvitesContext();
 
   const conflicts = useMemo(() => {
     const conflictList: Array<{

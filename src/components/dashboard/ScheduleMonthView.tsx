@@ -2,8 +2,8 @@ import React, { useMemo } from 'react';
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, format, isSameDay, isSameMonth } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { useUserAvailability } from '@/hooks/useUserAvailability';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 
 interface ScheduleMonthViewProps {
   currentDate: Date;
@@ -14,8 +14,8 @@ export const ScheduleMonthView: React.FC<ScheduleMonthViewProps> = ({
   currentDate,
   onDateClick,
 }) => {
-  const { availability } = useUserAvailability();
-  const { invites } = useMatchInvites();
+  const { availability } = useAvailabilityContext();
+  const { invites } = useMatchInvitesContext();
 
   const monthDays = useMemo(() => {
     const monthStart = startOfMonth(currentDate);
