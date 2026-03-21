@@ -3,53 +3,46 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   AreaChart,
   Area,
   BarChart,
-  Bar
+  Bar,
 } from 'recharts';
-import { 
-  TrendingUp, 
-  Activity,
-  AlertCircle
-} from 'lucide-react';
+import { TrendingUp, Activity, AlertCircle } from 'lucide-react';
 import { usePerformanceAnalytics } from '@/hooks/usePerformanceAnalytics';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { PerformanceMatch } from '@/hooks/usePlayerPerformance';
 
 interface PerformanceChartProps {
-  registrations: any[];
-  player: any;
-  matches: any[];
+  matches: PerformanceMatch[];
 }
 
-const PerformanceChart: React.FC<PerformanceChartProps> = ({ registrations, player, matches }) => {
+const PerformanceChart: React.FC<PerformanceChartProps> = ({ matches }) => {
   const [timeRange, setTimeRange] = useState<'3m' | '6m' | '1y' | 'all'>('1y');
-  
-  const { monthlyData, overall } = usePerformanceAnalytics(matches, player?.id);
+
+  const { monthlyData } = usePerformanceAnalytics(matches);
 
   const getFilteredData = () => {
     const monthsBack = {
       '3m': 3,
       '6m': 6,
       '1y': 12,
-      'all': monthlyData.length
+      'all': monthlyData.length,
     }[timeRange];
-    
     return monthlyData.slice(-monthsBack);
   };
 
   const calculateTrend = () => {
     const data = getFilteredData();
     if (data.length < 2) return 0;
-    
     const first = data[0].winRate;
     const last = data[data.length - 1].winRate;
     return first > 0 ? ((last - first) / first) * 100 : 0;
@@ -102,9 +95,9 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ registrations, play
           <Tabs defaultValue="winrate" className="space-y-4">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="winrate">Win Rate</TabsTrigger>
-              <TabsTrigger value="position">Matches</TabsTrigger>
-              <TabsTrigger value="skills">W/L Split</TabsTrigger>
-              <TabsTrigger value="leagues">Points</TabsTrigger>
+              <TabsTrigger value="matches">Matches</TabsTrigger>
+              <TabsTrigger value="wl">W/L Split</TabsTrigger>
+              <TabsTrigger value="sets">Sets %</TabsTrigger>
             </TabsList>
 
             <TabsContent value="winrate" className="mt-6">
@@ -112,25 +105,25 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ registrations, play
                 <AreaChart data={filteredData}>
                   <defs>
                     <linearGradient id="colorWinRate" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="month" className="text-xs" />
                   <YAxis className="text-xs" domain={[0, 100]} />
-                  <Tooltip 
-                    contentStyle={{ 
+                  <Tooltip
+                    contentStyle={{
                       backgroundColor: 'hsl(var(--background))',
                       border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
+                      borderRadius: '8px',
                     }}
                     formatter={(value: number) => [`${value}%`, 'Win Rate']}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="winRate" 
-                    stroke="hsl(var(--primary))" 
+                  <Area
+                    type="monotone"
+                    dataKey="winRate"
+                    stroke="hsl(var(--primary))"
                     fillOpacity={1}
                     fill="url(#colorWinRate)"
                   />
@@ -138,24 +131,24 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ registrations, play
               </ResponsiveContainer>
             </TabsContent>
 
-            <TabsContent value="position" className="mt-6">
+            <TabsContent value="matches" className="mt-6">
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={filteredData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="month" className="text-xs" />
                   <YAxis className="text-xs" />
-                  <Tooltip 
-                    contentStyle={{ 
+                  <Tooltip
+                    contentStyle={{
                       backgroundColor: 'hsl(var(--background))',
                       border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
+                      borderRadius: '8px',
                     }}
                     formatter={(value: number) => [value, 'Matches']}
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="matches" 
-                    stroke="hsl(var(--chart-2))" 
+                  <Line
+                    type="monotone"
+                    dataKey="matches"
+                    stroke="hsl(var(--chart-2))"
                     strokeWidth={2}
                     dot={{ fill: 'hsl(var(--chart-2))' }}
                   />
@@ -163,17 +156,17 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ registrations, play
               </ResponsiveContainer>
             </TabsContent>
 
-            <TabsContent value="skills" className="mt-6">
+            <TabsContent value="wl" className="mt-6">
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={filteredData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="month" className="text-xs" />
                   <YAxis className="text-xs" />
-                  <Tooltip 
-                    contentStyle={{ 
+                  <Tooltip
+                    contentStyle={{
                       backgroundColor: 'hsl(var(--background))',
                       border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
+                      borderRadius: '8px',
                     }}
                   />
                   <Bar dataKey="wins" fill="hsl(var(--chart-1))" name="Wins" />
@@ -182,32 +175,32 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ registrations, play
               </ResponsiveContainer>
             </TabsContent>
 
-            <TabsContent value="leagues" className="mt-6">
+            <TabsContent value="sets" className="mt-6">
               <ResponsiveContainer width="100%" height={300}>
                 <AreaChart data={filteredData}>
                   <defs>
-                    <linearGradient id="colorPoints" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--chart-3))" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0}/>
+                    <linearGradient id="colorSetRate" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--chart-3))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="month" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip 
-                    contentStyle={{ 
+                  <YAxis className="text-xs" domain={[0, 100]} />
+                  <Tooltip
+                    contentStyle={{
                       backgroundColor: 'hsl(var(--background))',
                       border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
+                      borderRadius: '8px',
                     }}
-                    formatter={(value: number) => [value, 'Points']}
+                    formatter={(value: number) => [`${value}%`, 'Sets Win Rate']}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="points" 
-                    stroke="hsl(var(--chart-3))" 
+                  <Area
+                    type="monotone"
+                    dataKey="setWinRate"
+                    stroke="hsl(var(--chart-3))"
                     fillOpacity={1}
-                    fill="url(#colorPoints)"
+                    fill="url(#colorSetRate)"
                   />
                 </AreaChart>
               </ResponsiveContainer>

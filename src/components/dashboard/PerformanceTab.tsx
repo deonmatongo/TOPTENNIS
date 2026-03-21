@@ -2,87 +2,90 @@ import React, { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { TrendingUp, Trophy, Target, Calendar, Award, Zap, AlertCircle } from "lucide-react";
+import { TrendingUp, Trophy, Target, Calendar, Award, Zap, AlertCircle, Clock } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useLeagueRegistrations } from "@/hooks/useLeagueRegistrations";
 import { useAchievements } from "@/hooks/useAchievements";
+import { usePlayerPerformance } from "@/hooks/usePlayerPerformance";
 import { useNavigate } from "react-router-dom";
 import PerformanceChart from "./PerformanceChart";
 import PlayerStatsCard from "./PlayerStatsCard";
+
 interface PerformanceTabProps {
   player: any;
-  matches: any[];
 }
-const PerformanceTab = ({
-  player,
-  matches
-}: PerformanceTabProps) => {
+
+const PerformanceTab = ({ player }: PerformanceTabProps) => {
   const navigate = useNavigate();
-  const {
-    registrations,
-    loading: loadingRegistrations
-  } = useLeagueRegistrations();
-  const [selectedLeagueId, setSelectedLeagueId] = useState<string>("");
+  const { registrations, loading: loadingRegistrations } = useLeagueRegistrations();
+  const { stats, loading: loadingStats } = usePlayerPerformance(player?.id);
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string>("all");
 
-  // Set default league when registrations load
-  React.useEffect(() => {
-    if (registrations.length > 0 && !selectedLeagueId) {
-      setSelectedLeagueId(registrations[0].league_id);
-    }
-  }, [registrations, selectedLeagueId]);
+  const { achievements, unlockedCount, totalCount, completionPercentage } = useAchievements(stats);
 
-  // Filter matches by selected league
+  // Filter matches for the selected league (or all)
   const leagueMatches = useMemo(() => {
-    if (!selectedLeagueId) return [];
-    return matches.filter(match => (match.player1_id === player?.id || match.player2_id === player?.id) && match.league_id === selectedLeagueId);
-  }, [matches, player?.id, selectedLeagueId]);
+    if (!stats) return [];
+    if (selectedLeagueId === "all") return stats.matches;
+    return stats.matches.filter(m => m.leagueId === selectedLeagueId);
+  }, [stats, selectedLeagueId]);
 
-  // Calculate performance stats
-  const userMatches = leagueMatches;
-  const completedMatches = userMatches.filter(match => match.status === 'completed');
-  const wonMatches = completedMatches.filter(match => match.winner_id === player?.id);
-  const winRate = completedMatches.length > 0 ? Math.round(wonMatches.length / completedMatches.length * 100) : 0;
+  // Per-league stats for the performance metrics section
+  const leagueWins = leagueMatches.filter(m => m.isWin).length;
+  const leagueTotal = leagueMatches.length;
+  const leagueWinRate = leagueTotal > 0 ? Math.round((leagueWins / leagueTotal) * 100) : 0;
+  const leagueSetsWon = leagueMatches.reduce((a, m) => a + m.setsWon, 0);
+  const leagueSetsLost = leagueMatches.reduce((a, m) => a + m.setsLost, 0);
+  const leagueMinutes = leagueMatches.reduce((a, m) => a + (m.durationMinutes ?? 90), 0);
 
-  // Recent matches (last 10)
-  const recentMatches = completedMatches.sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime()).slice(0, 10);
-  const performanceMetrics = [{
-    title: "Total Matches",
-    value: completedMatches.length,
-    description: "Matches played",
-    icon: Target,
-    color: "text-blue-600",
-    bgColor: "bg-blue-50"
-  }, {
-    title: "Win Rate",
-    value: `${winRate}%`,
-    description: `${wonMatches.length}W - ${completedMatches.length - wonMatches.length}L`,
-    icon: Trophy,
-    color: "text-emerald-600",
-    bgColor: "bg-emerald-50"
-  }, {
-    title: "Current Win Streak",
-    value: player?.current_streak || 0,
-    description: "Consecutive wins",
-    icon: Zap,
-    color: "text-orange-600",
-    bgColor: "bg-orange-50"
-  }, {
-    title: "Record Win Streak",
-    value: player?.best_streak || 0,
-    description: "Longest win streak",
-    icon: Award,
-    color: "text-purple-600",
-    bgColor: "bg-purple-50"
-  }];
-  const { achievements, unlockedCount, totalCount, completionPercentage } = useAchievements(matches, player);
-  // Show prompt if no league registrations
-  if (loadingRegistrations) {
-    return <div className="text-center py-12">Loading...</div>;
+  const performanceMetrics = [
+    {
+      title: "Matches Played",
+      value: leagueTotal,
+      description: "Completed matches",
+      icon: Target,
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
+    },
+    {
+      title: "Win Rate",
+      value: `${leagueWinRate}%`,
+      description: `${leagueWins}W – ${leagueTotal - leagueWins}L`,
+      icon: Trophy,
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50",
+    },
+    {
+      title: "Sets Record",
+      value: `${leagueSetsWon}–${leagueSetsLost}`,
+      description: leagueSetsWon + leagueSetsLost > 0
+        ? `${Math.round((leagueSetsWon / (leagueSetsWon + leagueSetsLost)) * 100)}% sets won`
+        : "No sets recorded",
+      icon: Award,
+      color: "text-orange-600",
+      bgColor: "bg-orange-50",
+    },
+    {
+      title: "Hours Played",
+      value: Math.round(leagueMinutes / 60),
+      description: "Estimated court time",
+      icon: Clock,
+      color: "text-purple-600",
+      bgColor: "bg-purple-50",
+    },
+  ];
+
+  const isLoading = loadingRegistrations || loadingStats;
+
+  if (isLoading) {
+    return <div className="text-center py-12 text-muted-foreground">Loading performance data…</div>;
   }
+
   if (registrations.length === 0) {
-    return <div className="space-y-8">
+    return (
+      <div className="space-y-8">
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold text-foreground flex items-center justify-center space-x-2">
             <TrendingUp className="w-8 h-8 text-primary" />
@@ -98,9 +101,12 @@ const PerformanceTab = ({
             </Button>
           </AlertDescription>
         </Alert>
-      </div>;
+      </div>
+    );
   }
-  return <div className="space-y-8">
+
+  return (
+    <div className="space-y-8">
       {/* Header */}
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-bold text-foreground flex items-center justify-center space-x-2">
@@ -115,8 +121,8 @@ const PerformanceTab = ({
       {/* League Selector */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Select League</CardTitle>
-          <CardDescription>View your performance for a specific league</CardDescription>
+          <CardTitle className="text-lg">Filter by League</CardTitle>
+          <CardDescription>View your performance for a specific league or across all leagues</CardDescription>
         </CardHeader>
         <CardContent>
           <Select value={selectedLeagueId} onValueChange={setSelectedLeagueId}>
@@ -124,26 +130,31 @@ const PerformanceTab = ({
               <SelectValue placeholder="Select a league" />
             </SelectTrigger>
             <SelectContent>
-              {registrations.map(reg => <SelectItem key={reg.id} value={reg.league_id}>
+              <SelectItem value="all">All Leagues</SelectItem>
+              {registrations.map(reg => (
+                <SelectItem key={reg.id} value={reg.league_id}>
                   {reg.league_name}
-                </SelectItem>)}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </CardContent>
       </Card>
 
-      {/* Current Performance Section */}
+      {/* Performance Metrics */}
       <div className="space-y-6">
         <div className="flex items-center space-x-2 border-b pb-3">
           <Zap className="w-6 h-6 text-primary" />
-          <h2 className="text-2xl font-bold text-foreground">Current League Performance</h2>
+          <h2 className="text-2xl font-bold text-foreground">
+            {selectedLeagueId === "all" ? "Overall Performance" : "League Performance"}
+          </h2>
         </div>
 
-        {/* Performance Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {performanceMetrics.map((metric, index) => {
-          const Icon = metric.icon;
-          return <Card key={index} className="relative overflow-hidden hover:shadow-md transition-shadow">
+            const Icon = metric.icon;
+            return (
+              <Card key={index} className="relative overflow-hidden hover:shadow-md transition-shadow">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -158,18 +169,19 @@ const PerformanceTab = ({
                   <div className="text-2xl font-bold text-foreground">{metric.value}</div>
                   <p className="text-xs text-muted-foreground mt-1">{metric.description}</p>
                 </CardContent>
-              </Card>;
-        })}
+              </Card>
+            );
+          })}
         </div>
       </div>
 
-      {/* Performance Charts */}
-      <PerformanceChart registrations={registrations} player={player} matches={matches} />
+      {/* Performance Charts — all-time data */}
+      <PerformanceChart matches={stats?.matches ?? []} />
 
-      {/* Player Stats Cards */}
-      <PlayerStatsCard player={player} registrations={registrations} />
+      {/* Player Stats Card — all-time data */}
+      <PlayerStatsCard stats={stats} registrations={registrations} />
 
-      {/* Achievements Section */}
+      {/* Achievements */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
@@ -193,8 +205,8 @@ const PerformanceTab = ({
             {achievements.map((achievement) => {
               const Icon = achievement.icon;
               return (
-                <div 
-                  key={achievement.id} 
+                <div
+                  key={achievement.id}
                   className={`flex items-start gap-3 p-4 rounded-lg border bg-card transition-opacity ${!achievement.unlocked && 'opacity-50'}`}
                 >
                   <div className={`p-2 rounded-lg bg-muted ${achievement.color}`}>
@@ -227,99 +239,91 @@ const PerformanceTab = ({
         </CardContent>
       </Card>
 
-      {/* Historic Performance Section */}
+      {/* Match History */}
       <div className="space-y-6">
         <div className="flex items-center space-x-2 border-b pb-3">
           <Calendar className="w-6 h-6 text-primary" />
-          <h2 className="text-2xl font-bold text-foreground">Historic Performance</h2>
+          <h2 className="text-2xl font-bold text-foreground">Match History</h2>
         </div>
 
-        {/* Performance Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Career Matches</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{completedMatches.length}</div>
-              <p className="text-xs text-muted-foreground mt-1">All time matches played</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Career Win Rate</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{winRate}%</div>
-              <p className="text-xs text-muted-foreground mt-1">Overall success rate</p>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Career Record Win Streak</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{player?.best_streak || 0}</div>
-              <p className="text-xs text-muted-foreground mt-1">Longest winning streak</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Recent Match History */}
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Calendar className="w-5 h-5" />
-              <span>Match History</span>
+              <span>Recent Matches</span>
             </CardTitle>
             <CardDescription>
-              Your most recent matches, from newest to oldest
+              Your most recent completed matches, newest first
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {recentMatches.length > 0 ? <div className="space-y-4">
-                {recentMatches.map((match, index) => {
-              const isWinner = match.winner_id === player?.id;
-              const opponentId = match.player1_id === player?.id ? match.player2_id : match.player1_id;
-              return <div key={match.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors">
-                      <div className="flex items-center space-x-4">
-                        <div className="text-sm text-muted-foreground">
-                          #{recentMatches.length - index}
-                        </div>
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <span className="font-medium">
-                              vs Opponent
-                            </span>
-                            <Badge variant={isWinner ? "default" : "secondary"} className={isWinner ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}>
-                              {isWinner ? "Won" : "Lost"}
+            {leagueMatches.length > 0 ? (
+              <div className="space-y-3">
+                {leagueMatches.slice(0, 20).map((match, index) => (
+                  <div
+                    key={match.id}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="text-sm text-muted-foreground w-6 text-right">
+                        #{index + 1}
+                      </div>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">vs {match.opponentName}</span>
+                          <Badge
+                            variant={match.isWin ? "default" : "secondary"}
+                            className={match.isWin ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}
+                          >
+                            {match.isWin ? "Won" : "Lost"}
+                          </Badge>
+                          {match.wonInStraightSets && (
+                            <Badge variant="outline" className="text-xs text-cyan-600 border-cyan-300">
+                              Straight Sets
                             </Badge>
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {new Date(match.match_date).toLocaleDateString()} • {match.court_location || "Court TBD"}
-                          </div>
+                          )}
+                          {match.wasComeback && (
+                            <Badge variant="outline" className="text-xs text-violet-600 border-violet-300">
+                              Comeback
+                            </Badge>
+                          )}
+                          {match.hasBagel && match.isWin && (
+                            <Badge variant="outline" className="text-xs text-rose-600 border-rose-300">
+                              Bagel
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-sm text-muted-foreground mt-0.5">
+                          {new Date(match.matchDate).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                          {match.courtLocation ? ` • ${match.courtLocation}` : ''}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-mono text-sm">
-                          {match.player1_score || 0} - {match.player2_score || 0}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {match.duration_minutes ? `${match.duration_minutes} min` : "Duration N/A"}
-                        </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-mono text-sm font-medium">{match.score}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {match.durationMinutes ? `${match.durationMinutes} min` : '~90 min'}
                       </div>
-                    </div>;
-            })}
-              </div> : <div className="text-center py-12 text-muted-foreground">
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">
                 <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p className="text-lg font-medium">No match history yet</p>
                 <p className="text-sm mt-2">Complete some matches to see your performance stats</p>
-              </div>}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default PerformanceTab;

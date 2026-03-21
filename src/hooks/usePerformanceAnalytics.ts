@@ -1,29 +1,19 @@
 import { useMemo } from 'react';
 import { format, startOfMonth, parseISO } from 'date-fns';
-
-interface Match {
-  id: string;
-  match_date: string;
-  status: string;
-  winner_id: string;
-  player1_id: string;
-  player2_id: string;
-  duration_minutes?: number;
-}
+import { PerformanceMatch } from './usePlayerPerformance';
 
 interface MonthlyPerformance {
   month: string;
   winRate: number;
-  avgPosition: number;
-  points: number;
+  setWinRate: number;
   matches: number;
   wins: number;
   losses: number;
 }
 
-export const usePerformanceAnalytics = (matches: Match[], playerId: string) => {
+export const usePerformanceAnalytics = (matches: PerformanceMatch[]) => {
   const analytics = useMemo(() => {
-    if (!playerId || !matches.length) {
+    if (!matches.length) {
       return {
         monthlyData: [],
         overall: {
@@ -31,77 +21,55 @@ export const usePerformanceAnalytics = (matches: Match[], playerId: string) => {
           totalWins: 0,
           totalLosses: 0,
           winRate: 0,
-          totalHours: 0
-        }
+          totalHours: 0,
+        },
       };
     }
 
-    // Filter matches for this player
-    const playerMatches = matches.filter(
-      match => (match.player1_id === playerId || match.player2_id === playerId) && 
-               match.status === 'completed'
+    // Sort ascending for the chart
+    const sorted = [...matches].sort(
+      (a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime()
     );
 
-    // Group matches by month
-    const matchesByMonth = playerMatches.reduce((acc, match) => {
+    const matchesByMonth = sorted.reduce((acc, match) => {
       try {
-        const date = parseISO(match.match_date);
+        const date = parseISO(match.matchDate);
         const monthKey = format(startOfMonth(date), 'MMM yyyy');
-        
+
         if (!acc[monthKey]) {
-          acc[monthKey] = {
-            matches: [],
-            wins: 0,
-            losses: 0,
-            totalMinutes: 0
-          };
+          acc[monthKey] = { matches: [] as PerformanceMatch[], wins: 0, losses: 0, setsWon: 0, setsLost: 0 };
         }
 
         acc[monthKey].matches.push(match);
-        
-        if (match.winner_id === playerId) {
-          acc[monthKey].wins += 1;
-        } else {
-          acc[monthKey].losses += 1;
-        }
-
-        acc[monthKey].totalMinutes += match.duration_minutes || 120;
-      } catch (error) {
-        console.error('Error parsing match date:', error);
+        if (match.isWin) acc[monthKey].wins++;
+        else acc[monthKey].losses++;
+        acc[monthKey].setsWon += match.setsWon;
+        acc[monthKey].setsLost += match.setsLost;
+      } catch {
+        // ignore unparseable dates
       }
-
       return acc;
-    }, {} as Record<string, { matches: Match[], wins: number, losses: number, totalMinutes: number }>);
+    }, {} as Record<string, { matches: PerformanceMatch[]; wins: number; losses: number; setsWon: number; setsLost: number }>);
 
-    // Convert to array and calculate metrics
-    const monthlyData: MonthlyPerformance[] = Object.entries(matchesByMonth)
-      .sort((a, b) => {
-        const dateA = new Date(a[0]);
-        const dateB = new Date(b[0]);
-        return dateA.getTime() - dateB.getTime();
-      })
-      .map(([month, data], index) => {
-        const totalMatches = data.matches.length;
-        const winRate = totalMatches > 0 ? Math.round((data.wins / totalMatches) * 100) : 0;
-        
-        // Calculate cumulative points (simplified: 10 points per win, 5 for participation)
-        const points = (data.wins * 10) + (totalMatches * 5);
+    const monthlyData: MonthlyPerformance[] = Object.entries(matchesByMonth).map(([monthLabel, data]) => {
+      const totalM = data.matches.length;
+      const winRate = totalM > 0 ? Math.round((data.wins / totalM) * 100) : 0;
+      const totalSets = data.setsWon + data.setsLost;
+      const setWinRate = totalSets > 0 ? Math.round((data.setsWon / totalSets) * 100) : 0;
 
-        return {
-          month: format(new Date(month), 'MMM'),
-          winRate,
-          avgPosition: 0, // Would need division standings data
-          points,
-          matches: totalMatches,
-          wins: data.wins,
-          losses: data.losses
-        };
-      });
+      return {
+        month: format(new Date(monthLabel), 'MMM'),
+        winRate,
+        setWinRate,
+        matches: totalM,
+        wins: data.wins,
+        losses: data.losses,
+      };
+    });
 
-    // Calculate overall stats
-    const totalWins = playerMatches.filter(m => m.winner_id === playerId).length;
-    const totalMatches = playerMatches.length;
-    const totalMinutes = playerMatches.reduce((sum, m) => sum + (m.duration_minutes || 120), 0);
+    const totalWins = matches.filter(m => m.isWin).length;
+    const totalMatches = matches.length;
+    const totalMinutes = matches.reduce((sum, m) => sum + (m.durationMinutes ?? 90), 0);
 
     return {
       monthlyData,
@@ -110,10 +78,10 @@ export const usePerformanceAnalytics = (matches: Match[], playerId: string) => {
         totalWins,
         totalLosses: totalMatches - totalWins,
         winRate: totalMatches > 0 ? Math.round((totalWins / totalMatches) * 100) : 0,
-        totalHours: Math.round(totalMinutes / 60)
-      }
+        totalHours: Math.round(totalMinutes / 60),
+      },
     };
-  }, [matches, playerId]);
+  }, [matches]);
 
   return analytics;
 };

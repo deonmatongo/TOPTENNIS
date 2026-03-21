@@ -197,7 +197,7 @@ const NewDashboard = () => {
       case 'performance':
         return (
           <ComponentErrorBoundary componentName="PerformanceTab">
-            <PerformanceTab player={player} matches={matches} />
+            <PerformanceTab player={player} />
           </ComponentErrorBoundary>
         );
       case 'register':

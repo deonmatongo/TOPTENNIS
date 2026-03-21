@@ -1,23 +1,6 @@
 import { useMemo } from 'react';
-import { Trophy, Flame, Medal, Star, Target, Award, Zap, TrendingUp } from 'lucide-react';
-
-interface Match {
-  id: string;
-  match_date: string;
-  status: string;
-  winner_id: string;
-  player1_id: string;
-  player2_id: string;
-}
-
-interface Player {
-  id: string;
-  wins?: number;
-  losses?: number;
-  total_matches?: number;
-  current_streak?: number;
-  best_streak?: number;
-}
+import { Trophy, Flame, Medal, Star, Target, Award, Zap, TrendingUp, Shield, RotateCcw, Clock } from 'lucide-react';
+import { PlayerPerformanceStats } from './usePlayerPerformance';
 
 export interface Achievement {
   id: string;
@@ -31,36 +14,40 @@ export interface Achievement {
   target?: number;
 }
 
-export const useAchievements = (matches: Match[], player: Player) => {
+export const useAchievements = (stats: PlayerPerformanceStats | null) => {
   const achievements = useMemo(() => {
-    if (!player?.id) return [];
+    if (!stats) return [];
 
-    const completedMatches = matches.filter(
-      m => (m.player1_id === player.id || m.player2_id === player.id) && m.status === 'completed'
-    );
+    const {
+      totalMatches,
+      wins,
+      winRate,
+      currentStreak,
+      bestStreak,
+      straightSetsWins,
+      comebackWins,
+      bagels,
+      tiebreakMatches,
+      matches,
+    } = stats;
 
-    const wonMatches = completedMatches.filter(m => m.winner_id === player.id);
-    const totalMatches = completedMatches.length;
-    const totalWins = wonMatches.length;
-    const currentStreak = player.current_streak || 0;
-    const bestStreak = player.best_streak || 0;
-
-    // Find first win date
-    const firstWin = wonMatches.sort((a, b) => 
-      new Date(a.match_date).getTime() - new Date(b.match_date).getTime()
-    )[0];
+    // Find first win date (matches are newest-first, so reverse to get oldest first)
+    const firstWinMatch = [...matches].reverse().find(m => m.isWin);
+    const firstWinDate = firstWinMatch
+      ? new Date(firstWinMatch.matchDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      : null;
 
     const achievementsList: Achievement[] = [
       {
         id: 'first_victory',
         title: 'First Victory',
         description: 'Won your first match',
-        date: firstWin ? new Date(firstWin.match_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : null,
+        date: wins >= 1 ? firstWinDate : null,
         icon: Trophy,
         color: 'text-yellow-600',
-        unlocked: totalWins >= 1,
-        progress: Math.min(totalWins, 1),
-        target: 1
+        unlocked: wins >= 1,
+        progress: Math.min(wins, 1),
+        target: 1,
       },
       {
         id: 'win_streak_5',
@@ -71,7 +58,7 @@ export const useAchievements = (matches: Match[], player: Player) => {
         color: 'text-orange-600',
         unlocked: bestStreak >= 5,
         progress: Math.min(currentStreak, 5),
-        target: 5
+        target: 5,
       },
       {
         id: 'win_streak_10',
@@ -82,7 +69,7 @@ export const useAchievements = (matches: Match[], player: Player) => {
         color: 'text-purple-600',
         unlocked: bestStreak >= 10,
         progress: Math.min(currentStreak, 10),
-        target: 10
+        target: 10,
       },
       {
         id: 'matches_10',
@@ -93,7 +80,7 @@ export const useAchievements = (matches: Match[], player: Player) => {
         color: 'text-blue-600',
         unlocked: totalMatches >= 10,
         progress: Math.min(totalMatches, 10),
-        target: 10
+        target: 10,
       },
       {
         id: 'matches_50',
@@ -104,7 +91,7 @@ export const useAchievements = (matches: Match[], player: Player) => {
         color: 'text-green-600',
         unlocked: totalMatches >= 50,
         progress: Math.min(totalMatches, 50),
-        target: 50
+        target: 50,
       },
       {
         id: 'matches_100',
@@ -115,54 +102,99 @@ export const useAchievements = (matches: Match[], player: Player) => {
         color: 'text-indigo-600',
         unlocked: totalMatches >= 100,
         progress: Math.min(totalMatches, 100),
-        target: 100
+        target: 100,
       },
       {
         id: 'wins_25',
         title: 'Rising Star',
         description: 'Win 25 matches',
-        date: totalWins >= 25 ? 'Achieved' : null,
+        date: wins >= 25 ? 'Achieved' : null,
         icon: Star,
         color: 'text-amber-600',
-        unlocked: totalWins >= 25,
-        progress: Math.min(totalWins, 25),
-        target: 25
+        unlocked: wins >= 25,
+        progress: Math.min(wins, 25),
+        target: 25,
       },
       {
         id: 'wins_50',
         title: 'Champion',
         description: 'Win 50 matches',
-        date: totalWins >= 50 ? 'Achieved' : null,
+        date: wins >= 50 ? 'Achieved' : null,
         icon: Trophy,
         color: 'text-yellow-600',
-        unlocked: totalWins >= 50,
-        progress: Math.min(totalWins, 50),
-        target: 50
+        unlocked: wins >= 50,
+        progress: Math.min(wins, 50),
+        target: 50,
       },
       {
         id: 'win_rate_70',
         title: 'Consistent Performer',
         description: '70%+ win rate (min 10 matches)',
-        date: totalMatches >= 10 && (totalWins / totalMatches) >= 0.7 ? 'Achieved' : null,
+        date: totalMatches >= 10 && winRate >= 70 ? 'Achieved' : null,
         icon: TrendingUp,
         color: 'text-emerald-600',
-        unlocked: totalMatches >= 10 && (totalWins / totalMatches) >= 0.7,
-        progress: totalMatches >= 10 ? Math.min((totalWins / totalMatches) * 100, 70) : 0,
-        target: 70
-      }
+        unlocked: totalMatches >= 10 && winRate >= 70,
+        progress: totalMatches >= 10 ? Math.min(winRate, 70) : 0,
+        target: 70,
+      },
+      // Tennis-specific achievements
+      {
+        id: 'bagel_artist',
+        title: 'Bagel Artist',
+        description: 'Win a set 6–0',
+        date: bagels >= 1 ? 'Achieved' : null,
+        icon: Award,
+        color: 'text-rose-600',
+        unlocked: bagels >= 1,
+        progress: Math.min(bagels, 1),
+        target: 1,
+      },
+      {
+        id: 'straight_set_specialist',
+        title: 'Straight Set Specialist',
+        description: 'Win 5 matches without dropping a set',
+        date: straightSetsWins >= 5 ? 'Achieved' : null,
+        icon: Shield,
+        color: 'text-cyan-600',
+        unlocked: straightSetsWins >= 5,
+        progress: Math.min(straightSetsWins, 5),
+        target: 5,
+      },
+      {
+        id: 'comeback_king',
+        title: 'Comeback King',
+        description: 'Win 3 matches after losing the first set',
+        date: comebackWins >= 3 ? 'Achieved' : null,
+        icon: RotateCcw,
+        color: 'text-violet-600',
+        unlocked: comebackWins >= 3,
+        progress: Math.min(comebackWins, 3),
+        target: 3,
+      },
+      {
+        id: 'tiebreak_titan',
+        title: 'Tiebreak Titan',
+        description: 'Play 5 matches that include a tiebreak',
+        date: tiebreakMatches >= 5 ? 'Achieved' : null,
+        icon: Clock,
+        color: 'text-sky-600',
+        unlocked: tiebreakMatches >= 5,
+        progress: Math.min(tiebreakMatches, 5),
+        target: 5,
+      },
     ];
 
     return achievementsList;
-  }, [matches, player]);
+  }, [stats]);
 
   const unlockedCount = achievements.filter(a => a.unlocked).length;
   const totalCount = achievements.length;
-  const completionPercentage = Math.round((unlockedCount / totalCount) * 100);
+  const completionPercentage = totalCount > 0 ? Math.round((unlockedCount / totalCount) * 100) : 0;
 
   return {
     achievements,
     unlockedCount,
     totalCount,
-    completionPercentage
+    completionPercentage,
   };
 };
