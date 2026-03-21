@@ -16,8 +16,8 @@ import {
   Globe
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUserAvailability } from '@/hooks/useUserAvailability';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { TimezoneSelect } from '@/components/ui/TimezoneSelect';
@@ -89,8 +89,8 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   const [showInviterProfile, setShowInviterProfile] = useState(false);
 
   const { user } = useAuth();
-  const { availability, loading, error, deleteAvailability, createAvailability, updateAvailability, fetchAvailability } = useUserAvailability();
-  const { invites, getPendingInvites, getConfirmedInvites, respondToInvite, deleteInvite, cancelInvite } = useMatchInvites();
+  const { availability, loading, error, deleteAvailability, createAvailability, updateAvailability, fetchAvailability } = useAvailabilityContext();
+  const { invites, getPendingInvites, getConfirmedInvites, respondToInvite, deleteInvite, cancelInvite } = useMatchInvitesContext();
   const { notifications, markAsRead } = useNotificationsContext();
   const { timezone, updateTimezone } = useUserTimezone();
 
@@ -268,6 +268,9 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   };
 
   const handleDateClick = (date: Date, startTime?: string) => {
+    // Keep currentDate in sync with the selected date so the Day view
+    // header reflects the correct date when the user switches views.
+    setCurrentDate(date);
     setSelectedDate(date);
     if (startTime) {
       // Calculate end time (1 hour after start time)
@@ -784,13 +787,6 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                       onClick={handlePrevious}
                     >
                       <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleToday}
-                    >
-                      Today
                     </Button>
                     <Button
                       variant="outline"

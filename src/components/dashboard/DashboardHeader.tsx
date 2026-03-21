@@ -1,13 +1,10 @@
 
 import React from "react";
-import { Search, Bell, Settings, Menu, X } from "lucide-react";
+import { Bell, Settings, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNotificationsContext } from "@/contexts/NotificationsContext";
 import NotificationDropdown from "./NotificationDropdown";
-import PlayerSearch from "./PlayerSearch";
-import PlayerProfileModal from "./PlayerProfileModal";
-import { SearchResult } from "@/hooks/usePlayerSearch";
 import { toast } from "sonner";
 
 interface DashboardHeaderProps {
@@ -22,13 +19,7 @@ interface DashboardHeaderProps {
 
 const DashboardHeader = ({ player, user, sidebarCollapsed, setSidebarCollapsed, isMobile = false, sidebarOpen = false, setSidebarOpen }: DashboardHeaderProps) => {
   const { unreadCount } = useNotificationsContext();
-  const [selectedPlayer, setSelectedPlayer] = React.useState<SearchResult | null>(null);
-  const [showPlayerModal, setShowPlayerModal] = React.useState(false);
 
-  const handlePlayerSelect = (selectedPlayer: SearchResult) => {
-    setSelectedPlayer(selectedPlayer);
-    setShowPlayerModal(true);
-  };
   const userInitials = user?.user_metadata?.first_name && user?.user_metadata?.last_name 
     ? `${user.user_metadata.first_name[0]}${user.user_metadata.last_name[0]}`
     : user?.email?.[0]?.toUpperCase() || 'U';
@@ -96,14 +87,6 @@ const DashboardHeader = ({ player, user, sidebarCollapsed, setSidebarCollapsed, 
         </div>
 
         <div className="flex items-center space-x-2 sm:space-x-3 lg:space-x-4">
-          <div className="hidden md:block">
-            <PlayerSearch 
-              onPlayerSelect={handlePlayerSelect}
-              placeholder="Search players..."
-              className="w-60 lg:w-80"
-            />
-          </div>
-          
           <NotificationDropdown>
             <Button size="icon" variant="ghost" className="relative h-9 w-9 sm:h-10 sm:w-10 hover:bg-accent/50">
               <Bell className="w-4 h-4" />
@@ -125,15 +108,6 @@ const DashboardHeader = ({ player, user, sidebarCollapsed, setSidebarCollapsed, 
         </div>
       </div>
 
-      {/* Player Profile Modal */}
-      <PlayerProfileModal 
-        player={selectedPlayer}
-        isOpen={showPlayerModal}
-        onClose={() => {
-          setShowPlayerModal(false);
-          setSelectedPlayer(null);
-        }}
-      />
     </header>
   );
 };

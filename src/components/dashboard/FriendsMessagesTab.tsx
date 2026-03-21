@@ -4,8 +4,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { useBlockedUsers } from '@/hooks/useBlockedUsers';
 import { useAuth } from '@/contexts/AuthContext';
-import { useConversations, type Conversation, type ConversationMessage } from '@/hooks/useConversations';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useConversationsContext } from '@/contexts/ConversationsContext';
+import type { Conversation, ConversationMessage } from '@/hooks/useConversations';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import { useOnlinePresence } from '@/hooks/useOnlinePresence';
 import { formatDistanceToNow, format, isToday, isYesterday, isSameDay } from 'date-fns';
@@ -116,9 +117,10 @@ interface GroupMatchRequestSheetProps {
   conv: Conversation;
   currentUserId: string;
   onConfirm: (players: SearchResult[]) => void;
+  onViewProfile: (player: SearchResult) => void;
 }
 const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
-  open, onClose, conv, currentUserId, onConfirm,
+  open, onClose, conv, currentUserId, onConfirm, onViewProfile,
 }) => {
   const otherMembers = conv.members.filter(m => m.user_id !== currentUserId);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -229,6 +231,30 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
                       {m.role === 'admin' ? '⭐ Admin' : 'Member'}
                     </div>
                   </div>
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      onViewProfile({
+                        id: m.user_id,
+                        user_id: m.user_id,
+                        name,
+                        email: m.profile?.email || '',
+                        skill_level: 0,
+                        wins: 0,
+                        losses: 0,
+                        first_name: m.profile?.first_name ?? undefined,
+                        last_name: m.profile?.last_name ?? undefined,
+                      });
+                    }}
+                    style={{
+                      background: 'none', border: `1px solid ${C.border}`, borderRadius: 8,
+                      padding: '4px 10px', fontSize: 11, fontWeight: 600,
+                      color: C.accent, cursor: 'pointer', flexShrink: 0,
+                      fontFamily: "'DM Sans', sans-serif",
+                    }}
+                  >
+                    Profile
+                  </button>
                 </div>
               );
             })
@@ -1035,15 +1061,8 @@ const FriendRow: React.FC<FriendRowProps> = ({ fid, name, avatar, online, faded,
 
 // ── Main component ────────────────────────────────────────────────────────────
 const FriendsMessagesTab = () => {
-  console.log('🚀 FriendsMessagesTab: COMPONENT STARTED RENDERING!');
-  console.log('🚀 FriendsMessagesTab: Current timestamp:', new Date().toISOString());
-  
-  try {
-    console.log('🔍 FriendsMessagesTab: Component rendering start');
-    
+  // ── All hooks must be called unconditionally at the top ──────────────────
   const [activeTab, setActiveTab]         = useState<'chat' | 'friends' | 'requests'>('chat');
-  console.log('🔍 FriendsMessagesTab: activeTab state initialized');
-  
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
   const [msgInput, setMsgInput]           = useState('');
   const [search, setSearch]               = useState('');
@@ -1063,111 +1082,57 @@ const FriendsMessagesTab = () => {
   const [newGroupConvId, setNewGroupConvId] = useState<string | null>(null);
   const isMobile = useWindowWidth() < 768;
 
-  console.log('🔍 FriendsMessagesTab: All state initialized');
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollRef      = useRef<HTMLDivElement>(null);
   const inputRef       = useRef<HTMLTextAreaElement>(null);
 
-  console.log('🔍 FriendsMessagesTab: Getting auth user');
   const { user } = useAuth();
-  console.log('🔍 FriendsMessagesTab: Auth user:', user?.id || 'No user');
-  
-  // Early return if no user - this is a common crash cause
-  if (!user) {
-    console.log('🔍 FriendsMessagesTab: No user found, returning loading state');
-    return (
-      <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
-        <div style={{ fontSize: '24px', marginBottom: '16px' }}>👤</div>
-        <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>Loading user data...</div>
-        <div style={{ fontSize: '14px' }}>Please wait while we set up your network</div>
-      </div>
-    );
-  }
-  
-  console.log('🔍 FriendsMessagesTab: Getting friend requests');
+
   const {
     requests, loading: friendsLoading,
     updateRequestStatus, revokeFriendRequest, getPendingRequestsCount,
   } = useFriendRequests();
-  console.log('🔍 FriendsMessagesTab: Friend requests loaded, count:', requests?.length || 0);
-  
-  console.log('🔍 FriendsMessagesTab: Getting blocked users');
+
   const { blockedUsers, blockUser, unfriendUser } = useBlockedUsers();
-  console.log('🔍 FriendsMessagesTab: Blocked users loaded, count:', blockedUsers?.length || 0);
-  
-  console.log('🔍 FriendsMessagesTab: Getting conversations');
+
   const {
     conversations, loading: convLoading,
     sendMessage, getOrCreateDM, createGroupChat,
     addMember, removeMember, deleteMessage, toggleReaction,
     leaveGroup, deleteGroup, togglePin,
     updateGroup, markConversationRead, getTotalUnread, getMyRole, setMemberRole,
-  } = useConversations();
-  console.log('🔍 FriendsMessagesTab: Conversations loaded, count:', conversations?.length || 0);
-  
-  // Early return if conversations are still loading
-  if (convLoading) {
-    console.log('🔍 FriendsMessagesTab: Conversations still loading, showing loading state');
-    return (
-      <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
-        <div style={{ fontSize: '24px', marginBottom: '16px' }}>💬</div>
-        <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>Loading conversations...</div>
-        <div style={{ fontSize: '14px' }}>Setting up your messaging</div>
-      </div>
-    );
-  }
-  
-  console.log('🔍 FriendsMessagesTab: Getting match invites');
-  const { invites: _invites } = useMatchInvites();
-  
-  console.log('🔍 FriendsMessagesTab: Getting online presence');
+  } = useConversationsContext();
+
+  const { invites: _invites } = useMatchInvitesContext();
   const { isOnline } = useOnlinePresence();
-  
-  console.log('🔍 FriendsMessagesTab: Getting typing indicator');
   const { typingUsers, broadcastTyping } = useTypingIndicator(selectedConvId);
 
   const blockedIds = useMemo(() => new Set((blockedUsers || []).map(b => b.blocked_user_id)), [blockedUsers]);
-  console.log('🔍 FriendsMessagesTab: Blocked IDs created:', blockedIds.size);
 
   const pendingIn   = (requests || []).filter(r => r.status === 'pending' && r.receiver_id === user?.id);
   const pendingSent = (requests || []).filter(r => r.status === 'pending' && r.sender_id === user?.id);
   const friends     = (requests || []).filter(r => r.status === 'accepted');
-  console.log('🔍 FriendsMessagesTab: Requests processed - pendingIn:', pendingIn.length, 'pendingSent:', pendingSent.length, 'friends:', friends.length);
 
   const visConvs = useMemo(() => (conversations || []).filter(c => {
     if (c.is_group) return true;
     const other = c.members?.find(m => m.user_id !== user?.id);
     return other ? !blockedIds.has(other.user_id) : true;
-  }), [conversations, user, blockedIds]);
-  console.log('🔍 FriendsMessagesTab: Visible conversations calculated:', visConvs.length);
+  }), [conversations, user?.id, blockedIds]);
 
   const dmConvs    = visConvs.filter(c => !c.is_group);
   const groupConvs = visConvs.filter(c => c.is_group);
-  console.log('🔍 FriendsMessagesTab: DM/Group conversations split - DMs:', dmConvs.length, 'Groups:', groupConvs.length);
 
   const sortPinned = (arr: Conversation[]) => [...arr].sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
   const filteredDMs    = sortPinned(dmConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(search.toLowerCase())));
   const filteredGroups = sortPinned(groupConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(search.toLowerCase())));
-  console.log('🔍 FriendsMessagesTab: Filtered conversations - DMs:', filteredDMs.length, 'Groups:', filteredGroups.length);
-  console.log('🔍 FriendsMessagesTab: Search term:', search, 'Active tab:', activeTab);
 
-  // Memoized online status calculations to prevent repeated calls
+  // Memoized online status map — depends on stableOnlineUserIds via isOnline
   const onlineStatusMap = useMemo(() => {
-    console.log('🔍 FriendsMessagesTab: Calculating online status map...');
     const map = new Map<string, boolean>();
     (friends || []).forEach(f => {
       const friendId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
-      if (friendId && isOnline) {
-        try {
-          map.set(friendId, isOnline(friendId));
-        } catch (err) {
-          console.error('❌ FriendsMessagesTab: Error checking online status:', err);
-          map.set(friendId, false);
-        }
-      }
+      if (friendId) map.set(friendId, isOnline(friendId));
     });
-    console.log('🔍 FriendsMessagesTab: Online status map created with', map.size, 'entries');
     return map;
   }, [friends, user?.id, isOnline]);
 
@@ -1176,8 +1141,7 @@ const FriendsMessagesTab = () => {
     const s  = friendSearch.toLowerCase();
     return (fd?.name || '').toLowerCase().includes(s) || (fd?.email || '').toLowerCase().includes(s);
   });
-  console.log('🔍 FriendsMessagesTab: Filtered friends:', filteredFriends.length);
-  
+
   const onlineFriends  = filteredFriends.filter(f => {
     const friendId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
     return friendId ? onlineStatusMap.get(friendId) : false;
@@ -1186,28 +1150,24 @@ const FriendsMessagesTab = () => {
     const friendId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
     return friendId ? !onlineStatusMap.get(friendId) : true;
   });
-  console.log('🔍 FriendsMessagesTab: Online/offline friends - Online:', onlineFriends.length, 'Offline:', offlineFriends.length);
 
   const selectedConv = visConvs.find(c => c.id === selectedConvId) ?? null;
   const convName     = selectedConv ? getConvName(selectedConv, user?.id || '') : '';
   const convAvatar   = selectedConv ? getConvAvatar(selectedConv, user?.id || '') : undefined;
   const myRole       = selectedConv ? getMyRole(selectedConv) : null;
   const dmOtherId    = selectedConv && !selectedConv.is_group ? getConvOtherUserId(selectedConv, user?.id || '') : undefined;
-  console.log('🔍 FriendsMessagesTab: Selected conversation processed:', selectedConvId, convName);
 
   const friendsList = (friends || []).map(f => {
     const fid = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
     const fd  = f.sender_id === user?.id ? f.receiver : f.sender;
     return { userId: fid, name: fd?.name || 'Unknown', avatar: fd?.profile_picture_url };
   });
-  console.log('🔍 FriendsMessagesTab: Friends list created:', friendsList.length);
 
   const totalUnread = getTotalUnread();
   const onlineCount = (friends || []).filter(f => {
     const friendId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
     return friendId ? onlineStatusMap.get(friendId) : false;
   }).length;
-  console.log('🔍 FriendsMessagesTab: Totals calculated - Total unread:', totalUnread, 'Online count:', onlineCount);
 
   useEffect(() => {
     if (atBottom) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1303,10 +1263,17 @@ const FriendsMessagesTab = () => {
     { id: 'requests', label: 'Requests', count: getPendingRequestsCount() },
   ];
 
-  // Only return loading spinner on initial load, not for ongoing loading states
-  console.log('🔍 FriendsMessagesTab: Loading state check - convLoading:', convLoading, 'conversations:', conversations, 'conversations exists:', !!conversations);
+  // Loading guard — all hooks are already called above, safe to return early here
+  if (!user) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+        <div style={{ fontSize: '24px', marginBottom: '16px' }}>👤</div>
+        <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>Loading user data...</div>
+      </div>
+    );
+  }
+
   if (convLoading && !conversations) {
-    console.log('🔍 FriendsMessagesTab: Initial load, showing spinner');
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 400 }}>
         <div style={{ width: 36, height: 36, borderRadius: '50%', border: `4px solid ${C.accent}`, borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
@@ -1796,6 +1763,7 @@ const FriendsMessagesTab = () => {
             setMatchRequestQueue(rest);
             setMatchRequestTarget(first);
           }}
+          onViewProfile={player => setProfilePlayer(player)}
         />
       )}
 
@@ -1868,24 +1836,6 @@ const FriendsMessagesTab = () => {
       `}</style>
     </div>
   );
-  console.log('🚀 FriendsMessagesTab: COMPONENT FINISHED RENDERING SUCCESSFULLY!');
-  } catch (error) {
-    console.error('❌ FriendsMessagesTab: Component crashed:', {
-      error,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      errorStack: error instanceof Error ? error.stack : null,
-      timestamp: new Date().toISOString()
-    });
-    
-    // Fallback UI
-    return (
-      <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
-        <div style={{ fontSize: '24px', marginBottom: '16px' }}>💬</div>
-        <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>Network temporarily unavailable</div>
-        <div style={{ fontSize: '14px' }}>Please refresh the page to try again</div>
-      </div>
-    );
-  }
 };
 
 export default FriendsMessagesTab;

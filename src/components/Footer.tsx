@@ -18,7 +18,6 @@ const Footer = () => {
           <div className="text-center sm:text-left">
             <h4 className="text-base sm:text-lg font-bold mb-3 sm:mb-4">QUICK LINKS</h4>
             <ul className="space-y-1 sm:space-y-2">
-              <li><a href="#players" className="text-gray-400 hover:text-white transition-colors text-sm sm:text-base">Find Players</a></li>
               <li><a href="#locations" className="text-gray-400 hover:text-white transition-colors text-sm sm:text-base">Court Locations</a></li>
               <li><a href="#faq" className="text-gray-400 hover:text-white transition-colors text-sm sm:text-base">FAQ</a></li>
               <li><a href="#newsletter" className="text-gray-400 hover:text-white transition-colors text-sm sm:text-base">Newsletter</a></li>

@@ -36,7 +36,7 @@ import { PlayerScheduleModal } from './PlayerScheduleModal';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { useBlockedUsers } from '@/hooks/useBlockedUsers';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import { format, parseISO } from 'date-fns';
 
 interface PendingInvite {
@@ -68,7 +68,7 @@ const PlayerProfileModal = ({ player, isOpen, onClose, pendingInvite, onInviteRe
   const { user } = useAuth();
   const { sendFriendRequest, updateRequestStatus, getRelationshipWith, requests, refetch: refetchFriends } = useFriendRequests();
   const { blockUser, unfriendUser } = useBlockedUsers();
-  const { respondToInvite } = useMatchInvites();
+  const { respondToInvite } = useMatchInvitesContext();
   
   if (!player) return null;
 

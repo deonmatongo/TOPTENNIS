@@ -11,7 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Calendar, Clock, MapPin, MessageCircle, User, Check, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { useMatchInvites, type PlayerProfile } from '@/hooks/useMatchInvites';
+import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
+import type { PlayerProfile } from '@/hooks/useMatchInvites';
 import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import PlayerProfileModal from './PlayerProfileModal';
 
@@ -40,7 +41,7 @@ export const InviteResponseDialog: React.FC<InviteResponseDialogProps> = ({
   onClose,
   invite,
 }) => {
-  const { respondToInvite } = useMatchInvites();
+  const { respondToInvite } = useMatchInvitesContext();
   const { notifications, markAsRead } = useNotificationsContext();
   const [isResponding, setIsResponding] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -215,6 +216,8 @@ export const InviteResponseDialog: React.FC<InviteResponseDialogProps> = ({
           player={playerForModal}
           isOpen={showProfile}
           onClose={() => setShowProfile(false)}
+          pendingInvite={invite}
+          onInviteResponded={() => { setShowProfile(false); onClose(); }}
         />
       )}
     </>

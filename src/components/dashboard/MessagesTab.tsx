@@ -7,15 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { MessageCircle, Search, Send, Plus, Filter, Clock, Check, CheckCheck, Reply, X, Users, Mail, Eye, EyeOff } from 'lucide-react';
+import { MessageCircle, Search, Send, Filter, Clock, Check, CheckCheck, Reply, X, Mail, Eye, EyeOff } from 'lucide-react';
 import { useMessagesContext } from '@/contexts/MessagesContext';
 import type { Message } from '@/hooks/useMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns';
 import { toast } from 'sonner';
-import PlayerSearch from './PlayerSearch';
-import { SearchResult } from '@/hooks/usePlayerSearch';
-import SendMessageModal from './SendMessageModal';
 interface Conversation {
   otherUserId: string;
   otherUser: {
@@ -33,9 +30,6 @@ const MessagesTab = () => {
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyContent, setReplyContent] = useState('');
   const [sending, setSending] = useState(false);
-  const [showComposeModal, setShowComposeModal] = useState(false);
-  const [selectedPlayer, setSelectedPlayer] = useState<SearchResult | null>(null);
-  const [showPlayerSearch, setShowPlayerSearch] = useState(false);
   const {
     messages,
     loading,
@@ -112,11 +106,6 @@ const MessagesTab = () => {
       setSending(false);
     }
   };
-  const handlePlayerSelect = (player: SearchResult) => {
-    setSelectedPlayer(player);
-    setShowComposeModal(true);
-    setShowPlayerSearch(false);
-  };
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     if (isToday(date)) {
@@ -148,24 +137,7 @@ const MessagesTab = () => {
           </div>
         </div>
         
-        <div className="flex items-center space-x-2">
-          <Button size="sm" variant="outline" onClick={() => setShowPlayerSearch(!showPlayerSearch)} className="flex items-center space-x-2">
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">New Message</span>
-          </Button>
-        </div>
       </div>
-
-      {/* Player Search */}
-      {showPlayerSearch && <Card className="m-4 mb-0">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2 mb-3">
-              <Users className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Find a player to message</span>
-            </div>
-            <PlayerSearch onPlayerSelect={handlePlayerSelect} placeholder="Search for players..." />
-          </CardContent>
-        </Card>}
 
       <div className="flex-1 flex overflow-hidden">
         {/* Conversations List */}
@@ -301,11 +273,6 @@ const MessagesTab = () => {
         </div>
       </div>
 
-      {/* Send Message Modal */}
-      <SendMessageModal player={selectedPlayer} isOpen={showComposeModal} onClose={() => {
-      setShowComposeModal(false);
-      setSelectedPlayer(null);
-    }} />
     </div>;
 };
 export default MessagesTab;

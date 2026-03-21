@@ -10,8 +10,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useNotificationsContext } from "@/contexts/NotificationsContext";
 import { useFriendRequests } from "@/hooks/useFriendRequests";
 import { useMatchInvitesCount } from "@/hooks/useMatchInvitesCount";
-import { useConversations } from "@/hooks/useConversations";
-import { Home, Calendar, User, FileText, BarChart3, Trophy, Users, Bell, Search, Settings, LogOut, Menu, X, Zap, TrendingUp, Target, MessageCircle, Mail } from "lucide-react";
+import { useConversationsContext } from "@/contexts/ConversationsContext";
+import { Calendar, User, FileText, BarChart3, Trophy, Bell, Settings, LogOut, Menu, X, Zap, TrendingUp, Target, MessageCircle, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,9 +19,6 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ComponentErrorBoundary } from "@/components/ui/ComponentErrorBoundary";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import PlayerSearch from "@/components/dashboard/PlayerSearch";
-import PlayerProfileModal from "@/components/dashboard/PlayerProfileModal";
-import { SearchResult } from "@/hooks/usePlayerSearch";
 import Header from "@/components/Header";
 
 // Import all tab components
@@ -31,9 +28,7 @@ import CompetitionTab from "@/components/dashboard/CompetitionTab";
 import RegisterTab from "@/components/dashboard/RegisterTab";
 import ProfileTab from "@/components/dashboard/ProfileTab";
 import NotificationsTab from "@/components/dashboard/NotificationsTab";
-import MatchingTab from "@/components/dashboard/MatchingTab";
 import FriendsMessagesTab from "@/components/dashboard/FriendsMessagesTab";
-import MessagesTab from "@/components/dashboard/MessagesTab";
 import PerformanceTab from "@/components/dashboard/PerformanceTab";
 import MyLeaguesTab from "@/components/dashboard/MyLeaguesTab";
 import ScheduleTab from "@/components/dashboard/ScheduleTab";
@@ -67,20 +62,17 @@ const NewDashboard = () => {
   const {
     getPendingRequestsCount
   } = useFriendRequests();
-  const { getTotalUnread } = useConversations();
+  const { getTotalUnread } = useConversationsContext();
   const pendingMatchInvites = useMatchInvitesCount();
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState('profile');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedLeague, setSelectedLeague] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPlayer, setSelectedPlayer] = useState<SearchResult | null>(null);
-  const [showPlayerModal, setShowPlayerModal] = useState(false);
-
   // Handle URL parameters for tab navigation
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['profile', 'performance', 'my-leagues', 'schedule', 'matching', 'register', 'messages', 'social', 'notifications'].includes(tabParam)) {
+    if (tabParam && ['profile', 'performance', 'my-leagues', 'schedule', 'register', 'messages', 'social', 'notifications'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
@@ -92,10 +84,6 @@ const NewDashboard = () => {
     } catch (error) {
       toast.error('Failed to sign out');
     }
-  };
-  const handlePlayerSelect = (player: SearchResult) => {
-    setSelectedPlayer(player);
-    setShowPlayerModal(true);
   };
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -149,11 +137,6 @@ const NewDashboard = () => {
     icon: Calendar,
     description: "Availability & matches",
     badge: pendingMatchInvites > 0 ? pendingMatchInvites : null
-  }, {
-    id: "matching",
-    label: "Casual Match",
-    icon: Users,
-    description: "Find an Opponent"
   }, {
     id: "social",
     label: "Build Your Network",
@@ -381,16 +364,6 @@ const NewDashboard = () => {
                   </Card>
                 </div>
 
-                {/* Search */}
-                <div className="hidden lg:block">
-                  <PlayerSearch onPlayerSelect={handlePlayerSelect} placeholder="Search players..." className="w-48 xl:w-64" />
-                </div>
-
-                {/* Mobile Search */}
-                <Button size="icon" variant="ghost" className="lg:hidden h-8 w-8 sm:h-10 sm:w-10 rounded-xl hover:bg-accent/50">
-                  <Search className="w-4 h-4 sm:w-5 sm:h-5" />
-                </Button>
-
                 {/* Notifications */}
                 
 
@@ -406,8 +379,6 @@ const NewDashboard = () => {
           </div>
         </main>
 
-        {/* Player Profile Modal */}
-        <PlayerProfileModal player={selectedPlayer} isOpen={showPlayerModal} onClose={() => setShowPlayerModal(false)} />
       </div>
     </div>;
 };

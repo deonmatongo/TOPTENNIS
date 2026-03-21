@@ -9,7 +9,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useUserAvailability } from '@/hooks/useUserAvailability';
 import { toast } from 'sonner';
 import { Repeat, Calendar } from 'lucide-react';
 

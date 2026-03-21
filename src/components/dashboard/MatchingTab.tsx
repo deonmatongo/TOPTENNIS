@@ -2,23 +2,18 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Users, Search, Bot, Calendar, AlertCircle, Trophy, TrendingUp } from 'lucide-react';
+import { Users, Bot, Calendar, AlertCircle, Trophy, TrendingUp } from 'lucide-react';
 import MatchSuggestions from '@/components/MatchSuggestions';
-import PlayerSearch from '@/components/dashboard/PlayerSearch';
-import { PlayerScheduleModal } from './PlayerScheduleModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useDivisionAssignments } from '@/hooks/useDivisionAssignments';
 import { useMatchSuggestions } from '@/hooks/useMatchSuggestions';
 import { useMatches, type Match } from '@/hooks/useMatches';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
-import type { SearchResult } from '@/hooks/usePlayerSearch';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-type MatchingMode = 'selection' | 'ai-recommendations' | 'player-search';
+type MatchingMode = 'selection' | 'ai-recommendations';
 const MatchingTab = () => {
   const [matchingMode, setMatchingMode] = useState<MatchingMode>('selection');
-  const [selectedPlayer, setSelectedPlayer] = useState<SearchResult | null>(null);
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showUnmatchedDialog, setShowUnmatchedDialog] = useState(false);
   const {
     assignments
@@ -32,10 +27,6 @@ const MatchingTab = () => {
   const {
     player
   } = usePlayerProfile();
-  const handlePlayerSelect = (player: SearchResult) => {
-    setSelectedPlayer(player);
-    setShowScheduleModal(true);
-  };
   const handleUnmatchedPlayerOption = async (acceptOutsideCriteria: boolean) => {
     if (acceptOutsideCriteria) {
       toast.success("We'll place you in the next available division and notify you when it's ready!");
@@ -110,35 +101,6 @@ const MatchingTab = () => {
           </CardContent>
         </Card>
 
-        {/* Manual Search Card */}
-        <Card className="cursor-pointer hover:shadow-lg transition-all duration-200 border-2 hover:border-primary/50" onClick={() => setMatchingMode('player-search')}>
-          <CardHeader className="text-center pb-4">
-            <div className="w-16 h-16 bg-gradient-primary rounded-full flex items-center justify-center mx-auto mb-4">
-              <Search className="w-8 h-8 text-primary-foreground" />
-            </div>
-            <CardTitle className="text-xl">Search by Player Name</CardTitle>
-            <CardDescription className="text-center">Search and connect with specific players by name </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                Search by name or email
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                View player profiles & stats
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                Send match request
-              </div>
-            </div>
-            <Button variant="outline" className="w-full mt-4" onClick={() => setMatchingMode('player-search')}>
-              Search Players
-            </Button>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Quick Stats - Recent Casual Matches */}
@@ -208,53 +170,9 @@ const MatchingTab = () => {
         </CardContent>
       </Card>
     </div>;
-  const renderPlayerSearch = () => <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground mb-2">Search Players</h2>
-          <p className="text-muted-foreground">
-            Find and connect with specific players by searching their name
-          </p>
-        </div>
-        <Button variant="outline" onClick={() => setMatchingMode('selection')} className="shrink-0">
-          Back to Options
-        </Button>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5" />
-            Player Search
-          </CardTitle>
-          <CardDescription>
-            Search for players and send match requests after selecting a calendar slot
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <PlayerSearch onPlayerSelect={handlePlayerSelect} placeholder="Search by name or email..." className="max-w-md" />
-          <div className="mt-4 text-sm text-muted-foreground">
-            <p>💡 <strong>Tip:</strong> After finding a player, you can view their schedule and send a match request for an available time slot. Location can be added to the calendar entry.</p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>;
   return <div className="space-y-6">
       {matchingMode === 'selection' && renderModeSelection()}
       {matchingMode === 'ai-recommendations' && renderAIRecommendations()}
-      {matchingMode === 'player-search' && renderPlayerSearch()}
-
-      {/* Player Schedule Modal */}
-      <PlayerScheduleModal
-        open={showScheduleModal}
-        onClose={() => setShowScheduleModal(false)}
-        player={selectedPlayer}
-        onInviteSent={() => {
-          setShowScheduleModal(false);
-          setSelectedPlayer(null);
-          setMatchingMode('selection');
-        }}
-      />
 
       {/* Unmatched Player Dialog */}
       <Dialog open={showUnmatchedDialog} onOpenChange={setShowUnmatchedDialog}>
