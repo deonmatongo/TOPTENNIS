@@ -31,7 +31,7 @@ const C = {
   hover:       '#F9FAFB',
 };
 
-const QUICK_EMOJIS = ['👍','❤️','😂','🎾','🔥','👏','😮','😢'];
+const QUICK_EMOJIS = ['👍','❤️','😂','🎾','🔥','👏','😮','😢','🏆','💪','🎯','⚡'];
 
 // ── Responsive helper ────────────────────────────────────────────────────────
 function useWindowWidth() {
@@ -43,7 +43,16 @@ function useWindowWidth() {
   }, []);
   return width;
 }
-const EMOJI_TRAY   = ['😀','😂','🔥','🎾','👍','❤️','😮','🏆','💪','🎯','⚡','🤝','🙌','👊','😎'];
+const EMOJI_TRAY = [
+  // Sports & Tennis
+  '🎾','🏆','🥇','🏅','🎱','🏓','⛳','🥎','🏸','🏊',
+  // Emotions & Gestures
+  '😀','😂','😎','🤩','😅','😊','🙌','👊','💪','🤝','👋','🫶',
+  // Celebration & Energy
+  '🔥','⚡','🎉','🎊','💯','🚀','✨','🌟',
+  // Reactions
+  '👍','❤️','😮','😢','🤣','😍','🥳','🫡',
+];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getConvName(conv: Conversation, uid: string) {
@@ -1457,7 +1466,9 @@ const FriendsMessagesTab = () => {
                     <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Incoming — {pendingIn.length}</div>
                     {pendingIn.map(req => (
                       <div key={req.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, border: `1.5px solid ${C.border}`, marginBottom: 8, background: C.white }}>
-                        <Av name={req.sender?.name || 'U'} src={req.sender?.profile_picture_url} size={40} />
+                        <button onClick={() => setProfilePlayer({ id: req.sender_id, user_id: req.sender_id, name: req.sender?.name || 'Unknown', email: req.sender?.email || '', skill_level: 0, wins: 0, losses: 0 })} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
+                          <Av name={req.sender?.name || 'U'} src={req.sender?.profile_picture_url} size={40} />
+                        </button>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 600, fontSize: 14 }}>{req.sender?.name}</div>
                           <div style={{ fontSize: 12, color: C.muted }}>{formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}</div>
@@ -1475,7 +1486,9 @@ const FriendsMessagesTab = () => {
                     <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, margin: '16px 0 8px' }}>Sent — {pendingSent.length}</div>
                     {pendingSent.map(req => (
                       <div key={req.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, border: `1.5px solid ${C.border}`, marginBottom: 8, background: C.white }}>
-                        <Av name={req.receiver?.name || 'U'} src={req.receiver?.profile_picture_url} size={40} />
+                        <button onClick={() => setProfilePlayer({ id: req.receiver_id, user_id: req.receiver_id, name: req.receiver?.name || 'Unknown', email: req.receiver?.email || '', skill_level: 0, wins: 0, losses: 0 })} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
+                          <Av name={req.receiver?.name || 'U'} src={req.receiver?.profile_picture_url} size={40} />
+                        </button>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 600, fontSize: 14 }}>{req.receiver?.name}</div>
                           <div style={{ fontSize: 12, color: C.muted }}>{formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}</div>

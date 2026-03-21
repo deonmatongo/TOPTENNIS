@@ -139,14 +139,14 @@ export const useFriendRequests = () => {
         : 'Someone';
 
       // Server-side idempotency check - prevent duplicate notifications
-      const existingNotification = await supabase
+      const { data: existingNotification } = await supabase
         .from('notifications')
         .select('id')
         .eq('user_id', receiverId)
         .eq('type', 'friend_request')
         .eq('metadata->>sender_id', user.id)
-        .single();
-      
+        .maybeSingle();
+
       if (!existingNotification) {
         await supabase.from('notifications').insert({
           user_id: receiverId,
@@ -157,8 +157,7 @@ export const useFriendRequests = () => {
           action_url: '/dashboard?tab=social',
           metadata: { sender_id: user.id },
         });
-      } else {
-        }
+      }
 
       await fetchRequests();
       return true;
@@ -196,7 +195,7 @@ export const useFriendRequests = () => {
           : 'Someone';
 
         // Server-side idempotency check - prevent duplicate acceptance notifications
-        const existingAcceptNotification = await supabase
+        const { data: existingAcceptNotification } = await supabase
           .from('notifications')
           .select('id')
           .eq('user_id', request.sender_id)
@@ -204,8 +203,8 @@ export const useFriendRequests = () => {
           .eq('title', 'Friend Request Accepted')
           .eq('metadata->>receiver_id', user.id)
           .eq('metadata->>request_id', requestId)
-          .single();
-        
+          .maybeSingle();
+
         if (!existingAcceptNotification) {
           await supabase.from('notifications').insert({
             user_id: request.sender_id,
@@ -216,8 +215,7 @@ export const useFriendRequests = () => {
             action_url: '/dashboard?tab=social',
             metadata: { receiver_id: user.id, request_id: requestId },
           });
-        } else {
-            }
+        }
       }
 
       await fetchRequests();
