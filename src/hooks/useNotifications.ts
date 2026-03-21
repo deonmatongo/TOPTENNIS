@@ -32,6 +32,12 @@ export const useNotifications = () => {
   // Keep latest notifications accessible in effects without causing re-runs
   const notificationsRef = useRef<Notification[]>([]);
 
+  // ── Reconnection state ────────────────────────────────────────────────────
+  // Incrementing this triggers the subscription effect to recreate the channel
+  const [subscriptionKey, setSubscriptionKey] = useState(0);
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Keep notificationsRef in sync without triggering subscription re-creation
   useEffect(() => {
     notificationsRef.current = notifications;
@@ -180,8 +186,9 @@ export const useNotifications = () => {
     fetchNotificationsRef.current = fetchNotifications;
   }, [fetchNotifications]);
 
-  // Real-time subscription — depends only on user.id so the channel is created
-  // once per session and never torn down by notification state changes.
+  // ── Real-time subscription with exponential-backoff reconnection ───────────
+  // subscriptionKey is incremented on CHANNEL_ERROR/TIMED_OUT to force
+  // this effect to re-run and create a fresh channel.
   useEffect(() => {
     if (!user) {
       setIsLoading(false);
@@ -192,8 +199,11 @@ export const useNotifications = () => {
     pendingQueueRef.current = [];
     fetchNotificationsRef.current();
 
+    // Unique channel name per user + attempt so Supabase never deduplicates
+    const channelName = `notifications-${user.id}-${subscriptionKey}`;
+
     const channel = supabase
-      .channel(`notifications-${user.id}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
@@ -236,7 +246,10 @@ export const useNotifications = () => {
       )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          // Sync any missed notifications since last known timestamp
+          // Reset backoff counter on successful connection
+          reconnectAttemptsRef.current = 0;
+
+          // Catch up on any notifications missed while the channel was reconnecting
           const latest = notificationsRef.current[0];
           if (hasLoadedRef.current && latest) {
             supabase
@@ -252,14 +265,53 @@ export const useNotifications = () => {
               });
           }
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('Notification channel error:', status);
+          // Exponential backoff: 2s, 4s, 8s, 16s, 30s (cap), then give up
+          const attempts = reconnectAttemptsRef.current;
+          const MAX_ATTEMPTS = 6;
+          if (attempts < MAX_ATTEMPTS) {
+            const delay = Math.min(2000 * Math.pow(2, attempts), 30000);
+            console.warn(`[notifications] Channel ${status}. Reconnecting in ${delay}ms (attempt ${attempts + 1}/${MAX_ATTEMPTS})`);
+            reconnectTimerRef.current = setTimeout(() => {
+              reconnectAttemptsRef.current = attempts + 1;
+              setSubscriptionKey(k => k + 1);
+            }, delay);
+          } else {
+            console.error('[notifications] Max reconnect attempts reached. Will retry on next tab focus.');
+          }
         }
       });
 
     return () => {
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
       supabase.removeChannel(channel);
     };
-  }, [user?.id]); // Only user.id — never notifications state
+  }, [user?.id, subscriptionKey]); // subscriptionKey drives reconnection
+
+  // ── Refetch on tab visibility (covers browser throttling background tabs) ──
+  useEffect(() => {
+    if (!user) return;
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchNotificationsRef.current();
+        // Also reset reconnect counter so a fresh connection attempt is allowed
+        reconnectAttemptsRef.current = 0;
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [user?.id]);
+
+  // ── Periodic fallback poll (catches any gaps if real-time silently fails) ─
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      fetchNotificationsRef.current();
+    }, 60_000); // every 60 seconds
+    return () => clearInterval(interval);
+  }, [user?.id]);
 
   const markAsRead = useCallback(async (notificationId: string) => {
     if (!user) return;
