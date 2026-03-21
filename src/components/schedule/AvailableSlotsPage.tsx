@@ -450,8 +450,6 @@ export const AvailableSlotsPage: React.FC<AvailableSlotsPageProps> = ({ onBack, 
           setEditingSlot(null);
         }}
         onSuccess={() => {
-          // Force immediate refresh
-          fetchAvailability();
           setRefreshKey(prev => prev + 1);
         }}
         editingItem={editingSlot}

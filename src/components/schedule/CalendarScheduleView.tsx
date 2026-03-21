@@ -1143,7 +1143,6 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
           setShowAddModal(false);
           setSelectedDate(null);
           setSelectedTime(null);
-          fetchAvailability();
         }}
       />
 
