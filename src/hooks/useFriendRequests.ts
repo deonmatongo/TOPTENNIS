@@ -158,8 +158,7 @@ export const useFriendRequests = () => {
           metadata: { sender_id: user.id },
         });
       } else {
-        console.log('🔄 Skipping duplicate friend request notification for sender_id:', user.id);
-      }
+        }
 
       await fetchRequests();
       return true;
@@ -182,7 +181,6 @@ export const useFriendRequests = () => {
         .eq('id', requestId)
         .select();
 
-      console.error('[updateRequestStatus] result:', { error, updated, requestId, status, userId: user.id });
       if (error) throw error;
       if (!updated || updated.length === 0) throw new Error('No rows updated — check RLS policies on friend_requests');
 
@@ -219,8 +217,7 @@ export const useFriendRequests = () => {
             metadata: { receiver_id: user.id, request_id: requestId },
           });
         } else {
-          console.log('🔄 Skipping duplicate friend request acceptance notification for request_id:', requestId);
-        }
+            }
       }
 
       await fetchRequests();
@@ -261,29 +258,13 @@ export const useFriendRequests = () => {
         .channel(`friend-requests-changes-${user.id}`)
         .on(
           'postgres_changes',
-          {
-            event: '*', // Listen to all changes (INSERT, UPDATE, DELETE)
-            schema: 'public',
-            table: 'friend_requests',
-            filter: `sender_id=eq.${user.id}`
-          },
-          (payload) => {
-            console.log('Real-time friend request update (sent):', payload);
-            fetchRequests();
-          }
+          { event: '*', schema: 'public', table: 'friend_requests', filter: `sender_id=eq.${user.id}` },
+          () => { fetchRequests(); }
         )
         .on(
           'postgres_changes',
-          {
-            event: '*', // Listen to all changes (INSERT, UPDATE, DELETE)
-            schema: 'public',
-            table: 'friend_requests',
-            filter: `receiver_id=eq.${user.id}`
-          },
-          (payload) => {
-            console.log('Real-time friend request update (received):', payload);
-            fetchRequests();
-          }
+          { event: '*', schema: 'public', table: 'friend_requests', filter: `receiver_id=eq.${user.id}` },
+          () => { fetchRequests(); }
         )
         .subscribe();
 

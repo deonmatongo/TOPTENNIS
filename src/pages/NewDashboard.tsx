@@ -196,13 +196,8 @@ const NewDashboard = () => {
         );
       case 'schedule':
         return (
-          <ComponentErrorBoundary componentName="MatchesCalendarTab">
-            <MatchesCalendarTab 
-              player={player} 
-              matches={matches} 
-              matchesLoading={matchesLoading} 
-              selectedLeague={selectedLeague}
-            />
+          <ComponentErrorBoundary componentName="ScheduleTab">
+            <ScheduleTab />
           </ComponentErrorBoundary>
         );
       case 'competition':

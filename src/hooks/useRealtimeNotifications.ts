@@ -45,7 +45,6 @@ export const useRealtimeNotifications = () => {
     
     // Skip if already processed
     if (processedEvents.current.has(eventId)) {
-      console.log('🔄 Skipping duplicate notification event:', eventId);
       return;
     }
     
@@ -57,7 +56,6 @@ export const useRealtimeNotifications = () => {
       oldIds.forEach(id => processedEvents.current.delete(id));
     }
     
-    console.log('🔔 Processing real-time notification event:', event);
     
     // Handle different event types with appropriate UI feedback
     switch (event.type) {
@@ -235,11 +233,8 @@ export const useRealtimeNotifications = () => {
     }
   }, [user?.id, getEventId, isSupported, permission, sendNotification]);
 
-  // Set up real-time subscriptions for all notification-critical tables
   useEffect(() => {
     if (!user || !isConnected) return;
-
-    console.log('🔔 Setting up real-time notification subscriptions for user:', user.id);
 
     // Subscribe to match invites (both sent and received)
     const unsubscribeInvitesSent = subscribeToTable('match_invites', (payload) => {
@@ -335,7 +330,6 @@ export const useRealtimeNotifications = () => {
     });
 
     return () => {
-      console.log('🔔 Cleaning up real-time notification subscriptions');
       unsubscribeInvitesSent();
       unsubscribeInvitesReceived();
       unsubscribeFriendRequests();
