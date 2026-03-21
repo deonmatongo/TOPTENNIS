@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import confetti from 'canvas-confetti';
+import Picker from '@emoji-mart/react';
+import data from '@emoji-mart/data';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { useBlockedUsers } from '@/hooks/useBlockedUsers';
@@ -43,16 +45,6 @@ function useWindowWidth() {
   }, []);
   return width;
 }
-const EMOJI_TRAY = [
-  // Sports & Tennis
-  '🎾','🏆','🥇','🏅','🎱','🏓','⛳','🥎','🏸','🏊',
-  // Emotions & Gestures
-  '😀','😂','😎','🤩','😅','😊','🙌','👊','💪','🤝','👋','🫶',
-  // Celebration & Energy
-  '🔥','⚡','🎉','🎊','💯','🚀','✨','🌟',
-  // Reactions
-  '👍','❤️','😮','😢','🤣','😍','🥳','🫡',
-];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getConvName(conv: Conversation, uid: string) {
@@ -1198,6 +1190,19 @@ const FriendsMessagesTab = () => {
     return () => document.removeEventListener('click', handler);
   }, [reactionPickerMsg]);
 
+  // Dismiss emoji picker on outside click
+  useEffect(() => {
+    if (!emojiTrayOpen) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('em-emoji-picker') && !target.closest('[data-emoji-btn]')) {
+        setEmojiTrayOpen(false);
+      }
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [emojiTrayOpen]);
+
   // Auto-grow textarea
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (e.target.value.length > 1000) return;
@@ -1716,21 +1721,28 @@ const FriendsMessagesTab = () => {
               )}
 
               {/* Input bar */}
-              <div style={{ padding: '12px 20px', background: C.white, borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
+              <div style={{ padding: '12px 20px', background: C.white, borderTop: `1px solid ${C.border}`, flexShrink: 0, position: 'relative' }}>
                 {msgInput.length > 500 && (
                   <div style={{ textAlign: 'right', fontSize: 12, marginBottom: 4, color: msgInput.length > 900 ? '#ef4444' : C.accent, fontWeight: 600 }}>
                     {msgInput.length}/1000
                   </div>
                 )}
                 {emojiTrayOpen && (
-                  <div style={{ marginBottom: 10, padding: '10px 12px', background: C.bg, borderRadius: 12, border: `1.5px solid ${C.border}`, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {EMOJI_TRAY.map(e => (
-                      <button key={e} onClick={() => setMsgInput(prev => prev + e)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer' }}>{e}</button>
-                    ))}
+                  <div style={{ position: 'absolute', bottom: '100%', left: 0, zIndex: 50, marginBottom: 6 }}>
+                    <Picker
+                      data={data}
+                      onEmojiSelect={(emoji: any) => { setMsgInput(prev => prev + emoji.native); inputRef.current?.focus(); }}
+                      theme="light"
+                      previewPosition="none"
+                      skinTonePosition="search"
+                      navPosition="top"
+                      perLine={9}
+                      set="native"
+                    />
                   </div>
                 )}
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, background: C.bg, borderRadius: 14, border: `1.5px solid ${C.border}`, padding: '8px 12px' }}>
-                  <button onClick={() => setEmojiTrayOpen(v => !v)} title="Emoji"
+                  <button onClick={() => setEmojiTrayOpen(v => !v)} title="Emoji" data-emoji-btn
                     style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: 4, borderRadius: 8, color: emojiTrayOpen ? C.accent : C.muted }}>😊</button>
                   <textarea
                     ref={inputRef}
