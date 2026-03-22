@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SocketProvider } from "@/contexts/SocketContext";
 import { RealtimeProvider } from "@/contexts/RealtimeContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import { MessagesProvider } from "@/contexts/MessagesContext";
@@ -84,6 +85,7 @@ const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <SocketProvider>
         <RealtimeProvider>
           <NotificationsProvider>
             <MatchInvitesProvider>
@@ -143,6 +145,7 @@ const App: React.FC = () => {
             </MatchInvitesProvider>
           </NotificationsProvider>
         </RealtimeProvider>
+        </SocketProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

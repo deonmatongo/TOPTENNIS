@@ -5,6 +5,7 @@ import { useBrowserNotifications } from './useBrowserNotifications';
 import { playNotificationSound } from '@/utils/notificationSound';
 import { toast } from 'sonner';
 import { usePushSubscription } from './usePushSubscription';
+import { useSocket } from '@/contexts/SocketContext';
 
 export interface Notification {
   id: string;
@@ -19,6 +20,7 @@ export interface Notification {
 
 export const useNotifications = () => {
   const { user } = useAuth();
+  const { socketRef, connected, isAvailable: socketAvailable } = useSocket();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -431,6 +433,26 @@ export const useNotifications = () => {
       console.error('Error clearing all notifications:', error);
     }
   }, [user, updateUnreadCount]);
+
+  // ── Socket.io: instant badge update on notification:new ──────────────────
+  // When the server pushes `notification:new`, immediately increment the
+  // unread count and trigger a full fetch to get the persisted row.
+  const injectRealtimeRowRefLocal = injectRealtimeRowRef;
+  useEffect(() => {
+    if (!socketAvailable || !connected) return;
+    const socket = socketRef.current;
+    if (!socket) return;
+
+    const handleNew = (payload: { id: string; title: string; message: string; type: string; actionUrl?: string }) => {
+      // Immediately bump the badge count
+      setUnreadCount(prev => prev + 1);
+      // Fetch from DB to get the full row (includes metadata, etc.)
+      fetchNotificationsRef.current();
+    };
+
+    socket.on('notification:new', handleNew);
+    return () => { socket.off('notification:new', handleNew); };
+  }, [socketRef, connected, socketAvailable]);
 
   return {
     notifications,
