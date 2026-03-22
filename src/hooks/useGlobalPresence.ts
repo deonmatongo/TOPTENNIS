@@ -123,8 +123,10 @@ export const useGlobalPresence = () => {
       return;
     }
 
-    // Unique channel name per user + attempt so Supabase never deduplicates
-    const channelName = `online-presence-${user.id}-${subscriptionKey}`;
+    // All users join the same shared channel so they can see each other.
+    // subscriptionKey is appended so we can force a fresh channel on reconnect
+    // without Supabase deduplicating the subscribe call.
+    const channelName = `online-presence-${subscriptionKey}`;
     const channel = supabase.channel(channelName, {
       config: {
         presence: {
