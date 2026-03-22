@@ -142,8 +142,7 @@ export const useAIRecommendations = (
             compatibilityScore,
           } satisfies RecommendedPlayer;
         })
-        .sort((a, b) => b.compatibilityScore - a.compatibilityScore)
-        .slice(0, 6);
+        .sort((a, b) => b.compatibilityScore - a.compatibilityScore);
 
       setRecommendations(scored);
     } catch (err: any) {
