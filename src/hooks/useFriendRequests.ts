@@ -199,16 +199,14 @@ export const useFriendRequests = () => {
           .from('notifications')
           .select('id')
           .eq('user_id', request.sender_id)
-          .eq('type', 'friend_request')
-          .eq('title', 'Friend Request Accepted')
-          .eq('metadata->>receiver_id', user.id)
+          .eq('type', 'friend_accepted')
           .eq('metadata->>request_id', requestId)
           .maybeSingle();
 
         if (!existingAcceptNotification) {
           await supabase.from('notifications').insert({
             user_id: request.sender_id,
-            type: 'friend_request',
+            type: 'friend_accepted',
             title: 'Friend Request Accepted',
             message: `${receiverName} accepted your friend request`,
             read: false,
