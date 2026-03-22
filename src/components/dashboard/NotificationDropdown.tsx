@@ -1,18 +1,28 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Bell, 
-  Trophy, 
-  Calendar, 
-  Users, 
-  TrendingUp, 
+import {
+  Bell,
+  Trophy,
+  Calendar,
+  Users,
+  TrendingUp,
   CheckCircle,
   X,
-  MoreHorizontal,
   Check,
   UserCheck,
-  Loader2
+  Loader2,
+  Trash2
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -81,10 +91,11 @@ interface NotificationDropdownProps {
 
 const NotificationDropdown = ({ children }: NotificationDropdownProps) => {
   const navigate = useNavigate();
-  const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification, isLoading } = useNotificationsContext();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification, clearAllNotifications, isLoading } = useNotificationsContext();
   const { invites, respondToInvite } = useMatchInvitesContext();
   const { requests, updateRequestStatus } = useFriendRequests();
   const [isOpen, setIsOpen] = React.useState(false);
+  const [showClearConfirm, setShowClearConfirm] = React.useState(false);
   const [selectedInvite, setSelectedInvite] = React.useState<any>(null);
   const [showInviteDialog, setShowInviteDialog] = React.useState(false);
   // Per-notification action state: 'idle' | 'loading' | 'accepted' | 'declined'
@@ -218,16 +229,18 @@ const NotificationDropdown = ({ children }: NotificationDropdownProps) => {
             <DropdownMenuLabel className="text-base font-semibold p-0">
               Notifications
             </DropdownMenuLabel>
-            {unreadCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={markAllAsRead}
-                className="text-xs h-auto p-1 text-primary hover:text-primary/80"
-                  >
-                Mark all read
-              </Button>
-            )}
+            <div className="flex items-center gap-1">
+              {unreadCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={markAllAsRead}
+                  className="text-xs h-auto p-1 text-primary hover:text-primary/80"
+                >
+                  Mark all read
+                </Button>
+              )}
+            </div>
           </div>
           {unreadCount > 0 && (
             <p className="text-sm text-muted-foreground mt-1">
@@ -420,8 +433,47 @@ const NotificationDropdown = ({ children }: NotificationDropdownProps) => {
             </div>
           </>
         )}
+
+        {notifications.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <div className="p-2">
+              <Button
+                variant="ghost"
+                className="w-full justify-center text-sm text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => {
+                  setIsOpen(false);
+                  setShowClearConfirm(true);
+                }}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Clear all notifications
+              </Button>
+            </div>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
+
+    <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Clear all notifications?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently delete all {notifications.length} notification{notifications.length !== 1 ? 's' : ''}. This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => clearAllNotifications()}
+          >
+            Clear all
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
 
     <InviteResponseDialog
       open={showInviteDialog}

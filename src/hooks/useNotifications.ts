@@ -392,6 +392,30 @@ export const useNotifications = () => {
     }
   }, [user, updateUnreadCount]);
 
+  const clearAllNotifications = useCallback(async () => {
+    if (!user) return;
+
+    const previous = notificationsRef.current;
+    setNotifications([]);
+    setUnreadCount(0);
+
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (error) {
+        // Revert on failure
+        setNotifications(previous);
+        updateUnreadCount(previous);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error clearing all notifications:', error);
+    }
+  }, [user, updateUnreadCount]);
+
   return {
     notifications,
     unreadCount,
@@ -400,6 +424,7 @@ export const useNotifications = () => {
     markAllAsRead,
     addNotification,
     removeNotification,
+    clearAllNotifications,
     refetch: fetchNotifications,
   };
 };
