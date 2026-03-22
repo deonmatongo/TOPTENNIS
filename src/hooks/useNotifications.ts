@@ -3,6 +3,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useBrowserNotifications } from './useBrowserNotifications';
 import { playNotificationSound } from '@/utils/notificationSound';
+import { toast } from 'sonner';
+import { usePushSubscription } from './usePushSubscription';
 
 export interface Notification {
   id: string;
@@ -21,6 +23,11 @@ export const useNotifications = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const { sendNotification, isSupported } = useBrowserNotifications();
+
+  // Register Web Push subscription silently in the background.
+  // This stores the browser's PushSubscription in Supabase so the Edge Function
+  // can deliver background push messages even when the app is not open.
+  usePushSubscription();
 
   // Refs to hold latest values for use inside real-time callbacks (avoids stale closures)
   const isSupportedRef = useRef(isSupported);
@@ -128,6 +135,12 @@ export const useNotifications = () => {
       notifiedRowIds.current.add(incoming.id);
 
       playNotificationSound(0.5).catch(() => {});
+
+      // In-app toast notification
+      toast.info(incoming.title, {
+        description: incoming.message,
+        duration: 5000,
+      });
 
       if (isSupportedRef.current) {
         sendNotificationRef.current(incoming.title, {
@@ -304,12 +317,15 @@ export const useNotifications = () => {
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [user?.id]);
 
-  // ── Periodic fallback poll (catches any gaps if real-time silently fails) ─
+  // ── Periodic fallback poll ────────────────────────────────────────────────
+  // Catches any gaps if Supabase realtime is silently failing.
+  // 8 s means a notification never sits unseen for more than 8 s even if
+  // the WebSocket drops without firing CHANNEL_ERROR.
   useEffect(() => {
     if (!user) return;
     const interval = setInterval(() => {
       fetchNotificationsRef.current();
-    }, 60_000); // every 60 seconds
+    }, 8_000);
     return () => clearInterval(interval);
   }, [user?.id]);
 

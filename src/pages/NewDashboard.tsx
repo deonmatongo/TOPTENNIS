@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -11,7 +11,9 @@ import { useNotificationsContext } from "@/contexts/NotificationsContext";
 import { useFriendRequests } from "@/hooks/useFriendRequests";
 import { useMatchInvitesCount } from "@/hooks/useMatchInvitesCount";
 import { useConversationsContext } from "@/contexts/ConversationsContext";
-import { Calendar, User, FileText, BarChart3, Trophy, Bell, Settings, LogOut, Menu, X, Zap, TrendingUp, Target, MessageCircle, Mail } from "lucide-react";
+import { usePlayerSearch, SearchResult } from "@/hooks/usePlayerSearch";
+import { useBlockedUsers } from "@/hooks/useBlockedUsers";
+import { Calendar, User, FileText, BarChart3, Trophy, Bell, Settings, LogOut, Menu, X, Zap, TrendingUp, Target, MessageCircle, Mail, Search, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,6 +22,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ComponentErrorBoundary } from "@/components/ui/ComponentErrorBoundary";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import Header from "@/components/Header";
+import PlayerProfileModal from "@/components/dashboard/PlayerProfileModal";
 
 // Import all tab components
 import OverviewTab from "@/components/dashboard/OverviewTab";
@@ -69,7 +72,26 @@ const NewDashboard = () => {
   const [activeTab, setActiveTab] = useState('profile');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedLeague, setSelectedLeague] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedPlayer, setSelectedPlayer] = useState<SearchResult | null>(null);
+  const [showPlayerProfile, setShowPlayerProfile] = useState(false);
+  const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Global player search (available on every tab)
+  const { blockedUsers } = useBlockedUsers();
+  const blockedIds = useMemo(() => blockedUsers.map(b => b.blocked_user_id), [blockedUsers]);
+  const { searchTerm, setSearchTerm, searchResults, isSearching, clearSearch } = usePlayerSearch(blockedIds);
+  // Close search dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setSearchDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Handle URL parameters for tab navigation
   useEffect(() => {
     const tabParam = searchParams.get('tab');
@@ -363,7 +385,7 @@ const NewDashboard = () => {
                       </div>
                     </CardContent>
                   </Card>
-                  
+
                   <Card className="bg-blue-50 border-blue-200">
                     <CardContent className="p-2 lg:p-3">
                       <div className="flex items-center space-x-2">
@@ -377,8 +399,76 @@ const NewDashboard = () => {
                 </div>
 
                 {/* Notifications */}
-                
 
+
+              </div>
+            </div>
+
+            {/* Global Player Search Bar — visible under every tab */}
+            <div className="mt-3 sm:mt-4" ref={searchContainerRef}>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  value={searchTerm}
+                  onChange={e => { setSearchTerm(e.target.value); setSearchDropdownOpen(true); }}
+                  onFocus={() => searchTerm && setSearchDropdownOpen(true)}
+                  placeholder="Search players by name, USTA rating, skill level…"
+                  className="pl-9 pr-9 h-10"
+                  autoComplete="off"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => { clearSearch(); setSearchDropdownOpen(false); }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Clear search"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+
+                {/* Dropdown results */}
+                {searchDropdownOpen && searchTerm.trim() && (
+                  <div className="absolute top-full mt-1 left-0 right-0 bg-card border border-border rounded-xl shadow-xl z-50 max-h-72 overflow-y-auto">
+                    {isSearching ? (
+                      <div className="flex items-center gap-2 px-4 py-4 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Searching…
+                      </div>
+                    ) : searchResults.length > 0 ? (
+                      searchResults.map(p => {
+                        const initials = p.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                        return (
+                          <button
+                            key={p.id}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent/50 text-left border-b border-border/40 last:border-0 transition-colors"
+                            onMouseDown={() => {
+                              setSelectedPlayer(p);
+                              setShowPlayerProfile(true);
+                              clearSearch();
+                              setSearchDropdownOpen(false);
+                            }}
+                          >
+                            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+                              {initials}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-sm text-foreground truncate">{p.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {p.usta_rating ? `USTA ${p.usta_rating}` : `Level ${p.skill_level}`}
+                                {p.wins !== undefined && ` · ${p.wins}W ${p.losses}L`}
+                              </div>
+                            </div>
+                            <span className="text-xs text-muted-foreground flex-shrink-0">View profile →</span>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="px-4 py-4 text-sm text-muted-foreground">
+                        No players found for "{searchTerm}"
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -392,6 +482,16 @@ const NewDashboard = () => {
         </main>
 
       </div>
+
+      {/* Global player profile modal — opened from the search bar */}
+      <PlayerProfileModal
+        player={selectedPlayer}
+        isOpen={showPlayerProfile}
+        onClose={() => {
+          setShowPlayerProfile(false);
+          setSelectedPlayer(null);
+        }}
+      />
     </div>;
 };
 export default NewDashboard;

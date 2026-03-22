@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { playMessageSound } from '@/utils/notificationSound';
 
 export interface ConversationMember {
   user_id: string;
@@ -72,6 +73,11 @@ export const useConversations = () => {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
+  // Incrementing this recreates all real-time channels (used for reconnection)
+  const [subscriptionKey, setSubscriptionKey] = useState(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const fetchConversationsRef = useRef<() => Promise<void>>(async () => {});
 
   const fetchConversations = useCallback(async () => {
     if (!user) {
@@ -435,17 +441,43 @@ export const useConversations = () => {
     return me?.role ?? null;
   }, [user]);
 
+  // Keep fetchConversationsRef in sync so subscription callbacks can call it without stale closure
+  useEffect(() => {
+    fetchConversationsRef.current = fetchConversations;
+  }, [fetchConversations]);
+
+  // Initial fetch when user changes
   useEffect(() => {
     if (!user) {
       setLoading(false);
       return;
     }
-
     fetchConversations();
+  }, [user, fetchConversations]);
+
+  // ── Real-time subscriptions with exponential-backoff reconnection ──────────
+  // subscriptionKey is incremented on CHANNEL_ERROR/TIMED_OUT to force channel recreation
+  useEffect(() => {
+    if (!user) return;
+
+    const scheduleReconnect = () => {
+      const attempts = reconnectAttemptsRef.current;
+      const MAX_ATTEMPTS = 6;
+      if (attempts < MAX_ATTEMPTS) {
+        const delay = Math.min(2000 * Math.pow(2, attempts), 30000);
+        console.warn(`[conversations] Channel error. Reconnecting in ${delay}ms (attempt ${attempts + 1}/${MAX_ATTEMPTS})`);
+        reconnectTimerRef.current = setTimeout(() => {
+          reconnectAttemptsRef.current = attempts + 1;
+          setSubscriptionKey(k => k + 1);
+        }, delay);
+      } else {
+        console.error('[conversations] Max reconnect attempts reached.');
+      }
+    };
 
     // ── Real-time: new message ────────────────────────────────────────────────
     const msgChannel = supabase
-      .channel('conv-messages-realtime')
+      .channel(`conv-messages-${user.id}-${subscriptionKey}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -453,12 +485,25 @@ export const useConversations = () => {
       }, async (payload) => {
         const newMsg = payload.new as any;
 
+        // Capture sender name for live toast (assigned inside the updater below)
+        let incomingToastName: string | null = null;
+        let incomingToastContent: string | null = null;
+
         setConversations(prev => {
           const conv = prev.find(c => c.id === newMsg.conversation_id);
           if (!conv) return prev; // not our conversation
 
           // Skip if already present (optimistic update)
           if (conv.messages.some(m => m.id === newMsg.id)) return prev;
+
+          // Capture info for toast when it's an incoming message from another user
+          if (newMsg.sender_id !== user.id && !newMsg.is_system && newMsg.content) {
+            const senderProfile = conv.members.find(m => m.user_id === newMsg.sender_id)?.profile;
+            incomingToastName = senderProfile
+              ? (`${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim() || senderProfile.email)
+              : 'Someone';
+            incomingToastContent = newMsg.content.slice(0, 100);
+          }
 
           // Try to find sender profile from existing members
           const senderProfile = conv.members.find(m => m.user_id === newMsg.sender_id)?.profile;
@@ -509,6 +554,15 @@ export const useConversations = () => {
           }
           return prev;
         });
+
+        // Play sound + show live toast for incoming messages from other users
+        if (incomingToastName && incomingToastContent !== null) {
+          playMessageSound(0.4).catch(() => {});
+          toast.info(`💬 ${incomingToastName}`, {
+            description: incomingToastContent,
+            duration: 5000,
+          });
+        }
       })
       .on('postgres_changes', {
         event: 'UPDATE',
@@ -524,14 +578,18 @@ export const useConversations = () => {
         })));
       })
       .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('Message real-time channel error:', status);
+        if (status === 'SUBSCRIBED') {
+          reconnectAttemptsRef.current = 0;
+          // Catch up on any messages missed during reconnection
+          fetchConversationsRef.current();
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          scheduleReconnect();
         }
       });
 
     // ── Real-time: reactions ──────────────────────────────────────────────────
     const reactChannel = supabase
-      .channel('conv-reactions-realtime')
+      .channel(`conv-reactions-${user.id}-${subscriptionKey}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -589,13 +647,13 @@ export const useConversations = () => {
       })
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('Reaction real-time channel error:', status);
+          scheduleReconnect();
         }
       });
 
     // ── Real-time: membership & conversation changes (full refetch) ───────────
     const membershipChannel = supabase
-      .channel('conv-membership-realtime')
+      .channel(`conv-membership-${user.id}-${subscriptionKey}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -621,16 +679,44 @@ export const useConversations = () => {
       })
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('Membership real-time channel error:', status);
+          scheduleReconnect();
         }
       });
 
     return () => {
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
       supabase.removeChannel(msgChannel);
       supabase.removeChannel(reactChannel);
       supabase.removeChannel(membershipChannel);
     };
-  }, [user, fetchConversations]);
+  }, [user?.id, subscriptionKey]);
+
+  // Refetch on tab visibility (catches any gaps if real-time silently fails)
+  useEffect(() => {
+    if (!user) return;
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        reconnectAttemptsRef.current = 0;
+        fetchConversationsRef.current();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [user?.id]);
+
+  // ── Periodic fallback poll ────────────────────────────────────────────────
+  // Ensures new messages appear within 8 s even if the realtime WebSocket
+  // silently dies without firing CHANNEL_ERROR.
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      fetchConversationsRef.current();
+    }, 8_000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
 
   return {
     conversations,

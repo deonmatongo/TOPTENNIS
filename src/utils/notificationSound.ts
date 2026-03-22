@@ -1,80 +1,139 @@
 /**
- * Utility for playing notification sounds
+ * Notification sound — Web Audio API chime
+ *
+ * Browsers block audio until the user interacts with the page (autoplay policy).
+ * This module solves that by:
+ *   1. Listening for the first user gesture (click/keydown/touchstart) and
+ *      immediately resuming the AudioContext so future plays work.
+ *   2. Calling ctx.resume() right before every play() call as a second safety net.
+ *   3. Using only the Web Audio API — no MP3 file dependency.
+ *
+ * Two exported sounds:
+ *   playNotificationSound() — two-tone chime for notifications
+ *   playMessageSound()      — single soft tone for incoming messages
  */
 
-let audioContext: AudioContext | null = null;
-let notificationAudio: HTMLAudioElement | null = null;
+let ctx: AudioContext | null = null;
+let unlocked = false;
 
-/**
- * Initialize audio context (needed for some browsers)
- */
-const initAudioContext = () => {
-  if (!audioContext && typeof window !== 'undefined') {
-    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+// ── AudioContext — created lazily ─────────────────────────────────────────────
+function getCtx(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  if (!ctx) {
+    try {
+      ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    } catch {
+      return null;
+    }
   }
-};
+  return ctx;
+}
+
+// ── Unlock on first user gesture ──────────────────────────────────────────────
+// Browsers suspend AudioContext until the user interacts. We listen for any
+// gesture and resume the context so subsequent sounds play instantly.
+function handleUnlock() {
+  if (unlocked) return;
+  const c = getCtx();
+  if (c && c.state === 'suspended') {
+    c.resume().catch(() => {});
+  }
+  unlocked = true;
+}
+
+if (typeof document !== 'undefined') {
+  const opts: AddEventListenerOptions = { passive: true };
+  document.addEventListener('click',      handleUnlock, opts);
+  document.addEventListener('keydown',    handleUnlock, opts);
+  document.addEventListener('touchstart', handleUnlock, opts);
+  document.addEventListener('pointerdown', handleUnlock, opts);
+}
+
+// ── Internal: ensure context is running before scheduling audio ───────────────
+async function ensureRunning(): Promise<AudioContext | null> {
+  const c = getCtx();
+  if (!c) return null;
+  if (c.state === 'suspended') {
+    try { await c.resume(); } catch { return null; }
+  }
+  return c.state === 'running' ? c : null;
+}
+
+// ── Two-tone notification chime ───────────────────────────────────────────────
+// A5 (880 Hz) followed 120 ms later by C#6 (1108 Hz).
+// Both fade out smoothly over ~450 ms.
+function scheduleChime(c: AudioContext, volume: number) {
+  const now = c.currentTime;
+
+  [
+    { freq: 880,  delay: 0 },
+    { freq: 1108, delay: 0.12 },
+  ].forEach(({ freq, delay }) => {
+    const start = now + delay;
+    const osc   = c.createOscillator();
+    const gain  = c.createGain();
+
+    osc.connect(gain);
+    gain.connect(c.destination);
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, start);
+
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(volume * 0.35, start + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.45);
+
+    osc.start(start);
+    osc.stop(start + 0.46);
+  });
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Play notification sound
- * Uses a simple beep sound generated programmatically if no audio file is available
+ * Play the two-tone notification chime.
+ * Safe to call at any time — silently no-ops if audio is unavailable.
  */
 export const playNotificationSound = async (volume: number = 0.5): Promise<void> => {
   try {
-    // Try to play custom notification sound file first
-    if (!notificationAudio) {
-      notificationAudio = new Audio('/notification-sound.mp3');
-      notificationAudio.volume = volume;
-    }
-
-    // Clone the audio to allow multiple simultaneous plays
-    const sound = notificationAudio.cloneNode() as HTMLAudioElement;
-    sound.volume = volume;
-    
-    await sound.play().catch(() => {
-      // If file doesn't exist or fails, generate a simple beep
-      generateBeepSound(volume);
-    });
-  } catch (error) {
-    console.warn('Could not play notification sound:', error);
-    // Fallback to generated beep
-    generateBeepSound(volume);
+    const c = await ensureRunning();
+    if (!c) return;
+    scheduleChime(c, Math.max(0, Math.min(1, volume)));
+  } catch {
+    // Never throw — sound is non-critical
   }
 };
 
 /**
- * Generate a simple beep sound using Web Audio API
+ * Play a single soft tone for incoming chat messages.
+ * Shorter and quieter than the notification chime.
  */
-const generateBeepSound = (volume: number = 0.5) => {
+export const playMessageSound = async (volume: number = 0.35): Promise<void> => {
   try {
-    initAudioContext();
-    
-    if (!audioContext) return;
+    const c = await ensureRunning();
+    if (!c) return;
 
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
+    const now  = c.currentTime;
+    const osc  = c.createOscillator();
+    const gain = c.createGain();
 
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
+    osc.connect(gain);
+    gain.connect(c.destination);
 
-    // Set frequency for a pleasant notification sound
-    oscillator.frequency.value = 800;
-    oscillator.type = 'sine';
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1046, now); // C6
 
-    // Set volume
-    gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(volume * 0.3, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
 
-    // Play the sound
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.3);
-  } catch (error) {
-    console.warn('Could not generate beep sound:', error);
+    osc.start(now);
+    osc.stop(now + 0.31);
+  } catch {
+    // Degrade silently
   }
 };
 
-/**
- * Check if audio playback is supported and allowed
- */
-export const isAudioSupported = (): boolean => {
-  return typeof Audio !== 'undefined' && typeof AudioContext !== 'undefined';
-};
+export const isAudioSupported = (): boolean =>
+  typeof window !== 'undefined' &&
+  (typeof AudioContext !== 'undefined' || typeof (window as any).webkitAudioContext !== 'undefined');
