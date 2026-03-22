@@ -32,6 +32,7 @@ import FriendsMessagesTab from "@/components/dashboard/FriendsMessagesTab";
 import PerformanceTab from "@/components/dashboard/PerformanceTab";
 import MyLeaguesTab from "@/components/dashboard/MyLeaguesTab";
 import ScheduleTab from "@/components/dashboard/ScheduleTab";
+import CasualMatchTab from "@/components/dashboard/CasualMatchTab";
 const NewDashboard = () => {
   const {
     user,
@@ -72,7 +73,7 @@ const NewDashboard = () => {
   // Handle URL parameters for tab navigation
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['profile', 'performance', 'my-leagues', 'schedule', 'register', 'messages', 'social', 'notifications'].includes(tabParam)) {
+    if (tabParam && ['profile', 'performance', 'my-leagues', 'schedule', 'casual-match', 'register', 'messages', 'social', 'notifications'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
@@ -138,6 +139,11 @@ const NewDashboard = () => {
     description: "Availability & matches",
     badge: pendingMatchInvites > 0 ? pendingMatchInvites : null
   }, {
+    id: "casual-match",
+    label: "Casual Match",
+    icon: Target,
+    description: "Find players & book matches"
+  }, {
     id: "social",
     label: "Build Your Network",
     icon: MessageCircle,
@@ -198,6 +204,12 @@ const NewDashboard = () => {
         return (
           <ComponentErrorBoundary componentName="PerformanceTab">
             <PerformanceTab player={player} />
+          </ComponentErrorBoundary>
+        );
+      case 'casual-match':
+        return (
+          <ComponentErrorBoundary componentName="CasualMatchTab">
+            <CasualMatchTab />
           </ComponentErrorBoundary>
         );
       case 'register':
