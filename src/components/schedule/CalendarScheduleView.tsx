@@ -161,7 +161,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
             originalEndTime: slot.end_time,
             originalTimezone: slotTimezone,
             title: 'Available',
-            color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700',
+            color: 'bg-green-500 text-white border-green-600',
             data: slot
           });
         }
@@ -197,7 +197,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
             originalEndTime: match.end_time,
             originalTimezone: matchTimezone,
             title: `Match vs ${opponentName}`,
-            color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700',
+            color: 'bg-blue-500 text-white border-blue-600',
             data: match
           });
         }
@@ -233,7 +233,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
             originalEndTime: invite.end_time,
             originalTimezone: inviteTimezone,
             title: `Invite from ${senderName}`,
-            color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700',
+            color: 'bg-orange-500 text-white border-orange-600',
             data: invite
           });
         }
@@ -399,14 +399,14 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
           <div className="border-r"></div>
           <div className={cn(
             "px-2 py-3 text-center",
-            isToday(currentDate) && "bg-blue-50 dark:bg-blue-950/20"
+            isToday(currentDate) && "bg-primary/5 dark:bg-primary/10"
           )}>
             <div className="text-xs font-medium text-muted-foreground uppercase">
               {format(currentDate, 'EEEE')}
             </div>
             <div className={cn(
               "text-2xl font-semibold mt-1",
-              isToday(currentDate) && "text-blue-600"
+              isToday(currentDate) && "text-primary"
             )}>
               {format(currentDate, 'MMMM d, yyyy')}
             </div>
@@ -414,18 +414,18 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
         </div>
 
         {/* Time grid */}
-        <div className="overflow-y-auto max-h-[600px] relative">
+        <div className="overflow-y-auto max-h-[400px] sm:max-h-[600px] relative">
           {/* Hour rows */}
           {hours.map((hour) => {
             const timeString = `${String(hour).padStart(2, '0')}:00`;
             return (
-              <div key={hour} className="grid grid-cols-[60px_1fr] border-b min-h-[50px]">
+              <div key={hour} className="grid grid-cols-[50px_1fr] sm:grid-cols-[60px_1fr] border-b min-h-[44px] sm:min-h-[50px]">
                 <div className="px-2 py-1 text-xs text-muted-foreground text-right border-r bg-muted/20">
                   {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
                 </div>
                 <div className={cn(
                   "min-h-[50px] hover:bg-muted/30 cursor-pointer relative",
-                  isToday(currentDate) && "bg-blue-50/50 dark:bg-blue-950/10"
+                  isToday(currentDate) && "bg-primary/5"
                 )}
                 onClick={() => handleDateClick(currentDate, timeString)}>
                 </div>
@@ -434,7 +434,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
           })}
 
           {/* Absolutely positioned events */}
-          <div className="absolute top-0 left-[60px] right-0 pointer-events-none" style={{ height: '1200px' }}>
+          <div className="absolute top-0 left-[50px] sm:left-[60px] right-0 pointer-events-none" style={{ height: '1200px' }}>
             <div className="relative h-full pointer-events-none">
               {dayEvents.map((event) => {
                 const { absoluteTop, height } = calculateEventLayout(
@@ -508,14 +508,14 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 key={day.toISOString()}
                 className={cn(
                   "px-1 py-2 text-center border-l text-xs",
-                  isCurrentDay && "bg-blue-50 dark:bg-blue-950/20",
+                  isCurrentDay && "bg-primary/5 dark:bg-primary/10",
                   !isCurrentMonth && "text-muted-foreground/50"
                 )}
               >
                 <div className="font-medium text-[10px]">{format(day, 'EEE')}</div>
                 <div className={cn(
                   "text-sm font-semibold",
-                  isCurrentDay && "text-blue-600"
+                  isCurrentDay && "text-primary"
                 )}>
                   {format(day, 'd')}
                 </div>
@@ -543,7 +543,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                     key={`${dateKey}-${hour}`}
                     className={cn(
                       "min-h-[40px] border-l hover:bg-muted/30 cursor-pointer relative",
-                      isCurrentDay && "bg-blue-50/50 dark:bg-blue-950/10",
+                      isCurrentDay && "bg-primary/5",
                       isPastDate && "opacity-60",
                       !isCurrentMonth && "bg-muted/10"
                     )}
@@ -626,7 +626,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
     return (
       <div className="border rounded-lg bg-card overflow-hidden">
         {/* Header with days */}
-        <div className="grid grid-cols-[40px_repeat(7,minmax(40px,1fr))] sm:grid-cols-[60px_repeat(7,1fr)] border-b sticky top-0 bg-card z-10 overflow-x-auto">
+        <div className="grid grid-cols-[36px_repeat(7,minmax(36px,1fr))] sm:grid-cols-[60px_repeat(7,1fr)] border-b sticky top-0 bg-card z-10">
           <div className="border-r"></div>
           {daysInWeek.map((day) => {
             const isCurrentDay = isToday(day);
@@ -635,7 +635,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 key={day.toISOString()}
                 className={cn(
                   "px-1 sm:px-2 py-2 sm:py-3 text-center border-l",
-                  isCurrentDay && "bg-blue-50 dark:bg-blue-950/20"
+                  isCurrentDay && "bg-primary/5 dark:bg-primary/10"
                 )}
               >
                 <div className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase">
@@ -643,7 +643,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 </div>
                 <div className={cn(
                   "text-sm sm:text-2xl font-semibold mt-0.5 sm:mt-1",
-                  isCurrentDay && "text-blue-600"
+                  isCurrentDay && "text-primary"
                 )}>
                   {format(day, 'd')}
                 </div>
@@ -653,12 +653,12 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
         </div>
 
         {/* Time grid */}
-        <div className="overflow-x-auto overflow-y-auto max-h-[600px] relative">
+        <div className="overflow-x-auto overflow-y-auto max-h-[400px] sm:max-h-[600px] relative">
           {/* Hour rows */}
           {hours.map((hour) => {
             const timeString = `${String(hour).padStart(2, '0')}:00`;
             return (
-              <div key={hour} className="grid grid-cols-[40px_repeat(7,minmax(40px,1fr))] sm:grid-cols-[60px_repeat(7,1fr)] border-b min-h-[50px]">
+              <div key={hour} className="grid grid-cols-[36px_repeat(7,minmax(36px,1fr))] sm:grid-cols-[60px_repeat(7,1fr)] border-b min-h-[44px] sm:min-h-[50px]">
                 <div className="px-2 py-1 text-xs text-muted-foreground text-right border-r bg-muted/20">
                   {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
                 </div>
@@ -672,7 +672,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                       key={`${dateKey}-${hour}`}
                       className={cn(
                         "min-h-[50px] border-l hover:bg-muted/30 cursor-pointer relative",
-                        isCurrentDay && "bg-blue-50/50 dark:bg-blue-950/10",
+                        isCurrentDay && "bg-primary/5",
                         isPastDate && "opacity-60"
                       )}
                       onClick={() => !isPastDate && handleDateClick(day, timeString)}
@@ -684,7 +684,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
           })}
 
           {/* Absolutely positioned events */}
-          <div className="absolute top-0 left-[60px] right-0 pointer-events-none" style={{ height: '1200px' }}>
+          <div className="absolute top-0 left-[36px] sm:left-[60px] right-0 pointer-events-none" style={{ height: '1200px' }}>
             <div className="grid grid-cols-7 h-full">
               {daysInWeek.map((day) => {
                 const dateKey = format(day, 'yyyy-MM-dd');
@@ -744,110 +744,64 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
         <div className="p-4 space-y-4">
           {/* Pre-selected Opponent Banner */}
           {preSelectedOpponent && preSelectedOpponent.name && (
-            <Card className="border-orange-500 bg-orange-50 dark:bg-orange-950">
-              <CardContent className="p-3">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-orange-500 rounded-full">
-                      <Users className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-sm text-orange-900 dark:text-orange-100">
-                        Ready to schedule with {preSelectedOpponent.name}
-                      </h3>
-                      <p className="text-xs text-orange-700 dark:text-orange-200">
-                        Click any date to add your availability
-                      </p>
-                    </div>
-                  </div>
-                  {onClearOpponent && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={onClearOpponent}
-                      className="text-orange-700 hover:text-orange-900"
-                    >
-                      Clear
-                    </Button>
-                  )}
+            <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl bg-orange-500 text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-full shrink-0">
+                  <Users className="h-4 w-4 text-white" />
                 </div>
-              </CardContent>
-            </Card>
+                <div>
+                  <p className="font-semibold text-sm">Ready to schedule with {preSelectedOpponent.name}</p>
+                  <p className="text-xs text-white/80">Click any date to add your availability</p>
+                </div>
+              </div>
+              {onClearOpponent && (
+                <Button variant="ghost" size="sm" onClick={onClearOpponent}
+                  className="text-white hover:bg-white/20 hover:text-white h-7 px-2 text-xs shrink-0">
+                  Clear
+                </Button>
+              )}
+            </div>
           )}
 
-          {/* Calendar Controls */}
-          <div className="space-y-4">
-            <Card>
-              <CardContent className="py-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handlePrevious}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleNext}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <h2 className="text-lg sm:text-xl font-semibold">{getHeaderTitle()}</h2>
-
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                      <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <div className="flex-1 sm:flex-initial min-w-[200px]">
-                        <TimezoneSelect
-                          value={timezone}
-                          onValueChange={updateTimezone}
-                          placeholder="Select timezone"
-                        />
-                      </div>
-                    </div>
-                    <Button
-                      onClick={() => handleDateClick(new Date())}
-                      size="sm"
-                      className="w-full sm:w-auto"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Availability
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* View Mode Selector */}
-            <div className="flex border rounded-lg overflow-hidden w-full sm:w-auto">
-              <Button
-                variant={viewMode === 'day' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('day')}
-                className="rounded-none flex-1 sm:flex-initial"
-              >
-                Day
+              {/* Calendar toolbar */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            {/* Nav arrows + Today button */}
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={handlePrevious}>
+                <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button
-                variant={viewMode === 'week' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('week')}
-                className="rounded-none flex-1 sm:flex-initial"
-              >
-                Week
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleNext}>
+                <ChevronRight className="h-4 w-4" />
               </Button>
-              <Button
-                variant={viewMode === 'month' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('month')}
-                className="rounded-none flex-1 sm:flex-initial"
-              >
-                Month
+            </div>
+
+            {/* Title */}
+            <h2 className="text-sm sm:text-base font-semibold flex-1 min-w-0 truncate">{getHeaderTitle()}</h2>
+
+            {/* View mode pill toggle */}
+            <div className="flex border rounded-lg overflow-hidden shrink-0">
+              {(['day', 'week', 'month'] as const).map(mode => (
+                <Button
+                  key={mode}
+                  variant={viewMode === mode ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode(mode)}
+                  className="rounded-none h-8 px-3 text-xs capitalize"
+                >
+                  {mode}
+                </Button>
+              ))}
+            </div>
+
+            {/* Timezone + Add */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 w-full sm:w-auto">
+              <Globe className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
+              <div className="flex-1 sm:flex-none sm:min-w-[150px]">
+                <TimezoneSelect value={timezone} onValueChange={updateTimezone} placeholder="Timezone" />
+              </div>
+              <Button onClick={() => handleDateClick(new Date())} size="sm" className="h-8 px-2 sm:px-3 text-xs shrink-0">
+                <Plus className="h-3.5 w-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">Add Availability</span>
               </Button>
             </div>
           </div>
@@ -857,6 +811,24 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
       {/* Calendar Grid */}
       <div className="flex-1 overflow-auto p-4">
         <div className="space-y-4">
+
+          {/* Legend */}
+          <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-5 gap-y-1.5 px-1 text-xs text-muted-foreground">
+            <span className="font-semibold uppercase tracking-wide">Legend</span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm bg-green-500 shrink-0" />Available slot
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm bg-blue-500 shrink-0" />Confirmed match
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm bg-orange-500 shrink-0" />Pending invite
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full ring-2 ring-primary ring-offset-1 shrink-0" />Today
+            </span>
+            <span className="hidden sm:block ml-auto text-[11px]">Click any empty time slot to add availability</span>
+          </div>
           {/* Calendar - Day/Week/Month Views */}
           {viewMode === 'day' ? (
             renderDayView()
@@ -892,7 +864,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                     className={cn(
                       "min-h-[80px] sm:min-h-[120px] border-r border-b last:border-r-0 p-1 sm:p-2 cursor-pointer hover:bg-muted/50 transition-colors",
                       !isCurrentMonth && viewMode === 'month' && "bg-muted/20 text-muted-foreground",
-                      isToday(date) && "bg-blue-50 dark:bg-blue-950/20",
+                      isToday(date) && "bg-primary/5 dark:bg-primary/10",
                       isPastDate && "opacity-60"
                     )}
                     onClick={() => !isPastDate && handleDateClick(date)}
@@ -900,7 +872,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                     <div className="flex items-center justify-between mb-1 sm:mb-2">
                       <span className={cn(
                         "text-xs sm:text-sm font-medium",
-                        isToday(date) && "bg-blue-600 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs"
+                        isToday(date) && "bg-primary text-primary-foreground rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs"
                       )}>
                         {format(date, 'd')}
                       </span>
@@ -967,12 +939,12 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
           {/* Quick Access Sections */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Pending Invites */}
-            <Card className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-orange-500/50">
+            <Card className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-orange-500">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
-                      <Mail className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                    <div className="p-2 bg-orange-500 rounded-lg">
+                      <Mail className="h-5 w-5 text-white" />
                     </div>
                     <h3 className="font-semibold text-sm">Pending Invites</h3>
                   </div>
@@ -994,7 +966,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                           start_time: invite.start_time,
                           end_time: invite.end_time,
                           title: `Invite from ${senderName}`,
-                          color: 'bg-orange-100',
+                          color: 'bg-orange-500 text-white border-orange-600',
                           data: invite
                         })}
                         className="p-2 bg-muted/50 rounded hover:bg-muted transition-colors"
@@ -1017,12 +989,12 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
             </Card>
 
             {/* Upcoming Matches */}
-            <Card className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-blue-500/50">
+            <Card className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-blue-500">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                      <CheckCircle2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    <div className="p-2 bg-blue-500 rounded-lg">
+                      <CheckCircle2 className="h-5 w-5 text-white" />
                     </div>
                     <h3 className="font-semibold text-sm">Upcoming Matches</h3>
                   </div>
@@ -1049,7 +1021,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                             start_time: match.start_time,
                             end_time: match.end_time,
                             title: `Match vs ${opponentName}`,
-                            color: 'bg-blue-100',
+                            color: 'bg-blue-500 text-white border-blue-600',
                             data: match
                           })}
                           className="p-2 bg-muted/50 rounded hover:bg-muted transition-colors"
@@ -1074,12 +1046,12 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
             </Card>
 
             {/* Available Slots */}
-            <Card className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-green-500/50">
+            <Card className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-green-500">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
-                      <Clock className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <div className="p-2 bg-green-500 rounded-lg">
+                      <Clock className="h-5 w-5 text-white" />
                     </div>
                     <h3 className="font-semibold text-sm">Available Slots</h3>
                   </div>
@@ -1101,7 +1073,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                           start_time: slot.start_time,
                           end_time: slot.end_time,
                           title: 'Available',
-                          color: 'bg-green-100',
+                          color: 'bg-green-500 text-white border-green-600',
                           data: slot
                         })}
                         className="p-2 bg-muted/50 rounded hover:bg-muted transition-colors"

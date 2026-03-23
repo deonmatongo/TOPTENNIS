@@ -87,26 +87,10 @@ export const useMatchInvites = () => {
         if (payload.eventType === 'INSERT') {
           const newInvite = payload.new as any;
           
-          // Only show notification if current user is receiver and not already notified
+          // Toast is handled by useNotifications via the notifications table row.
+          // We only deduplicate to avoid double-fetching.
           if (newInvite.receiver_id === user.id && !notifiedIds.current.has(`insert:${newInvite.id}`)) {
             notifiedIds.current.add(`insert:${newInvite.id}`);
-            // Fetch sender's profile for the notification message
-            try {
-              const { data: senderProfile } = await supabase
-                .from('profiles')
-                .select('first_name, last_name')
-                .eq('id', newInvite.sender_id)
-                .single();
-              
-              const senderName = senderProfile
-                ? `${senderProfile.first_name} ${senderProfile.last_name}`.trim()
-                : 'Someone';
-              const message = `New match invite from ${senderName}!`;
-              
-              toast.info(message, { duration: 5000 });
-            } catch (error) {
-              logger.warn('Failed to fetch sender profile for notification', { error });
-            }
           }
         }
         
@@ -426,29 +410,15 @@ export const useMatchInvites = () => {
         ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim()
         : 'Someone';
       
-      // Server-side idempotency check - prevent duplicate notifications
-      const existingNotification = await supabase
-        .from('notifications')
-        .select('id')
-        .eq('user_id', inviteData.receiver_id)
-        .eq('type', 'match_invite')
-        .eq('metadata->>match_id', data?.id)
-        .eq('metadata->>sender_id', user.id)
-        .single();
-      
-      if (existingNotification) {
-        console.log('🔄 Skipping duplicate match invite notification for match_id:', data?.id);
-      } else {
-        await supabase.from('notifications').insert({
-          user_id: inviteData.receiver_id,
-          type: 'match_invite',
-          title: 'New Match Invitation',
-          message: `${senderName} invited you to a match on ${inviteData.date} at ${inviteData.start_time}`,
-          read: false,
-          action_url: '/dashboard?tab=schedule',
-          metadata: { match_id: data?.id, sender_id: user.id },
-        });
-      }
+      // Idempotent insert — DB unique index prevents duplicates.
+      await supabase.rpc('insert_notification_safe' as any, {
+        p_user_id:    inviteData.receiver_id,
+        p_type:       'match_invite',
+        p_title:      'New Match Invitation',
+        p_message:    `${senderName} invited you to a match on ${inviteData.date} at ${inviteData.start_time}`,
+        p_action_url: '/dashboard?tab=schedule',
+        p_metadata:   { match_id: data?.id, sender_id: user.id },
+      });
 
       toast.success('Match invite sent successfully');
       return data;
@@ -574,7 +544,7 @@ export const useMatchInvites = () => {
         }
       }
 
-      // Notify the other party of the response
+      // Notify the other party of the response (idempotent — unique index guards duplicates).
       const otherUserId = invite.sender_id === user.id ? invite.receiver_id : invite.sender_id;
       const { data: responderProfile } = await supabase
         .from('profiles')
@@ -584,16 +554,15 @@ export const useMatchInvites = () => {
       const responderName = responderProfile
         ? `${responderProfile.first_name || ''} ${responderProfile.last_name || ''}`.trim()
         : 'Someone';
-      await supabase.from('notifications').insert({
-        user_id: otherUserId,
-        type: status === 'accepted' ? 'match_accepted' : 'match_declined',
-        title: status === 'accepted' ? 'Match Invitation Accepted' : 'Match Invitation Declined',
-        message: status === 'accepted'
+      await supabase.rpc('insert_notification_safe' as any, {
+        p_user_id:    otherUserId,
+        p_type:       status === 'accepted' ? 'match_accepted' : 'match_declined',
+        p_title:      status === 'accepted' ? 'Match Invitation Accepted' : 'Match Invitation Declined',
+        p_message:    status === 'accepted'
           ? `${responderName} accepted your match invitation`
           : `${responderName} declined your match invitation`,
-        read: false,
-        action_url: '/dashboard?tab=schedule',
-        metadata: { match_id: inviteId },
+        p_action_url: '/dashboard?tab=schedule',
+        p_metadata:   { match_id: inviteId },
       });
 
       // If accepted, create a conversation between the users (in background)
@@ -667,14 +636,13 @@ export const useMatchInvites = () => {
         const proposerName = proposerProfile
           ? `${proposerProfile.first_name || ''} ${proposerProfile.last_name || ''}`.trim()
           : 'Someone';
-        await supabase.from('notifications').insert({
-          user_id: otherUserId,
-          type: 'match_rescheduled',
-          title: 'New Time Proposed',
-          message: `${proposerName} proposed a new time for your match: ${newDate} at ${newStartTime}`,
-          read: false,
-          action_url: '/dashboard?tab=schedule',
-          metadata: { match_id: inviteId },
+        await supabase.rpc('insert_notification_safe' as any, {
+          p_user_id:    otherUserId,
+          p_type:       'match_rescheduled',
+          p_title:      'New Time Proposed',
+          p_message:    `${proposerName} proposed a new time for your match: ${newDate} at ${newStartTime}`,
+          p_action_url: '/dashboard?tab=schedule',
+          p_metadata:   { match_id: inviteId },
         });
       }
     } catch (error) {
@@ -738,14 +706,13 @@ export const useMatchInvites = () => {
         const acceptorName = acceptorProfile
           ? `${acceptorProfile.first_name || ''} ${acceptorProfile.last_name || ''}`.trim()
           : 'Someone';
-        await supabase.from('notifications').insert({
-          user_id: otherUserId,
-          type: 'match_accepted',
-          title: 'Proposed Time Accepted',
-          message: `${acceptorName} accepted your proposed match time`,
-          read: false,
-          action_url: '/dashboard?tab=schedule',
-          metadata: { match_id: inviteId },
+        await supabase.rpc('insert_notification_safe' as any, {
+          p_user_id:    otherUserId,
+          p_type:       'match_accepted',
+          p_title:      'Proposed Time Accepted',
+          p_message:    `${acceptorName} accepted your proposed match time`,
+          p_action_url: '/dashboard?tab=schedule',
+          p_metadata:   { match_id: inviteId },
         });
       }
     } catch (error) {
@@ -822,14 +789,13 @@ export const useMatchInvites = () => {
         const cancellerName = cancellerProfile
           ? `${cancellerProfile.first_name || ''} ${cancellerProfile.last_name || ''}`.trim()
           : 'Someone';
-        await supabase.from('notifications').insert({
-          user_id: otherUserId,
-          type: 'match_cancelled',
-          title: 'Match Cancelled',
-          message: `${cancellerName} cancelled the match`,
-          read: false,
-          action_url: '/dashboard?tab=schedule',
-          metadata: { match_id: inviteId },
+        await supabase.rpc('insert_notification_safe' as any, {
+          p_user_id:    otherUserId,
+          p_type:       'match_cancelled',
+          p_title:      'Match Cancelled',
+          p_message:    `${cancellerName} cancelled the match`,
+          p_action_url: '/dashboard?tab=schedule',
+          p_metadata:   { match_id: inviteId },
         });
       }
 

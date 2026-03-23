@@ -1,33 +1,21 @@
 import React, { useState } from 'react';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
   DialogTitle,
   DialogDescription,
   DialogFooter
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { 
-  User, 
-  Trophy, 
-  Calendar, 
-  MapPin, 
-  Mail, 
-  Phone,
-  Target,
-  Flame,
-  MessageCircle,
-  Ban,
-  UserMinus,
-  ShieldAlert,
-  Clock,
-  Check,
-  X as XIcon
+import {
+  User, Trophy, Calendar, MapPin, Mail,
+  Target, Flame, MessageCircle, Ban, UserMinus,
+  ShieldAlert, Clock, Check, X as XIcon,
+  Users, UserPlus, Swords, TrendingUp,
 } from 'lucide-react';
 import { SearchResult } from '@/hooks/usePlayerSearch';
 import { toast } from 'sonner';
@@ -56,7 +44,65 @@ interface PlayerProfileModalProps {
   onInviteResponded?: () => void;
 }
 
-const PlayerProfileModal = ({ player, isOpen, onClose, pendingInvite, onInviteResponded }: PlayerProfileModalProps) => {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const skillColor = (level: number) => {
+  if (level >= 8) return { bg: 'bg-red-100 dark:bg-red-950', text: 'text-red-700 dark:text-red-300', dot: 'bg-red-500' };
+  if (level >= 6) return { bg: 'bg-orange-500', text: 'text-white', dot: 'bg-white/80' };
+  if (level >= 4) return { bg: 'bg-yellow-100 dark:bg-yellow-950', text: 'text-yellow-700 dark:text-yellow-300', dot: 'bg-yellow-500' };
+  return { bg: 'bg-green-100 dark:bg-green-950', text: 'text-green-700 dark:text-green-300', dot: 'bg-green-500' };
+};
+
+const skillLabel = (level: number) => {
+  if (level >= 7) return 'Advanced';
+  if (level >= 4) return 'Intermediate';
+  return 'Beginner';
+};
+
+const competitivenessLabel = (v?: string) => {
+  switch (v) {
+    case 'fun': return 'Just for fun';
+    case 'casual': return 'Casual';
+    case 'competitive': return 'Competitive';
+    default: return 'Not specified';
+  }
+};
+
+const competitivenessIcon = (v?: string) => {
+  if (v === 'competitive') return '🏆';
+  if (v === 'casual') return '😎';
+  if (v === 'fun') return '🎾';
+  return '—';
+};
+
+const ageRangeLabel = (v?: string) => {
+  const map: Record<string, string> = {
+    'under-18': 'Under 18', '18-29': '18–29', '30-39': '30–39',
+    '40-49': '40–49', '50-59': '50–59', '60-plus': '60+',
+  };
+  return v ? (map[v] ?? v) : 'Not specified';
+};
+
+const genderLabel = (v?: string | null) => {
+  if (!v) return 'Not specified';
+  return v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
+};
+
+const experienceLabel = (total: number) => {
+  if (total === 0) return 'New Player';
+  if (total < 5) return 'Getting Started';
+  if (total < 15) return 'Regular';
+  return 'Experienced';
+};
+
+const initials = (name: string) =>
+  name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+const PlayerProfileModal = ({
+  player, isOpen, onClose, pendingInvite, onInviteResponded,
+}: PlayerProfileModalProps) => {
   const [showSendMessage, setShowSendMessage] = useState(false);
   const [showScheduleMatch, setShowScheduleMatch] = useState(false);
   const [showBlockDialog, setShowBlockDialog] = useState(false);
@@ -65,70 +111,24 @@ const PlayerProfileModal = ({ player, isOpen, onClose, pendingInvite, onInviteRe
   const [isActioning, setIsActioning] = useState(false);
   const [inviteResponse, setInviteResponse] = useState<'accepted' | 'declined' | null>(null);
   const [isRespondingToInvite, setIsRespondingToInvite] = useState(false);
+
   const { user } = useAuth();
   const { sendFriendRequest, updateRequestStatus, getRelationshipWith, requests, refetch: refetchFriends } = useFriendRequests();
   const { blockUser, unfriendUser } = useBlockedUsers();
   const { respondToInvite } = useMatchInvitesContext();
-  
+
   if (!player) return null;
-
-  const getSkillBadgeColor = (skillLevel: number) => {
-    if (skillLevel >= 8) return 'bg-red-100 text-red-800 border-red-200';
-    if (skillLevel >= 6) return 'bg-orange-100 text-orange-800 border-orange-200';
-    if (skillLevel >= 4) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-    return 'bg-green-100 text-green-800 border-green-200';
-  };
-
-  const getSkillLabel = (skillLevel: number) => {
-    if (skillLevel >= 7) return 'Advanced';
-    if (skillLevel >= 4) return 'Intermediate';
-    return 'Beginner';
-  };
-
-  const getCompetitivenessLabel = (competitiveness?: string) => {
-    switch (competitiveness) {
-      case 'fun': return '🎾 Just for fun';
-      case 'casual': return '😎 Casual but competitive';
-      case 'competitive': return '🏆 Very competitive';
-      default: return 'Not specified';
-    }
-  };
-
-  const getAgeRangeLabel = (ageRange?: string) => {
-    switch (ageRange) {
-      case 'under-18': return 'Under 18';
-      case '18-29': return '18-29';
-      case '30-39': return '30-39';
-      case '40-49': return '40-49';
-      case '50-59': return '50-59';
-      case '60-plus': return '60+';
-      default: return 'Not specified';
-    }
-  };
-
-  const getGenderLabel = (gender?: string | null) => {
-    switch (gender?.toLowerCase()) {
-      case 'male': return 'Male';
-      case 'female': return 'Female';
-      case 'other': return 'Other';
-      default: return 'Not specified';
-    }
-  };
 
   const totalMatches = player.wins + player.losses;
   const winRate = totalMatches > 0 ? Math.round((player.wins / totalMatches) * 100) : 0;
-
-  const handleSendMessage = () => {
-    setShowSendMessage(true);
-  };
-
-  const handleChallengeMatch = () => {
-    setShowScheduleMatch(true);
-  };
-
   const otherUserId = player.user_id;
   const relationship = getRelationshipWith(otherUserId);
-  const incomingRequest = requests.find(r => r.status === 'pending' && r.sender_id === otherUserId && r.receiver_id === user?.id);
+  const incomingRequest = requests.find(
+    r => r.status === 'pending' && r.sender_id === otherUserId && r.receiver_id === user?.id,
+  );
+  const sc = skillColor(player.skill_level);
+
+  // ── Handlers (unchanged logic) ─────────────────────────────────────────────
 
   const handleBlockConfirm = async () => {
     if (!player?.user_id || player?.user_id === user?.id) return;
@@ -138,7 +138,7 @@ const PlayerProfileModal = ({ player, isOpen, onClose, pendingInvite, onInviteRe
       setShowBlockDialog(false);
       setBlockReason('');
       onClose();
-    } catch (error) {
+    } catch {
       toast.error('Failed to block user');
     } finally {
       setIsActioning(false);
@@ -153,7 +153,7 @@ const PlayerProfileModal = ({ player, isOpen, onClose, pendingInvite, onInviteRe
       await refetchFriends();
       setShowUnfriendDialog(false);
       onClose();
-    } catch (error) {
+    } catch {
       toast.error('Failed to remove friend');
     } finally {
       setIsActioning(false);
@@ -161,14 +161,11 @@ const PlayerProfileModal = ({ player, isOpen, onClose, pendingInvite, onInviteRe
   };
 
   const handleSendFriendRequest = async () => {
-    if (!otherUserId) {
-      toast.error('This player cannot receive friend requests');
-      return;
-    }
+    if (!otherUserId) { toast.error('This player cannot receive friend requests'); return; }
     try {
       await sendFriendRequest(otherUserId);
       toast.success('Friend request sent');
-    } catch (e) {
+    } catch {
       toast.error('Failed to send friend request');
     }
   };
@@ -178,9 +175,8 @@ const PlayerProfileModal = ({ player, isOpen, onClose, pendingInvite, onInviteRe
     try {
       await updateRequestStatus(incomingRequest.id, status);
       toast.success(status === 'accepted' ? 'Friend request accepted' : 'Friend request declined');
-      // Close modal after successful action
       setTimeout(() => onClose(), 1000);
-    } catch (e) {
+    } catch {
       toast.error('Failed to update friend request');
     }
   };
@@ -192,9 +188,8 @@ const PlayerProfileModal = ({ player, isOpen, onClose, pendingInvite, onInviteRe
       await respondToInvite(pendingInvite.id, response);
       setInviteResponse(response);
       onInviteResponded?.();
-      // Close modal after successful action
       setTimeout(() => onClose(), 1000);
-    } catch (e) {
+    } catch {
       toast.error('Failed to respond to invite');
     } finally {
       setIsRespondingToInvite(false);
@@ -203,377 +198,259 @@ const PlayerProfileModal = ({ player, isOpen, onClose, pendingInvite, onInviteRe
 
   return (
     <>
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-        <DialogHeader className="pb-4 sm:pb-6">
-          <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-3 sm:space-y-0 sm:space-x-4">
-            <div className="w-16 h-16 bg-gradient-primary rounded-full flex items-center justify-center text-primary-foreground font-bold text-xl">
-              {player.name.charAt(0).toUpperCase()}
-            </div>
-            <div className="flex-1 text-center sm:text-left">
-              <DialogTitle className="text-xl sm:text-2xl font-bold text-foreground mb-2">
-                {player.name}
-              </DialogTitle>
-              <DialogDescription className="sr-only">
-                Player profile details for {player.name}, including stats, contact information, and performance metrics.
-              </DialogDescription>
-              <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2">
-                <Badge 
-                  variant="outline" 
-                  className={`${getSkillBadgeColor(player.skill_level)} text-xs sm:text-sm`}
-                >
-                  {getSkillLabel(player.skill_level)} • {player.skill_level}/10
-                </Badge>
-                {player.usta_rating && (
-                  <Badge variant="secondary" className="text-xs sm:text-sm">
-                    Level {player.usta_rating}
-                  </Badge>
-                )}
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="w-[95vw] max-w-2xl p-0 overflow-hidden max-h-[92vh] flex flex-col">
+
+          {/* ── Hero header ──────────────────────────────────────────────── */}
+          <div className="relative bg-gradient-to-br from-primary/90 via-primary/70 to-primary/40 pt-5 pb-5 px-4 sm:px-5 shrink-0">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.1),transparent_60%)]" />
+
+            {/* Relationship badge top-right */}
+            {relationship === 'friends' && (
+              <div className="absolute top-3 right-4 flex items-center gap-1 bg-white/20 backdrop-blur-sm rounded-full px-2.5 py-1 text-xs text-white font-medium">
+                <Users className="w-3 h-3" />Friends
+              </div>
+            )}
+
+            <DialogTitle className="sr-only">{player.name}</DialogTitle>
+            <DialogDescription className="sr-only">
+              Player profile for {player.name}
+            </DialogDescription>
+
+            <div className="relative flex items-end gap-4">
+              {/* Avatar */}
+              <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm border-2 border-white/40 flex items-center justify-center text-white text-2xl font-bold shrink-0 shadow-lg">
+                {initials(player.name)}
+              </div>
+
+              <div className="flex-1 min-w-0 pb-0.5">
+                <h2 className="text-xl font-bold text-white leading-tight truncate">{player.name}</h2>
+                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  {/* USTA / skill badge */}
+                  <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${sc.bg} ${sc.text}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+                    {player.usta_rating ? `USTA ${player.usta_rating}` : `Level ${player.skill_level}`}
+                    &nbsp;·&nbsp;{skillLabel(player.skill_level)}
+                  </span>
+                  {/* Experience */}
+                  <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-white/20 text-white">
+                    {experienceLabel(totalMatches)}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-        </DialogHeader>
 
-        <div className="space-y-4 sm:space-y-6">
-          {/* Pending match invite banner */}
-          {pendingInvite && (
-            <div className="rounded-lg border border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/40 p-4 space-y-3">
-              <p className="text-sm font-semibold text-orange-800 dark:text-orange-200">Pending Match Invitation</p>
-              <div className="space-y-1.5 text-sm text-orange-700 dark:text-orange-300">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 shrink-0" />
-                  <span>{format(parseISO(pendingInvite.date), 'EEEE, MMMM d, yyyy')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 shrink-0" />
-                  <span>{pendingInvite.start_time?.slice(0, 5)} – {pendingInvite.end_time?.slice(0, 5)}</span>
-                </div>
-                {pendingInvite.court_location && (
+          {/* ── Stat strip ──────────────────────────────────────────────── */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 shrink-0 px-4 sm:px-5 py-3 sm:py-4 bg-muted/20 border-b border-border/50">
+            {[
+              { label: 'Wins',    value: player.wins,   accent: 'text-green-600 dark:text-green-400' },
+              { label: 'Losses',  value: player.losses, accent: 'text-red-500 dark:text-red-400' },
+              { label: 'Win %',   value: `${winRate}%`, accent: 'text-primary' },
+              { label: 'Played',  value: totalMatches,  accent: 'text-foreground' },
+            ].map(s => (
+              <div key={s.label} className="bg-card border border-border rounded-xl py-2.5 text-center shadow-sm">
+                <p className={`text-lg font-bold leading-none ${s.accent}`}>{s.value}</p>
+                <p className="text-[11px] text-muted-foreground mt-1">{s.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Scrollable body ─────────────────────────────────────────── */}
+          <div className="overflow-y-auto flex-1 px-3 sm:px-5 pb-4 sm:pb-5 pt-3 sm:pt-4 space-y-3 sm:space-y-4">
+
+            {/* Pending invite banner */}
+            {pendingInvite && (
+              <div className="rounded-xl border border-orange-500 bg-orange-500 p-4 space-y-3">
+                <p className="text-sm font-semibold text-white flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />Match Invitation
+                </p>
+                <div className="space-y-1.5 text-sm text-white/90">
                   <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 shrink-0" />
-                    <span>{pendingInvite.court_location}</span>
+                    <Calendar className="w-3.5 h-3.5 shrink-0" />
+                    <span>{format(parseISO(pendingInvite.date), 'EEEE, MMMM d, yyyy')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5 shrink-0" />
+                    <span>{pendingInvite.start_time?.slice(0, 5)} – {pendingInvite.end_time?.slice(0, 5)}</span>
+                  </div>
+                  {pendingInvite.court_location && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-3.5 h-3.5 shrink-0" />
+                      <span>{pendingInvite.court_location}</span>
+                    </div>
+                  )}
+                  {pendingInvite.message && (
+                    <p className="italic text-xs mt-1 opacity-80">"{pendingInvite.message}"</p>
+                  )}
+                </div>
+                {inviteResponse ? (
+                  <p className={`text-sm font-semibold ${inviteResponse === 'accepted' ? 'text-green-600' : 'text-muted-foreground'}`}>
+                    {inviteResponse === 'accepted' ? '✓ Invite accepted' : '✗ Invite declined'}
+                  </p>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button size="sm" className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => handleRespondToInvite('accepted')} disabled={isRespondingToInvite}>
+                      <Check className="w-3.5 h-3.5 mr-1" />
+                      {isRespondingToInvite ? 'Accepting…' : 'Accept'}
+                    </Button>
+                    <Button size="sm" variant="outline"
+                      className="flex-1 border-white/40 text-white hover:bg-white/20"
+                      onClick={() => handleRespondToInvite('declined')} disabled={isRespondingToInvite}>
+                      <XIcon className="w-3.5 h-3.5 mr-1" />Decline
+                    </Button>
                   </div>
                 )}
-                {pendingInvite.message && (
-                  <p className="italic text-xs mt-1 opacity-80">"{pendingInvite.message}"</p>
-                )}
               </div>
-              {inviteResponse ? (
-                <p className={`text-sm font-semibold ${
-                  inviteResponse === 'accepted' ? 'text-green-600' : 'text-muted-foreground'
-                }`}>
-                  {inviteResponse === 'accepted' ? '✓ Invite accepted' : '✗ Invite declined'}
-                </p>
-              ) : (
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => handleRespondToInvite('accepted')}
-                    disabled={isRespondingToInvite}
-                  >
-                    <Check className="w-3.5 h-3.5 mr-1.5" />
-                    {isRespondingToInvite ? 'Accepting...' : 'Accept'}
+            )}
+
+            {/* Player info */}
+            <div className="bg-muted/30 rounded-xl divide-y divide-border/50">
+              {[
+                { icon: Mail,     label: 'Email',         value: player.email },
+                { icon: User,     label: 'Gender',        value: genderLabel(player.gender) },
+                { icon: Calendar, label: 'Age Range',     value: ageRangeLabel(player.age_range) },
+                { icon: Flame,    label: 'Playing Style', value: `${competitivenessIcon(player.competitiveness)} ${competitivenessLabel(player.competitiveness)}` },
+                { icon: Trophy,   label: 'Record',        value: `${player.wins}W – ${player.losses}L` },
+              ].map(({ icon: Icon, label, value }) => (
+                <div key={label} className="flex items-center gap-3 px-4 py-2.5">
+                  <Icon className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-sm text-muted-foreground w-24 shrink-0">{label}</span>
+                  <span className="text-sm font-medium text-foreground">{value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Performance bars */}
+            <div className="space-y-2.5">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5" />Performance
+              </p>
+              <div className="space-y-3">
+                {[
+                  { label: 'Win Rate',    pct: winRate,                        value: `${winRate}%`,           color: 'bg-green-500' },
+                  { label: 'Skill Level', pct: (player.skill_level / 10) * 100, value: `${player.skill_level}/10`, color: 'bg-primary' },
+                ].map(bar => (
+                  <div key={bar.label} className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">{bar.label}</span>
+                      <span className="font-semibold text-foreground">{bar.value}</span>
+                    </div>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className={`h-full ${bar.color} rounded-full transition-all`} style={{ width: `${bar.pct}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="space-y-2 pt-1">
+              <div className="grid grid-cols-2 gap-2">
+                <Button onClick={() => setShowScheduleMatch(true)} className="h-10 text-xs sm:text-sm">
+                  <Swords className="w-4 h-4 mr-1.5 sm:mr-2" />Challenge
+                </Button>
+                <Button onClick={() => setShowSendMessage(true)} variant="outline" className="h-10 text-xs sm:text-sm">
+                  <MessageCircle className="w-4 h-4 mr-1.5 sm:mr-2" />Message
+                </Button>
+              </div>
+
+              {/* Relationship action */}
+              {relationship === 'friends' ? (
+                <Button variant="outline"
+                  className="w-full h-9 text-sm bg-orange-500 text-white border-orange-500 hover:bg-orange-600"
+                  onClick={() => setShowUnfriendDialog(true)}>
+                  <UserMinus className="w-4 h-4 mr-2" />Remove Friend
+                </Button>
+              ) : relationship === 'pending_sent' ? (
+                <Button variant="secondary" className="w-full h-9 text-sm" disabled>
+                  Friend Request Sent
+                </Button>
+              ) : relationship === 'pending_received' ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <Button className="bg-green-600 hover:bg-green-700 h-9 text-sm"
+                    onClick={() => handleRespondToRequest('accepted')}>
+                    <Check className="w-3.5 h-3.5 mr-1.5" />Accept
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1 border-orange-300 text-orange-700 hover:bg-orange-100 dark:text-orange-300 dark:border-orange-700"
-                    onClick={() => handleRespondToInvite('declined')}
-                    disabled={isRespondingToInvite}
-                  >
-                    <XIcon className="w-3.5 h-3.5 mr-1.5" />
+                  <Button variant="outline" className="h-9 text-sm"
+                    onClick={() => handleRespondToRequest('declined')}>
                     Decline
+                  </Button>
+                </div>
+              ) : otherUserId && otherUserId !== user?.id ? (
+                <Button variant="outline" className="w-full h-9 text-sm"
+                  onClick={handleSendFriendRequest}>
+                  <UserPlus className="w-4 h-4 mr-2" />Add Friend
+                </Button>
+              ) : null}
+
+              {/* Destructive — visually separated */}
+              {player?.user_id !== user?.id && (
+                <div className="pt-1 border-t border-border/50">
+                  <Button variant="ghost" size="sm"
+                    className="w-full text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                    onClick={() => setShowBlockDialog(true)}>
+                    <Ban className="w-3.5 h-3.5 mr-1.5" />Block User
                   </Button>
                 </div>
               )}
             </div>
-          )}
-
-          {/* Quick Stats */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-4">
-            <Card className="bg-gradient-primary/5 border-primary/20">
-              <CardContent className="p-2 sm:p-4 text-center">
-                <Trophy className="w-4 h-4 sm:w-6 sm:h-6 text-primary mx-auto mb-1 sm:mb-2" />
-                <p className="text-lg sm:text-2xl font-bold text-foreground">{player.wins}</p>
-                <p className="text-xs text-muted-foreground">Wins</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-accent/5 border-accent/20">
-              <CardContent className="p-2 sm:p-4 text-center">
-                <Target className="w-4 h-4 sm:w-6 sm:h-6 text-accent mx-auto mb-1 sm:mb-2" />
-                <p className="text-lg sm:text-2xl font-bold text-foreground">{winRate}%</p>
-                <p className="text-xs text-muted-foreground">Win Rate</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-muted/30 border-border">
-              <CardContent className="p-2 sm:p-4 text-center">
-                <Calendar className="w-4 h-4 sm:w-6 sm:h-6 text-muted-foreground mx-auto mb-1 sm:mb-2" />
-                <p className="text-lg sm:text-2xl font-bold text-foreground">{totalMatches}</p>
-                <p className="text-xs text-muted-foreground">Total Matches</p>
-              </CardContent>
-            </Card>
           </div>
 
-          {/* Contact & Details */}
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <User className="w-5 h-5 text-primary" />
-                <span>Player Information</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div className="flex items-center space-x-3">
-                  <Mail className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Email</p>
-                    <p className="text-sm text-muted-foreground">{player.email}</p>
-                  </div>
-                </div>
+          {/* Modals */}
+          <SendMessageModal player={player} isOpen={showSendMessage} onClose={() => setShowSendMessage(false)} />
+          <PlayerScheduleModal open={showScheduleMatch} onClose={() => setShowScheduleMatch(false)} player={player}
+            onInviteSent={() => { setShowScheduleMatch(false); onClose(); }} />
+        </DialogContent>
+      </Dialog>
 
-                <div className="flex items-center space-x-3">
-                  <User className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Gender</p>
-                    <p className="text-sm text-muted-foreground">{getGenderLabel(player.gender)}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Age Range</p>
-                    <p className="text-sm text-muted-foreground">{getAgeRangeLabel(player.age_range)}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <Flame className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Playing Style</p>
-                    <p className="text-sm text-muted-foreground">{getCompetitivenessLabel(player.competitiveness)}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <Trophy className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Record</p>
-                    <p className="text-sm text-muted-foreground">{player.wins}W - {player.losses}L</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Performance Insights */}
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Target className="w-5 h-5 text-accent" />
-                <span>Performance Insights</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
-                  <span className="text-sm font-medium text-foreground">Win Rate</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-gradient-primary rounded-full transition-all"
-                        style={{ width: `${winRate}%` }}
-                      />
-                    </div>
-                    <span className="text-sm font-bold text-foreground">{winRate}%</span>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
-                  <span className="text-sm font-medium text-foreground">Skill Level</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-gradient-secondary rounded-full transition-all"
-                        style={{ width: `${(player.skill_level / 10) * 100}%` }}
-                      />
-                    </div>
-                    <span className="text-sm font-bold text-foreground">{player.skill_level}/10</span>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
-                  <span className="text-sm font-medium text-foreground">Experience</span>
-                  <Badge variant="outline" className="font-medium">
-                    {totalMatches === 0 ? 'New Player' : 
-                     totalMatches < 5 ? 'Getting Started' :
-                     totalMatches < 15 ? 'Regular Player' : 'Experienced Player'}
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Action Buttons */}
-          <div className="space-y-3 pt-2">
-            {/* Primary actions */}
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                onClick={handleChallengeMatch}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground"
-              >
-                <Calendar className="w-4 h-4 mr-2 shrink-0" />
-                Match Request
-              </Button>
-              <Button
-                onClick={handleSendMessage}
-                variant="outline"
-              >
-                <MessageCircle className="w-4 h-4 mr-2 shrink-0" />
-                Send Message
-              </Button>
-            </div>
-
-            {/* Friend / relationship action */}
-            {relationship === 'friends' ? (
-              <Button
-                variant="outline"
-                className="w-full text-orange-600 border-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950"
-                onClick={() => setShowUnfriendDialog(true)}
-              >
-                <UserMinus className="w-4 h-4 mr-2 shrink-0" />
-                Remove Friend
-              </Button>
-            ) : relationship === 'pending_sent' ? (
-              <Button variant="secondary" className="w-full" disabled>
-                Friend Request Sent
-              </Button>
-            ) : relationship === 'pending_received' ? (
-              <div className="grid grid-cols-2 gap-3">
-                <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleRespondToRequest('accepted')}>
-                  Accept Friend Request
-                </Button>
-                <Button variant="outline" onClick={() => handleRespondToRequest('declined')}>
-                  Decline
-                </Button>
-              </div>
-            ) : otherUserId && otherUserId !== user?.id ? (
-              <Button
-                onClick={handleSendFriendRequest}
-                variant="outline"
-                className="w-full"
-              >
-                Send a friend request
-              </Button>
-            ) : null}
-
-            {/* Destructive action — visually separated */}
-            {player?.user_id !== user?.id && (
-              <div className="pt-1 border-t">
-                <Button
-                  onClick={() => setShowBlockDialog(true)}
-                  variant="ghost"
-                  size="sm"
-                  className="w-full text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-                >
-                  <Ban className="w-4 h-4 mr-2 shrink-0" />
-                  Block User
-                </Button>
-              </div>
-            )}
+      {/* Block dialog */}
+      <Dialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <ShieldAlert className="w-5 h-5" />Block {player?.name}?
+            </DialogTitle>
+            <DialogDescription>
+              They won't be able to message you, send match requests, or see your profile.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-1 space-y-2">
+            <Label htmlFor="block-reason" className="text-sm font-medium">Reason (optional)</Label>
+            <Textarea id="block-reason" placeholder="Why are you blocking this player?"
+              value={blockReason} onChange={e => setBlockReason(e.target.value)} rows={3} />
           </div>
-        </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setShowBlockDialog(false); setBlockReason(''); }}>Cancel</Button>
+            <Button variant="destructive" onClick={handleBlockConfirm} disabled={isActioning}>
+              <Ban className="w-4 h-4 mr-2" />{isActioning ? 'Blocking…' : 'Block'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        {/* Send Message Modal */}
-        <SendMessageModal 
-          player={player}
-          isOpen={showSendMessage}
-          onClose={() => setShowSendMessage(false)}
-        />
-
-        {/* Schedule Match Modal */}
-        <PlayerScheduleModal
-          open={showScheduleMatch}
-          onClose={() => setShowScheduleMatch(false)}
-          player={player}
-          onInviteSent={() => {
-            setShowScheduleMatch(false);
-            onClose();
-          }}
-        />
-      </DialogContent>
-    </Dialog>
-
-    {/* Block User Confirmation Dialog */}
-    <Dialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-red-600">
-            <ShieldAlert className="w-5 h-5" />
-            Block {player?.name}?
-          </DialogTitle>
-          <DialogDescription>
-            Blocking this user will prevent them from sending you match requests, messages, or viewing your profile. They will also be removed from your search results and match suggestions.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="py-2 space-y-2">
-          <Label htmlFor="block-reason" className="text-sm font-medium">Reason (optional)</Label>
-          <Textarea
-            id="block-reason"
-            placeholder="Let us know why you're blocking this user..."
-            value={blockReason}
-            onChange={(e) => setBlockReason(e.target.value)}
-            rows={3}
-          />
-        </div>
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => { setShowBlockDialog(false); setBlockReason(''); }}>
-            Cancel
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={handleBlockConfirm}
-            disabled={isActioning}
-          >
-            <Ban className="w-4 h-4 mr-2" />
-            {isActioning ? 'Blocking...' : 'Block User'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    {/* Unfriend Confirmation Dialog */}
-    <Dialog open={showUnfriendDialog} onOpenChange={setShowUnfriendDialog}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-orange-600">
-            <UserMinus className="w-5 h-5" />
-            Remove {player?.name} from network?
-          </DialogTitle>
-          <DialogDescription>
-            This will remove your connection with {player?.name}. They won't be notified, and you can send a new friend request in the future.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => setShowUnfriendDialog(false)}>
-            Cancel
-          </Button>
-          <Button
-            variant="outline"
-            className="text-orange-600 border-orange-300 hover:bg-orange-50"
-            onClick={handleUnfriendConfirm}
-            disabled={isActioning}
-          >
-            <UserMinus className="w-4 h-4 mr-2" />
-            {isActioning ? 'Removing...' : 'Remove Friend'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      {/* Unfriend dialog */}
+      <Dialog open={showUnfriendDialog} onOpenChange={setShowUnfriendDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-orange-600">
+              <UserMinus className="w-5 h-5" />Remove {player?.name}?
+            </DialogTitle>
+            <DialogDescription>
+              This removes your connection. They won't be notified and you can reconnect later.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowUnfriendDialog(false)}>Cancel</Button>
+            <Button variant="outline"
+              className="text-orange-600 border-orange-300 hover:bg-orange-50"
+              onClick={handleUnfriendConfirm} disabled={isActioning}>
+              <UserMinus className="w-4 h-4 mr-2" />{isActioning ? 'Removing…' : 'Remove'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

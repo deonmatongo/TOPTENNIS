@@ -31,7 +31,7 @@ const ScoreStepper = ({
     <button
       type="button"
       onClick={() => onChange(Math.max(0, value - 1))}
-      className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+      className="w-10 h-10 sm:w-8 sm:h-8 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
     >
       <Minus className="w-3 h-3" />
     </button>
@@ -49,7 +49,7 @@ const ScoreStepper = ({
     <button
       type="button"
       onClick={() => onChange(Math.min(max, value + 1))}
-      className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+      className="w-10 h-10 sm:w-8 sm:h-8 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
     >
       <Plus className="w-3 h-3" />
     </button>
@@ -235,7 +235,7 @@ const MatchScoringModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[95vw] max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <div className="p-1.5 bg-primary/10 rounded-lg">
@@ -300,7 +300,7 @@ const MatchScoringModal = ({
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-1">
+          <div className="flex gap-2 sm:gap-3 pt-1">
             <Button
               variant="outline"
               className="flex-1"

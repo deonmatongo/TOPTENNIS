@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
-import { toast } from 'sonner';
 
 // Exponential backoff utility
 const getBackoffDelay = (attempt: number, baseDelay = 1000, maxDelay = 30000) => {
@@ -60,6 +59,15 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const connectionMonitorRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Shared channel registry for subscribeToTable — prevents duplicate channels
+  // for the same table when multiple components subscribe simultaneously.
+  // Key: channel name.  Value: { channel, callbacks, connectionMonitor }.
+  const tableChannelsRef = useRef<Map<string, {
+    channel: any;
+    callbacks: Set<(payload: any) => void>;
+    connectionMonitor: NodeJS.Timeout;
+  }>>(new Map());
 
   // Enhanced reconnection logic with exponential backoff
   const attemptReconnection = useCallback(() => {
@@ -170,6 +178,12 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
+      // Tear down all shared table channels
+      tableChannelsRef.current.forEach(({ channel, connectionMonitor }) => {
+        clearInterval(connectionMonitor);
+        supabase.removeChannel(channel);
+      });
+      tableChannelsRef.current.clear();
       setIsConnected(false);
       setIsReconnecting(false);
       reconnectAttemptsRef.current = 0;
@@ -216,81 +230,75 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
+      // Tear down all shared table channels on unmount
+      tableChannelsRef.current.forEach(({ channel, connectionMonitor }) => {
+        clearInterval(connectionMonitor);
+        supabase.removeChannel(channel);
+      });
+      tableChannelsRef.current.clear();
       setIsConnected(false);
       setIsReconnecting(false);
       reconnectAttemptsRef.current = 0;
     };
   }, [user, setupConnectionMonitoring, attemptReconnection]);
 
-  const subscribeToTable = (table: string, callback: (payload: any) => void) => {
+  /**
+   * subscribeToTable — reference-counted, deduplicated channel subscription.
+   *
+   * Multiple callers for the same table share a single Supabase channel.
+   * The channel is only torn down when the last subscriber unsubscribes,
+   * preventing one component's unmount from silently breaking others.
+   */
+  const subscribeToTable = useCallback((table: string, callback: (payload: any) => void): (() => void) => {
     if (!user) return () => {};
+
     const channelName = `${table}-changes-${user.id}`;
-    const channel = supabase.channel(channelName);
+    const registry = tableChannelsRef.current;
 
-    channel
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: table,
-        },
-        (payload) => {
-          console.log(`Realtime update for ${table}:`, payload);
-          setLastUpdate(new Date().toISOString());
-          callback(payload);
+    let entry = registry.get(channelName);
+
+    if (!entry) {
+      // First subscriber for this table: create the channel.
+      const channel = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table },
+          (payload) => {
+            setLastUpdate(new Date().toISOString());
+            // Dispatch to every registered callback for this channel.
+            registry.get(channelName)?.callbacks.forEach(cb => cb(payload));
+          },
+        )
+        .subscribe();
+
+      const connectionMonitor = setInterval(() => {
+        const e = registry.get(channelName);
+        if (!e) return;
+        if ((e.channel.state as string) !== 'joined') {
+          // Channel dropped — re-subscribe in place (callbacks are preserved).
+          e.channel.subscribe();
         }
-      )
-      .subscribe();
+      }, 10_000);
 
-    // Add retry logic for better reliability
-    let retryCount = 0;
-    const maxRetries = 3;
-    const retryDelay = 1000;
+      entry = { channel, callbacks: new Set(), connectionMonitor };
+      registry.set(channelName, entry);
+    }
 
-    const attemptReconnect = () => {
-      if (retryCount < maxRetries) {
-        retryCount++;
-        console.log(`Attempting to reconnect to ${channelName} (attempt ${retryCount})`);
-        setTimeout(() => {
-          channel
-            .on(
-              'postgres_changes',
-              {
-                event: '*',
-                schema: 'public',
-                table: table,
-              },
-              (payload) => {
-                console.log(`Realtime update for ${table} (reconnected):`, payload);
-                setLastUpdate(new Date().toISOString());
-                callback(payload);
-                retryCount = 0; // Reset retry count on success
-              }
-            )
-            .subscribe();
-        }, retryDelay);
-      }
-    };
-
-    // Monitor connection and attempt reconnection if needed
-    const monitorConnection = () => {
-      if ((channel.state as string) !== 'joined' && isReconnecting) {
-        console.log(`Connection to ${channelName} lost, attempting reconnection...`);
-        setIsReconnecting(true);
-        attemptReconnect();
-      }
-    };
-
-    const connectionMonitor = setInterval(() => {
-      monitorConnection();
-    }, 10000); // Check every 10 seconds
+    entry.callbacks.add(callback);
 
     return () => {
-      supabase.removeChannel(channel);
-      clearInterval(connectionMonitor);
+      const e = registry.get(channelName);
+      if (!e) return;
+      e.callbacks.delete(callback);
+      if (e.callbacks.size === 0) {
+        // Last subscriber left — clean up the channel entirely.
+        clearInterval(e.connectionMonitor);
+        supabase.removeChannel(e.channel);
+        registry.delete(channelName);
+      }
     };
-  };
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const subscribeToUserChanges = (callback: (payload: any) => void) => {
     if (!user) return () => {};

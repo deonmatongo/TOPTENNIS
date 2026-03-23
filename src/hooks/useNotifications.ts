@@ -60,6 +60,9 @@ export const useNotifications = () => {
   // Track notification IDs to prevent duplicates
   const notificationIdsRef = useRef<Set<string>>(new Set());
 
+  // Fetch lock: prevents parallel in-flight fetches (e.g. 8s poll + SUBSCRIBED refetch + Socket.io refetch all firing at once)
+  const fetchInFlightRef = useRef(false);
+
   const addNotification = useCallback((notification: Omit<Notification, 'id' | 'createdAt'>) => {
     const newNotification: Notification = {
       ...notification,
@@ -165,6 +168,9 @@ export const useNotifications = () => {
       setIsLoading(false);
       return;
     }
+    // Bail if a fetch is already in flight — caller will see the result of the ongoing fetch.
+    if (fetchInFlightRef.current) return;
+    fetchInFlightRef.current = true;
 
     try {
       setIsLoading(true);
@@ -177,6 +183,15 @@ export const useNotifications = () => {
       if (error) throw error;
 
       const transformed = (data || []).map(transformRow);
+
+      // Seed notifiedRowIds so fetched rows can never trigger toasts via
+      // injectRealtimeRow (e.g. the SUBSCRIBED catch-up or a stale pendingQueue).
+      transformed.forEach(n => notifiedRowIds.current.add(n.id));
+
+      // Keep the ref in sync synchronously so the SUBSCRIBED catch-up always
+      // reads the freshest list, not a stale pre-render snapshot.
+      notificationsRef.current = transformed;
+
       setNotifications(transformed);
       updateUnreadCount(transformed);
       hasLoadedRef.current = true;
@@ -193,6 +208,7 @@ export const useNotifications = () => {
       pendingQueueRef.current = [];
     } finally {
       setIsLoading(false);
+      fetchInFlightRef.current = false;
     }
   }, [user, updateUnreadCount, transformRow]);
 
@@ -264,20 +280,11 @@ export const useNotifications = () => {
           // Reset backoff counter on successful connection
           reconnectAttemptsRef.current = 0;
 
-          // Catch up on any notifications missed while the channel was reconnecting
-          const latest = notificationsRef.current[0];
-          if (hasLoadedRef.current && latest) {
-            supabase
-              .from('notifications')
-              .select('*')
-              .eq('user_id', user.id)
-              .gt('created_at', latest.createdAt.toISOString())
-              .order('created_at', { ascending: false })
-              .then(({ data, error }) => {
-                if (!error && data?.length) {
-                  data.forEach(row => injectRealtimeRowRef.current(row));
-                }
-              });
+          // Catch up on any notifications missed while the channel was reconnecting.
+          // We do a fresh full fetch rather than injecting individual rows so that
+          // only genuinely NEW rows (not already in notifiedRowIds) produce toasts.
+          if (hasLoadedRef.current) {
+            fetchNotificationsRef.current();
           }
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           // Exponential backoff: 2s, 4s, 8s, 16s, 30s (cap), then give up
