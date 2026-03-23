@@ -353,7 +353,11 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
     const MatchCard = ({ match }: { match: (typeof userMatches)[0] }) => {
       const isScheduled = match.status === 'scheduled';
       const isCompleted = match.status === 'completed';
-      const needsScore = isCompleted && !match.winner_id;
+      // Show "Enter Score" when: no winner yet AND (match completed OR date already passed)
+      const matchDatePassed =
+        match.match_date && new Date(match.match_date) < new Date();
+      const needsScore =
+        !match.winner_id && match.isUserMatch && (isCompleted || (isScheduled && matchDatePassed));
       const borderColor = isTournament && isScheduled ? 'border-l-blue-500'
         : match.result === 'win' ? 'border-l-green-500'
         : match.result === 'loss' ? 'border-l-red-500'
@@ -374,7 +378,7 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
                   {match.result === 'win' && <Badge className="bg-green-600 text-white text-xs">Win</Badge>}
                   {match.result === 'loss' && <Badge variant="destructive" className="text-xs">Loss</Badge>}
                   {isScheduled && <Badge variant="secondary" className="text-xs">Upcoming</Badge>}
-                  {needsScore && <Badge className="bg-orange-500 text-white text-xs">Score Pending</Badge>}
+                  {needsScore && <Badge className="bg-primary/90 text-white text-xs">Enter Score</Badge>}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                   {match.match_date && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(match.match_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
@@ -389,8 +393,10 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
                 </div>
               </div>
               <div className="flex flex-col gap-1.5 shrink-0">
-                {needsScore && isTournament && (
-                  <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-white h-7 text-xs" onClick={() => setScoringMatch(match)}>Report Score</Button>
+                {needsScore && (
+                  <Button size="sm" className="bg-primary hover:bg-primary/90 text-white h-7 text-xs" onClick={() => setScoringMatch(match)}>
+                    <Trophy className="w-3 h-3 mr-1" />I Won
+                  </Button>
                 )}
                 {isScheduled && (
                   <Button size="sm" variant="outline" className="h-7 text-xs"
