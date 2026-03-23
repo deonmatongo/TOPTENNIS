@@ -123,7 +123,7 @@ export const SchedulingAssistant: React.FC<SchedulingAssistantProps> = ({
             Your availability
           </span>
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="w-3.5 h-3.5 rounded-sm bg-orange-300/60 border border-orange-300 dark:bg-orange-700/40 dark:border-orange-600" />
+            <span className="w-3.5 h-3.5 rounded-sm bg-purple-300/60 border border-purple-300 dark:bg-purple-700/40 dark:border-purple-600" />
             {theirName}'s availability
           </span>
           <span className="flex items-center gap-1.5 text-xs font-medium text-green-700 dark:text-green-400">
@@ -251,7 +251,7 @@ export const SchedulingAssistant: React.FC<SchedulingAssistantProps> = ({
                               'relative h-9 sm:h-10 border-r border-b border-border/30 transition-colors',
                               bothFree && 'bg-green-500 hover:bg-green-400 cursor-pointer group',
                               onlyMe    && 'bg-primary/25 dark:bg-primary/20',
-                              onlyThem  && 'bg-orange-200/70 dark:bg-orange-800/35',
+                              onlyThem  && 'bg-purple-200/70 dark:bg-purple-800/35',
                               !mySlot && !theirSlot && !isPast && 'bg-transparent',
                               isPast    && 'bg-muted/20 opacity-40 cursor-not-allowed',
                               booked    && !isPast && 'opacity-40 cursor-not-allowed',
@@ -280,7 +280,7 @@ export const SchedulingAssistant: React.FC<SchedulingAssistantProps> = ({
             {myName} (you)
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm bg-orange-300/60 border border-orange-300 dark:bg-orange-700/40 dark:border-orange-600 shrink-0" />
+            <span className="w-3 h-3 rounded-sm bg-purple-300/60 border border-purple-300 dark:bg-purple-700/40 dark:border-purple-600 shrink-0" />
             {theirName}
           </span>
           <span className="hidden sm:block ml-auto text-[11px]">

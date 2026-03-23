@@ -20,12 +20,13 @@ import {
 } from 'lucide-react';
 import { SearchResult } from '@/hooks/usePlayerSearch';
 import { toast } from 'sonner';
-import SendMessageModal from './SendMessageModal';
 import { PlayerScheduleModal } from './PlayerScheduleModal';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { useBlockedUsers } from '@/hooks/useBlockedUsers';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
+import { useConversationsContext } from '@/contexts/ConversationsContext';
+import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 
 interface PendingInvite {
@@ -104,8 +105,8 @@ const initials = (name: string) =>
 const PlayerProfileModal = ({
   player, isOpen, onClose, pendingInvite, onInviteResponded,
 }: PlayerProfileModalProps) => {
-  const [showSendMessage, setShowSendMessage] = useState(false);
   const [showScheduleMatch, setShowScheduleMatch] = useState(false);
+  const [isOpeningDM, setIsOpeningDM] = useState(false);
   const [showBlockDialog, setShowBlockDialog] = useState(false);
   const [showUnfriendDialog, setShowUnfriendDialog] = useState(false);
   const [blockReason, setBlockReason] = useState('');
@@ -114,9 +115,11 @@ const PlayerProfileModal = ({
   const [isRespondingToInvite, setIsRespondingToInvite] = useState(false);
 
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { sendFriendRequest, updateRequestStatus, getRelationshipWith, requests, refetch: refetchFriends } = useFriendRequests();
   const { blockUser, unfriendUser } = useBlockedUsers();
   const { respondToInvite } = useMatchInvitesContext();
+  const { getOrCreateDM } = useConversationsContext();
 
   if (!player) return null;
 
@@ -194,6 +197,20 @@ const PlayerProfileModal = ({
       toast.error('Failed to respond to invite');
     } finally {
       setIsRespondingToInvite(false);
+    }
+  };
+
+  const handleOpenMessage = async () => {
+    if (!otherUserId) return;
+    setIsOpeningDM(true);
+    try {
+      await getOrCreateDM(otherUserId);
+      onClose();
+      navigate('/dashboard?tab=messages');
+    } catch {
+      toast.error('Failed to open conversation');
+    } finally {
+      setIsOpeningDM(false);
     }
   };
 
@@ -359,8 +376,9 @@ const PlayerProfileModal = ({
                 <Button onClick={() => setShowScheduleMatch(true)} className="h-10 text-xs sm:text-sm">
                   <Swords className="w-4 h-4 mr-1.5 sm:mr-2" />Challenge
                 </Button>
-                <Button onClick={() => setShowSendMessage(true)} variant="outline" className="h-10 text-xs sm:text-sm">
-                  <MessageCircle className="w-4 h-4 mr-1.5 sm:mr-2" />Message
+                <Button onClick={handleOpenMessage} variant="outline" className="h-10 text-xs sm:text-sm" disabled={isOpeningDM}>
+                  <MessageCircle className="w-4 h-4 mr-1.5 sm:mr-2" />
+                  {isOpeningDM ? 'Opening…' : 'Message'}
                 </Button>
               </div>
 
@@ -407,7 +425,6 @@ const PlayerProfileModal = ({
           </div>
 
           {/* Modals */}
-          <SendMessageModal player={player} isOpen={showSendMessage} onClose={() => setShowSendMessage(false)} />
           <PlayerScheduleModal open={showScheduleMatch} onClose={() => setShowScheduleMatch(false)} player={player}
             onInviteSent={() => { setShowScheduleMatch(false); onClose(); }} />
         </DialogContent>

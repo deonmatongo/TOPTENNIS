@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Trophy,
@@ -13,8 +13,7 @@ import {
   Star,
   ChevronDown,
 } from 'lucide-react';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { toast } from 'sonner';
 
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { useBlockedUsers } from '@/hooks/useBlockedUsers';
@@ -42,16 +41,17 @@ const getSkillBadge = (level: number) => {
 };
 
 const toSearchResult = (p: RecommendedPlayer): SearchResult => ({
-  id:              p.id,
-  user_id:         p.user_id,
-  name:            p.name,
-  email:           p.email,
-  skill_level:     p.skill_level,
-  wins:            p.wins,
-  losses:          p.losses,
-  usta_rating:     p.usta_rating ?? undefined,
-  competitiveness: p.competitiveness ?? undefined,
-  age_range:       p.age_range ?? undefined,
+  id:                  p.id,
+  user_id:             p.user_id,
+  name:                p.name,
+  email:               p.email,
+  skill_level:         p.skill_level,
+  wins:                p.wins,
+  losses:              p.losses,
+  usta_rating:         p.usta_rating ?? undefined,
+  competitiveness:     p.competitiveness ?? undefined,
+  age_range:           p.age_range ?? undefined,
+  profile_picture_url: p.profile_picture_url,
 });
 
 // ── Skeleton card ─────────────────────────────────────────────────────────────
@@ -93,6 +93,7 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({ player, onInvit
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
           <Avatar className="w-12 h-12 ring-2 ring-border group-hover:ring-primary/40 transition-all flex-shrink-0">
+            <AvatarImage src={player.profile_picture_url ?? undefined} alt={player.name} className="object-cover" />
             <AvatarFallback className="bg-gradient-to-br from-primary/20 to-accent/20 text-primary font-bold text-sm">
               {getInitials(player.name)}
             </AvatarFallback>
@@ -184,9 +185,7 @@ const CasualMatchTab: React.FC = () => {
   // Show error toast when recommendation fetch fails
   useEffect(() => {
     if (recError) {
-      toast.error('Could not load AI recommendations. Please refresh.', {
-        toastId: 'rec-error',
-      });
+      toast.error('Could not load AI recommendations. Please refresh.');
     }
   }, [recError]);
 
@@ -197,10 +196,7 @@ const CasualMatchTab: React.FC = () => {
   const handleInvite = (p: RecommendedPlayer) => {
     setSelectedPlayer(toSearchResult(p));
     setShowProfile(true);
-    toast.info(`Opening profile for ${p.name} — pick a time slot to send the invite.`, {
-      toastId:   `invite-${p.id}`,
-      autoClose: 3000,
-    });
+    toast.info(`Opening profile for ${p.name} — pick a time slot to send the invite.`);
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -227,7 +223,7 @@ const CasualMatchTab: React.FC = () => {
             size="sm"
             onClick={() => {
               refetchRec();
-              toast.info('Refreshing recommendations…', { toastId: 'rec-refresh', autoClose: 1500 });
+              toast.info('Refreshing recommendations…');
             }}
             disabled={recLoading}
             className="flex-shrink-0"
@@ -294,18 +290,6 @@ const CasualMatchTab: React.FC = () => {
         }}
       />
 
-      {/* react-toastify container — self-contained, won't affect other tabs */}
-      <ToastContainer
-        position="bottom-right"
-        autoClose={4000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="light"
-      />
     </div>
   );
 };

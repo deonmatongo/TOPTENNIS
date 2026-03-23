@@ -14,6 +14,7 @@ export interface RecommendedPlayer {
   competitiveness: string | null;
   age_range: string | null;
   city: string | null;
+  profile_picture_url: string | null;
   /** 0–100 compatibility score computed client-side */
   compatibilityScore: number;
 }
@@ -78,11 +79,14 @@ export const useAIRecommendations = (
 
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, networking_enabled')
+        .select('id, networking_enabled, profile_picture_url')
         .in('id', userIds);
 
       const networkingMap = new Map(
         (profiles || []).map(p => [p.id, p.networking_enabled ?? true]),
+      );
+      const pictureMap = new Map(
+        (profiles || []).map(p => [p.id, p.profile_picture_url ?? null]),
       );
 
       // Compute win rate for the current user (for parity scoring)
@@ -128,17 +132,18 @@ export const useAIRecommendations = (
           );
 
           return {
-            id:              p.id,
-            user_id:         p.user_id!,
-            name:            p.name,
-            email:           p.email,
-            skill_level:     skill,
+            id:                  p.id,
+            user_id:             p.user_id!,
+            name:                p.name,
+            email:               p.email,
+            skill_level:         skill,
             wins,
             losses,
-            usta_rating:     p.usta_rating,
-            competitiveness: p.competitiveness,
-            age_range:       p.age_range,
-            city:            p.city,
+            usta_rating:         p.usta_rating,
+            competitiveness:     p.competitiveness,
+            age_range:           p.age_range,
+            city:                p.city,
+            profile_picture_url: pictureMap.get(p.user_id!) ?? null,
             compatibilityScore,
           } satisfies RecommendedPlayer;
         })
