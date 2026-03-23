@@ -252,6 +252,18 @@ const NewDashboard = () => {
             <FriendsMessagesTab />
           </ComponentErrorBoundary>
         );
+      case 'my-leagues':
+        return (
+          <ComponentErrorBoundary componentName="MyLeaguesTab">
+            <MyLeaguesTab
+              player={player}
+              registrations={registrations}
+              onNavigateToSchedule={(opponentId, opponentName) => {
+                setActiveTab('schedule');
+              }}
+            />
+          </ComponentErrorBoundary>
+        );
       case 'notifications':
         return (
           <ComponentErrorBoundary componentName="NotificationsTab">
