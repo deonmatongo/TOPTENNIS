@@ -90,12 +90,13 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
 
   const { user } = useAuth();
   const { availability, loading, error, deleteAvailability, createAvailability, updateAvailability, fetchAvailability } = useAvailabilityContext();
-  const { invites, getPendingInvites, getConfirmedInvites, respondToInvite, deleteInvite, cancelInvite } = useMatchInvitesContext();
+  const { invites, getPendingInvites, getSentInvites, getConfirmedInvites, respondToInvite, deleteInvite, cancelInvite } = useMatchInvitesContext();
   const { notifications, markAsRead } = useNotificationsContext();
   const { timezone, updateTimezone } = useUserTimezone();
 
   const pendingInvites = getPendingInvites();
   const confirmedMatches = getConfirmedInvites();
+  const sentPendingInvites = getSentInvites().filter(i => i.status === 'pending');
 
   // Calculate calendar range
   const calendarRange = useMemo(() => {
@@ -119,27 +120,38 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
       grouped[dateKey] = [];
     });
 
+    const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+
     // Build a fast lookup of confirmed-match time ranges keyed by date
     const confirmedRangesByDate: Record<string, Array<{ start: number; end: number }>> = {};
     confirmedMatches?.forEach(match => {
       if (match.status === 'accepted' && match.date && match.start_time && match.end_time) {
-        const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
         if (!confirmedRangesByDate[match.date]) confirmedRangesByDate[match.date] = [];
         confirmedRangesByDate[match.date].push({ start: toMin(match.start_time), end: toMin(match.end_time) });
       }
     });
 
-    const overlapsConfirmedMatch = (date: string, startTime: string, endTime: string): boolean => {
-      const ranges = confirmedRangesByDate[date];
-      if (!ranges?.length) return false;
-      const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    // Build a fast lookup of sent-pending-invite time ranges keyed by date
+    const sentPendingRangesByDate: Record<string, Array<{ start: number; end: number }>> = {};
+    sentPendingInvites?.forEach(invite => {
+      if (invite.date && invite.start_time && invite.end_time) {
+        if (!sentPendingRangesByDate[invite.date]) sentPendingRangesByDate[invite.date] = [];
+        sentPendingRangesByDate[invite.date].push({ start: toMin(invite.start_time), end: toMin(invite.end_time) });
+      }
+    });
+
+    const overlapsActiveBooking = (date: string, startTime: string, endTime: string): boolean => {
       const s = toMin(startTime); const e = toMin(endTime);
-      return ranges.some(r => s < r.end && e > r.start);
+      const confirmedRanges = confirmedRangesByDate[date];
+      if (confirmedRanges?.some(r => s < r.end && e > r.start)) return true;
+      const pendingRanges = sentPendingRangesByDate[date];
+      if (pendingRanges?.some(r => s < r.end && e > r.start)) return true;
+      return false;
     };
 
     // Add availability slots
     availability?.forEach(slot => {
-      if (slot.is_available && !slot.is_blocked && !overlapsConfirmedMatch(slot.date, slot.start_time, slot.end_time)) {
+      if (slot.is_available && !slot.is_blocked && !overlapsActiveBooking(slot.date, slot.start_time, slot.end_time)) {
         const dateKey = slot.date;
         if (grouped[dateKey]) {
           // Convert times to user's timezone if different from slot's timezone
@@ -204,19 +216,19 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
       }
     });
 
-    // Add pending invites
+    // Add pending invites (received)
     pendingInvites?.forEach(invite => {
       if (invite.date) {
         const dateKey = invite.date;
         if (grouped[dateKey]) {
           const sender = invite.sender;
-          const senderName = sender 
-            ? `${sender.first_name || ''} ${sender.last_name || ''}`.trim() 
+          const senderName = sender
+            ? `${sender.first_name || ''} ${sender.last_name || ''}`.trim()
             : 'Unknown';
 
           // Convert times to user's timezone if different from invite's timezone
           const inviteTimezone = (invite as any).timezone || 'America/New_York';
-          const displayStartTime = inviteTimezone !== timezone 
+          const displayStartTime = inviteTimezone !== timezone
             ? convertTimeBetweenTimezones(invite.start_time, inviteTimezone, timezone, invite.date)
             : invite.start_time;
           const displayEndTime = inviteTimezone !== timezone
@@ -240,8 +252,43 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
       }
     });
 
+    // Add sent pending invites (amber)
+    sentPendingInvites?.forEach(invite => {
+      if (invite.date) {
+        const dateKey = invite.date;
+        if (grouped[dateKey]) {
+          const receiver = invite.receiver;
+          const receiverName = receiver
+            ? `${receiver.first_name || ''} ${receiver.last_name || ''}`.trim()
+            : 'Unknown';
+
+          const inviteTimezone = (invite as any).timezone || 'America/New_York';
+          const displayStartTime = inviteTimezone !== timezone
+            ? convertTimeBetweenTimezones(invite.start_time, inviteTimezone, timezone, invite.date)
+            : invite.start_time;
+          const displayEndTime = inviteTimezone !== timezone
+            ? convertTimeBetweenTimezones(invite.end_time, inviteTimezone, timezone, invite.date)
+            : invite.end_time;
+
+          grouped[dateKey].push({
+            type: 'sent_invite',
+            id: invite.id,
+            date: invite.date,
+            start_time: displayStartTime,
+            end_time: displayEndTime,
+            originalStartTime: invite.start_time,
+            originalEndTime: invite.end_time,
+            originalTimezone: inviteTimezone,
+            title: `Invite to ${receiverName}`,
+            color: 'bg-amber-500 text-white border-amber-600',
+            data: invite
+          });
+        }
+      }
+    });
+
     return grouped;
-  }, [calendarRange, availability, confirmedMatches, pendingInvites, timezone]);
+  }, [calendarRange, availability, confirmedMatches, pendingInvites, sentPendingInvites, timezone]);
 
   const handlePrevious = () => {
     if (viewMode === 'day') {
@@ -463,6 +510,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                       {event.type === 'availability' && <Clock className="h-4 w-4 shrink-0" />}
                       {event.type === 'match' && <CheckCircle2 className="h-4 w-4 shrink-0" />}
                       {event.type === 'invite' && <Mail className="h-4 w-4 shrink-0" />}
+                      {event.type === 'sent_invite' && <Mail className="h-4 w-4 shrink-0" />}
                       <span className="truncate">{event.title}</span>
                     </div>
                     <div className="text-xs opacity-75 mt-1">
@@ -593,6 +641,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                             {event.type === 'availability' && <Clock className="h-2 w-2 shrink-0" />}
                             {event.type === 'match' && <CheckCircle2 className="h-2 w-2 shrink-0" />}
                             {event.type === 'invite' && <Mail className="h-2 w-2 shrink-0" />}
+                            {event.type === 'sent_invite' && <Mail className="h-2 w-2 shrink-0" />}
                             <span className="truncate text-[9px]">{event.title}</span>
                           </div>
                         </div>
@@ -719,6 +768,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                             {event.type === 'availability' && <Clock className="h-3 w-3 shrink-0" />}
                             {event.type === 'match' && <CheckCircle2 className="h-3 w-3 shrink-0" />}
                             {event.type === 'invite' && <Mail className="h-3 w-3 shrink-0" />}
+                            {event.type === 'sent_invite' && <Mail className="h-3 w-3 shrink-0" />}
                             <span className="truncate">{event.title}</span>
                           </div>
                           <div className="text-[10px] opacity-75 mt-0.5">
@@ -911,8 +961,9 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                               {event.type === 'availability' && <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />}
                               {event.type === 'match' && <CheckCircle2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />}
                               {event.type === 'invite' && <Mail className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />}
+                              {event.type === 'sent_invite' && <Mail className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />}
                               <span className="truncate hidden sm:inline">{event.title}</span>
-                              <span className="truncate sm:hidden">{event.type === 'availability' ? 'Avail' : event.type === 'match' ? 'Match' : 'Invite'}</span>
+                              <span className="truncate sm:hidden">{event.type === 'availability' ? 'Avail' : event.type === 'match' ? 'Match' : event.type === 'sent_invite' ? 'Sent' : 'Invite'}</span>
                             </div>
                             {event.start_time && event.end_time && (
                               <div className="text-[9px] sm:text-[10px] opacity-75 mt-0.5 flex items-center gap-1">
@@ -1128,6 +1179,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                   {selectedEvent.type === 'availability' && <Clock className="h-5 w-5 text-green-600" />}
                   {selectedEvent.type === 'match' && <CheckCircle2 className="h-5 w-5 text-blue-600" />}
                   {selectedEvent.type === 'invite' && <Mail className="h-5 w-5 text-orange-600" />}
+                  {selectedEvent.type === 'sent_invite' && <Mail className="h-5 w-5 text-amber-600" />}
                   {selectedEvent.title}
                 </DialogTitle>
                 <DialogDescription>
@@ -1162,7 +1214,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 </div>
 
                 {/* Message for invites */}
-                {selectedEvent.type === 'invite' && selectedEvent.data.message && (
+                {(selectedEvent.type === 'invite' || selectedEvent.type === 'sent_invite') && selectedEvent.data.message && (
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-sm italic">"{selectedEvent.data.message}"</p>
                   </div>
@@ -1209,10 +1261,21 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                     </>
                   )}
                   
+                  {selectedEvent.type === 'sent_invite' && (
+                    <Button
+                      onClick={() => handleCancelMatch(selectedEvent.id)}
+                      variant="destructive"
+                      className="flex-1"
+                    >
+                      <AlertCircle className="h-4 w-4 mr-2" />
+                      Cancel Invite
+                    </Button>
+                  )}
+
                   {selectedEvent.type === 'availability' && (
                     <Button
                       onClick={(e) => handleDeleteClick(
-                        selectedEvent.id, 
+                        selectedEvent.id,
                         'availability',
                         e
                       )}
