@@ -78,6 +78,8 @@ export const useConversations = () => {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const fetchConversationsRef = useRef<() => Promise<void>>(async () => {});
+  // Suppress the error toast when the call is a silent background poll
+  const silentRef = useRef(false);
 
   const fetchConversations = useCallback(async () => {
     if (!user) {
@@ -121,14 +123,18 @@ export const useConversations = () => {
 
       const userIds = Array.from(new Set((allMembers || []).map((m: any) => m.user_id)));
 
-      const { data: profiles, error: profileErr } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email, profile_picture_url')
-        .in('id', userIds as string[]);
+      // Guard: skip the profiles query when there are no member IDs to look up
+      let profiles: any[] = [];
+      if (userIds.length > 0) {
+        const { data: profileData, error: profileErr } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email, profile_picture_url')
+          .in('id', userIds as string[]);
+        if (profileErr) throw profileErr;
+        profiles = profileData || [];
+      }
 
-      if (profileErr) throw profileErr;
-
-      const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+      const profileMap = new Map(profiles.map(p => [p.id, p]));
 
       const { data: allMessages, error: msgErr } = await db
         .from('conversation_messages')
@@ -140,38 +146,48 @@ export const useConversations = () => {
 
       const senderIds = Array.from(new Set((allMessages || []).map((m: any) => m.sender_id)));
 
-      const { data: senderProfiles, error: senderErr } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email, profile_picture_url')
-        .in('id', senderIds as string[]);
+      // Guard: skip sender profiles query when there are no messages
+      let senderProfiles: any[] = [];
+      if (senderIds.length > 0) {
+        const { data: spData, error: senderErr } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email, profile_picture_url')
+          .in('id', senderIds as string[]);
+        if (senderErr) throw senderErr;
+        senderProfiles = spData || [];
+      }
 
-      if (senderErr) throw senderErr;
-
-      const senderMap = new Map((senderProfiles || []).map(p => [p.id, p]));
+      const senderMap = new Map(senderProfiles.map(p => [p.id, p]));
 
       const msgIds = (allMessages || []).map((m: any) => m.id);
       let reactionsMap = new Map<string, MessageReaction[]>();
 
+      // Reactions are non-critical — a failure here should not block conversation load
       if (msgIds.length > 0) {
-        const { data: allReactions, error: reactionsErr } = await db
-          .from('message_reactions')
-          .select('message_id, user_id, emoji')
-          .in('message_id', msgIds);
+        try {
+          const { data: allReactions, error: reactionsErr } = await db
+            .from('message_reactions')
+            .select('message_id, user_id, emoji')
+            .in('message_id', msgIds);
 
-        if (reactionsErr) throw reactionsErr;
+          if (reactionsErr) throw reactionsErr;
 
-        (allReactions || []).forEach((r: any) => {
-          const list = reactionsMap.get(r.message_id) || [];
-          const existing = list.find(x => x.emoji === r.emoji);
-          if (existing) {
-            existing.count++;
-            existing.userIds.push(r.user_id);
-            if (r.user_id === user.id) existing.reactedByMe = true;
-          } else {
-            list.push({ emoji: r.emoji, count: 1, reactedByMe: r.user_id === user.id, userIds: [r.user_id] });
-          }
-          reactionsMap.set(r.message_id, list);
-        });
+          (allReactions || []).forEach((r: any) => {
+            const list = reactionsMap.get(r.message_id) || [];
+            const existing = list.find(x => x.emoji === r.emoji);
+            if (existing) {
+              existing.count++;
+              existing.userIds.push(r.user_id);
+              if (r.user_id === user.id) existing.reactedByMe = true;
+            } else {
+              list.push({ emoji: r.emoji, count: 1, reactedByMe: r.user_id === user.id, userIds: [r.user_id] });
+            }
+            reactionsMap.set(r.message_id, list);
+          });
+        } catch (reactErr) {
+          // Non-blocking: reactions simply won't show until next fetch
+          console.warn('[conversations] Failed to load reactions:', reactErr);
+        }
       }
 
       const msgMap = new Map((allMessages || []).map((m: any) => [m.id, m]));
@@ -220,16 +236,20 @@ export const useConversations = () => {
       setConversations(sortConversations(built));
     } catch (err) {
       console.error('Error fetching conversations:', err);
-      toast.error('Failed to load conversations. Please try again.', {
-        duration: 5000,
-        action: {
-          label: 'Retry',
-          onClick: () => fetchConversations(),
-        },
-      });
-      setConversations([]);
+      // Only surface the error to the user when it's an explicit load (not a silent background poll)
+      if (!silentRef.current) {
+        toast.error('Failed to load conversations. Please try again.', {
+          duration: 5000,
+          action: {
+            label: 'Retry',
+            onClick: () => { silentRef.current = false; fetchConversations(); },
+          },
+        });
+        setConversations([]);
+      }
     } finally {
       setLoading(false);
+      silentRef.current = false;
     }
   }, [user]);
 
@@ -581,6 +601,7 @@ export const useConversations = () => {
         if (status === 'SUBSCRIBED') {
           reconnectAttemptsRef.current = 0;
           // Catch up on any messages missed during reconnection
+          silentRef.current = true;
           fetchConversationsRef.current();
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           scheduleReconnect();
@@ -700,6 +721,7 @@ export const useConversations = () => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         reconnectAttemptsRef.current = 0;
+        silentRef.current = true;
         fetchConversationsRef.current();
       }
     };
@@ -713,6 +735,7 @@ export const useConversations = () => {
   useEffect(() => {
     if (!user) return;
     const interval = setInterval(() => {
+      silentRef.current = true;
       fetchConversationsRef.current();
     }, 8_000);
     return () => clearInterval(interval);
