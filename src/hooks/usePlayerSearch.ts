@@ -17,6 +17,7 @@ export interface SearchResult {
   first_name?: string;
   last_name?: string;
   gender?: string | null;
+  profile_picture_url?: string | null;
 }
 
 export const usePlayerSearch = (blockedUserIds: string[] = []) => {
@@ -42,11 +43,11 @@ export const usePlayerSearch = (blockedUserIds: string[] = []) => {
         const userIds = playersData?.filter(p => p.user_id).map(p => p.user_id) || [];
 
         // Fetch networking prefs + names
-        let profilesData: { id: string; networking_enabled: boolean; first_name: string | null; last_name: string | null }[] = [];
+        let profilesData: { id: string; networking_enabled: boolean; first_name: string | null; last_name: string | null; profile_picture_url?: string | null }[] = [];
         if (userIds.length > 0) {
           const { data, error: profilesError } = await supabase
             .from('profiles')
-            .select('id, networking_enabled, first_name, last_name')
+            .select('id, networking_enabled, first_name, last_name, profile_picture_url')
             .in('id', userIds);
 
           if (profilesError) {
@@ -72,6 +73,7 @@ export const usePlayerSearch = (blockedUserIds: string[] = []) => {
             networking_enabled: profile?.networking_enabled ?? true,
             first_name: profile?.first_name,
             last_name: profile?.last_name,
+            profile_picture_url: profile?.profile_picture_url ?? null,
           };
         }).filter(player =>
           player.networking_enabled !== false &&

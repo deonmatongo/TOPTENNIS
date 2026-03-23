@@ -254,7 +254,7 @@ export const useMatchInvites = () => {
       const [{ data: profiles, error: profilesError }, { data: players, error: playersError }] = await Promise.all([
         supabase
           .from('profiles')
-          .select('id, first_name, last_name, email')
+          .select('id, first_name, last_name, email, profile_picture_url')
           .in('id', uniqueUserIds),
         supabase
           .from('players')

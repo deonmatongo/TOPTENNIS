@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
@@ -219,9 +220,16 @@ const PlayerProfileModal = ({
 
             <div className="relative flex items-end gap-4">
               {/* Avatar */}
-              <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm border-2 border-white/40 flex items-center justify-center text-white text-2xl font-bold shrink-0 shadow-lg">
-                {initials(player.name)}
-              </div>
+              <Avatar className="w-16 h-16 rounded-2xl border-2 border-white/40 shadow-lg shrink-0">
+                <AvatarImage
+                  src={player.profile_picture_url ?? undefined}
+                  alt={player.name}
+                  className="object-cover"
+                />
+                <AvatarFallback className="rounded-2xl bg-white/20 backdrop-blur-sm text-white text-2xl font-bold">
+                  {initials(player.name)}
+                </AvatarFallback>
+              </Avatar>
 
               <div className="flex-1 min-w-0 pb-0.5">
                 <h2 className="text-xl font-bold text-white leading-tight truncate">{player.name}</h2>

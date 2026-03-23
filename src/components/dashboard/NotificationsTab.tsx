@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
   Bell, Trophy, Calendar, Users, TrendingUp, X,
   Filter, Search, ChevronRight, MessageCircle, UserPlus,
@@ -104,6 +105,22 @@ const NotificationsTab = () => {
     isLoading,
   } = useNotificationsContext();
   const { invites } = useMatchInvitesContext();
+
+  /** Resolve the actor's photo URL + initials for a notification. */
+  const resolveActor = (n: Notification): { url: string | null; initials: string } => {
+    const init = (name: string) =>
+      name.split(' ').filter(Boolean).map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?';
+
+    if (['match_invite', 'match_rescheduled', 'match_accepted', 'match_declined', 'match_cancelled'].includes(n.type)) {
+      const invite = invites.find(i => i.id === n.metadata?.match_id);
+      const actor = invite?.sender;
+      if (actor) {
+        const name = `${actor.first_name || ''} ${actor.last_name || ''}`.trim() || 'Player';
+        return { url: (actor as any).profile_picture_url ?? null, initials: init(name) };
+      }
+    }
+    return { url: null, initials: init(n.title) };
+  };
 
   const [filter, setFilter]       = React.useState<'all' | 'unread' | 'read'>('all');
   const [typeFilter, setTypeFilter] = React.useState<string>('all');
@@ -399,11 +416,12 @@ const NotificationsTab = () => {
             ) : (
               <div className="divide-y divide-border">
                 {filteredNotifications.map(notification => {
-                  const Icon     = getNotificationIcon(notification.type);
-                  const iconColor = getNotificationColor(notification.type);
-                  const destLabel = getDestinationLabel(notification.type);
+                  const Icon      = getNotificationIcon(notification.type);
+                  const iconColor  = getNotificationColor(notification.type);
+                  const destLabel  = getDestinationLabel(notification.type);
                   const isClickable = !selectionMode && !!(destLabel || notification.actionUrl);
                   const isSelected  = selectedIds.has(notification.id);
+                  const actor       = resolveActor(notification);
 
                   return (
                     <div
@@ -429,10 +447,17 @@ const NotificationsTab = () => {
                           />
                         </div>
                       ) : (
-                        <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                          !notification.read ? 'bg-primary/10' : 'bg-muted/50'
-                        }`}>
-                          <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${iconColor}`} />
+                        <div className="relative flex-shrink-0">
+                          <Avatar className="w-10 h-10 sm:w-11 sm:h-11">
+                            <AvatarImage src={actor.url ?? undefined} alt="" className="object-cover" />
+                            <AvatarFallback className={`text-sm font-semibold ${!notification.read ? 'bg-primary/10 text-primary' : 'bg-muted/50 text-muted-foreground'}`}>
+                              {actor.initials}
+                            </AvatarFallback>
+                          </Avatar>
+                          {/* Type icon badge */}
+                          <span className={`absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-background flex items-center justify-center ${!notification.read ? 'bg-primary/10' : 'bg-muted/60'}`}>
+                            <Icon className={`w-2.5 h-2.5 ${iconColor}`} />
+                          </span>
                         </div>
                       )}
 

@@ -3,7 +3,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Calendar, Clock, MapPin, User, CheckCircle, XCircle, CalendarPlus } from 'lucide-react';
+import { Calendar, Clock, MapPin, CheckCircle, XCircle, CalendarPlus } from 'lucide-react';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 
 interface MatchInviteCardProps {
@@ -13,6 +14,7 @@ interface MatchInviteCardProps {
       first_name: string;
       last_name: string;
       email: string;
+      profile_picture_url?: string | null;
     } & {
       skill_level?: number | null;
       usta_rating?: string | null;
@@ -26,6 +28,7 @@ interface MatchInviteCardProps {
       first_name: string;
       last_name: string;
       email: string;
+      profile_picture_url?: string | null;
     } & {
       skill_level?: number | null;
       usta_rating?: string | null;
@@ -166,9 +169,17 @@ const MatchInviteCard: React.FC<MatchInviteCardProps> = ({
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h4 className="font-semibold">
-                {isReceiver ? 'Match Invite from' : 'Match Invite to'} {opponentName}
-              </h4>
+              <Avatar className="w-9 h-9 shrink-0">
+                <AvatarImage src={opponent?.profile_picture_url ?? undefined} alt={opponentName} className="object-cover" />
+                <AvatarFallback className="text-xs font-semibold">
+                  {opponentName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h4 className="font-semibold text-sm leading-tight">
+                  {isReceiver ? 'Invite from' : 'Invite to'} {opponentName}
+                </h4>
+              </div>
               {getStatusBadge()}
             </div>
             {invite.home_away_indicator && (

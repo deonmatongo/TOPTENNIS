@@ -13,6 +13,7 @@ import {
   Loader2,
   Trash2
 } from 'lucide-react';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -217,6 +218,30 @@ const NotificationDropdown = ({ children }: NotificationDropdownProps) => {
 
   const recentNotifications = notifications.slice(0, 12);
 
+  /** Resolve the sender's profile picture URL + initials for a notification. */
+  const resolveActor = (notification: Notification): { url: string | null; initials: string } => {
+    const init = (name: string) =>
+      name.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+
+    if (['match_invite', 'match_rescheduled', 'match_accepted', 'match_declined', 'match_cancelled'].includes(notification.type)) {
+      const invite = invites.find(i => i.id === notification.metadata?.match_id);
+      const actor = invite?.sender;
+      if (actor) {
+        const name = `${actor.first_name || ''} ${actor.last_name || ''}`.trim() || 'Player';
+        return { url: (actor as any).profile_picture_url ?? null, initials: init(name) };
+      }
+    }
+    if (notification.type === 'friend_request') {
+      const req = requests.find(r => r.sender_id === notification.metadata?.sender_id);
+      const sender = req?.sender;
+      if (sender) {
+        return { url: (sender as any).profile_picture_url ?? null, initials: init(sender.name || 'Player') };
+      }
+    }
+    // Fallback: derive initials from notification title
+    return { url: null, initials: init(notification.title) };
+  };
+
   return (
     <>
       <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
@@ -272,6 +297,7 @@ const NotificationDropdown = ({ children }: NotificationDropdownProps) => {
                 const nState = actionState[notification.id];
                 const isMatchInvite = ['match_invite', 'match_rescheduled'].includes(notification.type);
                 const isFriendReq = notification.type === 'friend_request';
+                const actor = resolveActor(notification);
 
                 // Determine if inline actions should be shown
                 const showMatchActions = isMatchInvite &&
@@ -294,12 +320,19 @@ const NotificationDropdown = ({ children }: NotificationDropdownProps) => {
                     } ${showMatchActions || showFriendActions || nState ? 'cursor-default' : 'cursor-pointer'}`}
                     onClick={() => !(showMatchActions || showFriendActions || nState) && handleNotificationClick(notification)}
                   >
-                    <div className={`w-8 h-8 rounded-lg bg-muted/30 flex items-center justify-center flex-shrink-0 ${
-                      !notification.read ? 'bg-primary/10' : ''
-                    }`}>
-                      {nState === 'accepted' ? <CheckCircle className="w-4 h-4 text-green-500" /> :
-                       nState === 'declined' ? <X className="w-4 h-4 text-muted-foreground" /> :
-                       <Icon className={`w-4 h-4 ${iconColor}`} />}
+                    <div className="relative flex-shrink-0">
+                      <Avatar className="w-8 h-8">
+                        <AvatarImage src={actor.url ?? undefined} alt="" className="object-cover" />
+                        <AvatarFallback className={`text-[10px] font-semibold ${!notification.read ? 'bg-primary/15 text-primary' : 'bg-muted/50 text-muted-foreground'}`}>
+                          {actor.initials}
+                        </AvatarFallback>
+                      </Avatar>
+                      {/* Type badge overlay */}
+                      <span className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center ${!notification.read ? 'bg-primary/10' : 'bg-muted/60'}`}>
+                        {nState === 'accepted' ? <CheckCircle className="w-2.5 h-2.5 text-green-500" /> :
+                         nState === 'declined' ? <X className="w-2.5 h-2.5 text-muted-foreground" /> :
+                         <Icon className={`w-2.5 h-2.5 ${iconColor}`} />}
+                      </span>
                     </div>
                     
                     <div className="flex-1 min-w-0">
