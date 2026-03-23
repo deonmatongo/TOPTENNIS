@@ -220,13 +220,13 @@ const PlayerProfileModal = ({
 
             <div className="relative flex items-end gap-4">
               {/* Avatar */}
-              <Avatar className="w-16 h-16 rounded-2xl border-2 border-white/40 shadow-lg shrink-0">
+              <Avatar className="w-16 h-16 rounded-full border-2 border-white/40 shadow-lg shrink-0">
                 <AvatarImage
                   src={player.profile_picture_url ?? undefined}
                   alt={player.name}
                   className="object-cover"
                 />
-                <AvatarFallback className="rounded-2xl bg-white/20 backdrop-blur-sm text-white text-2xl font-bold">
+                <AvatarFallback className="rounded-full bg-white/20 backdrop-blur-sm text-white text-2xl font-bold">
                   {initials(player.name)}
                 </AvatarFallback>
               </Avatar>

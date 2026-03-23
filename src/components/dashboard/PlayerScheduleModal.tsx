@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/compone
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Calendar, List, User, Clock, AlertCircle, CheckCircle, Users, UserPlus, Zap } from 'lucide-react';
 import { AvailableSlotsList } from './AvailableSlotsList';
 import { BookingModal } from './BookingModal';
@@ -219,9 +220,16 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
 
             <div className="relative flex items-center gap-4">
               {/* Avatar */}
-              <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm border-2 border-white/40 flex items-center justify-center text-white text-xl font-bold shrink-0 shadow-lg">
-                {initials(opponentName)}
-              </div>
+              <Avatar className="w-14 h-14 rounded-full border-2 border-white/40 shadow-lg shrink-0">
+                <AvatarImage
+                  src={(player as any)?.profile_picture_url ?? (player as any)?.avatar_url ?? undefined}
+                  alt={opponentName}
+                  className="object-cover"
+                />
+                <AvatarFallback className="rounded-full bg-white/20 backdrop-blur-sm text-white text-xl font-bold">
+                  {initials(opponentName)}
+                </AvatarFallback>
+              </Avatar>
 
               <div className="flex-1 min-w-0">
                 <p className="text-white/70 text-xs font-medium uppercase tracking-widest mb-0.5">Challenge</p>
