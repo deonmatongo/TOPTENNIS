@@ -727,7 +727,9 @@ export const useMatchInvites = () => {
 
   const isSlotBooked = (date: string, startTime: string, endTime: string, userId?: string) => {
     return invites.some(invite => {
-      if (invite.status !== 'accepted') return false;
+      // Treat both pending AND accepted invites as occupying the slot.
+      // Cancelled/declined invites free the slot back up.
+      if (invite.status !== 'accepted' && invite.status !== 'pending') return false;
       if (userId && invite.sender_id !== userId && invite.receiver_id !== userId) return false;
       if (invite.date !== date) return false;
       
