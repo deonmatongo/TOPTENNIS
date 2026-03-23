@@ -43,6 +43,8 @@ interface PlayerScheduleModalProps {
   onClose: () => void;
   player: SchedulePlayer | null;
   onInviteSent?: () => void;
+  groupMembers?: { user_id: string; name: string }[];
+  onCancelAll?: () => void;
 }
 
 export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
@@ -50,6 +52,8 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
   onClose,
   player,
   onInviteSent,
+  groupMembers,
+  onCancelAll,
 }) => {
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
@@ -133,26 +137,46 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
     // Not needed for viewing player schedule
   };
 
-  const handleBookingConfirm = async (courtLocation?: string, message?: string) => {
+  const handleBookingConfirm = async (courtLocation?: string, message?: string, additionalMemberIds?: string[]) => {
     if (!selectedSlot || !player) return;
 
     const opponentId = (player.user_id ?? player.id) as string;
-    
+    const slotDate = format(selectedSlot.date, 'yyyy-MM-dd');
+
     try {
       await createBooking({
         opponent_id: opponentId,
         availability_id: selectedSlot.availabilityId,
-        date: format(selectedSlot.date, 'yyyy-MM-dd'),
+        date: slotDate,
         start_time: selectedSlot.startTime,
         end_time: selectedSlot.endTime,
         court_location: courtLocation,
-        message: message
+        message: message,
       });
-      
-      toast.success(`Match request sent to ${opponentName}!`);
+
+      if (additionalMemberIds && additionalMemberIds.length > 0) {
+        await Promise.all(
+          additionalMemberIds.map(memberId =>
+            createBooking({
+              opponent_id: memberId,
+              date: slotDate,
+              start_time: selectedSlot.startTime,
+              end_time: selectedSlot.endTime,
+              court_location: courtLocation,
+              message: message,
+            })
+          )
+        );
+      }
+
+      const extraCount = additionalMemberIds?.length ?? 0;
+      toast.success(
+        extraCount > 0
+          ? `Match request sent to ${opponentName} + ${extraCount} group member${extraCount !== 1 ? 's' : ''}!`
+          : `Match request sent to ${opponentName}!`
+      );
       setShowBookingModal(false);
       setSelectedSlot(null);
-      onClose();
       onInviteSent?.();
     } catch (error) {
       console.error('Error creating booking:', error);
@@ -327,6 +351,18 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
               )}
             </TabsContent>
           </Tabs>
+
+          {/* Cancel footer — only shown in group context */}
+          {onCancelAll && (
+            <div className="px-6 pb-4 pt-2 border-t shrink-0 flex justify-center">
+              <button
+                onClick={onCancelAll}
+                className="text-sm text-muted-foreground hover:text-foreground underline-offset-2 hover:underline transition-colors"
+              >
+                Cancel match request
+              </button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -340,6 +376,8 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
           onConfirm={handleBookingConfirm}
           slot={selectedSlot}
           opponent={player}
+          groupMembers={groupMembers?.filter(m => m.user_id !== opponentUserId)}
+          onCancelAll={onCancelAll}
         />
       )}
     </>

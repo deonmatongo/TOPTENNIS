@@ -11,7 +11,8 @@ import type { Conversation, ConversationMessage } from '@/hooks/useConversations
 import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import { useOnlinePresence } from '@/hooks/useOnlinePresence';
-import { formatDistanceToNow, format, isToday, isYesterday, isSameDay } from 'date-fns';
+import { formatDistanceToNow, format, isToday, isYesterday, isSameDay, parseISO } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { SearchResult } from '@/hooks/usePlayerSearch';
 import PlayerProfileModal from './PlayerProfileModal';
@@ -112,196 +113,336 @@ const UnreadBadge = ({ count }: { count: number }) => {
 };
 
 // ── GroupMatchRequestSheet ────────────────────────────────────────────────────
+type SlotEntry = { date: string; start_time: string; end_time: string; playerIds: string[] };
+
 interface GroupMatchRequestSheetProps {
   open: boolean;
   onClose: () => void;
   conv: Conversation;
   currentUserId: string;
-  onConfirm: (players: SearchResult[]) => void;
+  onComplete: (count: number) => void;
   onViewProfile: (player: SearchResult) => void;
 }
 const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
-  open, onClose, conv, currentUserId, onConfirm, onViewProfile,
+  open, onClose, conv, currentUserId, onComplete, onViewProfile,
 }) => {
+  const { sendInvite } = useMatchInvitesContext();
   const otherMembers = conv.members.filter(m => m.user_id !== currentUserId);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  // Reset selection whenever the sheet opens
-  useEffect(() => { if (open) setSelected(new Set()); }, [open]);
+  const [step, setStep]                 = useState<0 | 1 | 2>(0);
+  const [selected, setSelected]         = useState<Set<string>>(new Set());
+  const [rankedSlots, setRankedSlots]   = useState<SlotEntry[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<SlotEntry | null>(null);
+  const [sending, setSending]           = useState(false);
+
+  // Reset whenever the sheet opens
+  useEffect(() => {
+    if (open) { setStep(0); setSelected(new Set()); setRankedSlots([]); setSelectedSlot(null); }
+  }, [open]);
 
   const memberName = (m: Conversation['members'][0]) =>
-    m.profile
-      ? `${m.profile.first_name || ''} ${m.profile.last_name || ''}`.trim() || m.profile.email
-      : 'Unknown';
+    m.profile ? `${m.profile.first_name || ''} ${m.profile.last_name || ''}`.trim() || m.profile.email : 'Unknown';
 
-  const toggle = (uid: string) =>
-    setSelected(prev => {
-      const next = new Set(prev);
-      next.has(uid) ? next.delete(uid) : next.add(uid);
-      return next;
-    });
-
+  const toggle = (uid: string) => setSelected(prev => {
+    const n = new Set(prev); n.has(uid) ? n.delete(uid) : n.add(uid); return n;
+  });
   const allSelected = otherMembers.length > 0 && selected.size === otherMembers.length;
+  const toggleAll   = () => setSelected(allSelected ? new Set() : new Set(otherMembers.map(m => m.user_id)));
 
-  const toggleAll = () =>
-    setSelected(allSelected ? new Set() : new Set(otherMembers.map(m => m.user_id)));
-
-  const handleConfirm = () => {
-    const players: SearchResult[] = otherMembers
-      .filter(m => selected.has(m.user_id))
-      .map(m => ({
-        id: m.user_id,
-        user_id: m.user_id,
-        name: memberName(m),
-        email: m.profile?.email || '',
-        skill_level: 0,
-        wins: 0,
-        losses: 0,
-        first_name: m.profile?.first_name ?? undefined,
-        last_name: m.profile?.last_name ?? undefined,
-      }));
-    onClose();
-    onConfirm(players);
+  // ── Step 1→2: fetch & rank availability ──────────────────────────────────
+  const goToStep2 = async () => {
+    setStep(1);
+    setLoadingSlots(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('user_availability')
+        .select('user_id, date, start_time, end_time')
+        .in('user_id', Array.from(selected))
+        .eq('is_available', true)
+        .neq('booking_status', 'booked')
+        .gte('date', today)
+        .or('privacy_level.eq.public,privacy_level.is.null')
+        .order('date', { ascending: true })
+        .order('start_time', { ascending: true });
+      if (error) throw error;
+      const slotMap = new Map<string, SlotEntry>();
+      (data || []).forEach(row => {
+        const key = `${row.date}|${row.start_time}|${row.end_time}`;
+        const ex = slotMap.get(key);
+        if (ex) ex.playerIds.push(row.user_id);
+        else slotMap.set(key, { date: row.date, start_time: row.start_time, end_time: row.end_time, playerIds: [row.user_id] });
+      });
+      setRankedSlots(
+        Array.from(slotMap.values()).sort((a, b) =>
+          b.playerIds.length - a.playerIds.length ||
+          a.date.localeCompare(b.date) ||
+          a.start_time.localeCompare(b.start_time)
+        )
+      );
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load availability');
+    } finally {
+      setLoadingSlots(false);
+    }
   };
+
+  // ── Step 3: send invites ──────────────────────────────────────────────────
+  const handleSend = async () => {
+    if (!selectedSlot) return;
+    setSending(true);
+    try {
+      await Promise.all(
+        Array.from(selected).map(uid =>
+          sendInvite({ receiver_id: uid, date: selectedSlot.date, start_time: selectedSlot.start_time, end_time: selectedSlot.end_time })
+        )
+      );
+      onComplete(selected.size);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to send match request');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // ── Formatters ────────────────────────────────────────────────────────────
+  const fmtDate = (d: string) => format(parseISO(d), 'EEE, MMM d');
+  const fmtTime = (s: string, e: string) => `${s.slice(0, 5)} – ${e.slice(0, 5)}`;
+
+  const selectedMembers = otherMembers.filter(m => selected.has(m.user_id));
+  const STEP_LABELS = ['Select players', 'Choose slot', 'Confirm'];
+
+  // ── Stepper dots ─────────────────────────────────────────────────────────
+  const Stepper = () => (
+    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
+      {STEP_LABELS.map((label, i) => (
+        <React.Fragment key={i}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+            <div style={{ width: 24, height: 24, borderRadius: '50%', background: i <= step ? C.accent : C.border, color: i <= step ? '#fff' : C.muted, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>{i + 1}</div>
+            <div style={{ fontSize: 9, fontWeight: 600, color: i <= step ? C.accent : C.muted, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
+          </div>
+          {i < STEP_LABELS.length - 1 && (
+            <div style={{ flex: 1, height: 2, background: i < step ? C.accent : C.border, margin: '0 6px', marginBottom: 14 }} />
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
 
   return (
     <Sheet open={open} onOpenChange={v => !v && onClose()}>
-      <SheetContent side="right" style={{ width: 380, padding: 0, display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif" }}>
-        <SheetHeader style={{ padding: '20px 20px 14px', borderBottom: `1px solid ${C.border}` }}>
-          <SheetTitle style={{ fontSize: 16, fontWeight: 700 }}>Request Match</SheetTitle>
-          <p style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
-            Select the members you want to challenge. You'll pick a time slot for each one.
-          </p>
+      <SheetContent side="right" style={{ width: 400, padding: 0, display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif" }}>
+
+        {/* ── Header ── */}
+        <SheetHeader style={{ padding: '20px 20px 14px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+          <Stepper />
+          <SheetTitle style={{ fontSize: 16, fontWeight: 700, marginTop: 0 }}>
+            {step === 0 && 'Select players to challenge'}
+            {step === 1 && 'Choose a time slot'}
+            {step === 2 && 'Confirm match request'}
+          </SheetTitle>
         </SheetHeader>
 
-        {/* Select All row */}
-        {otherMembers.length > 1 && (
-          <div
-            onClick={toggleAll}
-            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: `1px solid ${C.border}`, cursor: 'pointer', background: allSelected ? C.accentLight : 'transparent' }}
-          >
-            <div style={{
-              width: 22, height: 22, borderRadius: 6, border: `2px solid ${allSelected ? C.accent : C.border}`,
-              background: allSelected ? C.accent : C.white,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s',
-            }}>
-              {allSelected && <span style={{ color: '#fff', fontSize: 13, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+        {/* ════════════════════════════════════════════════════════════════════
+            Step 0 — Player selection
+            ════════════════════════════════════════════════════════════════════ */}
+        {step === 0 && (
+          <>
+            {/* Select all */}
+            {otherMembers.length > 1 && (
+              <div onClick={toggleAll} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: `1px solid ${C.border}`, cursor: 'pointer', background: allSelected ? C.accentLight : 'transparent', flexShrink: 0 }}>
+                <div style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${allSelected ? C.accent : C.border}`, background: allSelected ? C.accent : C.white, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
+                  {allSelected && <span style={{ color: '#fff', fontSize: 13, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Select all ({otherMembers.length})</span>
+              </div>
+            )}
+
+            {/* Member list */}
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {otherMembers.length === 0 ? (
+                <div style={{ padding: '40px 0', textAlign: 'center' }}>
+                  <div style={{ fontSize: 36, marginBottom: 10 }}>👥</div>
+                  <div style={{ fontWeight: 600, color: C.text }}>No other members</div>
+                  <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Add members to the group first</div>
+                </div>
+              ) : otherMembers.map(m => {
+                const name = memberName(m);
+                const isChecked = selected.has(m.user_id);
+                return (
+                  <div key={m.user_id} onClick={() => toggle(m.user_id)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', borderBottom: `1px solid ${C.border}`, cursor: 'pointer', transition: 'background 0.1s', background: isChecked ? C.accentLight : 'transparent' }}>
+                    <div style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, border: `2px solid ${isChecked ? C.accent : C.border}`, background: isChecked ? C.accent : C.white, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>
+                      {isChecked && <span style={{ color: '#fff', fontSize: 13, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+                    </div>
+                    <Av name={name} src={m.profile?.profile_picture_url ?? undefined} size={40} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                      <div style={{ fontSize: 12, color: C.muted, fontWeight: 500, marginTop: 2 }}>{m.role === 'admin' ? '⭐ Admin' : 'Member'}</div>
+                    </div>
+                    <button onClick={e => { e.stopPropagation(); onViewProfile({ id: m.user_id, user_id: m.user_id, name, email: m.profile?.email || '', skill_level: 0, wins: 0, losses: 0, first_name: m.profile?.first_name ?? undefined, last_name: m.profile?.last_name ?? undefined }); }}
+                      style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: '4px 10px', fontSize: 11, fontWeight: 600, color: C.accent, cursor: 'pointer', flexShrink: 0, fontFamily: "'DM Sans', sans-serif" }}>
+                      Profile
+                    </button>
+                  </div>
+                );
+              })}
             </div>
-            <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Select all ({otherMembers.length})</span>
-          </div>
+
+            {/* Footer */}
+            <div style={{ padding: '16px 20px', borderTop: `1px solid ${C.border}`, background: C.white, flexShrink: 0 }}>
+              <button disabled={selected.size === 0} onClick={goToStep2}
+                style={{ width: '100%', padding: '11px 0', borderRadius: 10, background: selected.size > 0 ? C.accent : C.border, color: selected.size > 0 ? '#fff' : C.muted, border: 'none', fontSize: 14, fontWeight: 700, cursor: selected.size > 0 ? 'pointer' : 'not-allowed', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.15s' }}>
+                {selected.size === 0 ? 'Select players to continue' : `Next: Find a time slot →`}
+              </button>
+              <button onClick={onClose} style={{ width: '100%', padding: '10px 0', borderRadius: 10, border: 'none', background: 'transparent', fontSize: 13, fontWeight: 600, color: C.muted, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", marginTop: 8 }}>
+                Cancel
+              </button>
+            </div>
+          </>
         )}
 
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          {otherMembers.length === 0 ? (
-            <div style={{ padding: '40px 0', textAlign: 'center' }}>
-              <div style={{ fontSize: 36, marginBottom: 10 }}>👥</div>
-              <div style={{ fontWeight: 600, color: C.text }}>No other members</div>
-              <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Add members to the group first</div>
-            </div>
-          ) : (
-            otherMembers.map(m => {
-              const name = memberName(m);
-              const isChecked = selected.has(m.user_id);
-              return (
-                <div
-                  key={m.user_id}
-                  onClick={() => toggle(m.user_id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '13px 20px', borderBottom: `1px solid ${C.border}`,
-                    cursor: 'pointer', transition: 'background 0.1s',
-                    background: isChecked ? C.accentLight : 'transparent',
-                  }}
-                >
-                  {/* Checkbox */}
-                  <div style={{
-                    width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-                    border: `2px solid ${isChecked ? C.accent : C.border}`,
-                    background: isChecked ? C.accent : C.white,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'all 0.15s',
-                  }}>
-                    {isChecked && <span style={{ color: '#fff', fontSize: 13, fontWeight: 700, lineHeight: 1 }}>✓</span>}
-                  </div>
-
-                  <Av name={name} src={m.profile?.profile_picture_url ?? undefined} size={40} />
-
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-                    <div style={{ fontSize: 12, color: C.muted, fontWeight: 500, marginTop: 2 }}>
-                      {m.role === 'admin' ? '⭐ Admin' : 'Member'}
-                    </div>
-                  </div>
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      onViewProfile({
-                        id: m.user_id,
-                        user_id: m.user_id,
-                        name,
-                        email: m.profile?.email || '',
-                        skill_level: 0,
-                        wins: 0,
-                        losses: 0,
-                        first_name: m.profile?.first_name ?? undefined,
-                        last_name: m.profile?.last_name ?? undefined,
-                      });
-                    }}
-                    style={{
-                      background: 'none', border: `1px solid ${C.border}`, borderRadius: 8,
-                      padding: '4px 10px', fontSize: 11, fontWeight: 600,
-                      color: C.accent, cursor: 'pointer', flexShrink: 0,
-                      fontFamily: "'DM Sans', sans-serif",
-                    }}
-                  >
-                    Profile
-                  </button>
+        {/* ════════════════════════════════════════════════════════════════════
+            Step 1 — Time slot selection
+            ════════════════════════════════════════════════════════════════════ */}
+        {step === 1 && (
+          <>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+              {loadingSlots ? (
+                <div style={{ padding: '60px 0', textAlign: 'center' }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', border: `3px solid ${C.border}`, borderTopColor: C.accent, animation: 'spin 0.8s linear infinite', margin: '0 auto 14px' }} />
+                  <div style={{ fontSize: 13, color: C.muted, fontWeight: 500 }}>Checking availability…</div>
                 </div>
-              );
-            })
-          )}
-        </div>
-
-        {/* Footer */}
-        <div style={{ padding: '16px 20px', borderTop: `1px solid ${C.border}`, background: C.white, flexShrink: 0 }}>
-          {otherMembers.length > 0 && (
-            <>
-              {selected.size > 0 ? (
-                <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, fontWeight: 500 }}>
-                  {selected.size} player{selected.size !== 1 ? 's' : ''} selected — you'll set a time slot for each one.
+              ) : rankedSlots.length === 0 ? (
+                <div style={{ padding: '48px 0', textAlign: 'center' }}>
+                  <div style={{ fontSize: 36, marginBottom: 10 }}>📅</div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 6 }}>No shared availability found</div>
+                  <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>None of the selected players have public availability set. Go back and try fewer players, or ask them to add available slots.</div>
                 </div>
               ) : (
-                <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>Tap members above to select them.</div>
+                <>
+                  <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                    {rankedSlots.length} slot{rankedSlots.length !== 1 ? 's' : ''} found — ranked by player overlap
+                  </div>
+                  {rankedSlots.map((slot, idx) => {
+                    const ratio      = slot.playerIds.length / selected.size;
+                    const isChosen   = selectedSlot?.date === slot.date && selectedSlot?.start_time === slot.start_time && selectedSlot?.end_time === slot.end_time;
+                    const isBest     = idx === 0;
+                    return (
+                      <div key={`${slot.date}|${slot.start_time}`} onClick={() => setSelectedSlot(slot)}
+                        style={{ padding: '13px 14px', borderRadius: 12, border: `2px solid ${isChosen ? C.accent : C.border}`, background: isChosen ? C.accentLight : C.white, marginBottom: 10, cursor: 'pointer', transition: 'all 0.15s' }}>
+
+                        {/* Top row: date/time + badge */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{fmtDate(slot.date)}</div>
+                            <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{fmtTime(slot.start_time, slot.end_time)}</div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {isBest && (
+                              <span style={{ fontSize: 10, fontWeight: 700, background: '#22C55E', color: '#fff', padding: '3px 9px', borderRadius: 999 }}>Best match</span>
+                            )}
+                            {isChosen && (
+                              <div style={{ width: 22, height: 22, borderRadius: '50%', background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>✓</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Availability bar */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ flex: 1, height: 6, borderRadius: 3, background: C.border, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${ratio * 100}%`, background: isBest ? '#22C55E' : C.accent, borderRadius: 3, transition: 'width 0.3s' }} />
+                          </div>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: isBest ? '#22C55E' : C.accent, whiteSpace: 'nowrap' }}>
+                            {slot.playerIds.length}/{selected.size} players
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
               )}
-              <button
-                disabled={selected.size === 0}
-                onClick={handleConfirm}
-                style={{
-                  width: '100%', padding: '11px 0', borderRadius: 10,
-                  background: selected.size > 0 ? C.accent : C.border,
-                  color: selected.size > 0 ? '#fff' : C.muted,
-                  border: 'none', fontSize: 14, fontWeight: 700,
-                  cursor: selected.size > 0 ? 'pointer' : 'not-allowed',
-                  fontFamily: "'DM Sans', sans-serif", transition: 'all 0.15s',
-                }}
-              >
-                {selected.size === 0 ? 'Select players to continue' : `Continue with ${selected.size} player${selected.size !== 1 ? 's' : ''} →`}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '16px 20px', borderTop: `1px solid ${C.border}`, background: C.white, flexShrink: 0 }}>
+              <button disabled={!selectedSlot} onClick={() => selectedSlot && setStep(2)}
+                style={{ width: '100%', padding: '11px 0', borderRadius: 10, background: selectedSlot ? C.accent : C.border, color: selectedSlot ? '#fff' : C.muted, border: 'none', fontSize: 14, fontWeight: 700, cursor: selectedSlot ? 'pointer' : 'not-allowed', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.15s' }}>
+                {selectedSlot ? 'Review & confirm →' : 'Select a time slot'}
               </button>
-            </>
-          )}
-          <button
-            onClick={onClose}
-            style={{
-              width: '100%', padding: '10px 0', borderRadius: 10,
-              border: 'none', background: 'transparent',
-              fontSize: 13, fontWeight: 600, color: C.muted,
-              cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
-              marginTop: otherMembers.length > 0 ? 8 : 0,
-            }}
-          >
-            Cancel
-          </button>
-        </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button onClick={() => setStep(0)} style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: `1.5px solid ${C.border}`, background: 'transparent', fontSize: 13, fontWeight: 600, color: C.text, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>← Back</button>
+                <button onClick={onClose} style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: 'none', background: 'transparent', fontSize: 13, fontWeight: 600, color: C.muted, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════════════
+            Step 2 — Confirmation
+            ════════════════════════════════════════════════════════════════════ */}
+        {step === 2 && selectedSlot && (
+          <>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px' }}>
+
+              {/* Invited players */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>Invited players ({selectedMembers.length})</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                  {selectedMembers.map(m => (
+                    <div key={m.user_id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.bg, borderRadius: 10, padding: '8px 12px', border: `1px solid ${C.border}` }}>
+                      <Av name={memberName(m)} src={m.profile?.profile_picture_url ?? undefined} size={32} />
+                      <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{memberName(m).split(' ')[0]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Selected time */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>Proposed time</div>
+                <div style={{ background: C.accentLight, border: `1.5px solid ${C.accent}`, borderRadius: 12, padding: '14px 16px' }}>
+                  <div style={{ fontWeight: 700, fontSize: 16, color: C.text }}>{fmtDate(selectedSlot.date)}</div>
+                  <div style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>{fmtTime(selectedSlot.start_time, selectedSlot.end_time)}</div>
+                </div>
+              </div>
+
+              {/* Availability summary */}
+              <div style={{ background: C.bg, borderRadius: 12, padding: '14px 16px', border: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8 }}>Availability for this slot</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                  <div style={{ flex: 1, height: 8, borderRadius: 4, background: C.border, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${(selectedSlot.playerIds.length / selected.size) * 100}%`, background: '#22C55E', borderRadius: 4 }} />
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#22C55E' }}>{selectedSlot.playerIds.length}/{selected.size}</span>
+                </div>
+                <div style={{ fontSize: 12, color: C.muted }}>
+                  {selectedSlot.playerIds.length === selected.size
+                    ? 'All selected players are available at this time.'
+                    : `${selectedSlot.playerIds.length} of ${selected.size} selected players have this slot open. Others will still receive the invite.`}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '16px 20px', borderTop: `1px solid ${C.border}`, background: C.white, flexShrink: 0 }}>
+              <button disabled={sending} onClick={handleSend}
+                style={{ width: '100%', padding: '12px 0', borderRadius: 10, background: sending ? C.border : C.accent, color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: sending ? 'default' : 'pointer', fontFamily: "'DM Sans', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.15s' }}>
+                {sending ? <><div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid white', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />Sending…</> : `🎾 Send match request to ${selected.size} player${selected.size !== 1 ? 's' : ''}`}
+              </button>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button onClick={() => setStep(1)} disabled={sending} style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: `1.5px solid ${C.border}`, background: 'transparent', fontSize: 13, fontWeight: 600, color: C.text, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>← Back</button>
+                <button onClick={onClose} disabled={sending} style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: 'none', background: 'transparent', fontSize: 13, fontWeight: 600, color: C.muted, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
+              </div>
+            </div>
+          </>
+        )}
+
       </SheetContent>
     </Sheet>
   );
@@ -321,10 +462,12 @@ interface GroupInfoSheetProps {
   onSetAvatar: (file: File) => Promise<void>;
   onSetMemberRole: (uid: string, role: 'admin' | 'member') => Promise<void>;
   onViewProfile: (profile: NonNullable<Conversation['members'][0]['profile']>, uid: string) => void;
+  onSendMatchRequest: () => void;
 }
 const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
   open, onClose, conv, currentUserId, isAdmin, friends,
   onRemoveMember, onAddMember, onRenameGroup, onSetAvatar, onSetMemberRole, onViewProfile,
+  onSendMatchRequest,
 }) => {
   const [renaming, setRenaming]       = useState(false);
   const [newName, setNewName]         = useState(conv.name || '');
@@ -430,6 +573,20 @@ const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
               {isAdmin && <button onClick={() => setRenaming(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 14 }}>✏️</button>}
             </div>
           )}
+
+          {/* ── Send Match Request ── */}
+          <button
+            onClick={() => { onClose(); onSendMatchRequest(); }}
+            style={{
+              width: '100%', padding: '11px 0', borderRadius: 10,
+              background: C.accent, color: '#fff',
+              border: 'none', fontSize: 14, fontWeight: 700,
+              cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
+              marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            🎾 Send Match Request
+          </button>
 
           {/* ── Members ── */}
           <p style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Members ({conv.members.length})</p>
@@ -1078,6 +1235,7 @@ const FriendsMessagesTab = () => {
   const [showGroupMatchRequest, setShowGroupMatchRequest] = useState(false);
   const [matchRequestQueue, setMatchRequestQueue] = useState<SearchResult[]>([]);
   const [matchRequestTarget, setMatchRequestTarget] = useState<SearchResult | null>(null);
+  const [groupContextMembers, setGroupContextMembers] = useState<{ user_id: string; name: string }[] | null>(null);
   const [profilePlayer, setProfilePlayer]       = useState<any | null>(null);
   const [sending, setSending]             = useState(false);
   const [newGroupConvId, setNewGroupConvId] = useState<string | null>(null);
@@ -1782,11 +1940,9 @@ const FriendsMessagesTab = () => {
           onClose={() => setShowGroupMatchRequest(false)}
           conv={selectedConv}
           currentUserId={user?.id || ''}
-          onConfirm={players => {
-            if (players.length === 0) return;
-            const [first, ...rest] = players;
-            setMatchRequestQueue(rest);
-            setMatchRequestTarget(first);
+          onComplete={count => {
+            setShowGroupMatchRequest(false);
+            toast.success(`Match request sent to ${count} player${count !== 1 ? 's' : ''}!`);
           }}
           onViewProfile={player => setProfilePlayer(player)}
         />
@@ -1796,18 +1952,26 @@ const FriendsMessagesTab = () => {
       <PlayerScheduleModal
         open={!!matchRequestTarget}
         onClose={() => {
-          // Advance to next queued player, if any
+          // × / skip: advance to the next queued player
           const [next, ...rest] = matchRequestQueue;
           setMatchRequestQueue(rest ?? []);
           setMatchRequestTarget(next ?? null);
+          if (!next) setGroupContextMembers(null);
         }}
         player={matchRequestTarget}
         onInviteSent={() => {
           toast.success(`Match invite sent to ${matchRequestTarget?.name}!`);
-          // Advance queue
           const [next, ...rest] = matchRequestQueue;
           setMatchRequestQueue(rest ?? []);
           setMatchRequestTarget(next ?? null);
+          if (!next) setGroupContextMembers(null);
+        }}
+        groupMembers={groupContextMembers ?? undefined}
+        onCancelAll={() => {
+          // Cancel: abort the entire flow and return to group chat
+          setMatchRequestTarget(null);
+          setMatchRequestQueue([]);
+          setGroupContextMembers(null);
         }}
       />
 
@@ -1849,6 +2013,7 @@ const FriendsMessagesTab = () => {
           }}
           onSetMemberRole={(uid, role) => setMemberRole(selectedConv.id, uid, role)}
           onViewProfile={(profile, uid) => { setShowGroupInfo(false); setProfilePlayer(buildProfile(profile, uid)); }}
+          onSendMatchRequest={() => setShowGroupMatchRequest(true)}
         />
       )}
 

@@ -197,7 +197,7 @@ const NotificationsTab = () => {
               </Badge>}
           </h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1">
-            Stay updated with matches, achievements, and league updates
+            Stay updated with matches and league updates
           </p>
         </div>
         

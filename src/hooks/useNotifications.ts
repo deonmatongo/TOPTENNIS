@@ -444,6 +444,9 @@ export const useNotifications = () => {
     if (!socket) return;
 
     const handleNew = (payload: { id: string; title: string; message: string; type: string; actionUrl?: string }) => {
+      // Deduplicate: skip if we already handled this notification ID (e.g. on socket reconnect)
+      if (payload.id && notifiedRowIds.current.has(payload.id)) return;
+      if (payload.id) notifiedRowIds.current.add(payload.id);
       // Immediately bump the badge count
       setUnreadCount(prev => prev + 1);
       // Fetch from DB to get the full row (includes metadata, etc.)

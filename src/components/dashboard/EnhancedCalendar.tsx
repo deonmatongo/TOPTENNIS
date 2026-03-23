@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { CalendarViewSelector, CalendarView } from './CalendarViewSelector';
 import { EnhancedAvailabilityModal } from './EnhancedAvailabilityModal';
 import { downloadICS } from '@/utils/icsExport';
 import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useMatchBookings } from '@/hooks/useMatchBookings';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,31 +18,50 @@ import { toast } from 'sonner';
 
 export const EnhancedCalendar = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [activeView, setActiveView] = useState<CalendarView>('week');
   const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
+  // Stable mount ID so channel names are unique per component instance,
+  // preventing subscription stacking when the tab unmounts and remounts.
+  const mountId = useRef(`${Date.now()}-${Math.random().toString(36).slice(2, 7)}`).current;
 
   const { availability, deleteAvailability, loading: availabilityLoading } = useAvailabilityContext();
   const { bookings, loading: bookingsLoading } = useMatchBookings();
 
   // Set up real-time subscriptions for calendar updates
   useEffect(() => {
-    // Subscribe to match_invites changes (bookings)
+    if (!user?.id) return;
+
+    // Subscribe to match_invites changes (bookings) — scoped to current user
     const invitesChannel = supabase
-      .channel('calendar-match-invites')
+      .channel(`calendar-match-invites-${mountId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'match_invites'
+          table: 'match_invites',
+          filter: `sender_id=eq.${user.id}`
         },
         (payload) => {
-          console.log('Match invite changed:', payload);
-          // Invalidate bookings query to refetch
           queryClient.invalidateQueries({ queryKey: ['match-invites'] });
-          
+          if (payload.eventType === 'UPDATE' && payload.new.status === 'accepted') {
+            toast.success('Match confirmed! Your calendar has been updated.');
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'match_invites',
+          filter: `receiver_id=eq.${user.id}`
+        },
+        (payload) => {
+          queryClient.invalidateQueries({ queryKey: ['match-invites'] });
           if (payload.eventType === 'UPDATE' && payload.new.status === 'accepted') {
             toast.success('Match confirmed! Your calendar has been updated.');
           }
@@ -49,21 +69,36 @@ export const EnhancedCalendar = () => {
       )
       .subscribe();
 
-    // Subscribe to matches table changes (league matches)
+    // Subscribe to matches table changes (league matches) — scoped to current user
     const matchesChannel = supabase
-      .channel('calendar-matches')
+      .channel(`calendar-matches-${mountId}`)
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
           table: 'matches',
-          filter: 'invitation_status=in.(confirmed,accepted,rescheduled)'
+          filter: `home_player_id=eq.${user.id}`
         },
         (payload) => {
-          console.log('Match status changed:', payload);
           queryClient.invalidateQueries({ queryKey: ['matches'] });
-          
+          if (payload.new.invitation_status === 'confirmed') {
+            toast.success('Match confirmed! Your calendar has been updated.');
+          } else if (payload.new.invitation_status === 'rescheduled') {
+            toast.info('Match time updated. Check your calendar for the new time.');
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'matches',
+          filter: `away_player_id=eq.${user.id}`
+        },
+        (payload) => {
+          queryClient.invalidateQueries({ queryKey: ['matches'] });
           if (payload.new.invitation_status === 'confirmed') {
             toast.success('Match confirmed! Your calendar has been updated.');
           } else if (payload.new.invitation_status === 'rescheduled') {
@@ -73,18 +108,18 @@ export const EnhancedCalendar = () => {
       )
       .subscribe();
 
-    // Subscribe to match_responses changes
+    // Subscribe to match_responses changes — scoped to current user
     const responsesChannel = supabase
-      .channel('calendar-match-responses')
+      .channel(`calendar-match-responses-${mountId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'match_responses'
+          table: 'match_responses',
+          filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          console.log('Match response changed:', payload);
           queryClient.invalidateQueries({ queryKey: ['match-invites-pending'] });
           queryClient.invalidateQueries({ queryKey: ['matches'] });
         }
@@ -96,7 +131,7 @@ export const EnhancedCalendar = () => {
       supabase.removeChannel(matchesChannel);
       supabase.removeChannel(responsesChannel);
     };
-  }, [queryClient]);
+  }, [user?.id, queryClient]);
 
   // Get events for selected date
   const selectedDateEvents = useMemo(() => {

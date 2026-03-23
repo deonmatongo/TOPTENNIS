@@ -11,13 +11,13 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar, Clock, MapPin, User } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, Users } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface BookingModalProps {
   open: boolean;
   onClose: () => void;
-  onConfirm: (courtLocation?: string, message?: string) => void;
+  onConfirm: (courtLocation?: string, message?: string, additionalMemberIds?: string[]) => void;
   slot: {
     date: Date;
     startTime: string;
@@ -34,6 +34,8 @@ interface BookingModalProps {
     startTime: string;
     endTime: string;
   }>;
+  groupMembers?: { user_id: string; name: string }[];
+  onCancelAll?: () => void;
 }
 
 export const BookingModal: React.FC<BookingModalProps> = ({
@@ -43,10 +45,20 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   slot,
   opponent,
   additionalSlots = [],
+  groupMembers,
+  onCancelAll,
 }) => {
   const [courtLocation, setCourtLocation] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
+
+  const toggleMember = (uid: string) =>
+    setSelectedMemberIds(prev => {
+      const next = new Set(prev);
+      next.has(uid) ? next.delete(uid) : next.add(uid);
+      return next;
+    });
 
   const opponentName = opponent.name || `${opponent.first_name || ''} ${opponent.last_name || ''}`.trim();
   const allSlots = [slot, ...additionalSlots];
@@ -54,10 +66,15 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const handleConfirm = async () => {
     setIsSubmitting(true);
     try {
-      await onConfirm(courtLocation || undefined, message || undefined);
+      await onConfirm(
+        courtLocation || undefined,
+        message || undefined,
+        selectedMemberIds.size > 0 ? Array.from(selectedMemberIds) : undefined,
+      );
       // Reset form
       setCourtLocation('');
       setMessage('');
+      setSelectedMemberIds(new Set());
     } finally {
       setIsSubmitting(false);
     }
@@ -66,6 +83,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const handleClose = () => {
     setCourtLocation('');
     setMessage('');
+    setSelectedMemberIds(new Set());
     onClose();
   };
 
@@ -156,15 +174,60 @@ export const BookingModal: React.FC<BookingModalProps> = ({
               rows={3}
             />
           </div>
+
+          {/* Invite group members */}
+          {groupMembers && groupMembers.length > 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Also Invite Group Members (Optional)
+              </Label>
+              <div className="rounded-lg border divide-y max-h-48 overflow-y-auto">
+                {groupMembers.map(m => {
+                  const checked = selectedMemberIds.has(m.user_id);
+                  return (
+                    <button
+                      key={m.user_id}
+                      type="button"
+                      onClick={() => toggleMember(m.user_id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${checked ? 'bg-primary/10' : 'hover:bg-muted/50'}`}
+                    >
+                      <div className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${checked ? 'bg-primary border-primary' : 'border-muted-foreground/40'}`}>
+                        {checked && <span className="text-primary-foreground text-[10px] font-bold leading-none">✓</span>}
+                      </div>
+                      <span className="text-sm font-medium">{m.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedMemberIds.size > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {selectedMemberIds.size} member{selectedMemberIds.size !== 1 ? 's' : ''} will receive an invite for the same time slot.
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={handleClose} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button onClick={handleConfirm} disabled={isSubmitting}>
-            {isSubmitting ? 'Booking...' : 'Confirm Booking'}
-          </Button>
+        <DialogFooter className="gap-2 flex-col items-stretch sm:items-end">
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={handleClose} disabled={isSubmitting}>
+              Back
+            </Button>
+            <Button onClick={handleConfirm} disabled={isSubmitting}>
+              {isSubmitting ? 'Booking...' : 'Confirm Booking'}
+            </Button>
+          </div>
+          {onCancelAll && (
+            <button
+              type="button"
+              onClick={onCancelAll}
+              disabled={isSubmitting}
+              className="text-sm text-muted-foreground hover:text-foreground underline-offset-2 hover:underline transition-colors self-center mt-1"
+            >
+              Cancel match request
+            </button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
