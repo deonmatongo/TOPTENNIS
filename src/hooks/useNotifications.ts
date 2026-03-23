@@ -372,6 +372,127 @@ export const useNotifications = () => {
     }
   }, [user, updateUnreadCount]);
 
+  const markAsUnread = useCallback(async (notificationId: string) => {
+    if (!user) return;
+
+    setNotifications(prev => {
+      const updated = prev.map(n =>
+        n.id === notificationId ? { ...n, read: false } : n
+      );
+      updateUnreadCount(updated);
+      return updated;
+    });
+
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: false })
+        .eq('id', notificationId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        setNotifications(prev => {
+          const reverted = prev.map(n =>
+            n.id === notificationId ? { ...n, read: true } : n
+          );
+          updateUnreadCount(reverted);
+          return reverted;
+        });
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error marking notification as unread:', error);
+    }
+  }, [user, updateUnreadCount]);
+
+  const bulkMarkAsRead = useCallback(async (ids: string[]) => {
+    if (!user || ids.length === 0) return;
+
+    const idSet = new Set(ids);
+    setNotifications(prev => {
+      const updated = prev.map(n => idSet.has(n.id) ? { ...n, read: true } : n);
+      updateUnreadCount(updated);
+      return updated;
+    });
+
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .in('id', ids)
+        .eq('user_id', user.id);
+
+      if (error) {
+        setNotifications(prev => {
+          const reverted = prev.map(n => idSet.has(n.id) ? { ...n, read: false } : n);
+          updateUnreadCount(reverted);
+          return reverted;
+        });
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error bulk marking as read:', error);
+    }
+  }, [user, updateUnreadCount]);
+
+  const bulkMarkAsUnread = useCallback(async (ids: string[]) => {
+    if (!user || ids.length === 0) return;
+
+    const idSet = new Set(ids);
+    setNotifications(prev => {
+      const updated = prev.map(n => idSet.has(n.id) ? { ...n, read: false } : n);
+      updateUnreadCount(updated);
+      return updated;
+    });
+
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: false })
+        .in('id', ids)
+        .eq('user_id', user.id);
+
+      if (error) {
+        setNotifications(prev => {
+          const reverted = prev.map(n => idSet.has(n.id) ? { ...n, read: true } : n);
+          updateUnreadCount(reverted);
+          return reverted;
+        });
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error bulk marking as unread:', error);
+    }
+  }, [user, updateUnreadCount]);
+
+  const bulkRemove = useCallback(async (ids: string[]) => {
+    if (!user || ids.length === 0) return;
+
+    const idSet = new Set(ids);
+    const previous = notificationsRef.current;
+    setNotifications(prev => {
+      const filtered = prev.filter(n => !idSet.has(n.id));
+      updateUnreadCount(filtered);
+      return filtered;
+    });
+
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .in('id', ids)
+        .eq('user_id', user.id);
+
+      if (error) {
+        setNotifications(previous);
+        updateUnreadCount(previous);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error bulk removing notifications:', error);
+    }
+  }, [user, updateUnreadCount]);
+
   const markAllAsRead = useCallback(async () => {
     if (!user) return;
 
@@ -469,7 +590,11 @@ export const useNotifications = () => {
     unreadCount,
     isLoading,
     markAsRead,
+    markAsUnread,
     markAllAsRead,
+    bulkMarkAsRead,
+    bulkMarkAsUnread,
+    bulkRemove,
     addNotification,
     removeNotification,
     clearAllNotifications,
