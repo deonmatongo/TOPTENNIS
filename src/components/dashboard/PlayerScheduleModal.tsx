@@ -91,7 +91,7 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
   const { user } = useAuth();
   const { profile } = useUserProfile();
   const { sendFriendRequest, updateRequestStatus, getRelationshipWith, requests } = useFriendRequests();
-  const { availability: myAvailability } = useUserAvailability();
+  const { availability: myAvailability, createAvailability } = useUserAvailability();
 
   const opponentUserId = player ? ((player.user_id ?? player.id) || undefined) : undefined;
   const relationship = getRelationshipWith(opponentUserId);
@@ -203,6 +203,19 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
   }, [availability, selectedDate, isSlotBooked, opponentUserId]);
 
   const totalSlots = availability?.filter(a => a.is_available && !a.is_blocked).length || 0;
+
+  const handleAddMyAvailability = async (date: Date, startTime: string, endTime: string) => {
+    try {
+      await createAvailability({
+        date: format(date, 'yyyy-MM-dd'),
+        start_time: startTime,
+        end_time: endTime,
+        is_available: true,
+      });
+    } catch {
+      // createAvailability already shows an error toast
+    }
+  };
 
   return (
     <>
@@ -444,6 +457,7 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
                 onNextWeek={() => setAssistantWeekStart(w => addWeeks(w, 1))}
                 onThisWeek={() => setAssistantWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
                 onSelectSlot={handleSelectSlot}
+                onAddMyAvailability={handleAddMyAvailability}
                 isBooked={(date, startTime, endTime) =>
                   isSlotBooked(date, startTime, endTime, player?.user_id || player?.id)
                 }

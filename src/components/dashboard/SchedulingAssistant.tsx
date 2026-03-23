@@ -23,6 +23,8 @@ interface SchedulingAssistantProps {
   onThisWeek: () => void;
   onSelectSlot: (date: Date, startTime: string, endTime: string, availabilityId?: string) => void;
   isBooked: (date: string, startTime: string, endTime: string) => boolean;
+  /** Called when the user clicks an empty cell to add their own availability */
+  onAddMyAvailability?: (date: Date, startTime: string, endTime: string) => void;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -63,6 +65,7 @@ export const SchedulingAssistant: React.FC<SchedulingAssistantProps> = ({
   onThisWeek,
   onSelectSlot,
   isBooked,
+  onAddMyAvailability,
 }) => {
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
@@ -130,9 +133,15 @@ export const SchedulingAssistant: React.FC<SchedulingAssistantProps> = ({
             <span className="w-3.5 h-3.5 rounded-sm bg-green-500 border border-green-600" />
             Both free — click to book
           </span>
+          {onAddMyAvailability && (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="w-3.5 h-3.5 rounded-sm border border-dashed border-primary/50 flex items-center justify-center text-primary text-[10px] font-bold">+</span>
+              Click empty slot to add your availability
+            </span>
+          )}
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className="w-3.5 h-3.5 rounded-sm bg-muted/40 border border-border/40" />
-            Unavailable
+            Past / unavailable
           </span>
         </div>
 
@@ -227,31 +236,46 @@ export const SchedulingAssistant: React.FC<SchedulingAssistantProps> = ({
                     const bothFree  = !!mySlot && !!theirSlot && !isPast && !booked;
                     const onlyMe    = !!mySlot && !theirSlot && !isPast;
                     const onlyThem  = !mySlot && !!theirSlot && !isPast;
+                    // Cell is clickable to add the user's own availability
+                    const canAdd    = !mySlot && !isPast && !booked && !!onAddMyAvailability;
 
                     const cellContent = bothFree ? (
                       <span className="absolute inset-0 flex items-center justify-center text-white text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                         Book
+                      </span>
+                    ) : canAdd ? (
+                      <span className="absolute inset-0 flex items-center justify-center text-primary text-[11px] font-bold opacity-0 group-hover/add:opacity-60 transition-opacity pointer-events-none">
+                        +
                       </span>
                     ) : null;
 
                     const tooltipText = bothFree
                       ? `Both free · ${format(day, 'EEE MMM d')} · ${hourLabel(hour)} – ${hourLabel(hour + 1)}`
                       : onlyMe
-                      ? `Only you're free · ${format(day, 'EEE MMM d')} · ${hourLabel(hour)}`
+                      ? `You're free · ${format(day, 'EEE MMM d')} · ${hourLabel(hour)}`
                       : onlyThem
-                      ? `Only ${theirName} is free · ${format(day, 'EEE MMM d')} · ${hourLabel(hour)}`
+                      ? `${theirName} is free · click to add your availability`
+                      : canAdd
+                      ? `Click to mark yourself available · ${format(day, 'EEE MMM d')} · ${hourLabel(hour)}`
                       : `Unavailable`;
+
+                    const handleClick = bothFree
+                      ? () => onSelectSlot(day, startT, endT, theirSlot?.id)
+                      : canAdd
+                      ? () => onAddMyAvailability!(day, startT, endT)
+                      : undefined;
 
                     return (
                       <Tooltip key={day.toISOString()}>
                         <TooltipTrigger asChild>
                           <td
-                            onClick={bothFree ? () => onSelectSlot(day, startT, endT, theirSlot?.id) : undefined}
+                            onClick={handleClick}
                             className={cn(
                               'relative h-9 sm:h-10 border-r border-b border-border/30 transition-colors',
                               bothFree && 'bg-green-500 hover:bg-green-400 cursor-pointer group',
                               onlyMe    && 'bg-primary/25 dark:bg-primary/20',
                               onlyThem  && 'bg-purple-200/70 dark:bg-purple-800/35',
+                              canAdd && !bothFree && 'cursor-pointer group/add hover:bg-primary/8 dark:hover:bg-primary/10',
                               !mySlot && !theirSlot && !isPast && 'bg-transparent',
                               isPast    && 'bg-muted/20 opacity-40 cursor-not-allowed',
                               booked    && !isPast && 'opacity-40 cursor-not-allowed',
@@ -260,7 +284,7 @@ export const SchedulingAssistant: React.FC<SchedulingAssistantProps> = ({
                             {cellContent}
                           </td>
                         </TooltipTrigger>
-                        <TooltipContent side="top" className="text-xs max-w-[180px]">
+                        <TooltipContent side="top" className="text-xs max-w-[200px]">
                           {tooltipText}
                           {booked && <span className="block text-muted-foreground">Already booked</span>}
                         </TooltipContent>
