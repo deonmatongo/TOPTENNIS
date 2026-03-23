@@ -4,31 +4,35 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { 
-  Trophy, 
-  Calendar, 
+import { Progress } from '@/components/ui/progress';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Trophy,
+  Calendar,
   ArrowLeft,
   MapPin,
-  User,
   Clock,
   Users,
   BarChart3,
-  History,
   TrendingUp,
   Target,
   Award,
-  Flame,
   ChevronRight,
   CalendarDays,
-  Medal
+  Flame,
+  Star,
+  CheckCircle2,
+  CircleDashed,
+  Swords,
+  ShieldCheck,
+  AlertCircle,
+  Zap,
 } from 'lucide-react';
 import { useDivisionMatches } from '@/hooks/useDivisionMatches';
 import { useDivisionLeaderboard } from '@/hooks/useDivisionLeaderboard';
 import { useDivisionAssignments } from '@/hooks/useDivisionAssignments';
 import { supabase } from '@/integrations/supabase/client';
 import MatchScoringModal from './MatchScoringModal';
-import LeagueProgressTable from './LeagueProgressTable';
 import { toast } from 'sonner';
 
 interface EnhancedMyLeaguesTabProps {
@@ -46,274 +50,552 @@ interface DivisionInfo {
   id: string;
   tournament_status: string;
   division_name: string;
+  skill_level_range?: string;
+  competitiveness?: string;
+  season?: string;
 }
 
-const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({ 
-  player, 
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+const getLeagueStatus = (league: any): 'In Progress' | 'Completed' => {
+  const now = new Date();
+  const monthsAgo =
+    (now.getTime() - new Date(league.created_at).getTime()) / (1000 * 60 * 60 * 24 * 30);
+  return monthsAgo < 3 ? 'In Progress' : 'Completed';
+};
+
+const winRate = (wins: number, total: number) =>
+  total > 0 ? Math.round((wins / total) * 100) : 0;
+
+const FormDot = ({ result }: { result: 'W' | 'L' }) => (
+  <span
+    className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white ${
+      result === 'W' ? 'bg-green-500' : 'bg-red-500'
+    }`}
+  >
+    {result}
+  </span>
+);
+
+const RankMedal = ({ rank }: { rank: number }) => {
+  if (rank === 1)
+    return (
+      <span className="text-xl" title="1st">
+        🥇
+      </span>
+    );
+  if (rank === 2)
+    return (
+      <span className="text-xl" title="2nd">
+        🥈
+      </span>
+    );
+  if (rank === 3)
+    return (
+      <span className="text-xl" title="3rd">
+        🥉
+      </span>
+    );
+  return (
+    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-muted text-sm font-bold text-muted-foreground">
+      {rank}
+    </span>
+  );
+};
+
+// ── Main Component ───────────────────────────────────────────────────────────
+
+const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
+  player,
   registrations,
-  onNavigateToSchedule 
+  onNavigateToSchedule,
 }) => {
   const [viewState, setViewState] = useState<LeagueViewState>({ view: 'overview' });
   const [divisionInfo, setDivisionInfo] = useState<DivisionInfo | null>(null);
   const [scoringMatch, setScoringMatch] = useState<any>(null);
-  const [showHistory, setShowHistory] = useState(false);
   const navigate = useNavigate();
 
-  // Helper functions defined early to avoid hoisting issues
-  const getLeagueStatus = (league: any) => {
-    const now = new Date();
-    const createdAt = new Date(league.created_at);
-    const monthsAgo = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24 * 30);
-    
-    if (monthsAgo < 1) return 'In Progress';
-    if (monthsAgo < 3) return 'In Progress';
-    return 'Completed';
-  };
+  const activeRegistrations = registrations.filter(
+    (l) => getLeagueStatus(l) === 'In Progress',
+  );
+  const completedRegistrations = registrations.filter(
+    (l) => getLeagueStatus(l) === 'Completed',
+  );
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'In Progress': return 'bg-green-500';
-      case 'Upcoming': return 'bg-blue-500';
-      case 'Completed': return 'bg-gray-500';
-      default: return 'bg-gray-500';
-    }
-  };
-  
-  // Use real registrations only
-  const allRegistrations = registrations;
-  
-  // Filter registrations based on status
-  const activeRegistrations = allRegistrations.filter(league => {
-    const status = getLeagueStatus(league);
-    return status === 'In Progress';
-  });
-  
-  const completedRegistrations = allRegistrations.filter(league => {
-    const status = getLeagueStatus(league);
-    return status === 'Completed';
-  });
-  
-  const displayRegistrations = showHistory ? completedRegistrations : activeRegistrations;
-  
   const { assignments } = useDivisionAssignments();
-  const divisionId = viewState.selectedLeague ? 
-    assignments.find(a => a.league_registration_id === viewState.selectedLeague?.id)?.division_id : 
-    undefined;
-  
-  const { matches, loading: matchesLoading } = useDivisionMatches(divisionId);
-  const { leaderboard, loading: leaderboardLoading } = useDivisionLeaderboard(divisionId);
 
-  // Fetch division info when league is selected
+  const divisionId = viewState.selectedLeague
+    ? assignments.find((a) => a.league_registration_id === viewState.selectedLeague?.id)
+        ?.division_id
+    : undefined;
+
+  const currentAssignment = viewState.selectedLeague
+    ? assignments.find((a) => a.league_registration_id === viewState.selectedLeague?.id)
+    : undefined;
+
+  const { matches, loading: matchesLoading } = useDivisionMatches(divisionId);
+  const { leaderboard, loading: leaderboardLoading, currentUser: currentUserStats } =
+    useDivisionLeaderboard(divisionId);
+
   useEffect(() => {
-    const fetchDivisionInfo = async () => {
-      if (!divisionId) return;
-      
-      const { data, error } = await supabase
-        .from('divisions')
-        .select('id, tournament_status, division_name')
-        .eq('id', divisionId)
-        .single();
-      
-      if (!error && data) {
-        setDivisionInfo(data);
-      }
-    };
-    
-    fetchDivisionInfo();
+    if (!divisionId) return;
+    supabase
+      .from('divisions')
+      .select('id, tournament_status, division_name, skill_level_range, competitiveness, season')
+      .eq('id', divisionId)
+      .single()
+      .then(({ data, error }) => {
+        if (!error && data) setDivisionInfo(data as DivisionInfo);
+      });
   }, [divisionId]);
 
-  const handleLeagueClick = (league: any) => {
-    setViewState({ view: 'details', selectedLeague: league });
+  const handleScheduleMatch = (opponentId: string, opponentName: string) => {
+    if (onNavigateToSchedule) {
+      onNavigateToSchedule(opponentId, opponentName);
+    } else {
+      const divId = divisionInfo?.id || divisionId;
+      const divName = divisionInfo?.division_name || 'League';
+      toast.info(`Opening ${opponentName}'s availability...`);
+      navigate(
+        `/public-availability/${opponentId}?source=league&divisionId=${divId}&divisionName=${encodeURIComponent(divName)}`,
+      );
+    }
   };
 
-  const handleBackClick = () => {
-    setViewState({ view: 'overview' });
-  };
+  // ── Overview ───────────────────────────────────────────────────────────────
 
-  const renderLeagueOverview = () => (
-    <div className="space-y-6">
-      {/* Header Section */}
-      <div className="flex items-center justify-between">
+  const renderOverview = () => {
+    // Aggregate stats across all registrations (use player-level data)
+    const totalWins = player?.wins ?? 0;
+    const totalLosses = player?.losses ?? 0;
+    const totalMatches = totalWins + totalLosses;
+    const wr = winRate(totalWins, totalMatches);
+    const streak = player?.current_streak ?? 0;
+
+    return (
+      <div className="space-y-6">
+        {/* Page header */}
         <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-lg">
-              <Trophy className="w-7 h-7 text-primary" />
+              <Trophy className="w-6 h-6 text-primary" />
             </div>
-            {showHistory ? 'League History' : 'My Leagues'}
+            My Leagues
           </h1>
-          <p className="text-muted-foreground mt-2 text-sm">
-            {showHistory 
-              ? 'Review your past league performances and achievements'
-              : 'Manage your active leagues and track your progress'
-            }
+          <p className="text-muted-foreground mt-1 text-sm">
+            Track your divisions, standings, and match progress
           </p>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={() => setShowHistory(!showHistory)}
-          className="flex items-center gap-2"
-        >
-          {showHistory ? (
-            <>
-              <Trophy className="w-4 h-4" />
-              Active Leagues
-            </>
-          ) : (
-            <>
-              <History className="w-4 h-4" />
-              View History
-            </>
-          )}
-        </Button>
-      </div>
 
-      {showHistory ? (
-        <LeagueProgressTable 
-          registrations={completedRegistrations}
-          onLeagueClick={handleLeagueClick}
-        />
-      ) : (
-        <div className="space-y-6">
-          {/* Active Leagues Cards */}
-          {displayRegistrations.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="text-center py-16">
-                <div className="max-w-md mx-auto">
-                  <div className="p-4 bg-primary/5 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
-                    <Trophy className="w-10 h-10 text-primary" />
+        {/* Aggregate stat strip */}
+        {totalMatches > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              {
+                label: 'Overall Record',
+                value: `${totalWins}W – ${totalLosses}L`,
+                icon: <Swords className="w-4 h-4 text-primary" />,
+                sub: `${wr}% win rate`,
+              },
+              {
+                label: 'Active Leagues',
+                value: activeRegistrations.length,
+                icon: <Flame className="w-4 h-4 text-orange-500" />,
+                sub: `${completedRegistrations.length} completed`,
+              },
+              {
+                label: 'Current Streak',
+                value: streak > 0 ? `${streak}W` : '—',
+                icon: <Zap className="w-4 h-4 text-yellow-500" />,
+                sub: 'win streak',
+              },
+              {
+                label: 'Skill Level',
+                value: player?.usta_rating ?? player?.skill_level ?? '—',
+                icon: <Star className="w-4 h-4 text-primary" />,
+                sub: player?.usta_rating ? 'USTA rating' : 'skill level',
+              },
+            ].map((s) => (
+              <Card key={s.label} className="bg-muted/30">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    {s.icon}
+                    <span className="text-xs text-muted-foreground">{s.label}</span>
                   </div>
-                  <h3 className="text-xl font-semibold mb-2">No Active Leagues</h3>
-                  <p className="text-muted-foreground mb-6">
-                    Join a league to compete with players at your skill level and track your progress.
-                  </p>
-                  <Button size="lg" className="bg-primary hover:bg-primary/90" onClick={() => navigate('/dashboard?tab=register')}>
-                    <Trophy className="w-4 h-4 mr-2" />
-                    Browse Available Leagues
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {displayRegistrations.map((league) => {
-                const status = getLeagueStatus(league);
+                  <div className="text-xl font-bold">{s.value}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{s.sub}</div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Active leagues */}
+        {activeRegistrations.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Active
+            </h2>
+            <div className="grid gap-3">
+              {activeRegistrations.map((league) => {
+                const asgn = assignments.find((a) => a.league_registration_id === league.id);
+                const completed = asgn?.matches_completed ?? 0;
+                const required = asgn?.matches_required ?? 5;
+                const playoffEligible = asgn?.playoff_eligible ?? false;
+                const progressPct = Math.min(100, Math.round((completed / required) * 100));
+
                 return (
-                  <Card 
-                    key={league.id} 
-                    className="hover:shadow-lg transition-all duration-200 cursor-pointer border-l-4 border-l-primary group"
-                    onClick={() => handleLeagueClick(league)}
+                  <Card
+                    key={league.id}
+                    className="cursor-pointer hover:shadow-md transition-all duration-200 border-l-4 border-l-primary group"
+                    onClick={() => setViewState({ view: 'details', selectedLeague: league })}
                   >
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-3">
-                            <h3 className="text-xl font-bold group-hover:text-primary transition-colors">
+                    <CardContent className="p-5">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <h3 className="font-bold text-base group-hover:text-primary transition-colors truncate">
                               {league.league_name}
                             </h3>
-                            <Badge 
-                              variant="secondary" 
-                              className={`text-white ${getStatusColor(status)}`}
-                            >
-                              {status}
-                            </Badge>
+                            {playoffEligible ? (
+                              <Badge className="bg-green-600 text-white text-xs shrink-0">
+                                <ShieldCheck className="w-3 h-3 mr-1" />
+                                Playoff Ready
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs shrink-0">
+                                In Progress
+                              </Badge>
+                            )}
                           </div>
-                          <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                            <div className="flex items-center gap-2">
-                              <CalendarDays className="w-4 h-4" />
-                              <span>Season {new Date(league.created_at).getFullYear()}</span>
+                          {asgn?.division && (
+                            <p className="text-sm text-muted-foreground mb-3">
+                              {asgn.division.division_name}
+                              {asgn.division.skill_level_range &&
+                                ` · Level ${asgn.division.skill_level_range}`}
+                            </p>
+                          )}
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>Match progress</span>
+                              <span className="font-medium text-foreground">
+                                {completed} / {required} played
+                              </span>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Users className="w-4 h-4" />
-                              <span>Division Play</span>
-                            </div>
+                            <Progress value={progressPct} className="h-1.5" />
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <Button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleLeagueClick(league);
-                            }}
-                            size="lg"
-                            className="bg-primary hover:bg-primary/90 text-white"
-                          >
-                            View League
-                            <ChevronRight className="w-4 h-4 ml-1" />
-                          </Button>
-                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="shrink-0 text-primary hover:bg-primary/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewState({ view: 'details', selectedLeague: league });
+                          }}
+                        >
+                          View
+                          <ChevronRight className="w-3 h-3 ml-1" />
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
                 );
               })}
             </div>
-          )}
-          {/* Join a League prompt — shown below active leagues */}
-          {!showHistory && (
-            <Card className="border border-primary/20 bg-primary/5">
-              <CardContent className="p-5">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg shrink-0">
-                      <Trophy className="w-5 h-5 text-primary" />
+          </div>
+        )}
+
+        {/* Completed leagues */}
+        {completedRegistrations.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Completed
+            </h2>
+            <div className="grid gap-3">
+              {completedRegistrations.map((league) => (
+                <Card
+                  key={league.id}
+                  className="cursor-pointer hover:shadow-md transition-all duration-200 opacity-75 hover:opacity-100 group"
+                  onClick={() => setViewState({ view: 'details', selectedLeague: league })}
+                >
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h3 className="font-semibold group-hover:text-primary transition-colors">
+                          {league.league_name}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          Season {new Date(league.created_at).getFullYear()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">Completed</Badge>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-semibold text-foreground">Join a League</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Browse open leagues and compete at your skill level.
-                      </p>
-                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {registrations.length === 0 && (
+          <Card className="border-dashed">
+            <CardContent className="text-center py-16">
+              <div className="p-4 bg-primary/5 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                <Trophy className="w-10 h-10 text-primary" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">No Leagues Yet</h3>
+              <p className="text-muted-foreground mb-6 max-w-xs mx-auto">
+                Join a league to compete with players at your skill level and track your
+                progress.
+              </p>
+              <Button
+                size="lg"
+                className="bg-primary hover:bg-primary/90"
+                onClick={() => navigate('/dashboard?tab=register')}
+              >
+                <Trophy className="w-4 h-4 mr-2" />
+                Browse Leagues
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Browse more CTA */}
+        {registrations.length > 0 && (
+          <Card className="border border-primary/20 bg-primary/5">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg shrink-0">
+                    <Trophy className="w-4 h-4 text-primary" />
                   </div>
-                  <Button
-                    size="sm"
-                    className="shrink-0"
-                    onClick={() => navigate('/dashboard?tab=register')}
-                  >
-                    <ChevronRight className="w-4 h-4 mr-1" />
-                    Browse Leagues
-                  </Button>
+                  <div>
+                    <p className="font-medium text-sm">Looking for more competition?</p>
+                    <p className="text-xs text-muted-foreground">Browse open leagues to join</p>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {/* Stats and match history sections removed - will be populated with real data from the league details view */}
-    </div>
-  );
-
-  const handleScheduleMatch = (opponentId: string, opponentName: string) => {
-    // Navigate to opponent's public availability page with league context
-    const divId = divisionInfo?.id || divisionId;
-    const divName = divisionInfo?.division_name || 'League';
-    
-    toast.info(`Opening ${opponentName}'s availability calendar...`);
-    navigate(`/public-availability/${opponentId}?source=league&divisionId=${divId}&divisionName=${encodeURIComponent(divName)}`);
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                  onClick={() => navigate('/dashboard?tab=register')}
+                >
+                  Browse Leagues
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
   };
 
-  const handleReportScore = (match: any) => {
-    setScoringMatch(match);
-  };
+  // ── Detail: Matches tab ───────────────────────────────────────────────────
 
   const renderMatches = () => {
     if (matchesLoading) {
-      return <div className="text-center py-8">Loading matches...</div>;
+      return (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-24 rounded-lg bg-muted/40 animate-pulse" />
+          ))}
+        </div>
+      );
     }
 
+    const userMatches = matches.filter((m) => m.isUserMatch);
+    const upcoming = userMatches.filter((m) => m.status === 'scheduled');
+    const recent = userMatches.filter((m) => m.status === 'completed');
     const isTournamentActive = divisionInfo?.tournament_status === 'active';
-
-    // Use real matches only
-    const userMatches = matches.filter(match => match.isUserMatch);
 
     if (userMatches.length === 0) {
       return (
         <Card>
-          <CardContent className="text-center py-8">
-            <Clock className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-            <h3 className="text-lg font-medium mb-2">No matches yet</h3>
-            <p className="text-muted-foreground">
-              Your matches will appear here once they're scheduled
+          <CardContent className="text-center py-10">
+            <Clock className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
+            <h3 className="font-medium mb-1">No matches yet</h3>
+            <p className="text-sm text-muted-foreground">
+              Matches will appear here once they're scheduled in your division.
+            </p>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    const MatchCard = ({ match }: { match: (typeof userMatches)[0] }) => {
+      const isScheduled = match.status === 'scheduled';
+      const isCompleted = match.status === 'completed';
+      const needsScore = isCompleted && !match.winner_id;
+      const borderColor =
+        isTournamentActive && isScheduled
+          ? 'border-l-blue-500'
+          : match.result === 'win'
+            ? 'border-l-green-500'
+            : match.result === 'loss'
+              ? 'border-l-red-500'
+              : 'border-l-muted-foreground/30';
+
+      const ResultIcon =
+        match.result === 'win'
+          ? Trophy
+          : match.result === 'loss'
+            ? Target
+            : Clock;
+      const iconBg =
+        match.result === 'win'
+          ? 'bg-green-100 dark:bg-green-900 text-green-600'
+          : match.result === 'loss'
+            ? 'bg-red-100 dark:bg-red-900 text-red-600'
+            : 'bg-blue-100 dark:bg-blue-900 text-blue-600';
+
+      return (
+        <Card className={`border-l-4 ${borderColor}`}>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${iconBg}`}>
+                <ResultIcon className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className="font-semibold text-sm">vs {match.opponent_name}</span>
+                  {match.result === 'win' && (
+                    <Badge className="bg-green-600 text-white text-xs">Win</Badge>
+                  )}
+                  {match.result === 'loss' && (
+                    <Badge variant="destructive" className="text-xs">Loss</Badge>
+                  )}
+                  {match.status === 'scheduled' && (
+                    <Badge variant="secondary" className="text-xs">Upcoming</Badge>
+                  )}
+                  {needsScore && (
+                    <Badge className="bg-orange-500 text-white text-xs">Score Pending</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                  {match.match_date && (
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      {new Date(match.match_date).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </span>
+                  )}
+                  {match.court_location && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      {match.court_location}
+                    </span>
+                  )}
+                  {isCompleted &&
+                    match.set1_player1 !== null &&
+                    match.set1_player2 !== null && (
+                      <span className="font-medium text-foreground">
+                        {match.set1_player1}–{match.set1_player2}
+                        {match.set2_player1 !== null &&
+                          `, ${match.set2_player1}–${match.set2_player2}`}
+                        {match.set3_player1 !== null &&
+                          `, ${match.set3_player1}–${match.set3_player2}`}
+                      </span>
+                    )}
+                </div>
+              </div>
+              <div className="flex flex-col gap-1.5 shrink-0">
+                {needsScore && isTournamentActive && (
+                  <Button
+                    size="sm"
+                    className="bg-orange-500 hover:bg-orange-600 text-white h-7 text-xs"
+                    onClick={() => setScoringMatch(match)}
+                  >
+                    Report Score
+                  </Button>
+                )}
+                {isScheduled && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    onClick={() =>
+                      handleScheduleMatch(
+                        match.userIsPlayer1 ? match.player2_id : match.player1_id,
+                        match.opponent_name,
+                      )
+                    }
+                  >
+                    <Calendar className="w-3 h-3 mr-1" />
+                    Schedule
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    };
+
+    return (
+      <div className="space-y-5">
+        {isTournamentActive && (
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
+            <span className="text-sm font-medium text-green-700 dark:text-green-300">
+              Tournament active — {divisionInfo?.division_name}
+            </span>
+            <Badge className="ml-auto bg-green-600 text-white text-xs">Live</Badge>
+          </div>
+        )}
+
+        {upcoming.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Upcoming ({upcoming.length})
+            </h3>
+            {upcoming.map((m) => (
+              <MatchCard key={m.id} match={m} />
+            ))}
+          </div>
+        )}
+
+        {recent.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Recent Results ({recent.length})
+            </h3>
+            {recent.map((m) => (
+              <MatchCard key={m.id} match={m} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── Detail: Standings tab ─────────────────────────────────────────────────
+
+  const renderStandings = () => {
+    if (leaderboardLoading) {
+      return (
+        <div className="space-y-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-16 rounded-lg bg-muted/40 animate-pulse" />
+          ))}
+        </div>
+      );
+    }
+
+    if (leaderboard.length === 0) {
+      return (
+        <Card>
+          <CardContent className="text-center py-10">
+            <BarChart3 className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
+            <h3 className="font-medium mb-1">No standings yet</h3>
+            <p className="text-sm text-muted-foreground">
+              Division rankings appear once matches are played.
             </p>
           </CardContent>
         </Card>
@@ -322,377 +604,381 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
 
     return (
       <div className="space-y-4">
-        {/* Active Tournament Indicator */}
-        {isTournamentActive && (
-          <Card className="border-green-500 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
-                  <div>
-                    <span className="font-semibold text-green-700 dark:text-green-300 block">
-                      🏆 Active Tournament
-                    </span>
-                    <span className="text-sm text-green-600 dark:text-green-400">
-                      {divisionInfo?.division_name}
-                    </span>
-                  </div>
-                </div>
-                <Badge className="bg-green-600 text-white">In Progress</Badge>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Division context */}
+        {divisionInfo && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="outline">{divisionInfo.division_name}</Badge>
+            {divisionInfo.skill_level_range && (
+              <Badge variant="outline">Level {divisionInfo.skill_level_range}</Badge>
+            )}
+            {divisionInfo.competitiveness && (
+              <Badge variant="outline">{divisionInfo.competitiveness}</Badge>
+            )}
+          </div>
         )}
 
-        {userMatches.map((match, index) => {
-          const isScheduled = match.status === 'scheduled';
-          const isCompleted = match.status === 'completed';
-          const needsScoreReport = isCompleted && !match.winner_id;
-          const homeAway = match.home_player_id === match.player1_id 
-            ? (match.userIsPlayer1 ? 'Home' : 'Away')
-            : (match.userIsPlayer1 ? 'Away' : 'Home');
+        {/* Standings list */}
+        <div className="space-y-2">
+          {leaderboard.map((p, idx) => {
+            const wr = winRate(p.wins, p.total_matches);
+            const isMe = p.isCurrentUser;
+            const form: ('W' | 'L')[] = (p.recentForm || []).slice(0, 5) as ('W' | 'L')[];
 
-          return (
-            <Card 
-              key={match.id} 
-              className={`hover:shadow-md transition-shadow ${
-                isTournamentActive && isScheduled ? 'border-l-4 border-l-green-500' : 
-                match.result === 'win' ? 'border-l-4 border-l-green-500' : 
-                match.result === 'loss' ? 'border-l-4 border-l-red-500' : ''
-              }`}
-            >
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        match.result === 'win' ? 'bg-green-100 dark:bg-green-900' :
-                        match.result === 'loss' ? 'bg-red-100 dark:bg-red-900' :
-                        'bg-blue-100 dark:bg-blue-900'
-                      }`}>
-                        {match.result === 'win' ? <Trophy className="w-5 h-5 text-green-600" /> :
-                         match.result === 'loss' ? <User className="w-5 h-5 text-red-600" /> :
-                         <Clock className="w-5 h-5 text-blue-600" />}
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-lg">vs {match.opponent_name}</h4>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge 
-                            variant={match.result === 'win' ? 'default' : match.result === 'loss' ? 'destructive' : 'secondary'}
-                            className={match.result === 'win' ? 'bg-green-600' : ''}
-                          >
-                            {match.result === 'win' ? 'Victory' : match.result === 'loss' ? 'Defeat' : 'Upcoming'}
-                          </Badge>
-                          {homeAway && (
-                            <Badge variant="outline" className="text-xs">
-                              {homeAway}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calendar className="w-4 h-4" />
-                        <span>{new Date(match.match_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Clock className="w-4 h-4" />
-                        <span>{new Date(match.match_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <MapPin className="w-4 h-4" />
-                        <span>{match.court_location || 'Location TBD'}</span>
-                      </div>
-                    </div>
-                    {match.set1_player1 !== null && match.set1_player2 !== null && (
-                      <div className="mt-3 p-3 bg-muted/50 rounded-lg">
-                        <div className="text-sm font-semibold mb-1">Final Score</div>
-                        <div className="text-lg font-bold">
-                          {match.set1_player1}-{match.set1_player2}, {match.set2_player1}-{match.set2_player2}
-                          {match.set3_player1 !== null && `, ${match.set3_player1}-${match.set3_player2}`}
-                        </div>
-                      </div>
+            return (
+              <div
+                key={p.user_id}
+                className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                  isMe
+                    ? 'bg-primary/5 border-primary/30 shadow-sm'
+                    : 'bg-muted/20 border-transparent hover:bg-muted/40'
+                }`}
+              >
+                {/* Rank */}
+                <div className="w-8 shrink-0 flex justify-center">
+                  <RankMedal rank={idx + 1} />
+                </div>
+
+                {/* Avatar */}
+                <Avatar className="w-8 h-8 shrink-0">
+                  <AvatarImage src={p.avatar_url} />
+                  <AvatarFallback className="text-xs bg-primary/10 text-primary font-semibold">
+                    {p.name.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+
+                {/* Name + form */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`font-semibold text-sm ${isMe ? 'text-primary' : ''}`}>
+                      {p.name}
+                    </span>
+                    {isMe && (
+                      <Badge variant="default" className="bg-primary text-xs py-0">
+                        You
+                      </Badge>
+                    )}
+                    {p.playoff_eligible && (
+                      <Badge className="bg-green-600 text-white text-xs py-0">
+                        <ShieldCheck className="w-2.5 h-2.5 mr-0.5" />
+                        Playoff
+                      </Badge>
                     )}
                   </div>
-                  <div className="flex flex-col gap-2 ml-4">
-                    {needsScoreReport && isTournamentActive && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleReportScore(match)}
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        <Trophy className="w-4 h-4 mr-1" />
-                        Report Score
-                      </Button>
-                    )}
-                    {isScheduled && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleScheduleMatch(
-                          match.userIsPlayer1 ? match.player2_id : match.player1_id,
-                          match.opponent_name
-                        )}
-                        className="bg-primary hover:bg-primary/90"
-                      >
-                        <Calendar className="w-4 h-4 mr-1" />
-                        Schedule Match
-                      </Button>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <span className="text-xs text-muted-foreground">
+                      {p.wins}W–{p.losses}L · {wr}%
+                    </span>
+                    {form.length > 0 && (
+                      <div className="flex items-center gap-0.5">
+                        {form.map((r, i) => (
+                          <FormDot key={i} result={r} />
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+
+                {/* Points + action */}
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="text-right hidden sm:block">
+                    <div className="text-sm font-bold">{p.points}</div>
+                    <div className="text-xs text-muted-foreground">pts</div>
+                  </div>
+                  {!isMe && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs hover:bg-primary hover:text-white hover:border-primary transition-colors"
+                      onClick={() => handleScheduleMatch(p.user_id, p.name)}
+                    >
+                      <Swords className="w-3 h-3 mr-1" />
+                      Challenge
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Playoff eligibility legend */}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground p-3 rounded-lg bg-muted/30">
+          <ShieldCheck className="w-3.5 h-3.5 text-green-600 shrink-0" />
+          <span>
+            Playoff badge requires {currentAssignment?.matches_required ?? 5} matches
+            completed. Form dots show last 5 results (newest right).
+          </span>
+        </div>
       </div>
     );
   };
 
-  const renderDivisionStandings = () => {
-    if (leaderboardLoading) {
-      return <div className="text-center py-8">Loading standings...</div>;
-    }
+  // ── Detail: Progress tab ─────────────────────────────────────────────────
 
-    // Use real leaderboard data only
-    const displayLeaderboard = leaderboard;
+  const renderProgress = () => {
+    const completed = currentAssignment?.matches_completed ?? 0;
+    const required = currentAssignment?.matches_required ?? 5;
+    const playoffEligible = currentAssignment?.playoff_eligible ?? false;
+    const progressPct = Math.min(100, Math.round((completed / required) * 100));
+    const remaining = Math.max(0, required - completed);
 
-    if (displayLeaderboard.length === 0) {
-      return (
-        <Card>
-          <CardContent className="text-center py-8">
-            <BarChart3 className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-            <h3 className="text-lg font-medium mb-2">No standings available</h3>
-            <p className="text-muted-foreground">
-              Division standings will appear here once matches are played
-            </p>
-          </CardContent>
-        </Card>
-      );
-    }
+    const meStats = currentUserStats;
+    const myRank = leaderboard.findIndex((p) => p.isCurrentUser) + 1;
+    const totalPlayers = leaderboard.length;
+
+    const milestones = [
+      {
+        label: 'First match played',
+        done: completed >= 1,
+        icon: <Calendar className="w-4 h-4" />,
+      },
+      {
+        label: `Halfway there (${Math.ceil(required / 2)} matches)`,
+        done: completed >= Math.ceil(required / 2),
+        icon: <TrendingUp className="w-4 h-4" />,
+      },
+      {
+        label: `Playoff eligible (${required} matches)`,
+        done: playoffEligible,
+        icon: <ShieldCheck className="w-4 h-4" />,
+      },
+      {
+        label: 'Top half of division',
+        done: myRank > 0 && myRank <= Math.ceil(totalPlayers / 2),
+        icon: <Award className="w-4 h-4" />,
+      },
+      {
+        label: 'Top 3 in division',
+        done: myRank > 0 && myRank <= 3,
+        icon: <Trophy className="w-4 h-4" />,
+      },
+    ];
 
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-primary" />
-            Division Standings
-          </CardTitle>
-          <CardDescription>
-            {divisionInfo?.division_name || 'Your division'} rankings and playoff status
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {displayLeaderboard.map((player, index) => {
-              const winRate = player.total_matches > 0 ? ((player.wins / player.total_matches) * 100).toFixed(0) : '0';
-              const isTopThree = index < 3;
-              
-              return (
-                <div 
-                  key={player.user_id} 
-                  className={`flex items-center justify-between p-4 rounded-lg transition-all ${
-                    player.isCurrentUser 
-                      ? 'bg-primary/10 border-2 border-primary shadow-sm' 
-                      : 'bg-muted/30 hover:bg-muted/50 border border-transparent'
-                  }`}
+      <div className="space-y-5">
+        {/* Match progress */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Target className="w-4 h-4 text-primary" />
+              Match Completion
+            </CardTitle>
+            <CardDescription>
+              {playoffEligible
+                ? 'You\'ve met the minimum match requirement!'
+                : `Play ${remaining} more match${remaining !== 1 ? 'es' : ''} to become playoff eligible`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Matches played</span>
+                <span className="font-bold">
+                  {completed} / {required}
+                </span>
+              </div>
+              <Progress
+                value={progressPct}
+                className={`h-3 ${playoffEligible ? '[&>div]:bg-green-500' : ''}`}
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>0</span>
+                <span
+                  className={
+                    playoffEligible ? 'text-green-600 font-semibold' : 'font-medium'
+                  }
                 >
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${
-                      player.isCurrentUser 
-                        ? 'bg-primary text-primary-foreground' 
-                        : isTopThree
-                        ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white'
+                  {required} (playoff)
+                </span>
+              </div>
+            </div>
+
+            {meStats && (
+              <div className="grid grid-cols-3 gap-3 pt-1">
+                <div className="text-center p-3 rounded-lg bg-green-50 dark:bg-green-950">
+                  <div className="text-xl font-bold text-green-600">{meStats.wins}</div>
+                  <div className="text-xs text-muted-foreground">Wins</div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-red-50 dark:bg-red-950">
+                  <div className="text-xl font-bold text-red-500">{meStats.losses}</div>
+                  <div className="text-xs text-muted-foreground">Losses</div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-primary/5">
+                  <div className="text-xl font-bold text-primary">{meStats.points}</div>
+                  <div className="text-xs text-muted-foreground">Points</div>
+                </div>
+              </div>
+            )}
+
+            {myRank > 0 && (
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/40 text-sm">
+                <span className="text-muted-foreground">Division rank</span>
+                <span className="font-bold">
+                  #{myRank}{' '}
+                  <span className="text-muted-foreground font-normal">of {totalPlayers}</span>
+                </span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Season milestones */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Star className="w-4 h-4 text-primary" />
+              Season Milestones
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {milestones.map((m, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                      m.done
+                        ? 'bg-green-100 dark:bg-green-900 text-green-600'
                         : 'bg-muted text-muted-foreground'
-                    }`}>
-                      {isTopThree && !player.isCurrentUser ? '🏆' : index + 1}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className={`font-semibold text-lg ${player.isCurrentUser ? 'text-primary' : ''}`}>
-                          {player.name}
-                        </div>
-                        {player.isCurrentUser && (
-                          <Badge variant="default" className="bg-primary text-xs">You</Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span className="font-medium">{player.wins}W - {player.losses}L</span>
-                        <span>•</span>
-                        <span>{winRate}% Win Rate</span>
-                        <span>•</span>
-                        <span>{player.points} pts</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right mr-2">
-                      {player.playoff_eligible ? (
-                        <Badge className="bg-green-600 text-white">
-                          <Award className="w-3 h-3 mr-1" />
-                          Playoff Ready
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-muted-foreground">
-                          {player.matches_required - player.matches_completed} more needed
-                        </Badge>
-                      )}
-                    </div>
-                    {!player.isCurrentUser && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleScheduleMatch(player.user_id, player.name)}
-                        className="bg-primary hover:bg-primary/90 text-white"
-                      >
-                        <Calendar className="w-4 h-4 mr-1" />
-                        Schedule
-                      </Button>
+                    }`}
+                  >
+                    {m.done ? (
+                      <CheckCircle2 className="w-4 h-4" />
+                    ) : (
+                      <CircleDashed className="w-4 h-4" />
                     )}
                   </div>
+                  <div className={`flex items-center gap-2 text-sm ${m.done ? '' : 'text-muted-foreground'}`}>
+                    <span className={m.done ? '' : 'text-muted-foreground/70'}>{m.icon}</span>
+                    <span className={m.done ? 'font-medium' : ''}>{m.label}</span>
+                  </div>
+                  {m.done && (
+                    <Badge className="ml-auto bg-green-600 text-white text-xs py-0">
+                      Done
+                    </Badge>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick action: schedule next */}
+        {!playoffEligible && (
+          <Card className="border border-primary/20 bg-primary/5">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg shrink-0">
+                    <Swords className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Schedule your next match</p>
+                    <p className="text-xs text-muted-foreground">
+                      Challenge a division opponent to get closer to playoffs
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  className="shrink-0 bg-primary hover:bg-primary/90"
+                  onClick={() =>
+                    setViewState((prev) => ({ ...prev })) // stay in details, switch to standings
+                  }
+                >
+                  View Opponents
+                  <ChevronRight className="w-3 h-3 ml-1" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     );
   };
 
-  const renderLeagueStandings = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Overall League Standings</CardTitle>
-        <CardDescription>Cross-division rankings (Coming Soon)</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="text-center py-12 text-muted-foreground">
-          <BarChart3 className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
-          <h3 className="text-lg font-medium mb-2">League-Wide Standings</h3>
-          <p className="text-sm">
-            Overall league rankings across all divisions will be displayed here once the season progresses.
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  );
+  // ── Detail wrapper ────────────────────────────────────────────────────────
 
-  const renderPlayoffBracket = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Playoff Bracket</CardTitle>
-        <CardDescription>Tournament bracket (Available during playoffs)</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="text-center py-12 text-muted-foreground">
-          <Trophy className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
-          <h3 className="text-lg font-medium mb-2">Playoff Bracket</h3>
-          <p className="text-sm">
-            The playoff bracket will be generated automatically once the regular season concludes and playoff matches begin.
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  );
+  const renderDetails = () => {
+    const league = viewState.selectedLeague;
+    if (!league) return null;
+    const status = getLeagueStatus(league);
 
-  const renderLeagueDetails = () => (
-    <div className="space-y-6">
-      {/* Enhanced Header */}
-      <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={handleBackClick}
-                className="flex items-center gap-2"
+    return (
+      <div className="space-y-5">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setViewState({ view: 'overview' })}
+            className="shrink-0"
+          >
+            <ArrowLeft className="w-4 h-4 mr-1" />
+            Back
+          </Button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-bold truncate">{league.league_name}</h1>
+              <Badge
+                variant="secondary"
+                className={`text-white shrink-0 ${
+                  status === 'In Progress' ? 'bg-green-500' : 'bg-gray-500'
+                }`}
               >
-                <ArrowLeft className="w-4 h-4" />
-                Back
-              </Button>
-              <Separator orientation="vertical" className="h-12" />
-              <div>
-                <h1 className="text-2xl font-bold flex items-center gap-3">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    <Trophy className="w-6 h-6 text-primary" />
-                  </div>
-                  {viewState.selectedLeague?.league_name}
-                </h1>
-                <p className="text-muted-foreground mt-1 flex items-center gap-2">
-                  <CalendarDays className="w-4 h-4" />
-                  Season {new Date(viewState.selectedLeague?.created_at).getFullYear()}
-                  {divisionInfo && (
-                    <>
-                      <span>•</span>
-                      <span>{divisionInfo.division_name}</span>
-                    </>
-                  )}
-                </p>
-              </div>
+                {status}
+              </Badge>
             </div>
-            <Badge 
-              variant="secondary" 
-              className={`text-white ${getStatusColor(getLeagueStatus(viewState.selectedLeague))}`}
-            >
-              {getLeagueStatus(viewState.selectedLeague)}
-            </Badge>
+            <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
+              <CalendarDays className="w-3.5 h-3.5" />
+              Season {new Date(league.created_at).getFullYear()}
+              {divisionInfo && (
+                <>
+                  <span>·</span>
+                  <span>{divisionInfo.division_name}</span>
+                </>
+              )}
+            </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      <Tabs defaultValue="matches" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 h-auto p-1">
-          <TabsTrigger value="matches" className="flex items-center gap-2 py-3">
-            <Calendar className="w-4 h-4" />
-            <span className="hidden sm:inline">Matches</span>
-          </TabsTrigger>
-          <TabsTrigger value="division" className="flex items-center gap-2 py-3">
-            <BarChart3 className="w-4 h-4" />
-            <span className="hidden sm:inline">Division</span>
-          </TabsTrigger>
-          <TabsTrigger value="league" className="flex items-center gap-2 py-3">
-            <Trophy className="w-4 h-4" />
-            <span className="hidden sm:inline">League</span>
-          </TabsTrigger>
-          <TabsTrigger value="playoffs" className="flex items-center gap-2 py-3">
-            <Award className="w-4 h-4" />
-            <span className="hidden sm:inline">Playoffs</span>
-          </TabsTrigger>
-        </TabsList>
+        {/* Tabs */}
+        <Tabs defaultValue="standings" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-3 h-auto">
+            <TabsTrigger value="matches" className="flex items-center gap-1.5 py-2.5">
+              <Calendar className="w-4 h-4" />
+              <span className="hidden sm:inline">Matches</span>
+            </TabsTrigger>
+            <TabsTrigger value="standings" className="flex items-center gap-1.5 py-2.5">
+              <BarChart3 className="w-4 h-4" />
+              <span className="hidden sm:inline">Standings</span>
+            </TabsTrigger>
+            <TabsTrigger value="progress" className="flex items-center gap-1.5 py-2.5">
+              <TrendingUp className="w-4 h-4" />
+              <span className="hidden sm:inline">Progress</span>
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="matches">
-          {renderMatches()}
-        </TabsContent>
+          <TabsContent value="matches">{renderMatches()}</TabsContent>
+          <TabsContent value="standings">{renderStandings()}</TabsContent>
+          <TabsContent value="progress">{renderProgress()}</TabsContent>
+        </Tabs>
+      </div>
+    );
+  };
 
-        <TabsContent value="division">
-          {renderDivisionStandings()}
-        </TabsContent>
-
-        <TabsContent value="league">
-          {renderLeagueStandings()}
-        </TabsContent>
-
-        <TabsContent value="playoffs">
-          {renderPlayoffBracket()}
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
+  // ── Root render ───────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
-      {viewState.view === 'overview' ? renderLeagueOverview() : renderLeagueDetails()}
-      
+      {viewState.view === 'overview' ? renderOverview() : renderDetails()}
+
       {scoringMatch && (
         <MatchScoringModal
           open={!!scoringMatch}
           onOpenChange={(open) => !open && setScoringMatch(null)}
           match={scoringMatch}
           playerId={player?.id}
-          onScoreSubmitted={() => {
-            setScoringMatch(null);
-            // Refresh matches
-          }}
+          onScoreSubmitted={() => setScoringMatch(null)}
         />
       )}
     </div>
