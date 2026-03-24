@@ -22,12 +22,18 @@ export const useGlobalPresence = () => {
   // Ref so debouncedUpdate can read the latest stableOnlineUserIds without being re-created
   const stableOnlineUserIdsRef = useRef<Set<string>>(new Set());
 
+  // Inactivity tracking
+  const lastActivityRef = useRef<number>(Date.now());
+  const isTrackedRef    = useRef<boolean>(false); // whether we've called channel.track()
+
   // Debounce time in milliseconds - wait this long before confirming status change
   const DEBOUNCE_TIME = 3000; // 3 seconds
   // Minimum time between status updates
   const MIN_UPDATE_INTERVAL = 1000; // 1 second
   // Heartbeat interval to maintain presence
   const HEARTBEAT_INTERVAL = 30000; // 30 seconds
+  // Inactivity timeout — untrack after this many ms with no user activity
+  const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes
 
   // Keep the ref in sync without adding it to any callback deps
   useEffect(() => { stableOnlineUserIdsRef.current = stableOnlineUserIds; }, [stableOnlineUserIds]);
@@ -163,19 +169,33 @@ export const useGlobalPresence = () => {
           // Reset backoff on successful connection
           reconnectAttemptsRef.current = 0;
           try {
+            lastActivityRef.current = Date.now();
             await channel.track({
               user_id: user.id,
-              online_at: new Date().toISOString()
+              online_at: new Date().toISOString(),
+              last_active: Date.now(),
             });
-            // Start heartbeat to keep presence alive
+            isTrackedRef.current = true;
+            // Start heartbeat — checks inactivity and tracks/untracks accordingly
             if (heartbeatInterval.current) clearInterval(heartbeatInterval.current);
             heartbeatInterval.current = setInterval(async () => {
               try {
-                await channel.track({
-                  user_id: user.id,
-                  online_at: new Date().toISOString(),
-                  heartbeat: true
-                });
+                const idle = Date.now() - lastActivityRef.current;
+                if (idle >= INACTIVITY_TIMEOUT) {
+                  // User has been inactive for 10+ minutes — go offline
+                  if (isTrackedRef.current) {
+                    await channel.untrack();
+                    isTrackedRef.current = false;
+                  }
+                } else {
+                  // User is active — keep presence alive
+                  await channel.track({
+                    user_id: user.id,
+                    online_at: new Date().toISOString(),
+                    last_active: lastActivityRef.current,
+                  });
+                  isTrackedRef.current = true;
+                }
               } catch (err) {
                 console.warn('Presence heartbeat failed:', err);
               }
@@ -202,6 +222,7 @@ export const useGlobalPresence = () => {
 
     return () => {
       stopHeartbeat();
+      isTrackedRef.current = false;
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
@@ -211,11 +232,34 @@ export const useGlobalPresence = () => {
     };
   }, [user?.id, subscriptionKey, debouncedUpdate, stopHeartbeat]);
 
+  // Activity detection — update lastActivityRef on any user interaction.
+  // When the user returns from idle, re-track if the channel exists.
+  useEffect(() => {
+    if (!user) return;
+    const onActivity = () => {
+      lastActivityRef.current = Date.now();
+      // If we went offline due to inactivity, come back online on next activity
+      if (!isTrackedRef.current && channelRef.current) {
+        channelRef.current.track({
+          user_id: user.id,
+          online_at: new Date().toISOString(),
+          last_active: Date.now(),
+        }).then(() => {
+          isTrackedRef.current = true;
+        }).catch(() => {});
+      }
+    };
+    const EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'] as const;
+    EVENTS.forEach(e => window.addEventListener(e, onActivity, { passive: true }));
+    return () => EVENTS.forEach(e => window.removeEventListener(e, onActivity));
+  }, [user?.id]);
+
   // Refetch on tab visibility (covers browser throttling background tabs)
   useEffect(() => {
     if (!user) return;
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
+        lastActivityRef.current = Date.now();
         // Reset reconnect counter so a fresh connection attempt is allowed
         reconnectAttemptsRef.current = 0;
         // Re-track presence in case the channel is still alive
@@ -223,6 +267,9 @@ export const useGlobalPresence = () => {
           channelRef.current.track({
             user_id: user.id,
             online_at: new Date().toISOString(),
+            last_active: Date.now(),
+          }).then(() => {
+            isTrackedRef.current = true;
           }).catch(() => {
             // If tracking fails, force a full channel recreation
             setSubscriptionKey(k => k + 1);

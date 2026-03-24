@@ -95,9 +95,7 @@ const Av: React.FC<AvProps> = ({ src, name, color, size = 36, online = false }) 
           {initials(name)}
         </div>
       )}
-      {online && (
-        <div style={{ position: 'absolute', bottom: 1, right: 1, width: size * 0.28, height: size * 0.28, borderRadius: '50%', background: C.online, border: '2px solid white' }} />
-      )}
+      <div style={{ position: 'absolute', bottom: 1, right: 1, width: size * 0.28, height: size * 0.28, borderRadius: '50%', background: online ? C.online : '#9CA3AF', border: '2px solid white' }} />
     </div>
   );
 };
