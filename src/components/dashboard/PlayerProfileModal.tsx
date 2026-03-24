@@ -220,7 +220,7 @@ const PlayerProfileModal = ({
         <DialogContent className="w-[95vw] max-w-2xl p-0 overflow-hidden max-h-[92vh] flex flex-col">
 
           {/* ── Hero header ──────────────────────────────────────────────── */}
-          <div className="relative bg-gradient-to-br from-primary/90 via-primary/70 to-primary/40 pt-5 pb-5 px-4 sm:px-5 shrink-0">
+          <div className="relative pt-5 pb-5 px-4 sm:px-5 shrink-0" style={{ background: '#F97316' }}>
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.1),transparent_60%)]" />
 
             {/* Relationship badge top-right */}
