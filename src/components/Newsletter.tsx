@@ -12,7 +12,7 @@ const Newsletter = () => {
   };
   return <>
       {/* Newsletter Section */}
-      <section id="newsletter" className="py-12 sm:py-16 lg:py-20 bg-white">
+      <section id="newsletter" className="py-12 sm:py-16 lg:py-20 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
             <div className="text-center lg:text-left">

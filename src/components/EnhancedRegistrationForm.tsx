@@ -402,7 +402,7 @@ const EnhancedRegistrationForm: React.FC<EnhancedRegistrationFormProps> = ({
 
       <div className="flex items-center my-6" role="separator">
         <div className="flex-1 border-t border-gray-300"></div>
-        <span className="px-4 text-sm text-gray-500 bg-white">OR</span>
+        <span className="px-4 text-sm text-muted-foreground bg-background">OR</span>
         <div className="flex-1 border-t border-gray-300"></div>
       </div>
 

@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 const TennisLadder = () => {
-  return <section className="py-8 sm:py-12 lg:py-16 xl:py-20 bg-white">
+  return <section className="py-8 sm:py-12 lg:py-16 xl:py-20 bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-8 sm:mb-12 lg:mb-16">
           <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black mb-4 sm:mb-6 text-black">

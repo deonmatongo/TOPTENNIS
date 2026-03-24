@@ -94,7 +94,7 @@ const NewsSection = () => {
             {/* Bottom Row News */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
               {sideNews.map((news, index) => (
-                <div key={index} className="relative bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                <div key={index} className="relative bg-card rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                   <div 
                     className="h-32 sm:h-40 bg-cover bg-center bg-no-repeat"
                     style={{ backgroundImage: `url('${news.image}')` }}
@@ -105,7 +105,7 @@ const NewsSection = () => {
                     <span className="text-orange-600 text-xs font-bold tracking-wide">
                       {news.category}
                     </span>
-                    <h3 className="text-black text-sm font-bold mt-1 leading-tight">
+                    <h3 className="text-foreground text-sm font-bold mt-1 leading-tight">
                       {news.title}
                     </h3>
                   </div>
@@ -117,9 +117,9 @@ const NewsSection = () => {
           {/* Right Sidebar */}
           <div className="space-y-6">
             {/* Tournament Info */}
-            <div className="bg-white rounded-lg p-6 shadow-sm">
+            <div className="bg-card rounded-lg p-6 shadow-sm">
               <div className="text-center mb-4">
-                <h3 className="text-lg font-black text-black mb-2">
+                <h3 className="text-lg font-black text-foreground mb-2">
                   Orders Of Play, Results & Draws
                 </h3>
                 <div className="flex items-center justify-center gap-2 mb-2">
@@ -133,7 +133,7 @@ const NewsSection = () => {
               </div>
               
               <div className="text-center">
-                <h4 className="text-xl font-bold text-black">{tournament.title}</h4>
+                <h4 className="text-xl font-bold text-foreground">{tournament.title}</h4>
                 <div className="flex items-center justify-center gap-1 text-sm text-gray-600 mt-1">
                   <MapPin className="w-4 h-4" />
                   {tournament.location}
@@ -143,8 +143,8 @@ const NewsSection = () => {
             </div>
 
             {/* Latest News */}
-            <div className="bg-white rounded-lg p-6 shadow-sm">
-              <h3 className="text-lg font-black text-black mb-4">
+            <div className="bg-card rounded-lg p-6 shadow-sm">
+              <h3 className="text-lg font-black text-foreground mb-4">
                 Latest News & Headlines
               </h3>
               <div className="space-y-4">

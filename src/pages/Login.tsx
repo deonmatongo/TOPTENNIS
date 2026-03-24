@@ -149,26 +149,26 @@ const Login = () => {
         </div>
 
         {/* Right Side - Login Form */}
-        <div className="flex-1 lg:flex-1 flex items-center justify-center p-4 sm:p-8 bg-white overflow-y-auto">
+        <div className="flex-1 lg:flex-1 flex items-center justify-center p-4 sm:p-8 bg-background overflow-y-auto">
           <div className="w-full max-w-md">
             <div className="text-center mb-6">
-              <img 
-                src="/logo.png" 
-                alt="Tennis League Logo" 
-                className="h-32 w-48 object-contain mx-auto mb-4" 
+              <img
+                src="/logo.png"
+                alt="Tennis League Logo"
+                className="h-32 w-48 object-contain mx-auto mb-4"
               />
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome</h2>
-              <p className="text-base text-gray-600">Sign in to your account</p>
+              <h2 className="text-3xl font-bold text-foreground mb-2">Welcome</h2>
+              <p className="text-base text-muted-foreground">Sign in to your account</p>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+            <div className="bg-card rounded-2xl shadow-lg p-6 sm:p-8">
               <form onSubmit={handleSubmit} className="space-y-4" noValidate>
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                  <Label htmlFor="email" className="text-sm font-medium text-foreground">
                     Email Address
                   </Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" aria-hidden="true" />
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" aria-hidden="true" />
                     <Input
                       id="email"
                       name="email"
@@ -177,7 +177,7 @@ const Login = () => {
                       required
                       value={formData.email}
                       onChange={handleInputChange}
-                      className={`pl-11 h-12 border-gray-300 focus:border-primary focus:ring-primary ${
+                      className={`pl-11 h-12 border-border focus:border-primary focus:ring-primary ${
                         validationErrors.email ? 'border-red-500' : ''
                       }`}
                       placeholder="Enter your email address"
@@ -195,11 +195,11 @@ const Login = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                  <Label htmlFor="password" className="text-sm font-medium text-foreground">
                     Password
                   </Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" aria-hidden="true" />
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" aria-hidden="true" />
                     <Input
                       id="password"
                       name="password"
@@ -208,7 +208,7 @@ const Login = () => {
                       required
                       value={formData.password}
                       onChange={handleInputChange}
-                      className={`pl-11 pr-11 h-12 border-gray-300 focus:border-primary focus:ring-primary ${
+                      className={`pl-11 pr-11 h-12 border-border focus:border-primary focus:ring-primary ${
                         validationErrors.password ? 'border-red-500' : ''
                       }`}
                       placeholder="Enter your password"
@@ -219,7 +219,7 @@ const Login = () => {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                       disabled={isLoading}
                       aria-label={showPassword ? "Hide password" : "Show password"}
                     >
@@ -235,16 +235,16 @@ const Login = () => {
                 </div>
 
                 <div className="text-right">
-                  <Link 
-                    to="/forgot-password" 
+                  <Link
+                    to="/forgot-password"
                     className="text-sm text-primary hover:text-primary/80 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
                   >
                     Forgot password?
                   </Link>
                 </div>
 
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-base"
                   disabled={isLoading}
                 >
@@ -259,22 +259,22 @@ const Login = () => {
                 </Button>
 
                 <div className="flex items-center my-6" role="separator">
-                  <div className="flex-1 border-t border-gray-300"></div>
-                  <span className="px-4 text-sm text-gray-500 bg-white">OR</span>
-                  <div className="flex-1 border-t border-gray-300"></div>
+                  <div className="flex-1 border-t border-border"></div>
+                  <span className="px-4 text-sm text-muted-foreground bg-card">OR</span>
+                  <div className="flex-1 border-t border-border"></div>
                 </div>
 
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full h-12 border-gray-300 hover:bg-gray-50 focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                  className="w-full h-12 border-border hover:bg-accent focus:ring-2 focus:ring-primary focus:ring-offset-2"
                   onClick={handleGoogleSignIn}
                   disabled={isLoading}
                   aria-label="Sign in with Google"
                 >
                   {googleLoading ? (
                     <div className="flex items-center">
-                      <div className="w-4 h-4 border-2 border-gray-600 border-t-transparent rounded-full animate-spin mr-2" aria-hidden="true"></div>
+                      <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin mr-2" aria-hidden="true"></div>
                       Connecting...
                     </div>
                   ) : (
@@ -291,16 +291,16 @@ const Login = () => {
                 </Button>
 
                 {/* Privacy notice */}
-                <p className="text-xs text-center text-gray-500 mt-4">
+                <p className="text-xs text-center text-muted-foreground mt-4">
                   <Shield className="w-3 h-3 inline mr-1" aria-hidden="true" />
                   We only access your name and email for authentication.
                 </p>
 
-                <div className="text-center pt-4 border-t border-gray-200 mt-6">
-                  <p className="text-sm text-gray-600">
+                <div className="text-center pt-4 border-t border-border mt-6">
+                  <p className="text-sm text-muted-foreground">
                     Have no account yet?{" "}
-                    <Link 
-                      to="/register" 
+                    <Link
+                      to="/register"
                       className="text-primary hover:text-primary/80 font-bold focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
                     >
                       Registration

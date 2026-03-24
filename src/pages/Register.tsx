@@ -70,15 +70,15 @@ const Register = () => {
       </div>
 
       {/* Right Side - Registration Form */}
-      <div className="flex-1 lg:flex-1 flex items-center justify-center p-4 sm:p-8 bg-gray-50 overflow-y-auto">
+      <div className="flex-1 lg:flex-1 flex items-center justify-center p-4 sm:p-8 bg-background overflow-y-auto">
         <div className="w-full max-w-md">
           <div className="text-center mb-6">
             <img src="/logo.png" alt="Tennis League Logo" className="h-32 w-48 object-contain mx-auto mb-4" />
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h2>
-            <p className="text-base text-gray-600">Join the league and start playing!</p>
+            <h2 className="text-3xl font-bold text-foreground mb-2">Create Account</h2>
+            <p className="text-base text-muted-foreground">Join the league and start playing!</p>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+          <div className="bg-card rounded-2xl shadow-lg p-6 sm:p-8">
             <EnhancedRegistrationForm onSubmit={handleSubmit} loading={loading} />
             
             

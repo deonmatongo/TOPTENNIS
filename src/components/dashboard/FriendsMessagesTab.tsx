@@ -25,18 +25,18 @@ import { PlayerScheduleModal } from './PlayerScheduleModal';
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const C = {
-  accent:      '#F97316',
-  accentLight: '#FFF7ED',
-  bg:          '#F8F9FB',
-  white:       '#FFFFFF',
-  border:      '#EAECF0',
-  text:        '#111827',
-  muted:       '#6B7280',
-  mutedLight:  '#9CA3AF',
-  bubbleOwn:   '#111827',
+  accent:      'hsl(var(--primary))',
+  accentLight: 'hsl(var(--primary) / 0.08)',
+  bg:          'hsl(var(--chat-bg-subtle))',
+  white:       'hsl(var(--card))',
+  border:      'hsl(var(--border))',
+  text:        'hsl(var(--foreground))',
+  muted:       'hsl(var(--muted-foreground))',
+  mutedLight:  'hsl(var(--muted-foreground) / 0.65)',
+  bubbleOwn:   'hsl(var(--chat-bubble-own))',
   online:      '#22C55E',
   unread:      '#EF4444',
-  hover:       '#F9FAFB',
+  hover:       'hsl(var(--chat-hover))',
 };
 
 const QUICK_EMOJIS = ['👍','❤️','😂','🎾','🔥','👏','😮','😢','🏆','💪','🎯','⚡'];

@@ -389,20 +389,20 @@ const NewDashboard = () => {
               <div className="flex items-center space-x-1 sm:space-x-2 lg:space-x-4 flex-shrink-0">
                 {/* Quick Stats */}
                 <div className="hidden xl:flex items-center space-x-2 lg:space-x-4">
-                  <Card className="bg-emerald-50 border-emerald-200">
+                  <Card className="bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800">
                     <CardContent className="p-2 lg:p-3">
                       <div className="flex items-center space-x-2">
-                        <Trophy className="w-3 h-3 lg:w-4 lg:h-4 text-emerald-600" />
-                        <span className="text-xs lg:text-sm font-bold text-emerald-700">{winRate}% Win Rate</span>
+                        <Trophy className="w-3 h-3 lg:w-4 lg:h-4 text-emerald-600 dark:text-emerald-400" />
+                        <span className="text-xs lg:text-sm font-bold text-emerald-700 dark:text-emerald-300">{winRate}% Win Rate</span>
                       </div>
                     </CardContent>
                   </Card>
 
-                  <Card className="bg-blue-50 border-blue-200">
+                  <Card className="bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800">
                     <CardContent className="p-2 lg:p-3">
                       <div className="flex items-center space-x-2">
-                        <Target className="w-3 h-3 lg:w-4 lg:h-4 text-blue-600" />
-                        <span className="text-xs lg:text-sm font-bold text-blue-700">
+                        <Target className="w-3 h-3 lg:w-4 lg:h-4 text-blue-600 dark:text-blue-400" />
+                        <span className="text-xs lg:text-sm font-bold text-blue-700 dark:text-blue-300">
                           {player?.usta_rating || `${player?.skill_level || 5}.0`} Level
                         </span>
                       </div>

@@ -181,8 +181,8 @@ const OverviewTab = ({ player, matches, leaderboard, selectedLeague, setSelected
     return (
       <div className="space-y-6">
         <div className="text-center py-8">
-          <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading your league information...</p>
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground font-medium">Loading your league information...</p>
         </div>
       </div>
     );
@@ -238,7 +238,7 @@ const OverviewTab = ({ player, matches, leaderboard, selectedLeague, setSelected
       </div>
 
       {/* League Selection Card */}
-      <Card className="bg-white/80 backdrop-blur-lg border-0 shadow-xl rounded-2xl overflow-hidden">
+      <Card className="bg-card/80 backdrop-blur-lg shadow-xl rounded-2xl overflow-hidden">
         <CardContent className="p-4 md:p-6 lg:p-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 md:gap-6">
             <div className="flex-1">
@@ -264,7 +264,7 @@ const OverviewTab = ({ player, matches, leaderboard, selectedLeague, setSelected
                 <div className="space-y-4 md:space-y-6">
                   <p className="text-muted-foreground text-sm md:text-base lg:text-lg">Select your active league:</p>
                   <Select value={selectedLeague} onValueChange={setSelectedLeague}>
-                    <SelectTrigger className="w-full max-w-md bg-white border-2 border-border/20 h-12 md:h-14 rounded-xl text-sm md:text-base lg:text-lg">
+                    <SelectTrigger className="w-full max-w-md bg-background border-2 border-border/20 h-12 md:h-14 rounded-xl text-sm md:text-base lg:text-lg">
                       <SelectValue placeholder="Choose league" />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl border-0 shadow-2xl">
@@ -373,7 +373,7 @@ const OverviewTab = ({ player, matches, leaderboard, selectedLeague, setSelected
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 md:gap-8">
         {/* Achievements Section */}
-        <Card className="xl:col-span-2 bg-white/80 backdrop-blur-lg border-0 shadow-xl rounded-2xl overflow-hidden">
+        <Card className="xl:col-span-2 bg-card/80 backdrop-blur-lg shadow-xl rounded-2xl overflow-hidden">
           <CardHeader className="p-4 md:p-6 lg:p-8 pb-4 md:pb-6">
             <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex items-center space-x-3 md:space-x-4">
@@ -398,8 +398,8 @@ const OverviewTab = ({ player, matches, leaderboard, selectedLeague, setSelected
                 <div 
                   key={index} 
                   className={`relative p-4 md:p-6 rounded-xl md:rounded-2xl border-2 transition-all duration-300 group hover:shadow-lg ${
-                    achievement.achieved 
-                      ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200 shadow-emerald-100/50' 
+                    achievement.achieved
+                      ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950/50 dark:to-emerald-900/40 border-emerald-200 dark:border-emerald-800 shadow-emerald-100/50 dark:shadow-emerald-900/30'
                       : 'bg-muted/30 border-muted/40 opacity-70'
                   }`}
                 >
@@ -442,7 +442,7 @@ const OverviewTab = ({ player, matches, leaderboard, selectedLeague, setSelected
         </Card>
 
         {/* Next Match */}
-        <Card className="bg-white/80 backdrop-blur-lg border-0 shadow-xl rounded-2xl overflow-hidden">
+        <Card className="bg-card/80 backdrop-blur-lg shadow-xl rounded-2xl overflow-hidden">
           <CardHeader className="p-4 md:p-6 lg:p-8 pb-4 md:pb-6">
             <CardTitle className="flex items-center space-x-3 md:space-x-4">
               <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-r from-primary to-accent rounded-lg md:rounded-xl flex items-center justify-center">
@@ -529,7 +529,7 @@ const OverviewTab = ({ player, matches, leaderboard, selectedLeague, setSelected
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 sm:p-6 pt-0">
-                  <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6">
+                  <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 p-6">
                     <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] bg-[length:16px_16px]"></div>
                     <div className="relative">
                       <div className="h-80 sm:h-96">
@@ -583,7 +583,7 @@ const OverviewTab = ({ player, matches, leaderboard, selectedLeague, setSelected
                                 content={({ active, payload, label }) => {
                                   if (active && payload && payload.length) {
                                     return (
-                                      <div className="rounded-lg bg-white/95 backdrop-blur-sm border border-border/50 p-3 shadow-lg animate-fade-in">
+                                      <div className="rounded-lg bg-card/95 backdrop-blur-sm border border-border/50 p-3 shadow-lg animate-fade-in">
                                         <p className="font-semibold text-sm text-foreground mb-2">{label}</p>
                                         <div className="space-y-1">
                                           <p className="text-sm flex items-center gap-2">
@@ -629,7 +629,7 @@ const OverviewTab = ({ player, matches, leaderboard, selectedLeague, setSelected
                       
                       {/* Performance insights */}
                       <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                        <div className="bg-card/70 dark:bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-border/40 dark:border-white/10">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium text-muted-foreground">Trend</span>
                             <TrendingUp className="w-4 h-4 text-green-500" />
@@ -654,7 +654,7 @@ const OverviewTab = ({ player, matches, leaderboard, selectedLeague, setSelected
                           </div>
                         </div>
                         
-                        <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                        <div className="bg-card/70 dark:bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-border/40 dark:border-white/10">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium text-muted-foreground">Best Month</span>
                             <Target className="w-4 h-4 text-blue-500" />
@@ -670,7 +670,7 @@ const OverviewTab = ({ player, matches, leaderboard, selectedLeague, setSelected
                           </div>
                         </div>
                         
-                        <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                        <div className="bg-card/70 dark:bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-border/40 dark:border-white/10">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium text-muted-foreground">Total Games</span>
                             <Activity className="w-4 h-4 text-purple-500" />
@@ -830,7 +830,7 @@ const OverviewTab = ({ player, matches, leaderboard, selectedLeague, setSelected
           </TabsContent>
         </Tabs>
       ) : (
-        <Card className="bg-white/80 backdrop-blur-lg border-0 shadow-xl rounded-2xl overflow-hidden">
+        <Card className="bg-card/80 dark:bg-card/90 backdrop-blur-lg border-0 shadow-xl rounded-2xl overflow-hidden">
           <CardHeader className="p-4 md:p-6 lg:p-8 pb-4 md:pb-6">
             <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex items-center space-x-3 md:space-x-4">

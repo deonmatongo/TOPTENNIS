@@ -26,7 +26,7 @@ const Players = () => {
         <h2 className="text-3xl font-bold text-center mb-12">Featured Players</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {players.map((player, index) => (
-            <div key={index} className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div key={index} className="bg-card rounded-lg shadow-md overflow-hidden">
               <img 
                 src={player.image} 
                 alt={player.name}

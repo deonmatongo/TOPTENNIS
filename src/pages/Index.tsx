@@ -13,7 +13,7 @@ import CookieConsent from "@/components/CookieConsent";
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-white overflow-x-hidden">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       <Header />
       <Hero />
       <NewsSection />

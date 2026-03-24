@@ -29,7 +29,7 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
   if (!isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50">
-        <div className="text-center p-8 bg-white rounded-lg shadow-lg">
+        <div className="text-center p-8 bg-card rounded-lg shadow-lg">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-red-600 text-2xl">⚠️</span>
           </div>

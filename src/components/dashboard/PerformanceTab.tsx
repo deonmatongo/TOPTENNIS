@@ -46,16 +46,16 @@ const PerformanceTab = ({ player }: PerformanceTabProps) => {
       value: leagueTotal,
       description: "Completed matches",
       icon: Target,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
+      color: "text-blue-600 dark:text-blue-400",
+      bgColor: "bg-blue-50 dark:bg-blue-950/40",
     },
     {
       title: "Win Rate",
       value: `${leagueWinRate}%`,
       description: `${leagueWins}W – ${leagueTotal - leagueWins}L`,
       icon: Trophy,
-      color: "text-emerald-600",
-      bgColor: "bg-emerald-50",
+      color: "text-emerald-600 dark:text-emerald-400",
+      bgColor: "bg-emerald-50 dark:bg-emerald-950/40",
     },
     {
       title: "Sets Record",
@@ -64,16 +64,16 @@ const PerformanceTab = ({ player }: PerformanceTabProps) => {
         ? `${Math.round((leagueSetsWon / (leagueSetsWon + leagueSetsLost)) * 100)}% sets won`
         : "No sets recorded",
       icon: Award,
-      color: "text-orange-600",
-      bgColor: "bg-orange-50",
+      color: "text-orange-600 dark:text-orange-400",
+      bgColor: "bg-orange-50 dark:bg-orange-950/40",
     },
     {
       title: "Hours Played",
       value: Math.round(leagueMinutes / 60),
       description: "Estimated court time",
       icon: Clock,
-      color: "text-purple-600",
-      bgColor: "bg-purple-50",
+      color: "text-purple-600 dark:text-purple-400",
+      bgColor: "bg-purple-50 dark:bg-purple-950/40",
     },
   ];
 
@@ -273,7 +273,7 @@ const PerformanceTab = ({ player }: PerformanceTabProps) => {
                           <span className="font-medium">vs {match.opponentName}</span>
                           <Badge
                             variant={match.isWin ? "default" : "secondary"}
-                            className={match.isWin ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}
+                            className={match.isWin ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400" : "bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400"}
                           >
                             {match.isWin ? "Won" : "Lost"}
                           </Badge>

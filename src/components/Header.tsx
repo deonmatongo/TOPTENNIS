@@ -48,7 +48,7 @@ const Header = () => {
       toast.error("Failed to sign out");
     }
   };
-  return <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isDashboard ? 'bg-card border-b-2 border-border' : isScrolled ? 'bg-white/95 backdrop-blur-lg border-b border-gray-200/60 shadow-xl' : 'bg-white/90 backdrop-blur-md border-b border-gray-100/40'}`}>
+  return <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isDashboard ? 'bg-card border-b-2 border-border' : isScrolled ? 'bg-background/95 backdrop-blur-lg border-b border-border/60 shadow-xl' : 'bg-background/90 backdrop-blur-md border-b border-border/40'}`}>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
@@ -58,7 +58,7 @@ const Header = () => {
           
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-8">
-            <Link to="/" className="nav-link group relative px-3 py-2 text-sm font-medium text-gray-700 hover:text-orange-600 transition-colors">
+            <Link to="/" className="nav-link group relative px-3 py-2 text-sm font-medium text-foreground hover:text-orange-600 transition-colors">
               Home
               <span className="absolute inset-x-0 -bottom-1 h-0.5 bg-orange-600 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></span>
             </Link>
@@ -66,41 +66,41 @@ const Header = () => {
             <NavigationMenu>
               <NavigationMenuList>
                 <NavigationMenuItem>
-                  <NavigationMenuTrigger className="nav-link group relative px-3 py-2 text-sm font-medium text-gray-700 hover:text-orange-600 bg-transparent hover:bg-transparent focus:bg-transparent data-[active]:bg-transparent data-[state=open]:bg-transparent border-0 shadow-none h-auto">
+                  <NavigationMenuTrigger className="nav-link group relative px-3 py-2 text-sm font-medium text-foreground hover:text-orange-600 bg-transparent hover:bg-transparent focus:bg-transparent data-[active]:bg-transparent data-[state=open]:bg-transparent border-0 shadow-none h-auto">
                     <span className="flex items-center">
                       <span>Register for a League</span>
                     </span>
                     <span className="absolute inset-x-0 -bottom-1 h-0.5 bg-orange-600 transform scale-x-0 group-hover:scale-x-100 group-data-[state=open]:scale-x-100 transition-transform origin-left"></span>
                   </NavigationMenuTrigger>
-                  <NavigationMenuContent className="bg-white/95 backdrop-blur-lg border border-gray-200/60 shadow-xl rounded-xl mt-3 min-w-[400px]">
+                  <NavigationMenuContent className="bg-background/95 backdrop-blur-lg border border-border/60 shadow-xl rounded-xl mt-3 min-w-[400px]">
                     <div className="p-6">
                       <div className="grid grid-cols-2 gap-6">
                         <div className="space-y-3">
-                          <Link to="/leagues#singles" className="font-semibold text-gray-900 text-sm uppercase tracking-wide border-b border-gray-200 pb-2 block hover:text-orange-600 transition-colors">
+                          <Link to="/leagues#singles" className="font-semibold text-foreground text-sm uppercase tracking-wide border-b border-border pb-2 block hover:text-orange-600 transition-colors">
                             Singles
                           </Link>
                           <div className="space-y-2">
-                            <Link to="/leagues#mens-singles" className="block px-3 py-2 text-sm text-gray-600 hover:text-orange-600 hover:bg-orange-50/80 rounded-lg transition-all">
+                            <Link to="/leagues#mens-singles" className="block px-3 py-2 text-sm text-muted-foreground hover:text-orange-600 hover:bg-orange-50/80 dark:hover:bg-orange-950/30 rounded-lg transition-all">
                               Men's Singles
                             </Link>
-                            <Link to="/leagues#womens-singles" className="block px-3 py-2 text-sm text-gray-600 hover:text-orange-600 hover:bg-orange-50/80 rounded-lg transition-all">
+                            <Link to="/leagues#womens-singles" className="block px-3 py-2 text-sm text-muted-foreground hover:text-orange-600 hover:bg-orange-50/80 dark:hover:bg-orange-950/30 rounded-lg transition-all">
                               Women's Singles
                             </Link>
                           </div>
                         </div>
-                        
+
                         <div className="space-y-3">
-                          <Link to="/leagues#doubles" className="font-semibold text-gray-900 text-sm uppercase tracking-wide border-b border-gray-200 pb-2 block hover:text-orange-600 transition-colors">
+                          <Link to="/leagues#doubles" className="font-semibold text-foreground text-sm uppercase tracking-wide border-b border-border pb-2 block hover:text-orange-600 transition-colors">
                             Doubles
                           </Link>
                           <div className="space-y-2">
-                            <Link to="/leagues#mens-doubles" className="block px-3 py-2 text-sm text-gray-600 hover:text-orange-600 hover:bg-orange-50/80 rounded-lg transition-all">
+                            <Link to="/leagues#mens-doubles" className="block px-3 py-2 text-sm text-muted-foreground hover:text-orange-600 hover:bg-orange-50/80 dark:hover:bg-orange-950/30 rounded-lg transition-all">
                               Men's Doubles
                             </Link>
-                            <Link to="/leagues#womens-doubles" className="block px-3 py-2 text-sm text-gray-600 hover:text-orange-600 hover:bg-orange-50/80 rounded-lg transition-all">
+                            <Link to="/leagues#womens-doubles" className="block px-3 py-2 text-sm text-muted-foreground hover:text-orange-600 hover:bg-orange-50/80 dark:hover:bg-orange-950/30 rounded-lg transition-all">
                               Women's Doubles
                             </Link>
-                            <Link to="/leagues#mixed-doubles" className="block px-3 py-2 text-sm text-gray-600 hover:text-orange-600 hover:bg-orange-50/80 rounded-lg transition-all">
+                            <Link to="/leagues#mixed-doubles" className="block px-3 py-2 text-sm text-muted-foreground hover:text-orange-600 hover:bg-orange-50/80 dark:hover:bg-orange-950/30 rounded-lg transition-all">
                               Mixed Doubles
                             </Link>
                           </div>
@@ -112,18 +112,18 @@ const Header = () => {
               </NavigationMenuList>
             </NavigationMenu>
 
-            <a href="#locations" className="nav-link group relative px-3 py-2 text-sm font-medium text-gray-700 hover:text-orange-600 transition-colors flex items-center space-x-1">
+            <a href="#locations" className="nav-link group relative px-3 py-2 text-sm font-medium text-foreground hover:text-orange-600 transition-colors flex items-center space-x-1">
               <MapPin className="h-4 w-4" />
               <span>Courts</span>
               <span className="absolute inset-x-0 -bottom-1 h-0.5 bg-orange-600 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></span>
             </a>
-            
-            <Link to="/rules" className="nav-link group relative px-3 py-2 text-sm font-medium text-gray-700 hover:text-orange-600 transition-colors">
+
+            <Link to="/rules" className="nav-link group relative px-3 py-2 text-sm font-medium text-foreground hover:text-orange-600 transition-colors">
               Rules
               <span className="absolute inset-x-0 -bottom-1 h-0.5 bg-orange-600 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></span>
             </Link>
-            
-            <Link to="/contact" className="nav-link group relative px-3 py-2 text-sm font-medium text-gray-700 hover:text-orange-600 transition-colors">
+
+            <Link to="/contact" className="nav-link group relative px-3 py-2 text-sm font-medium text-foreground hover:text-orange-600 transition-colors">
               Contact Us
               <span className="absolute inset-x-0 -bottom-1 h-0.5 bg-orange-600 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></span>
             </Link>
@@ -146,7 +146,7 @@ const Header = () => {
                 {/* User Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="flex items-center space-x-2 p-2 hover:bg-orange-50">
+                    <Button variant="ghost" className="flex items-center space-x-2 p-2 hover:bg-orange-50 dark:hover:bg-orange-950/30">
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={profile?.profile_picture_url || undefined} />
                         <AvatarFallback className="bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold text-sm">
@@ -154,14 +154,14 @@ const Header = () => {
                         </AvatarFallback>
                       </Avatar>
                       <div className="text-left">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-foreground">
                           {profile?.first_name ? `${profile.first_name} ${profile.last_name || ''}`.trim() : user.email}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-muted-foreground">
                           {profile?.membership_id || 'Member'}
                         </div>
                       </div>
-                      <ChevronDown className="h-4 w-4 text-gray-500" />
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
                     </Button>
                   </DropdownMenuTrigger>
                    <DropdownMenuContent align="end" className="w-56">

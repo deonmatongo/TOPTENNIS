@@ -60,7 +60,7 @@ const ForgotPassword = () => {
 
   if (emailSent) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
         <div className="w-full max-w-md">
           <div className="text-center mb-6">
             <img 
@@ -70,7 +70,7 @@ const ForgotPassword = () => {
             />
           </div>
 
-          <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 text-center">
+          <div className="bg-card rounded-2xl shadow-lg p-6 sm:p-8 text-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
@@ -117,7 +117,7 @@ const ForgotPassword = () => {
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+        <div className="bg-card rounded-2xl shadow-lg p-6 sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-medium text-gray-700">
