@@ -129,10 +129,11 @@ export const useGlobalPresence = () => {
       return;
     }
 
-    // All users join the same shared channel so they can see each other.
-    // subscriptionKey is appended so we can force a fresh channel on reconnect
-    // without Supabase deduplicating the subscribe call.
-    const channelName = `online-presence-${subscriptionKey}`;
+    // All users join this fixed channel so they can always see each other,
+    // even after a reconnect.  subscriptionKey forces the useEffect to re-run
+    // (cleanup removes the old channel, then the new effect recreates it with
+    // the same name — Supabase allows this because removeChannel unregisters it).
+    const channelName = 'global-online-presence';
     const channel = supabase.channel(channelName, {
       config: {
         presence: {

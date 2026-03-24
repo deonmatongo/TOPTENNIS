@@ -12,6 +12,7 @@ import { MessagesProvider } from "@/contexts/MessagesContext";
 import { MatchInvitesProvider } from "@/contexts/MatchInvitesContext";
 import { ConversationsProvider } from "@/contexts/ConversationsContext";
 import { AvailabilityProvider } from "@/contexts/AvailabilityContext";
+import { GlobalPresenceProvider } from "@/contexts/GlobalPresenceContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminRoute from "@/components/admin/AdminRoute";
 import RealtimeNotificationsManager from "@/components/RealtimeNotificationsManager";
@@ -86,6 +87,7 @@ const App: React.FC = () => {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <SocketProvider>
+        <GlobalPresenceProvider>
         <RealtimeProvider>
           <NotificationsProvider>
             <MatchInvitesProvider>
@@ -145,6 +147,7 @@ const App: React.FC = () => {
             </MatchInvitesProvider>
           </NotificationsProvider>
         </RealtimeProvider>
+        </GlobalPresenceProvider>
         </SocketProvider>
       </AuthProvider>
     </QueryClientProvider>
