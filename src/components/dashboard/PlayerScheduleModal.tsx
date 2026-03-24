@@ -210,7 +210,7 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
         <DialogContent className="w-[95vw] max-w-5xl h-[90vh] flex flex-col p-0 overflow-hidden">
 
           {/* ── Hero header ─────────────────────────────────────────────── */}
-          <div className="relative bg-gradient-to-br from-primary/90 via-primary/70 to-primary/40 pt-4 pb-4 px-4 sm:px-6 shrink-0">
+          <div className="relative pt-4 pb-4 px-4 sm:px-6 shrink-0" style={{ background: '#F97316' }}>
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.1),transparent_60%)]" />
 
             <DialogTitle className="sr-only">Schedule Match with {opponentName}</DialogTitle>
