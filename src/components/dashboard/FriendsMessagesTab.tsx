@@ -1,4 +1,9 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import {
+  Users, CalendarDays, User, Camera, Pencil, Star, Ban, Globe, Lock,
+  Search, AlertTriangle, MessageCircle, Pin, Check, LogOut, Trash2,
+  UserMinus, Settings, CheckCheck, X, Trophy, Hand
+} from 'lucide-react';
 import confetti from 'canvas-confetti';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
@@ -265,7 +270,7 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
             <div style={{ flex: 1, overflowY: 'auto' }}>
               {otherMembers.length === 0 ? (
                 <div style={{ padding: '40px 0', textAlign: 'center' }}>
-                  <div style={{ fontSize: 36, marginBottom: 10 }}>👥</div>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}><Users className="w-9 h-9" style={{ color: C.muted }} /></div>
                   <div style={{ fontWeight: 600, color: C.text }}>No other members</div>
                   <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Add members to the group first</div>
                 </div>
@@ -281,7 +286,7 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
                     <Av name={name} src={m.profile?.profile_picture_url ?? undefined} size={40} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: 14, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-                      <div style={{ fontSize: 12, color: C.muted, fontWeight: 500, marginTop: 2 }}>{m.role === 'admin' ? '⭐ Admin' : 'Member'}</div>
+                      <div style={{ fontSize: 12, color: C.muted, fontWeight: 500, marginTop: 2 }}>{m.role === 'admin' ? <><Star className="w-3.5 h-3.5 inline-block mr-1" />Admin</> : 'Member'}</div>
                     </div>
                     <button onClick={e => { e.stopPropagation(); onViewProfile({ id: m.user_id, user_id: m.user_id, name, email: m.profile?.email || '', skill_level: 0, wins: 0, losses: 0, first_name: m.profile?.first_name ?? undefined, last_name: m.profile?.last_name ?? undefined }); }}
                       style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: '4px 10px', fontSize: 11, fontWeight: 600, color: C.accent, cursor: 'pointer', flexShrink: 0, fontFamily: "'DM Sans', sans-serif" }}>
@@ -318,7 +323,7 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
                 </div>
               ) : rankedSlots.length === 0 ? (
                 <div style={{ padding: '48px 0', textAlign: 'center' }}>
-                  <div style={{ fontSize: 36, marginBottom: 10 }}>📅</div>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}><CalendarDays className="w-9 h-9" style={{ color: C.muted }} /></div>
                   <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 6 }}>No shared availability found</div>
                   <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>None of the selected players have public availability set. Go back and try fewer players, or ask them to add available slots.</div>
                 </div>
@@ -433,7 +438,7 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
             <div style={{ padding: '16px 20px', borderTop: `1px solid ${C.border}`, background: C.white, flexShrink: 0 }}>
               <button disabled={sending} onClick={handleSend}
                 style={{ width: '100%', padding: '12px 0', borderRadius: 10, background: sending ? C.border : C.accent, color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: sending ? 'default' : 'pointer', fontFamily: "'DM Sans', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.15s' }}>
-                {sending ? <><div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid white', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />Sending…</> : `🎾 Send match request to ${selected.size} player${selected.size !== 1 ? 's' : ''}`}
+                {sending ? <><div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid white', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />Sending…</> : <><Trophy className="w-3.5 h-3.5 inline-block mr-1" />{`Send match request to ${selected.size} player${selected.size !== 1 ? 's' : ''}`}</>}
               </button>
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <button onClick={() => setStep(1)} disabled={sending} style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: `1.5px solid ${C.border}`, background: 'transparent', fontSize: 13, fontWeight: 600, color: C.text, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>← Back</button>
@@ -542,7 +547,7 @@ const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
                   style={{ position: 'absolute', bottom: -6, right: -6, width: 28, height: 28, borderRadius: '50%', background: C.accent, border: '2px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 13 }}
                   title="Change group photo"
                 >
-                  {avatarUploading ? <div style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid white', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} /> : '📷'}
+                  {avatarUploading ? <div style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid white', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} /> : <Camera style={{ width: 13, height: 13, color: '#fff' }} />}
                 </button>
               )}
               <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
@@ -565,12 +570,12 @@ const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
               <button onClick={async () => { await onRenameGroup(newName); setRenaming(false); toast.success('Group renamed'); }}
                 style={{ padding: '8px 14px', borderRadius: 8, background: C.accent, color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Save</button>
               <button onClick={() => { setRenaming(false); setNewName(conv.name || ''); }}
-                style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', cursor: 'pointer', fontSize: 13 }}>✕</button>
+                style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X style={{ width: 13, height: 13, color: C.muted }} /></button>
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: C.bg, borderRadius: 10, marginBottom: 24 }}>
               <span style={{ flex: 1, fontWeight: 600, fontSize: 14 }}>{conv.name || 'Group Chat'}</span>
-              {isAdmin && <button onClick={() => setRenaming(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 14 }}>✏️</button>}
+              {isAdmin && <button onClick={() => setRenaming(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, display: 'flex', alignItems: 'center' }}><Pencil style={{ width: 14, height: 14 }} /></button>}
             </div>
           )}
 
@@ -585,7 +590,7 @@ const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
               marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}
           >
-            🎾 Send Match Request
+            <Trophy className="w-3.5 h-3.5" /> Send Match Request
           </button>
 
           {/* ── Members ── */}
@@ -603,7 +608,7 @@ const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>{name}{isMe ? ' (you)' : ''}</div>
                     <div style={{ fontSize: 11, fontWeight: 600, color: m.role === 'admin' ? C.accent : C.muted, marginTop: 1 }}>
-                      {m.role === 'admin' ? '⭐ Admin' : 'Member'}
+                      {m.role === 'admin' ? <><Star className="w-3.5 h-3.5 inline-block mr-1" />Admin</> : 'Member'}
                     </div>
                   </div>
                 </button>
@@ -625,7 +630,7 @@ const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
                             style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', fontSize: 13, fontWeight: 500, color: C.text, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
                             onMouseEnter={e => (e.currentTarget.style.background = C.hover)}
                             onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                          >⭐ Promote to admin</button>
+                          ><Star className="w-3.5 h-3.5 inline-block mr-1" />Promote to admin</button>
                         ) : (
                           <button onClick={() => doSetRole(m.user_id, 'member')}
                             style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', fontSize: 13, fontWeight: 500, color: C.text, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
@@ -638,13 +643,13 @@ const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
                           style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', fontSize: 13, fontWeight: 500, color: C.text, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
                           onMouseEnter={e => (e.currentTarget.style.background = C.hover)}
                           onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                        >👤 View profile</button>
+                        ><User className="w-3.5 h-3.5 inline-block mr-1" />View profile</button>
                         {/* Remove */}
                         <button onClick={() => { setMemberMenu(null); setConfirmRemove(m.user_id); }}
                           style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', fontSize: 13, fontWeight: 500, color: '#ef4444', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
                           onMouseEnter={e => (e.currentTarget.style.background = '#fef2f2')}
                           onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                        >🚫 Remove from group</button>
+                        ><Ban className="w-3.5 h-3.5 inline-block mr-1" />Remove from group</button>
                       </div>
                     )}
                   </div>
@@ -808,7 +813,7 @@ const NewGroupModal: React.FC<NewGroupModalProps> = ({
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div style={{ fontWeight: 700, fontSize: isMobile ? 20 : 18, color: C.text }}>Create a Group</div>
-          <button onClick={tryClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: C.muted, padding: '2px 6px', lineHeight: 1, borderRadius: 8 }}>✕</button>
+          <button onClick={tryClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, padding: '2px 6px', borderRadius: 8, display: 'flex', alignItems: 'center' }}><X style={{ width: 20, height: 20 }} /></button>
         </div>
 
         <StepDots step={step} labels={['Details', 'Members', 'Review']} />
@@ -839,7 +844,7 @@ const NewGroupModal: React.FC<NewGroupModalProps> = ({
               </div>
               <input value={name} onChange={e => setName(e.target.value.slice(0, 40))} autoFocus placeholder='e.g. "Friday Night Squad"'
                 style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: `1.5px solid ${nameTaken ? '#ef4444' : nameValid ? C.accent : C.border}`, fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: "'DM Sans', sans-serif", color: C.text }} />
-              {nameTaken && <div style={{ fontSize: 12, color: '#ef4444', marginTop: 5 }}>⚠ You already have a group with this name</div>}
+              {nameTaken && <div style={{ fontSize: 12, color: '#ef4444', marginTop: 5, display: 'flex', alignItems: 'center', gap: 4 }}><AlertTriangle className="w-3.5 h-3.5 inline-block" /> You already have a group with this name</div>}
             </div>
 
             {/* Description */}
@@ -856,7 +861,7 @@ const NewGroupModal: React.FC<NewGroupModalProps> = ({
                 <label key={t} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${groupType === t ? C.accent : C.border}`, background: groupType === t ? C.accentLight : C.white, cursor: 'pointer', marginBottom: 8, transition: 'all 0.15s' }}>
                   <input type="radio" checked={groupType === t} onChange={() => setGroupType(t)} style={{ accentColor: C.accent, width: 16, height: 16 }} />
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: C.text, textTransform: 'capitalize' }}>{t === 'private' ? '🔒 Private' : '🌐 Open'}</div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: C.text, textTransform: 'capitalize', display: 'flex', alignItems: 'center', gap: 4 }}>{t === 'private' ? <><Lock className="w-3.5 h-3.5 inline-block" /> Private</> : <><Globe className="w-3.5 h-3.5 inline-block" /> Open</>}</div>
                     <div style={{ fontSize: 12, color: C.muted }}>{t === 'private' ? 'Only invited members can join' : 'Any friend can join'}</div>
                   </div>
                 </label>
@@ -879,7 +884,7 @@ const NewGroupModal: React.FC<NewGroupModalProps> = ({
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
             {/* Search */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.bg, borderRadius: 10, padding: '9px 12px', border: `1.5px solid ${C.border}` }}>
-              <span style={{ color: C.muted }}>🔍</span>
+              <Search style={{ width: 14, height: 14, color: C.muted, flexShrink: 0 }} />
               <input value={memberSearch} onChange={e => setMemberSearch(e.target.value)} autoFocus placeholder="Search friends…"
                 style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, color: C.text, flex: 1, fontFamily: "'DM Sans', sans-serif" }} />
             </div>
@@ -926,7 +931,7 @@ const NewGroupModal: React.FC<NewGroupModalProps> = ({
                     <div key={uid} style={{ display: 'flex', alignItems: 'center', gap: 5, background: C.accentLight, border: `1px solid ${C.accent}`, borderRadius: 999, padding: '4px 10px 4px 6px', fontSize: 12, fontWeight: 600, color: C.text }}>
                       <Av name={f.name} src={f.avatar} size={18} />
                       {f.name.split(' ')[0]}
-                      <button onClick={() => setSelected(prev => { const n = new Set(prev); n.delete(uid); return n; })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 14, padding: 0, lineHeight: 1, marginLeft: 2 }}>✕</button>
+                      <button onClick={() => setSelected(prev => { const n = new Set(prev); n.delete(uid); return n; })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, padding: 0, lineHeight: 1, marginLeft: 2, display: 'flex', alignItems: 'center' }}><X style={{ width: 12, height: 12 }} /></button>
                     </div>
                   );
                 })}
@@ -950,8 +955,8 @@ const NewGroupModal: React.FC<NewGroupModalProps> = ({
               <div style={{ width: 52, height: 52, borderRadius: 14, background: avatarColorForName(name), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, flexShrink: 0 }}>{avatarEmoji}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 16, color: C.text, marginBottom: 2 }}>{name}</div>
-                <div style={{ fontSize: 12, color: C.muted, marginBottom: description ? 6 : 0 }}>
-                  {groupType === 'private' ? '🔒 Private' : '🌐 Open'} · {memberCount} member{memberCount !== 1 ? 's' : ''}
+                <div style={{ fontSize: 12, color: C.muted, marginBottom: description ? 6 : 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {groupType === 'private' ? <><Lock className="w-3.5 h-3.5 inline-block" /> Private</> : <><Globe className="w-3.5 h-3.5 inline-block" /> Open</>} · {memberCount} member{memberCount !== 1 ? 's' : ''}
                 </div>
                 {description && <div style={{ fontSize: 13, color: C.text, fontStyle: 'italic' }}>"{description}"</div>}
               </div>
@@ -978,8 +983,8 @@ const NewGroupModal: React.FC<NewGroupModalProps> = ({
             )}
 
             {/* Notification note */}
-            <div style={{ fontSize: 12, color: C.muted, background: C.bg, borderRadius: 10, padding: '10px 14px', border: `1px solid ${C.border}` }}>
-              ⚠ They'll each receive an in-app notification when the group is created.
+            <div style={{ fontSize: 12, color: C.muted, background: C.bg, borderRadius: 10, padding: '10px 14px', border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <AlertTriangle className="w-3.5 h-3.5 inline-block" /> They'll each receive an in-app notification when the group is created.
             </div>
 
             {/* Actions */}
@@ -1066,14 +1071,14 @@ const GroupOnboardingBanner: React.FC<GroupOnboardingBannerProps> = ({
               <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 2 }}>You created {convName}</div>
               <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>You're the admin · {memberCount} member{memberCount !== 1 ? 's' : ''}</div>
               <div style={{ fontSize: 12, color: C.text, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <div>✓ Invite more friends via <span style={{ color: C.accent, fontWeight: 600 }}>⚙ Settings</span></div>
-                <div>✓ Set a group description</div>
-                <div>✓ Send your first message below 👋</div>
+                <div><Check className="w-3.5 h-3.5 inline-block mr-1" />Invite more friends via <span style={{ color: C.accent, fontWeight: 600 }}><Settings className="w-3.5 h-3.5 inline-block mr-1" />Settings</span></div>
+                <div><Check className="w-3.5 h-3.5 inline-block mr-1" />Set a group description</div>
+                <div><Check className="w-3.5 h-3.5 inline-block mr-1" />Send your first message below <Hand className="w-3.5 h-3.5 inline-block ml-1" /></div>
               </div>
             </>
           ) : (
             <>
-              <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 2 }}>👋 {inviterName || 'Someone'} added you to {convName}</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}><Hand className="w-4 h-4 inline-block" /> {inviterName || 'Someone'} added you to {convName}</div>
               <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>
                 {memberCount} member{memberCount !== 1 ? 's' : ''}
               </div>
@@ -1081,7 +1086,7 @@ const GroupOnboardingBanner: React.FC<GroupOnboardingBannerProps> = ({
             </>
           )}
         </div>
-        <button onClick={dismiss} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 16, padding: 2, flexShrink: 0, lineHeight: 1 }} title="Got it">✕</button>
+        <button onClick={dismiss} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, padding: 2, flexShrink: 0, display: 'flex', alignItems: 'center' }} title="Got it"><X style={{ width: 16, height: 16 }} /></button>
       </div>
     </div>
   );
@@ -1108,11 +1113,11 @@ const ConvRow: React.FC<ConvRowProps> = ({ conv, selected, userId, isOnlineFn, o
   const online  = otherId ? isOnlineFn(otherId) : false;
   const lastMsg = conv.lastMessage;
 
-  const menuItems = [
-    { label: conv.isPinned ? '📌 Unpin' : '📌 Pin', action: () => onPin(!conv.isPinned) },
-    { label: '✓ Mark as read', action: onMarkRead },
-    ...(conv.is_group && onLeave  ? [{ label: '🚪 Leave group',  action: onLeave,  danger: false }] : []),
-    ...(conv.is_group && onDelete ? [{ label: '🗑️ Delete group', action: onDelete, danger: true  }] : []),
+  const menuItems: { key: string; label: React.ReactNode; action: () => void; danger?: boolean }[] = [
+    { key: 'pin', label: conv.isPinned ? <><Pin className="w-3.5 h-3.5 inline-block mr-1" />Unpin</> : <><Pin className="w-3.5 h-3.5 inline-block mr-1" />Pin</>, action: () => onPin(!conv.isPinned) },
+    { key: 'read', label: <><Check className="w-3.5 h-3.5 inline-block mr-1" />Mark as read</>, action: onMarkRead },
+    ...(conv.is_group && onLeave  ? [{ key: 'leave',  label: <><LogOut className="w-3.5 h-3.5 inline-block mr-1" />Leave group</>,  action: onLeave,  danger: false }] : []),
+    ...(conv.is_group && onDelete ? [{ key: 'delete', label: <><Trash2 className="w-3.5 h-3.5 inline-block mr-1" />Delete group</>, action: onDelete, danger: true  }] : []),
   ];
 
   return (
@@ -1127,7 +1132,7 @@ const ConvRow: React.FC<ConvRowProps> = ({ conv, selected, userId, isOnlineFn, o
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontWeight: conv.unreadCount ? 700 : 600, fontSize: 14, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {conv.is_group ? `# ${name}` : name}
-              {conv.isPinned && <span style={{ marginLeft: 6, fontSize: 12 }}>📌</span>}
+              {conv.isPinned && <Pin style={{ marginLeft: 6, width: 12, height: 12, display: 'inline-block', flexShrink: 0 }} />}
             </div>
             <div style={{ fontSize: 11, color: C.muted, flexShrink: 0, marginLeft: 6 }}>{lastMsg ? fmtTime(lastMsg.created_at) : ''}</div>
           </div>
@@ -1150,9 +1155,9 @@ const ConvRow: React.FC<ConvRowProps> = ({ conv, selected, userId, isOnlineFn, o
           {menuOpen && (
             <div style={{ position: 'absolute', right: 0, top: '110%', background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 50, minWidth: 170, overflow: 'hidden' }}>
               {menuItems.map(item => (
-                <button key={item.label}
+                <button key={item.key}
                   onClick={e => { e.stopPropagation(); setMenuOpen(false); item.action(); }}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', fontSize: 13, fontWeight: 500, color: (item as any).danger ? '#ef4444' : C.text, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
+                  style={{ display: 'flex', alignItems: 'center', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', fontSize: 13, fontWeight: 500, color: item.danger ? '#ef4444' : C.text, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
                   onMouseEnter={e => (e.currentTarget.style.background = C.hover)}
                   onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                 >{item.label}</button>
@@ -1198,12 +1203,12 @@ const FriendRow: React.FC<FriendRowProps> = ({ fid, name, avatar, online, faded,
             <button onClick={() => setMenuOpen(v => !v)} style={{ padding: '5px 10px', borderRadius: 8, background: C.bg, color: C.muted, border: `1px solid ${C.border}`, fontSize: 14, cursor: 'pointer' }}>···</button>
             {menuOpen && (
               <div style={{ position: 'absolute', right: 0, top: '110%', background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 50, minWidth: 160, overflow: 'hidden' }}>
-                {[
-                  { label: '👤 View Profile', action: onProfile },
-                  { label: '👋 Unfriend',     action: onUnfriend },
-                  { label: '🚫 Block',        action: onBlock, danger: true },
-                ].map(item => (
-                  <button key={item.label} onClick={() => { setMenuOpen(false); item.action(); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', fontSize: 13, fontWeight: 500, color: item.danger ? '#ef4444' : C.text, cursor: 'pointer' }}
+                {([
+                  { key: 'profile', label: <><User className="w-3.5 h-3.5 inline-block mr-1" />View Profile</>, action: onProfile },
+                  { key: 'unfriend', label: <><UserMinus className="w-3.5 h-3.5 inline-block mr-1" />Unfriend</>, action: onUnfriend },
+                  { key: 'block', label: <><Ban className="w-3.5 h-3.5 inline-block mr-1" />Block</>, action: onBlock, danger: true },
+                ] as { key: string; label: React.ReactNode; action: () => void; danger?: boolean }[]).map(item => (
+                  <button key={item.key} onClick={() => { setMenuOpen(false); item.action(); }} style={{ display: 'flex', alignItems: 'center', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', fontSize: 13, fontWeight: 500, color: item.danger ? '#ef4444' : C.text, cursor: 'pointer' }}
                     onMouseEnter={e => (e.currentTarget.style.background = C.hover)}
                     onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                   >{item.label}</button>
@@ -1439,7 +1444,7 @@ const FriendsMessagesTab = () => {
   if (!user) {
     return (
       <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
-        <div style={{ fontSize: '24px', marginBottom: '16px' }}>👤</div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}><User style={{ width: 24, height: 24 }} /></div>
         <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>Loading user data...</div>
       </div>
     );
@@ -1515,7 +1520,7 @@ const FriendsMessagesTab = () => {
           {/* Search */}
           <div style={{ padding: '10px 14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.bg, borderRadius: 10, padding: '8px 12px', border: `1.5px solid ${C.border}` }}>
-              <span style={{ color: C.muted }}>🔍</span>
+              <Search style={{ width: 14, height: 14, color: C.muted, flexShrink: 0 }} />
               <input
                 value={activeTab === 'friends' ? friendSearch : search}
                 onChange={e => activeTab === 'friends' ? setFriendSearch(e.target.value) : setSearch(e.target.value)}
@@ -1533,7 +1538,7 @@ const FriendsMessagesTab = () => {
               <>
                 {filteredDMs.length === 0 && filteredGroups.length === 0 ? (
                   <div style={{ padding: 40, textAlign: 'center' }}>
-                    <div style={{ fontSize: 36, marginBottom: 10 }}>💬</div>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}><MessageCircle className="w-9 h-9" style={{ color: C.muted }} /></div>
                     <div style={{ fontWeight: 600, color: C.text, marginBottom: 4 }}>No conversations yet</div>
                     <div style={{ fontSize: 13, color: C.muted }}>Start a new conversation with a friend</div>
                   </div>
@@ -1613,7 +1618,7 @@ const FriendsMessagesTab = () => {
                 )}
                 {filteredFriends.length === 0 && (
                   <div style={{ padding: 40, textAlign: 'center' }}>
-                    <div style={{ fontSize: 36, marginBottom: 10 }}>👥</div>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}><Users className="w-9 h-9" style={{ color: C.muted }} /></div>
                     <div style={{ fontWeight: 600, color: C.text }}>{friends.length === 0 ? 'No friends yet' : 'No matches'}</div>
                     {friends.length === 0 && <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Send a friend request to start connecting</div>}
                   </div>
@@ -1638,7 +1643,7 @@ const FriendsMessagesTab = () => {
                         </div>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button onClick={() => handleAccept(req.id)} style={{ padding: '6px 12px', borderRadius: 8, background: C.accent, color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Accept</button>
-                          <button onClick={async () => { await updateRequestStatus(req.id, 'declined'); toast.success('Declined'); }} style={{ padding: '6px 10px', borderRadius: 8, background: C.bg, color: C.muted, border: `1px solid ${C.border}`, fontSize: 12, cursor: 'pointer' }}>✕</button>
+                          <button onClick={async () => { await updateRequestStatus(req.id, 'declined'); toast.success('Declined'); }} style={{ padding: '6px 10px', borderRadius: 8, background: C.bg, color: C.muted, border: `1px solid ${C.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center' }}><X style={{ width: 12, height: 12 }} /></button>
                         </div>
                       </div>
                     ))}
@@ -1657,7 +1662,7 @@ const FriendsMessagesTab = () => {
                           <div style={{ fontSize: 12, color: C.muted }}>{formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}</div>
                         </div>
                         <span style={{ fontSize: 11, fontWeight: 700, color: C.muted, background: C.bg, padding: '3px 10px', borderRadius: 6, border: `1px solid ${C.border}` }}>Pending</span>
-                        <button onClick={async () => { await revokeFriendRequest(req.id); toast.success('Request revoked'); }} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 16, cursor: 'pointer' }}>✕</button>
+                        <button onClick={async () => { await revokeFriendRequest(req.id); toast.success('Request revoked'); }} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', display: 'flex', alignItems: 'center' }}><X style={{ width: 16, height: 16 }} /></button>
                       </div>
                     ))}
                   </>
@@ -1698,13 +1703,13 @@ const FriendsMessagesTab = () => {
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button title={selectedConv.isPinned ? 'Unpin' : 'Pin'} onClick={() => togglePin(selectedConv.id, !selectedConv.isPinned)}
-                    style={{ width: 36, height: 36, borderRadius: 9, background: selectedConv.isPinned ? C.accentLight : C.bg, border: `1px solid ${selectedConv.isPinned ? C.accent : C.border}`, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📌</button>
+                    style={{ width: 36, height: 36, borderRadius: 9, background: selectedConv.isPinned ? C.accentLight : C.bg, border: `1px solid ${selectedConv.isPinned ? C.accent : C.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Pin style={{ width: 15, height: 15, color: selectedConv.isPinned ? C.accent : C.muted }} /></button>
                   {selectedConv.is_group && (
                     <>
                       <button title="Request Match" onClick={() => setShowGroupMatchRequest(true)}
                         style={{ height: 36, padding: '0 12px', borderRadius: 9, background: C.accent, border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, color: '#fff', fontFamily: "'DM Sans', sans-serif" }}>Request Match</button>
                       <button title="Group settings" onClick={() => setShowGroupInfo(true)}
-                        style={{ width: 36, height: 36, borderRadius: 9, background: C.bg, border: `1px solid ${C.border}`, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⚙️</button>
+                        style={{ width: 36, height: 36, borderRadius: 9, background: C.bg, border: `1px solid ${C.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Settings style={{ width: 15, height: 15, color: C.muted }} /></button>
                     </>
                   )}
                 </div>
@@ -1794,7 +1799,7 @@ const FriendsMessagesTab = () => {
                                 style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '2px 4px', borderRadius: 6 }} title="Reply">↩️</button>
                               {canDel && (
                                 <button onClick={async () => { try { await deleteMessage(msg.id); } catch { toast.error('Failed to delete'); } }}
-                                  style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '2px 4px', borderRadius: 6 }} title="Delete">🗑️</button>
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: 6, display: 'flex', alignItems: 'center' }} title="Delete"><Trash2 style={{ width: 16, height: 16, color: '#ef4444' }} /></button>
                               )}
                             </div>
                           )}
@@ -1833,7 +1838,7 @@ const FriendsMessagesTab = () => {
                         {/* Timestamp */}
                         <div style={{ fontSize: 11, color: C.mutedLight, marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
                           {format(new Date(msg.created_at), 'HH:mm')}
-                          {isOwn && <span style={{ color: C.accent }}>✓✓</span>}
+                          {isOwn && <CheckCheck style={{ width: 14, height: 14, color: C.accent }} />}
                         </div>
                       </div>
                     </div>
@@ -1874,7 +1879,7 @@ const FriendsMessagesTab = () => {
                     <span style={{ fontSize: 12, fontWeight: 600, color: C.accent }}>Replying to </span>
                     <span style={{ fontSize: 12, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', maxWidth: 300 }}>{replyToMsg.content}</span>
                   </div>
-                  <button onClick={() => setReplyToMsg(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 16 }}>✕</button>
+                  <button onClick={() => setReplyToMsg(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, display: 'flex', alignItems: 'center' }}><X style={{ width: 16, height: 16 }} /></button>
                 </div>
               )}
 
@@ -1925,7 +1930,7 @@ const FriendsMessagesTab = () => {
           ) : (
             /* Empty state */
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, background: C.bg }}>
-              <div style={{ fontSize: 64 }}>💬</div>
+              <MessageCircle style={{ width: 64, height: 64, color: C.muted }} />
               <div style={{ fontWeight: 700, fontSize: 20, color: C.text }}>Select a conversation</div>
               <div style={{ fontSize: 14, color: C.muted }}>Choose a conversation from the sidebar</div>
             </div>
