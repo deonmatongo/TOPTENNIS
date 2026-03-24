@@ -202,11 +202,16 @@ const NotificationDropdown = ({ children }: NotificationDropdownProps) => {
       }
     }
     
-    // Navigate based on type
+    // Navigate based on type — actionUrl takes precedence; fall back to type-based mapping
+    const MATCH_TYPES = ['match_invite', 'match_rescheduled', 'match_accepted', 'match_confirmed', 'match_declined', 'match_cancelled', 'match_scheduled', 'match_result'];
     const dest = notification.actionUrl
-      ?? (notification.type === 'group_invite' || notification.type === 'message_received'
-        ? '/dashboard?tab=social'
-        : notification.type === 'friend_request' || notification.type === 'friend_accepted'
+      ?? (MATCH_TYPES.includes(notification.type)
+        ? '/dashboard?tab=schedule'
+        : notification.type === 'match_suggestion'
+        ? '/dashboard?tab=matching'
+        : notification.type === 'message_received'
+        ? '/dashboard?tab=messages'
+        : notification.type === 'group_invite' || notification.type === 'friend_request' || notification.type === 'friend_accepted'
         ? '/dashboard?tab=social'
         : null);
 

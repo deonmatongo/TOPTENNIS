@@ -212,7 +212,7 @@ const NotificationsTab = () => {
       case 'match_suggestion': return '/dashboard?tab=matching';
       case 'friend_request':
       case 'friend_accepted':  return '/dashboard?tab=social';
-      case 'message_received':
+      case 'message_received': return '/dashboard?tab=messages';
       case 'group_invite':     return '/dashboard?tab=social';
       case 'league_update':    return '/dashboard?tab=competition';
       case 'achievement':      return '/dashboard?tab=overview';

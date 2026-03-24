@@ -300,60 +300,76 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
     };
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const subscribeToUserChanges = (callback: (payload: any) => void) => {
+  /**
+   * subscribeToUserChanges — deduplicated, health-monitored subscription for the
+   * current user's personal changes (availability + sent/received match invites).
+   *
+   * Uses the same reference-counted pattern as subscribeToTable so multiple hook
+   * instances share one channel and the channel auto-reconnects if it drops.
+   */
+  const subscribeToUserChanges = useCallback((callback: (payload: any) => void): (() => void) => {
     if (!user) return () => {};
 
-    const channel = supabase.channel(`user-${user.id}-changes`);
+    const channelName = `user-${user.id}-changes`;
+    const registry = tableChannelsRef.current;
 
-    channel
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_availability',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          console.log('User availability update:', payload);
-          setLastUpdate(new Date().toISOString());
-          callback(payload);
+    let entry = registry.get(channelName);
+
+    if (!entry) {
+      const channel = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'user_availability', filter: `user_id=eq.${user.id}` },
+          (payload) => {
+            setLastUpdate(new Date().toISOString());
+            registry.get(channelName)?.callbacks.forEach(cb => cb(payload));
+          },
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'match_invites', filter: `sender_id=eq.${user.id}` },
+          (payload) => {
+            setLastUpdate(new Date().toISOString());
+            registry.get(channelName)?.callbacks.forEach(cb => cb(payload));
+          },
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'match_invites', filter: `receiver_id=eq.${user.id}` },
+          (payload) => {
+            setLastUpdate(new Date().toISOString());
+            registry.get(channelName)?.callbacks.forEach(cb => cb(payload));
+          },
+        )
+        .subscribe();
+
+      const connectionMonitor = setInterval(() => {
+        const e = registry.get(channelName);
+        if (!e) return;
+        if ((e.channel.state as string) !== 'joined') {
+          // Channel dropped — re-subscribe (callbacks are preserved in the registry).
+          e.channel.subscribe();
         }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'match_invites',
-          filter: `sender_id=eq.${user.id}`,
-        },
-        (payload) => {
-          console.log('User sent invite update:', payload);
-          setLastUpdate(new Date().toISOString());
-          callback(payload);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'match_invites',
-          filter: `receiver_id=eq.${user.id}`,
-        },
-        (payload) => {
-          console.log('User received invite update:', payload);
-          setLastUpdate(new Date().toISOString());
-          callback(payload);
-        }
-      )
-      .subscribe();
+      }, 10_000);
+
+      entry = { channel, callbacks: new Set(), connectionMonitor };
+      registry.set(channelName, entry);
+    }
+
+    entry.callbacks.add(callback);
 
     return () => {
-      supabase.removeChannel(channel);
+      const e = registry.get(channelName);
+      if (!e) return;
+      e.callbacks.delete(callback);
+      if (e.callbacks.size === 0) {
+        clearInterval(e.connectionMonitor);
+        supabase.removeChannel(e.channel);
+        registry.delete(channelName);
+      }
     };
-  };
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const broadcastUpdate = (event: string, data: any) => {
     if (!user) return;

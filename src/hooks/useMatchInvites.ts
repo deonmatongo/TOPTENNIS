@@ -565,13 +565,8 @@ export const useMatchInvites = () => {
         p_metadata:   { match_id: inviteId },
       });
 
-      // If accepted, create a conversation between the users (in background)
+      // Persist conflicting invite declines to DB in background (double-booking prevention)
       if (status === 'accepted') {
-        createConversation(invite).catch(convError => {
-          logger.error('Error creating conversation', { error: convError, inviteId });
-        });
-
-        // Persist conflicting invite declines to DB in background (double-booking prevention)
         if (conflictingIds.length > 0) {
           supabase
             .from('match_invites')
@@ -739,27 +734,6 @@ export const useMatchInvites = () => {
         (startTime <= invite.start_time && endTime >= invite.end_time)
       );
     });
-  };
-
-  const createConversation = async (invite: MatchInvite) => {
-    try {
-      // Send an initial message to create the conversation
-      const senderName = `${invite.sender?.first_name} ${invite.sender?.last_name}`;
-      const receiverName = `${invite.receiver?.first_name} ${invite.receiver?.last_name}`;
-      
-      const { error } = await supabase
-        .from('messages')
-        .insert({
-          sender_id: user?.id === invite.sender_id ? invite.sender_id : invite.receiver_id,
-          receiver_id: user?.id === invite.sender_id ? invite.receiver_id : invite.sender_id,
-          subject: 'Match Confirmed',
-          content: `Great! Our match for ${invite.date} at ${invite.start_time} is confirmed. Looking forward to playing with you!`,
-        });
-
-      if (error) throw error;
-    } catch (error) {
-      logger.error('Error creating conversation in hook', { error });
-    }
   };
 
   const cancelInvite = async (inviteId: string, reason?: string) => {
