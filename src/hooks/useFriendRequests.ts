@@ -138,26 +138,18 @@ export const useFriendRequests = () => {
         ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim()
         : 'Someone';
 
-      // Server-side idempotency check - prevent duplicate notifications
-      const { data: existingNotification } = await supabase
-        .from('notifications')
-        .select('id')
-        .eq('user_id', receiverId)
-        .eq('type', 'friend_request')
-        .eq('metadata->>sender_id', user.id)
-        .maybeSingle();
-
-      if (!existingNotification) {
-        await supabase.from('notifications').insert({
-          user_id: receiverId,
-          type: 'friend_request',
-          title: 'New Friend Request',
-          message: `${senderName} sent you a friend request`,
-          read: false,
-          action_url: '/dashboard?tab=social',
-          metadata: { sender_id: user.id },
-        });
-      }
+      // Use insert_notification_safe (ON CONFLICT DO NOTHING) so that if the
+      // notify_friend_request() DB trigger has not yet been dropped it will
+      // also try to insert — the second insert hits the unique partial index
+      // uniq_notifications_friend_request and is silently discarded.
+      await supabase.rpc('insert_notification_safe', {
+        p_user_id:    receiverId,
+        p_type:       'friend_request',
+        p_title:      'New Friend Request',
+        p_message:    `${senderName} sent you a friend request`,
+        p_action_url: '/dashboard?tab=social',
+        p_metadata:   { sender_id: user.id },
+      });
 
       await fetchRequests();
       return true;
@@ -194,26 +186,17 @@ export const useFriendRequests = () => {
           ? `${receiverProfile.first_name || ''} ${receiverProfile.last_name || ''}`.trim()
           : 'Someone';
 
-        // Server-side idempotency check - prevent duplicate acceptance notifications
-        const { data: existingAcceptNotification } = await supabase
-          .from('notifications')
-          .select('id')
-          .eq('user_id', request.sender_id)
-          .eq('type', 'friend_accepted')
-          .eq('metadata->>request_id', requestId)
-          .maybeSingle();
-
-        if (!existingAcceptNotification) {
-          await supabase.from('notifications').insert({
-            user_id: request.sender_id,
-            type: 'friend_accepted',
-            title: 'Friend Request Accepted',
-            message: `${receiverName} accepted your friend request`,
-            read: false,
-            action_url: '/dashboard?tab=social',
-            metadata: { receiver_id: user.id, request_id: requestId },
-          });
-        }
+        // Use insert_notification_safe (ON CONFLICT DO NOTHING) so that if a DB
+        // trigger already inserted the same notification, the second insert is
+        // silently discarded instead of creating a duplicate.
+        await supabase.rpc('insert_notification_safe', {
+          p_user_id:    request.sender_id,
+          p_type:       'friend_accepted',
+          p_title:      'Friend Request Accepted',
+          p_message:    `${receiverName} accepted your friend request`,
+          p_action_url: '/dashboard?tab=social',
+          p_metadata:   { receiver_id: user.id, request_id: requestId },
+        });
       }
 
       await fetchRequests();
