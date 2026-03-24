@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import {
   Users, CalendarDays, User, Camera, Pencil, Star, Ban, Globe, Lock,
   Search, AlertTriangle, MessageCircle, Pin, Check, LogOut, Trash2,
-  UserMinus, Settings, CheckCheck, X, Trophy, Hand
+  UserMinus, Settings, CheckCheck, X, Trophy, Hand, ShieldOff
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import Picker from '@emoji-mart/react';
@@ -1225,7 +1225,7 @@ const FriendRow: React.FC<FriendRowProps> = ({ fid, name, avatar, online, faded,
 // ── Main component ────────────────────────────────────────────────────────────
 const FriendsMessagesTab = () => {
   // ── All hooks must be called unconditionally at the top ──────────────────
-  const [activeTab, setActiveTab]         = useState<'chat' | 'friends' | 'requests'>('chat');
+  const [activeTab, setActiveTab]         = useState<'chat' | 'friends' | 'requests' | 'blocked'>('chat');
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
   const [msgInput, setMsgInput]           = useState('');
   const [search, setSearch]               = useState('');
@@ -1257,7 +1257,7 @@ const FriendsMessagesTab = () => {
     updateRequestStatus, revokeFriendRequest, getPendingRequestsCount,
   } = useFriendRequests();
 
-  const { blockedUsers, blockUser, unfriendUser } = useBlockedUsers();
+  const { blockedUsers, blockUser, unblockUser, unfriendUser } = useBlockedUsers();
 
   const {
     conversations, loading: convLoading,
@@ -1438,6 +1438,7 @@ const FriendsMessagesTab = () => {
     { id: 'chat',     label: 'Chat',     count: totalUnread },
     { id: 'friends',  label: 'Friends',  count: friends.length },
     { id: 'requests', label: 'Requests', count: getPendingRequestsCount() },
+    { id: 'blocked',  label: 'Blocked',  count: blockedUsers.length },
   ];
 
   // Loading guard — all hooks are already called above, safe to return early here
@@ -1668,10 +1669,61 @@ const FriendsMessagesTab = () => {
                   </>
                 )}
                 {pendingIn.length === 0 && pendingSent.length === 0 && (
-                  <div style={{ padding: 40, textAlign: 'center' }}>
-                    <div style={{ fontSize: 36, marginBottom: 10 }}>⏳</div>
+                  <div style={{ padding: 40, textAlign: 'center', color: C.muted }}>
+                    <Users className="w-9 h-9 mx-auto mb-3 opacity-30" />
                     <div style={{ fontWeight: 600, color: C.text }}>No friend requests</div>
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* BLOCKED */}
+            {activeTab === 'blocked' && (
+              <div style={{ padding: '12px 16px' }}>
+                {blockedUsers.length === 0 ? (
+                  <div style={{ padding: 40, textAlign: 'center', color: C.muted }}>
+                    <Ban className="w-9 h-9 mx-auto mb-3 opacity-30" />
+                    <div style={{ fontWeight: 600, color: C.text, marginBottom: 4 }}>No blocked users</div>
+                    <div style={{ fontSize: 13 }}>Players you block won't be able to contact you or see your profile.</div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                      Blocked — {blockedUsers.length}
+                    </div>
+                    {blockedUsers.map(bu => (
+                      <div key={bu.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, border: `1.5px solid ${C.border}`, marginBottom: 8, background: C.white }}>
+                        <Av name={bu.blocked_user_name || 'U'} src={bu.blocked_user_profile_picture || undefined} size={40} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 14, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {bu.blocked_user_name || 'Unknown Player'}
+                          </div>
+                          {bu.blocked_user_email && (
+                            <div style={{ fontSize: 12, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {bu.blocked_user_email}
+                            </div>
+                          )}
+                          {bu.reason && (
+                            <div style={{ fontSize: 11, color: C.mutedLight, fontStyle: 'italic', marginTop: 2 }}>
+                              {bu.reason}
+                            </div>
+                          )}
+                          <div style={{ fontSize: 11, color: C.mutedLight, marginTop: 2 }}>
+                            Blocked {new Date(bu.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            await unblockUser(bu.blocked_user_id);
+                          }}
+                          style={{ padding: '6px 14px', borderRadius: 8, background: C.bg, color: C.text, border: `1.5px solid ${C.border}`, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, fontFamily: "'DM Sans', sans-serif" }}
+                        >
+                          <ShieldOff style={{ width: 13, height: 13 }} />
+                          Unblock
+                        </button>
+                      </div>
+                    ))}
+                  </>
                 )}
               </div>
             )}
