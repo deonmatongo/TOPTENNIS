@@ -1266,7 +1266,7 @@ const FriendsMessagesTab = () => {
   } = useConversationsContext();
 
   const { invites: _invites } = useMatchInvitesContext();
-  const { isOnline } = useOnlinePresence();
+  const { isOnline, stableOnlineUserIds } = useOnlinePresence();
   const { typingUsers, broadcastTyping } = useTypingIndicator(selectedConvId);
 
   const blockedIds = useMemo(() => new Set((blockedUsers || []).map(b => b.blocked_user_id)), [blockedUsers]);
@@ -1288,15 +1288,17 @@ const FriendsMessagesTab = () => {
   const filteredDMs    = sortPinned(dmConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(search.toLowerCase())));
   const filteredGroups = sortPinned(groupConvs.filter(c => getConvName(c, user?.id || '').toLowerCase().includes(search.toLowerCase())));
 
-  // Memoized online status map — depends on stableOnlineUserIds via isOnline
+  // Memoized online status map — keyed on stableOnlineUserIds (Set reference
+  // changes whenever presence data changes) so the map recomputes reliably
+  // even if the isOnline function reference stays stable across renders.
   const onlineStatusMap = useMemo(() => {
     const map = new Map<string, boolean>();
     (friends || []).forEach(f => {
       const friendId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
-      if (friendId) map.set(friendId, isOnline(friendId));
+      if (friendId) map.set(friendId, stableOnlineUserIds.has(friendId));
     });
     return map;
-  }, [friends, user?.id, isOnline]);
+  }, [friends, user?.id, stableOnlineUserIds]);
 
   const filteredFriends = (friends || []).filter(f => {
     const fd = f.sender_id === user?.id ? f.receiver : f.sender;

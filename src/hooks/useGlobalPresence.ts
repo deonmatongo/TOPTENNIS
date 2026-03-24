@@ -147,8 +147,10 @@ export const useGlobalPresence = () => {
     channel
       .on('presence', { event: 'sync' }, () => {
         try {
-          const state = channel.presenceState<{ user_id: string }>();
-          const ids = new Set(Object.values(state).flatMap(arr => arr.map((p: any) => p.user_id)));
+          // channel config sets `key: user.id`, so Object.keys(state) gives
+          // every online user's ID directly — no need to dig into tracked data.
+          const state = channel.presenceState();
+          const ids = new Set<string>(Object.keys(state));
 
           // Update raw state immediately for internal use
           setOnlineUserIds(ids);
