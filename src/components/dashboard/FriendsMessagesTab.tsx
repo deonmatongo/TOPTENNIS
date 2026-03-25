@@ -481,20 +481,7 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
           <>
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px' }}>
 
-              {/* Invited players */}
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>Invited players ({selectedMembers.length})</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                  {selectedMembers.map(m => (
-                    <div key={m.user_id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.bg, borderRadius: 10, padding: '8px 12px', border: `1px solid ${C.border}` }}>
-                      <Av name={memberName(m)} src={m.profile?.profile_picture_url ?? undefined} size={32} />
-                      <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{memberName(m).split(' ')[0]}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Selected time */}
+              {/* Proposed time */}
               <div style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>Proposed time</div>
                 <div style={{ background: C.accentLight, border: `1.5px solid ${C.accent}`, borderRadius: 12, padding: '14px 16px' }}>
@@ -503,31 +490,92 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
                 </div>
               </div>
 
-              {/* Availability summary */}
-              <div style={{ background: C.bg, borderRadius: 12, padding: '14px 16px', border: `1px solid ${C.border}` }}>
-                {selectedSlot.playerIds.length === 0 ? (
-                  <>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 6 }}>Custom date & time</div>
-                    <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
-                      This time was chosen manually. All {selected.size} selected player{selected.size !== 1 ? 's' : ''} will receive an invitation and can accept or decline.
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8 }}>Availability for this slot</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                      <div style={{ flex: 1, height: 8, borderRadius: 4, background: C.border, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${(selectedSlot.playerIds.length / selected.size) * 100}%`, background: '#22C55E', borderRadius: 4 }} />
+              {/* Per-player availability breakdown */}
+              <div style={{ marginBottom: 20 }}>
+                {(() => {
+                  const isCustom = selectedSlot.playerIds.length === 0 && rankedSlots.length === 0;
+                  const availableMembers = selectedMembers.filter(m => selectedSlot.playerIds.includes(m.user_id));
+                  const unavailableMembers = selectedMembers.filter(m => !selectedSlot.playerIds.includes(m.user_id));
+                  const availCount = isCustom ? 0 : availableMembers.length;
+                  const unavailCount = isCustom ? 0 : unavailableMembers.length;
+
+                  return (
+                    <>
+                      {/* Summary bar */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                          Player availability
+                        </div>
+                        {!isCustom && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#22C55E' }}>
+                              {availCount} available
+                            </span>
+                            {unavailCount > 0 && (
+                              <span style={{ fontSize: 11, fontWeight: 700, color: '#F59E0B' }}>
+                                {unavailCount} unavailable
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#22C55E' }}>{selectedSlot.playerIds.length}/{selected.size}</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: C.muted }}>
-                      {selectedSlot.playerIds.length === selected.size
-                        ? 'All selected players are available at this time.'
-                        : `${selectedSlot.playerIds.length} of ${selected.size} selected players have this slot open. Others will still receive the invite.`}
-                    </div>
-                  </>
-                )}
+
+                      {/* Progress bar */}
+                      {!isCustom && selectedMembers.length > 0 && (
+                        <div style={{ height: 6, borderRadius: 3, background: C.border, overflow: 'hidden', marginBottom: 12 }}>
+                          <div style={{ height: '100%', width: `${(availCount / selectedMembers.length) * 100}%`, background: '#22C55E', borderRadius: 3 }} />
+                        </div>
+                      )}
+
+                      {/* Player rows */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {selectedMembers.map(m => {
+                          const available = !isCustom && selectedSlot.playerIds.includes(m.user_id);
+                          const unknown = isCustom;
+                          return (
+                            <div key={m.user_id} style={{
+                              display: 'flex', alignItems: 'center', gap: 12,
+                              padding: '10px 14px', borderRadius: 10,
+                              background: available ? 'rgba(34,197,94,0.06)' : unknown ? C.bg : 'rgba(245,158,11,0.06)',
+                              border: `1.5px solid ${available ? 'rgba(34,197,94,0.25)' : unknown ? C.border : 'rgba(245,158,11,0.25)'}`,
+                            }}>
+                              <Av name={memberName(m)} src={m.profile?.profile_picture_url ?? undefined} size={36} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: 600, fontSize: 13, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {memberName(m)}
+                                </div>
+                                <div style={{ fontSize: 11, color: available ? '#16A34A' : unknown ? C.muted : '#B45309', fontWeight: 600, marginTop: 2 }}>
+                                  {available ? 'Available at this time' : unknown ? 'Availability unknown' : 'No availability set for this slot'}
+                                </div>
+                              </div>
+                              <div style={{
+                                width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                                background: available ? '#22C55E' : unknown ? C.border : '#F59E0B',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              }}>
+                                {available
+                                  ? <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>✓</span>
+                                  : unknown
+                                  ? <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>?</span>
+                                  : <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>!</span>
+                                }
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Footer note */}
+                      <div style={{ marginTop: 12, fontSize: 11, color: C.muted, lineHeight: 1.5 }}>
+                        {isCustom
+                          ? 'All players will receive the invitation regardless of their calendar and can accept or decline.'
+                          : unavailCount > 0
+                          ? `${unavailCount} player${unavailCount !== 1 ? 's' : ''} without availability will still receive the invitation and can accept or decline.`
+                          : 'All players have this time open — great timing!'}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
