@@ -1,7 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, FontWeight, Spacing } from '@/theme/colors';
 
@@ -11,7 +10,7 @@ interface ScreenHeaderProps {
   navigation?: any;
   showBack?: boolean;
   rightElement?: React.ReactNode;
-  gradient?: boolean;
+  gradient?: boolean; // kept for compatibility, ignored
 }
 
 export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
@@ -20,23 +19,22 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
   navigation,
   showBack = false,
   rightElement,
-  gradient = true,
 }) => {
   const insets = useSafeAreaInsets();
 
-  const content = (
-    <View style={[styles.inner, { paddingTop: insets.top + Spacing.md }]}>
+  return (
+    <View style={[styles.container, { paddingTop: insets.top + Spacing.sm }]}>
       <View style={styles.row}>
         {showBack && navigation ? (
           <TouchableOpacity
             style={styles.backBtn}
             onPress={() => navigation.goBack()}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Ionicons name="chevron-back" size={26} color="#fff" />
+            <Ionicons name="chevron-back" size={24} color={Colors.text} />
           </TouchableOpacity>
         ) : (
-          <View style={styles.backPlaceholder} />
+          <View style={styles.side} />
         )}
 
         <View style={styles.titleWrap}>
@@ -44,57 +42,39 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
           {subtitle ? <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text> : null}
         </View>
 
-        <View style={styles.right}>
-          {rightElement ?? <View style={styles.backPlaceholder} />}
+        <View style={styles.side}>
+          {rightElement ?? null}
         </View>
       </View>
     </View>
   );
-
-  if (gradient) {
-    return (
-      <LinearGradient
-        colors={Colors.gradientWarm}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.container}
-      >
-        {content}
-      </LinearGradient>
-    );
-  }
-
-  return <View style={[styles.container, styles.solidBg]}>{content}</View>;
 };
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
-    paddingBottom: Spacing.lg,
-  },
-  solidBg: {
     backgroundColor: Colors.surface,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  inner: {
-    paddingHorizontal: Spacing.md,
+    borderBottomColor: Colors.borderLight,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: 44,
   },
   backBtn: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 18,
+    backgroundColor: Colors.backgroundAlt,
   },
-  backPlaceholder: {
-    width: 40,
+  side: {
+    width: 36,
+    alignItems: 'flex-end',
   },
   titleWrap: {
     flex: 1,
@@ -102,19 +82,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
   },
   title: {
-    fontSize: FontSize.xl,
+    fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
-    color: '#fff',
+    color: Colors.text,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: FontSize.xs,
-    color: 'rgba(255,255,255,0.8)',
+    color: Colors.textMuted,
     marginTop: 2,
     textAlign: 'center',
-  },
-  right: {
-    width: 40,
-    alignItems: 'flex-end',
   },
 });

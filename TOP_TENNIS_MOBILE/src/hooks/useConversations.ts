@@ -23,6 +23,9 @@ export interface ConversationMessage {
   content: string;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
+  is_system?: boolean;
+  reply_to_message_id?: string | null;
   sender?: {
     id: string;
     first_name?: string | null;
@@ -40,6 +43,7 @@ export interface Conversation {
   created_by: string;
   created_at: string;
   updated_at: string;
+  isPinned?: boolean;
   members: ConversationMember[];
   messages: ConversationMessage[];
   lastMessage?: ConversationMessage;
@@ -136,13 +140,15 @@ export const useConversations = () => {
     }
   }, [user]);
 
-  const sendMessage = useCallback(async (conversationId: string, content: string) => {
+  const sendMessage = useCallback(async (conversationId: string, content: string, replyToId?: string) => {
     if (!user || !content.trim()) return;
-    const { error } = await db.from('conversation_messages').insert({
+    const payload: any = {
       conversation_id: conversationId,
       sender_id: user.id,
       content: content.trim(),
-    });
+    };
+    if (replyToId) payload.reply_to_message_id = replyToId;
+    const { error } = await db.from('conversation_messages').insert(payload);
     if (error) throw error;
     await fetchConversations();
   }, [user, fetchConversations]);
@@ -226,6 +232,17 @@ export const useConversations = () => {
     return me?.role ?? null;
   }, [user]);
 
+  const leaveGroup = useCallback(async (conversationId: string) => {
+    if (!user) return;
+    const { error } = await db
+      .from('conversation_members')
+      .delete()
+      .eq('conversation_id', conversationId)
+      .eq('user_id', user.id);
+    if (error) throw error;
+    setConversations(prev => prev.filter(c => c.id !== conversationId));
+  }, [user]);
+
   useEffect(() => {
     if (!user) { setLoading(false); return; }
     fetchConversations();
@@ -270,6 +287,7 @@ export const useConversations = () => {
     markConversationRead,
     getTotalUnread,
     getMyRole,
+    leaveGroup,
     refetch: fetchConversations,
   };
 };

@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRealtime } from '@/contexts/RealtimeContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
@@ -45,7 +44,6 @@ type MatchInvite = Tables<'match_invites'> & {
 
 export const useMatchInvites = () => {
   const { user } = useAuth();
-  const { subscribeToUserChanges } = useRealtime();
   const [invites, setInvites] = useState<MatchInvite[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,14 +51,12 @@ export const useMatchInvites = () => {
   const notifiedIds = useRef<Set<string>>(new Set());
   // Track if we're in an error state to prevent automatic retries
   const hasErrorRef = useRef(false);
-
-  // Use refs to prevent dependency changes from triggering re-renders
-  const subscribeToUserChangesRef = useRef(subscribeToUserChanges);
-
-  // Update refs when functions change
-  useEffect(() => {
-    subscribeToUserChangesRef.current = subscribeToUserChanges;
-  }, [subscribeToUserChanges]);
+  // Always-current ref to fetchInvites so real-time callbacks never call a stale version
+  const fetchInvitesRef = useRef<(isRetry?: boolean) => Promise<void>>();
+  // Incrementing forces the subscription effect to recreate channels (reconnect)
+  const [subscriptionKey, setSubscriptionKey] = useState(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptsRef = useRef(0);
 
   useEffect(() => {
     if (!user?.id) {
@@ -68,85 +64,122 @@ export const useMatchInvites = () => {
       return;
     }
 
-    // Add a small delay to ensure auth is fully resolved
+    // Initial fetch with a small delay to ensure auth is fully resolved
     const authTimeout = setTimeout(() => {
-      // Only fetch if not already in error state
       if (!hasErrorRef.current) {
-        fetchInvites();
+        fetchInvitesRef.current?.();
       } else {
         setLoading(false);
       }
     }, 100);
 
-    // Set up real-time subscription using context
-    const unsubscribe = subscribeToUserChangesRef.current(async (payload) => {
-      if (payload.table === 'match_invites') {
-        logger.debug('Real-time invite update', { payload });
-        
-        // Handle new invite notifications (INSERT)
-        if (payload.eventType === 'INSERT') {
-          const newInvite = payload.new as any;
-          
-          // Toast is handled by useNotifications via the notifications table row.
-          // We only deduplicate to avoid double-fetching.
-          if (newInvite.receiver_id === user.id && !notifiedIds.current.has(`insert:${newInvite.id}`)) {
-            notifiedIds.current.add(`insert:${newInvite.id}`);
-          }
-        }
-        
-        // Handle invite status changes (UPDATE)
-        if (payload.eventType === 'UPDATE') {
-          const oldInvite = payload.old as any;
-          const updatedInvite = payload.new as any;
-          
-          // Check if status changed
-          const dedupeKey = `update:${updatedInvite.id}:${updatedInvite.status}`;
-          if (oldInvite.status !== updatedInvite.status && !notifiedIds.current.has(dedupeKey)) {
-            notifiedIds.current.add(dedupeKey);
-            // Fetch the other party's profile for the notification message
-            const otherUserId = updatedInvite.receiver_id === user.id
-              ? updatedInvite.sender_id
-              : updatedInvite.receiver_id;
+    // Real-time event handler shared by both channel subscriptions
+    const handlePayload = async (payload: any) => {
+      logger.debug('Real-time invite update', { payload });
 
-            try {
-              const { data: otherProfile } = await supabase
-                .from('profiles')
-                .select('first_name, last_name')
-                .eq('id', otherUserId)
-                .single();
-
-              const otherName = otherProfile
-                ? `${otherProfile.first_name} ${otherProfile.last_name}`.trim()
-                : 'Opponent';
-
-              if (updatedInvite.status === 'accepted' && updatedInvite.receiver_id === user.id) {
-                toast.success(`${otherName} accepted your match invite`, { duration: 5000 });
-              } else if (updatedInvite.status === 'declined' && updatedInvite.receiver_id === user.id) {
-                toast.info(`${otherName} declined your match invite`, { duration: 5000 });
-              } else if (updatedInvite.status === 'cancelled') {
-                toast.info(`${otherName} cancelled the match`, { duration: 5000 });
-              }
-            } catch (error) {
-              logger.warn('Failed to fetch other user profile for notification', { error });
-            }
-          }
-        }
-        
-        // Refresh on insert or meaningful status change
-        if (payload.eventType === 'INSERT' ||
-            (payload.eventType === 'UPDATE' &&
-             payload.old?.status !== payload.new?.status)) {
-          // Debounce to prevent rapid successive calls
-          setTimeout(() => fetchInvites(), 500);
+      // Handle new invite notifications (INSERT)
+      if (payload.eventType === 'INSERT') {
+        const newInvite = payload.new as any;
+        // Toast is handled by useNotifications via the notifications table row.
+        if (newInvite.receiver_id === user.id && !notifiedIds.current.has(`insert:${newInvite.id}`)) {
+          notifiedIds.current.add(`insert:${newInvite.id}`);
         }
       }
-    });
+
+      // Handle invite status changes (UPDATE)
+      if (payload.eventType === 'UPDATE') {
+        const oldInvite = payload.old as any;
+        const updatedInvite = payload.new as any;
+
+        const dedupeKey = `update:${updatedInvite.id}:${updatedInvite.status}`;
+        if (oldInvite.status !== updatedInvite.status && !notifiedIds.current.has(dedupeKey)) {
+          notifiedIds.current.add(dedupeKey);
+          const otherUserId = updatedInvite.receiver_id === user.id
+            ? updatedInvite.sender_id
+            : updatedInvite.receiver_id;
+
+          try {
+            const { data: otherProfile } = await supabase
+              .from('profiles')
+              .select('first_name, last_name')
+              .eq('id', otherUserId)
+              .single();
+
+            const otherName = otherProfile
+              ? `${otherProfile.first_name} ${otherProfile.last_name}`.trim()
+              : 'Opponent';
+
+            if (updatedInvite.status === 'accepted' && updatedInvite.receiver_id === user.id) {
+              toast.success(`${otherName} accepted your match invite`, { duration: 5000 });
+            } else if (updatedInvite.status === 'declined' && updatedInvite.receiver_id === user.id) {
+              toast.info(`${otherName} declined your match invite`, { duration: 5000 });
+            } else if (updatedInvite.status === 'cancelled') {
+              toast.info(`${otherName} cancelled the match`, { duration: 5000 });
+            }
+          } catch (err) {
+            logger.warn('Failed to fetch other user profile for notification', { error: err });
+          }
+        }
+      }
+
+      // Refresh on insert or meaningful status change
+      if (payload.eventType === 'INSERT' ||
+          (payload.eventType === 'UPDATE' && payload.old?.status !== payload.new?.status)) {
+        setTimeout(() => fetchInvitesRef.current?.(), 500);
+      }
+    };
+
+    const handleStatus = (status: string) => {
+      if (status === 'SUBSCRIBED') {
+        // Catch up on any changes that arrived while reconnecting
+        reconnectAttemptsRef.current = 0;
+        fetchInvitesRef.current?.();
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        const attempts = reconnectAttemptsRef.current;
+        const MAX_ATTEMPTS = 6;
+        if (attempts < MAX_ATTEMPTS) {
+          const delay = Math.min(2000 * Math.pow(2, attempts), 30_000);
+          logger.warn(`[useMatchInvites] Channel ${status}. Reconnecting in ${delay}ms (attempt ${attempts + 1}/${MAX_ATTEMPTS})`);
+          reconnectTimerRef.current = setTimeout(() => {
+            reconnectAttemptsRef.current = attempts + 1;
+            setSubscriptionKey(k => k + 1);
+          }, delay);
+        } else {
+          logger.error('[useMatchInvites] Max reconnect attempts reached.');
+        }
+      }
+    };
+
+    // Two SEPARATE channels — one per filter — to guarantee both are registered
+    // independently on the Supabase Realtime server. Having two `postgres_changes`
+    // bindings with different column filters on a single channel can cause only one
+    // to be honoured server-side; separate channels avoids this entirely.
+    const sentChannel = (supabase as any)
+      .channel(`match-invites-sent-${user.id}-${subscriptionKey}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'match_invites',
+        filter: `sender_id=eq.${user.id}`,
+      }, handlePayload)
+      .subscribe(handleStatus);
+
+    const receivedChannel = (supabase as any)
+      .channel(`match-invites-received-${user.id}-${subscriptionKey}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'match_invites',
+        filter: `receiver_id=eq.${user.id}`,
+      }, handlePayload)
+      .subscribe(handleStatus);
 
     return () => {
       clearTimeout(authTimeout);
-      unsubscribe();
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      supabase.removeChannel(sentChannel);
+      supabase.removeChannel(receivedChannel);
     };
-  }, [user?.id]); // Only depend on user ID, not on functions that might change
+  }, [user?.id, subscriptionKey]);
 
   // Network connectivity listeners with debouncing
   useEffect(() => {
@@ -158,7 +191,7 @@ export const useMatchInvites = () => {
         // Debounce online refresh to prevent multiple calls
         onlineTimeout = setTimeout(() => {
           if (!hasErrorRef.current) {
-            fetchInvites();
+            fetchInvitesRef.current?.();
           }
           onlineTimeout = null;
         }, 1000);
@@ -185,6 +218,29 @@ export const useMatchInvites = () => {
         clearTimeout(onlineTimeout);
       }
     };
+  }, [user?.id]);
+
+  // ── Tab visibility: refetch when user returns to the browser tab ──────────
+  useEffect(() => {
+    if (!user?.id) return;
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchInvitesRef.current?.();
+        reconnectAttemptsRef.current = 0;
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [user?.id]);
+
+  // ── Periodic fallback poll (30 s) ─────────────────────────────────────────
+  // Safety net if the WebSocket silently stops delivering events.
+  useEffect(() => {
+    if (!user?.id) return;
+    const interval = setInterval(() => {
+      fetchInvitesRef.current?.();
+    }, 30_000);
+    return () => clearInterval(interval);
   }, [user?.id]);
 
   // Network connectivity check
@@ -353,6 +409,9 @@ export const useMatchInvites = () => {
       setLoading(false);
     }
   };
+
+  // Keep the ref in sync on every render so real-time callbacks always call the latest version
+  fetchInvitesRef.current = fetchInvites;
 
   const sendInvite = async (inviteData: {
     receiver_id: string;

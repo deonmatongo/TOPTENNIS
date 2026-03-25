@@ -138,10 +138,27 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<SlotEntry | null>(null);
   const [sending, setSending]           = useState(false);
+  const [customMode, setCustomMode]     = useState(false);
+  const [customDate, setCustomDate]     = useState('');
+  const [customStart, setCustomStart]   = useState('');
+  const [customEnd, setCustomEnd]       = useState('');
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const applyCustomSlot = () => {
+    if (!customDate || !customStart || !customEnd) return;
+    setSelectedSlot({ date: customDate, start_time: customStart, end_time: customEnd, playerIds: [] });
+    setStep(2);
+  };
+
+  const customValid = !!customDate && !!customStart && !!customEnd && customEnd > customStart;
 
   // Reset whenever the sheet opens
   useEffect(() => {
-    if (open) { setStep(0); setSelected(new Set()); setRankedSlots([]); setSelectedSlot(null); }
+    if (open) {
+      setStep(0); setSelected(new Set()); setRankedSlots([]); setSelectedSlot(null);
+      setCustomMode(false); setCustomDate(''); setCustomStart(''); setCustomEnd('');
+    }
   }, [open]);
 
   const memberName = (m: Conversation['members'][0]) =>
@@ -320,10 +337,38 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
                   <div style={{ fontSize: 13, color: C.muted, fontWeight: 500 }}>Checking availability…</div>
                 </div>
               ) : rankedSlots.length === 0 ? (
-                <div style={{ padding: '48px 0', textAlign: 'center' }}>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}><CalendarDays className="w-9 h-9" style={{ color: C.muted }} /></div>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 6 }}>No shared availability found</div>
-                  <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>None of the selected players have public availability set. Go back and try fewer players, or ask them to add available slots.</div>
+                <div>
+                  <div style={{ padding: '32px 0 24px', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}><CalendarDays className="w-9 h-9" style={{ color: C.muted }} /></div>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 6 }}>No shared availability found</div>
+                    <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>None of the selected players have public availability set.</div>
+                  </div>
+                  {/* Custom date/time picker — always shown when no shared slots */}
+                  <div style={{ background: C.accentLight, border: `1.5px solid ${C.accent}`, borderRadius: 14, padding: '16px 16px 18px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 }}>Pick a date & time</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 4 }}>DATE</div>
+                        <input type="date" min={todayStr} value={customDate} onChange={e => setCustomDate(e.target.value)}
+                          style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${customDate ? C.accent : C.border}`, fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: 'none', background: C.white, boxSizing: 'border-box' }} />
+                      </div>
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 4 }}>START TIME</div>
+                          <input type="time" value={customStart} onChange={e => setCustomStart(e.target.value)}
+                            style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${customStart ? C.accent : C.border}`, fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: 'none', background: C.white, boxSizing: 'border-box' }} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 4 }}>END TIME</div>
+                          <input type="time" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
+                            style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${customEnd ? C.accent : C.border}`, fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: 'none', background: C.white, boxSizing: 'border-box' }} />
+                        </div>
+                      </div>
+                      {customEnd && customStart && customEnd <= customStart && (
+                        <div style={{ fontSize: 11, color: '#EF4444', fontWeight: 600 }}>End time must be after start time</div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <>
@@ -332,10 +377,10 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
                   </div>
                   {rankedSlots.map((slot, idx) => {
                     const ratio      = slot.playerIds.length / selected.size;
-                    const isChosen   = selectedSlot?.date === slot.date && selectedSlot?.start_time === slot.start_time && selectedSlot?.end_time === slot.end_time;
+                    const isChosen   = !customMode && selectedSlot?.date === slot.date && selectedSlot?.start_time === slot.start_time && selectedSlot?.end_time === slot.end_time;
                     const isBest     = idx === 0;
                     return (
-                      <div key={`${slot.date}|${slot.start_time}`} onClick={() => setSelectedSlot(slot)}
+                      <div key={`${slot.date}|${slot.start_time}`} onClick={() => { setCustomMode(false); setSelectedSlot(slot); }}
                         style={{ padding: '13px 14px', borderRadius: 12, border: `2px solid ${isChosen ? C.accent : C.border}`, background: isChosen ? C.accentLight : C.white, marginBottom: 10, cursor: 'pointer', transition: 'all 0.15s' }}>
 
                         {/* Top row: date/time + badge */}
@@ -368,16 +413,59 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
                       </div>
                     );
                   })}
+
+                  {/* ── Custom time option ── */}
+                  <div style={{ marginTop: 8, borderTop: `1px dashed ${C.border}`, paddingTop: 14 }}>
+                    <button onClick={() => { setCustomMode(m => !m); setSelectedSlot(null); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", marginBottom: customMode ? 12 : 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: C.accent }}>{customMode ? '▲ Hide custom time' : '▼ Pick a different date & time'}</span>
+                    </button>
+                    {customMode && (
+                      <div style={{ background: C.accentLight, border: `1.5px solid ${C.accent}`, borderRadius: 14, padding: '14px 14px 16px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          <div>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 4 }}>DATE</div>
+                            <input type="date" min={todayStr} value={customDate} onChange={e => setCustomDate(e.target.value)}
+                              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${customDate ? C.accent : C.border}`, fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: 'none', background: C.white, boxSizing: 'border-box' }} />
+                          </div>
+                          <div style={{ display: 'flex', gap: 10 }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 4 }}>START</div>
+                              <input type="time" value={customStart} onChange={e => setCustomStart(e.target.value)}
+                                style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${customStart ? C.accent : C.border}`, fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: 'none', background: C.white, boxSizing: 'border-box' }} />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 4 }}>END</div>
+                              <input type="time" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
+                                style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${customEnd ? C.accent : C.border}`, fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: 'none', background: C.white, boxSizing: 'border-box' }} />
+                            </div>
+                          </div>
+                          {customEnd && customStart && customEnd <= customStart && (
+                            <div style={{ fontSize: 11, color: '#EF4444', fontWeight: 600 }}>End time must be after start time</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
             </div>
 
             {/* Footer */}
             <div style={{ padding: '16px 20px', borderTop: `1px solid ${C.border}`, background: C.white, flexShrink: 0 }}>
-              <button disabled={!selectedSlot} onClick={() => selectedSlot && setStep(2)}
-                style={{ width: '100%', padding: '11px 0', borderRadius: 10, background: selectedSlot ? C.accent : C.border, color: selectedSlot ? '#fff' : C.muted, border: 'none', fontSize: 14, fontWeight: 700, cursor: selectedSlot ? 'pointer' : 'not-allowed', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.15s' }}>
-                {selectedSlot ? 'Review & confirm →' : 'Select a time slot'}
-              </button>
+              {(() => {
+                const canProceed = customMode ? customValid : !!selectedSlot;
+                const onClick = () => {
+                  if (customMode) { applyCustomSlot(); }
+                  else if (selectedSlot) { setStep(2); }
+                };
+                return (
+                  <button disabled={!canProceed} onClick={onClick}
+                    style={{ width: '100%', padding: '11px 0', borderRadius: 10, background: canProceed ? C.accent : C.border, color: canProceed ? '#fff' : C.muted, border: 'none', fontSize: 14, fontWeight: 700, cursor: canProceed ? 'pointer' : 'not-allowed', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.15s' }}>
+                    {canProceed ? 'Review & confirm →' : (customMode ? 'Fill in date & time to continue' : 'Select a time slot')}
+                  </button>
+                );
+              })()}
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <button onClick={() => setStep(0)} style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: `1.5px solid ${C.border}`, background: 'transparent', fontSize: 13, fontWeight: 600, color: C.text, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>← Back</button>
                 <button onClick={onClose} style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: 'none', background: 'transparent', fontSize: 13, fontWeight: 600, color: C.muted, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
@@ -417,18 +505,29 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
 
               {/* Availability summary */}
               <div style={{ background: C.bg, borderRadius: 12, padding: '14px 16px', border: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8 }}>Availability for this slot</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                  <div style={{ flex: 1, height: 8, borderRadius: 4, background: C.border, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${(selectedSlot.playerIds.length / selected.size) * 100}%`, background: '#22C55E', borderRadius: 4 }} />
-                  </div>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#22C55E' }}>{selectedSlot.playerIds.length}/{selected.size}</span>
-                </div>
-                <div style={{ fontSize: 12, color: C.muted }}>
-                  {selectedSlot.playerIds.length === selected.size
-                    ? 'All selected players are available at this time.'
-                    : `${selectedSlot.playerIds.length} of ${selected.size} selected players have this slot open. Others will still receive the invite.`}
-                </div>
+                {selectedSlot.playerIds.length === 0 ? (
+                  <>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 6 }}>Custom date & time</div>
+                    <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+                      This time was chosen manually. All {selected.size} selected player{selected.size !== 1 ? 's' : ''} will receive an invitation and can accept or decline.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8 }}>Availability for this slot</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                      <div style={{ flex: 1, height: 8, borderRadius: 4, background: C.border, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${(selectedSlot.playerIds.length / selected.size) * 100}%`, background: '#22C55E', borderRadius: 4 }} />
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#22C55E' }}>{selectedSlot.playerIds.length}/{selected.size}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: C.muted }}>
+                      {selectedSlot.playerIds.length === selected.size
+                        ? 'All selected players are available at this time.'
+                        : `${selectedSlot.playerIds.length} of ${selected.size} selected players have this slot open. Others will still receive the invite.`}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 

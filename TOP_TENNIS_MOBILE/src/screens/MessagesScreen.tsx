@@ -2,446 +2,707 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, KeyboardAvoidingView, Platform, RefreshControl,
-  ActivityIndicator, Alert, ScrollView, Modal, Pressable,
+  ActivityIndicator, Alert, ScrollView, Clipboard, Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { ScreenHeader } from '@/components/ui/ScreenHeader';
-import { useConversations, Conversation, ConversationMember } from '@/hooks/useConversations';
+import { useConversations, Conversation, ConversationMember, ConversationMessage } from '@/hooks/useConversations';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
+import { useBlockedUsers } from '@/hooks/useBlockedUsers';
+import { useOnlinePresence } from '@/hooks/useOnlinePresence';
+import { useTypingIndicator, TypingUser } from '@/hooks/useTypingIndicator';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar } from '@/components/ui/Avatar';
 import { Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
-import { format, isToday, isYesterday } from 'date-fns';
+import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-const formatTime = (dateStr?: string) => {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isToday(d)) return format(d, 'h:mm a');
-  if (isYesterday(d)) return 'Yesterday';
-  return format(d, 'MMM d');
+// ── Chat design tokens ─────────────────────────────────────────────────────────
+const C = {
+  chatBg:    '#ECE5DD',
+  sentBg:    '#FFF7ED',       // warm orange tint — brand-consistent
+  sentText:  '#0F172A',
+  recvBg:    '#FFFFFF',
+  recvText:  '#0F172A',
+  inputBar:  '#F0F2F5',
+  muted:     '#667781',
+  tick:      '#53BDEB',
+  divBg:     Colors.primaryLight,
+  divText:   Colors.primary,
+  onlineDot: '#25D366',
 };
 
-function getConvName(conv: Conversation, currentUserId: string): string {
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+const fmtConvTime = (d?: string) => {
+  if (!d) return '';
+  const date = new Date(d);
+  if (isToday(date)) return format(date, 'h:mm a');
+  if (isYesterday(date)) return 'Yesterday';
+  if ((Date.now() - date.getTime()) / 86400000 < 7) return format(date, 'EEE');
+  return format(date, 'M/d/yy');
+};
+const fmtMsgTime = (d: string) => format(new Date(d), 'h:mm a');
+const fmtDivider = (d: string) => {
+  const date = new Date(d);
+  if (isToday(date)) return 'TODAY';
+  if (isYesterday(date)) return 'YESTERDAY';
+  return format(date, 'MMMM d, yyyy').toUpperCase();
+};
+
+function getConvName(conv: Conversation, uid: string): string {
   if (conv.is_group) return conv.name || 'Group Chat';
-  const other = conv.members.find(m => m.user_id !== currentUserId);
+  const other = conv.members.find(m => m.user_id !== uid);
   if (!other?.profile) return 'Direct Message';
   return `${other.profile.first_name || ''} ${other.profile.last_name || ''}`.trim() || other.profile.email;
 }
-
-function getConvAvatar(conv: Conversation, currentUserId: string): string | undefined {
-  if (conv.is_group) return conv.avatar_url ?? undefined;
-  const other = conv.members.find(m => m.user_id !== currentUserId);
-  return other?.profile?.profile_picture_url ?? undefined;
+function getConvOtherId(conv: Conversation, uid: string): string | null {
+  if (conv.is_group) return null;
+  return conv.members.find(m => m.user_id !== uid)?.user_id ?? null;
 }
-
+function getConvAvatar(conv: Conversation, uid: string): string | undefined {
+  if (conv.is_group) return conv.avatar_url ?? undefined;
+  return conv.members.find(m => m.user_id !== uid)?.profile?.profile_picture_url ?? undefined;
+}
 function getMemberName(m: ConversationMember): string {
   if (!m.profile) return 'Unknown';
   return `${m.profile.first_name || ''} ${m.profile.last_name || ''}`.trim() || m.profile.email;
 }
+function getSenderName(msg: ConversationMessage): string {
+  if (!msg.sender) return '';
+  return `${msg.sender.first_name || ''} ${msg.sender.last_name || ''}`.trim() || msg.sender.email;
+}
 
-// ── Group Create Modal ────────────────────────────────────────────────────────
+type ListItem =
+  | { type: 'divider'; label: string; key: string }
+  | { type: 'message'; data: ConversationMessage; key: string };
 
-interface GroupCreateModalProps {
+function buildItems(messages: ConversationMessage[]): ListItem[] {
+  const items: ListItem[] = [];
+  let lastDate: Date | null = null;
+  const sorted = [...messages].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+  for (const msg of sorted) {
+    if (msg.deleted_at) continue; // skip hard-deleted messages
+    const d = new Date(msg.created_at);
+    if (!lastDate || !isSameDay(d, lastDate)) {
+      items.push({ type: 'divider', label: fmtDivider(msg.created_at), key: `div_${msg.id}` });
+      lastDate = d;
+    }
+    items.push({ type: 'message', data: msg, key: msg.id });
+  }
+  return items;
+}
+
+// ── Online dot ─────────────────────────────────────────────────────────────────
+
+const OnlineDot: React.FC<{ online: boolean; size?: number }> = ({ online, size = 12 }) => {
+  if (!online) return null;
+  return (
+    <View style={[dot.ring, { width: size + 4, height: size + 4, borderRadius: (size + 4) / 2 }]}>
+      <View style={[dot.dot, { width: size, height: size, borderRadius: size / 2 }]} />
+    </View>
+  );
+};
+const dot = StyleSheet.create({
+  ring: { backgroundColor: '#fff', position: 'absolute', bottom: 0, right: 0, alignItems: 'center', justifyContent: 'center' },
+  dot: { backgroundColor: C.onlineDot },
+});
+
+// ── Typing Indicator bar ───────────────────────────────────────────────────────
+
+const TypingBar: React.FC<{ users: TypingUser[] }> = ({ users }) => {
+  if (users.length === 0) return null;
+  const label = users.length === 1
+    ? `${users[0].displayName} is typing…`
+    : `${users.map(u => u.displayName).join(', ')} are typing…`;
+  return (
+    <View style={ty.wrap}>
+      <View style={ty.dots}>
+        {[0, 1, 2].map(i => <View key={i} style={ty.dot} />)}
+      </View>
+      <Text style={ty.txt}>{label}</Text>
+    </View>
+  );
+};
+const ty = StyleSheet.create({
+  wrap: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: Spacing.lg, paddingVertical: 5, backgroundColor: 'rgba(236,229,221,0.9)' },
+  dots: { flexDirection: 'row', gap: 3 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.muted },
+  txt: { fontSize: 12, color: C.muted, fontStyle: 'italic' },
+});
+
+// ── Reply preview ──────────────────────────────────────────────────────────────
+
+const ReplyPreview: React.FC<{ msg: ConversationMessage; onClear: () => void }> = ({ msg, onClear }) => (
+  <View style={rp.wrap}>
+    <View style={rp.bar} />
+    <View style={{ flex: 1 }}>
+      <Text style={rp.name}>{getSenderName(msg)}</Text>
+      <Text style={rp.content} numberOfLines={1}>{msg.content}</Text>
+    </View>
+    <TouchableOpacity onPress={onClear} style={rp.close}>
+      <Ionicons name="close" size={18} color={Colors.textMuted} />
+    </TouchableOpacity>
+  </View>
+);
+const rp = StyleSheet.create({
+  wrap: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F0F2F5', paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.borderLight },
+  bar: { width: 3, height: '100%', borderRadius: 2, backgroundColor: Colors.primary },
+  name: { fontSize: 12, fontWeight: FontWeight.bold, color: Colors.primary },
+  content: { fontSize: 12, color: Colors.textSecondary },
+  close: { padding: 4 },
+});
+
+// ── Message Bubble ─────────────────────────────────────────────────────────────
+
+const Bubble: React.FC<{
+  item: ConversationMessage;
+  replySource?: ConversationMessage | null;
+  isMine: boolean;
+  isGroup: boolean;
+  prevSameSender: boolean;
+  isLongPressed: boolean;
+  onLongPress: () => void;
+  onReply: () => void;
+  onDelete: () => void;
+  onCopy: () => void;
+  onDismiss: () => void;
+}> = ({ item, replySource, isMine, isGroup, prevSameSender, isLongPressed, onLongPress, onReply, onDelete, onCopy, onDismiss }) => {
+  const senderName = getSenderName(item);
+  const showAvatar = isGroup && !isMine && !prevSameSender;
+  const showName = isGroup && !isMine && !prevSameSender;
+
+  return (
+    <View style={[bub.wrap, isMine ? bub.wrapR : bub.wrapL, prevSameSender && bub.tight]}>
+      {isGroup && !isMine && (
+        <View style={bub.avatarCol}>
+          {showAvatar
+            ? <Avatar name={senderName} size={28} imageUrl={item.sender?.profile_picture_url ?? undefined} />
+            : <View style={{ width: 28 }} />
+          }
+        </View>
+      )}
+
+      <View style={bub.col}>
+        {showName && <Text style={bub.senderName}>{senderName}</Text>}
+
+        <TouchableOpacity onLongPress={onLongPress} activeOpacity={0.85} delayLongPress={300}>
+          <View style={[bub.bubble, isMine ? bub.bubR : bub.bubL]}>
+            {!prevSameSender && (isMine ? <View style={bub.tailR} /> : <View style={bub.tailL} />)}
+
+            {/* Reply context */}
+            {replySource && (
+              <View style={bub.replyBox}>
+                <View style={bub.replyBar} />
+                <View style={{ flex: 1 }}>
+                  <Text style={bub.replyName}>{getSenderName(replySource)}</Text>
+                  <Text style={bub.replyContent} numberOfLines={1}>{replySource.content}</Text>
+                </View>
+              </View>
+            )}
+
+            <Text style={[bub.text, isMine ? bub.textR : bub.textL]}>{item.content}</Text>
+            <View style={bub.meta}>
+              <Text style={[bub.time, isMine ? bub.timeR : bub.timeL]}>{fmtMsgTime(item.created_at)}</Text>
+              {isMine && <Ionicons name="checkmark-done" size={13} color={C.tick} style={{ marginLeft: 2 }} />}
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        {isLongPressed && (
+          <View style={[bub.menu, isMine ? bub.menuR : bub.menuL]}>
+            <TouchableOpacity style={bub.menuItem} onPress={onReply}>
+              <Ionicons name="arrow-undo-outline" size={14} color={Colors.text} />
+              <Text style={bub.menuTxt}>Reply</Text>
+            </TouchableOpacity>
+            <View style={bub.menuSep} />
+            <TouchableOpacity style={bub.menuItem} onPress={onCopy}>
+              <Ionicons name="copy-outline" size={14} color={Colors.text} />
+              <Text style={bub.menuTxt}>Copy</Text>
+            </TouchableOpacity>
+            {isMine && (
+              <>
+                <View style={bub.menuSep} />
+                <TouchableOpacity style={bub.menuItem} onPress={onDelete}>
+                  <Ionicons name="trash-outline" size={14} color={Colors.error} />
+                  <Text style={[bub.menuTxt, { color: Colors.error }]}>Delete</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            <View style={bub.menuSep} />
+            <TouchableOpacity style={bub.menuItem} onPress={onDismiss}>
+              <Ionicons name="close" size={14} color={C.muted} />
+              <Text style={[bub.menuTxt, { color: C.muted }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+};
+
+const bub = StyleSheet.create({
+  wrap: { flexDirection: 'row', alignItems: 'flex-end', marginHorizontal: Spacing.sm, marginBottom: 2 },
+  wrapR: { justifyContent: 'flex-end' },
+  wrapL: { justifyContent: 'flex-start' },
+  tight: { marginBottom: 1 },
+  avatarCol: { width: 32, alignItems: 'flex-start', justifyContent: 'flex-end', marginRight: 4 },
+  col: { maxWidth: '76%' },
+  senderName: { fontSize: 11, fontWeight: FontWeight.semibold, color: Colors.primary, marginBottom: 2, marginLeft: 10 },
+  bubble: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, paddingBottom: 5 },
+  bubR: { backgroundColor: C.sentBg, borderTopRightRadius: 2, borderWidth: 1, borderColor: Colors.primaryMuted },
+  bubL: { backgroundColor: C.recvBg, borderTopLeftRadius: 2, borderWidth: 1, borderColor: Colors.borderLight, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
+  tailR: { position: 'absolute', top: 0, right: -7, width: 0, height: 0, borderTopWidth: 10, borderLeftWidth: 8, borderTopColor: Colors.primaryMuted, borderLeftColor: 'transparent' },
+  tailL: { position: 'absolute', top: 0, left: -7, width: 0, height: 0, borderTopWidth: 10, borderRightWidth: 8, borderTopColor: Colors.borderLight, borderRightColor: 'transparent' },
+  replyBox: { flexDirection: 'row', gap: 6, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 6, padding: 6, marginBottom: 5 },
+  replyBar: { width: 3, borderRadius: 2, backgroundColor: Colors.primary, alignSelf: 'stretch' },
+  replyName: { fontSize: 11, fontWeight: FontWeight.semibold, color: Colors.primary },
+  replyContent: { fontSize: 11, color: Colors.textSecondary },
+  text: { fontSize: FontSize.md, lineHeight: 21, color: C.sentText },
+  textR: { color: C.sentText },
+  textL: { color: C.recvText },
+  meta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 2, gap: 1 },
+  time: { fontSize: 10 },
+  timeR: { color: Colors.primary },
+  timeL: { color: C.muted },
+  menu: { flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: 10, marginTop: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6, overflow: 'hidden', alignSelf: 'flex-start' },
+  menuR: { alignSelf: 'flex-end' },
+  menuL: { alignSelf: 'flex-start' },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 10 },
+  menuTxt: { fontSize: FontSize.xs, fontWeight: FontWeight.medium, color: Colors.text },
+  menuSep: { width: 1, height: 28, backgroundColor: Colors.borderLight },
+});
+
+// ── Group Create Modal ─────────────────────────────────────────────────────────
+
+const GroupCreateModal: React.FC<{
   visible: boolean;
   onClose: () => void;
   friends: { userId: string; name: string; avatar?: string }[];
-  onSubmit: (name: string, memberIds: string[]) => Promise<void>;
-}
-
-const GroupCreateModal: React.FC<GroupCreateModalProps> = ({ visible, onClose, friends, onSubmit }) => {
+  onSubmit: (name: string, ids: string[]) => Promise<void>;
+}> = ({ visible, onClose, friends, onSubmit }) => {
   const [name, setName] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
 
   const toggle = (id: string) => setSelected(prev => {
-    const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
-    return next;
+    const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s;
   });
 
   const handleCreate = async () => {
     if (!name.trim() || selected.size === 0) return;
     setCreating(true);
-    try {
-      await onSubmit(name.trim(), Array.from(selected));
-      setName(''); setSelected(new Set()); onClose();
-    } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to create group');
-    } finally {
-      setCreating(false);
-    }
+    try { await onSubmit(name.trim(), Array.from(selected)); setName(''); setSelected(new Set()); onClose(); }
+    catch (e: any) { Alert.alert('Error', e?.message || 'Failed to create group'); }
+    finally { setCreating(false); }
   };
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={modalStyles.safe}>
-        <View style={modalStyles.header}>
-          <TouchableOpacity onPress={onClose}><Text style={modalStyles.cancel}>Cancel</Text></TouchableOpacity>
-          <Text style={modalStyles.title}>New Group</Text>
-          <TouchableOpacity onPress={handleCreate} disabled={!name.trim() || selected.size === 0 || creating}>
-            <Text style={[modalStyles.done, (!name.trim() || selected.size === 0) && modalStyles.doneDim]}>
-              {creating ? '...' : 'Create'}
-            </Text>
+      <SafeAreaView style={md.safe}>
+        <View style={md.hdr}>
+          <TouchableOpacity onPress={onClose} style={md.closeBtn}>
+            <Ionicons name="close" size={20} color={Colors.textSecondary} />
+          </TouchableOpacity>
+          <Text style={md.title}>New Group</Text>
+          <TouchableOpacity onPress={handleCreate} disabled={!name.trim() || selected.size < 1 || creating} style={[md.saveBtn, (!name.trim() || selected.size < 1) && { opacity: 0.4 }]}>
+            {creating ? <ActivityIndicator size="small" color="#fff" /> : <Text style={md.saveTxt}>Create</Text>}
           </TouchableOpacity>
         </View>
-        <View style={modalStyles.nameWrap}>
-          <TextInput
-            style={modalStyles.nameInput}
-            placeholder="Group name"
-            placeholderTextColor={Colors.textMuted}
-            value={name}
-            onChangeText={setName}
-            maxLength={50}
-          />
+        <View style={md.nameRow}>
+          <View style={md.nameIcon}><Ionicons name="people" size={20} color="#fff" /></View>
+          <TextInput style={md.nameInput} placeholder="Group name" placeholderTextColor={Colors.textMuted} value={name} onChangeText={setName} maxLength={50} autoFocus />
         </View>
-        <Text style={modalStyles.sectionLabel}>ADD MEMBERS ({selected.size} selected)</Text>
+        <Text style={md.sectionLbl}>ADD MEMBERS{selected.size > 0 ? ` · ${selected.size} selected` : ''}</Text>
         <ScrollView>
-          {friends.length === 0 ? (
-            <View style={modalStyles.empty}>
-              <Text style={modalStyles.emptyText}>Add friends first to create a group</Text>
-            </View>
-          ) : (
-            friends.map(f => (
-              <TouchableOpacity key={f.userId} style={modalStyles.memberRow} onPress={() => toggle(f.userId)} activeOpacity={0.7}>
-                <Avatar name={f.name} size={42} imageUrl={f.avatar} />
-                <Text style={modalStyles.memberName}>{f.name}</Text>
-                <View style={[modalStyles.checkbox, selected.has(f.userId) && modalStyles.checkboxChecked]}>
-                  {selected.has(f.userId) && <Ionicons name="checkmark" size={14} color="#fff" />}
-                </View>
-              </TouchableOpacity>
-            ))
-          )}
+          {friends.length === 0
+            ? <View style={md.emptyWrap}><Ionicons name="people-outline" size={36} color={Colors.textMuted} /><Text style={md.emptyTxt}>Add friends first</Text></View>
+            : friends.map(f => {
+                const on = selected.has(f.userId);
+                return (
+                  <TouchableOpacity key={f.userId} style={md.row} onPress={() => toggle(f.userId)} activeOpacity={0.7}>
+                    <Avatar name={f.name} size={44} imageUrl={f.avatar} />
+                    <Text style={md.rowName}>{f.name}</Text>
+                    <View style={[md.chk, on && md.chkOn]}>
+                      {on && <Ionicons name="checkmark" size={13} color="#fff" />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+          }
         </ScrollView>
       </SafeAreaView>
     </Modal>
   );
 };
 
-// ── Group Info / Manage Members Modal ─────────────────────────────────────────
+// ── Group Info Modal ───────────────────────────────────────────────────────────
 
-interface GroupInfoModalProps {
-  visible: boolean;
-  onClose: () => void;
-  conv: Conversation;
-  currentUserId: string;
-  isAdmin: boolean;
+const GroupInfoModal: React.FC<{
+  visible: boolean; onClose: () => void;
+  conv: Conversation; currentUserId: string; isAdmin: boolean;
   friends: { userId: string; name: string; avatar?: string }[];
-  onRemoveMember: (userId: string) => Promise<void>;
-  onAddMember: (userId: string) => Promise<void>;
+  onRemoveMember: (uid: string) => Promise<void>;
+  onAddMember: (uid: string) => Promise<void>;
   onRenameGroup: (name: string) => Promise<void>;
-}
-
-const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
-  visible, onClose, conv, currentUserId, isAdmin, friends,
-  onRemoveMember, onAddMember, onRenameGroup,
-}) => {
+  onLeaveGroup: () => Promise<void>;
+}> = ({ visible, onClose, conv, currentUserId, isAdmin, friends, onRemoveMember, onAddMember, onRenameGroup, onLeaveGroup }) => {
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState(conv.name || '');
-  const [showAddMembers, setShowAddMembers] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
-
-  const existingIds = new Set(conv.members.map(m => m.user_id));
-  const addableFriends = friends.filter(f => !existingIds.has(f.userId));
-
-  const handleRename = async () => {
-    if (!newName.trim()) return;
-    try { await onRenameGroup(newName.trim()); setRenaming(false); } catch {}
-  };
+  const existing = new Set(conv.members.map(m => m.user_id));
+  const addable = friends.filter(f => !existing.has(f.userId));
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={modalStyles.safe}>
-        <View style={modalStyles.header}>
-          <TouchableOpacity onPress={onClose}><Text style={modalStyles.cancel}>Done</Text></TouchableOpacity>
-          <Text style={modalStyles.title}>Group Info</Text>
-          <View style={{ width: 60 }} />
+      <SafeAreaView style={md.safe}>
+        <View style={md.hdr}>
+          <View style={{ width: 64 }} />
+          <Text style={md.title}>Group Info</Text>
+          <TouchableOpacity onPress={onClose} style={md.saveBtn}><Text style={md.saveTxt}>Done</Text></TouchableOpacity>
         </View>
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          {/* Group name */}
-          <View style={modalStyles.infoSection}>
-            {renaming ? (
-              <View style={modalStyles.renameRow}>
-                <TextInput
-                  style={modalStyles.renameInput}
-                  value={newName}
-                  onChangeText={setNewName}
-                  autoFocus
-                  maxLength={50}
-                />
-                <TouchableOpacity onPress={handleRename}><Text style={modalStyles.done}>Save</Text></TouchableOpacity>
-                <TouchableOpacity onPress={() => { setRenaming(false); setNewName(conv.name || ''); }}>
-                  <Text style={modalStyles.cancel}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity style={modalStyles.infoRow} onPress={() => isAdmin && setRenaming(true)} activeOpacity={isAdmin ? 0.7 : 1}>
-                <Ionicons name="people-circle-outline" size={20} color={Colors.primary} />
-                <Text style={modalStyles.infoLabel}>{conv.name || 'Group Chat'}</Text>
-                {isAdmin && <Ionicons name="pencil-outline" size={16} color={Colors.textMuted} />}
+        <View style={md.groupHero}>
+          <View style={md.groupAvt}><Ionicons name="people" size={34} color="#fff" /></View>
+          {renaming ? (
+            <View style={md.renameRow}>
+              <TextInput style={md.renameInput} value={newName} onChangeText={setNewName} autoFocus maxLength={50} />
+              <TouchableOpacity onPress={async () => { if (newName.trim()) { await onRenameGroup(newName.trim()); setRenaming(false); } }}>
+                <Text style={md.saveTxt}>Save</Text>
               </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Members */}
-          <Text style={modalStyles.sectionLabel}>MEMBERS ({conv.members.length})</Text>
+            </View>
+          ) : (
+            <TouchableOpacity style={md.groupNameRow} onPress={() => isAdmin && setRenaming(true)} activeOpacity={isAdmin ? 0.7 : 1}>
+              <Text style={md.groupName}>{conv.name || 'Group Chat'}</Text>
+              {isAdmin && <Ionicons name="pencil-outline" size={13} color={Colors.textMuted} style={{ marginLeft: 5 }} />}
+            </TouchableOpacity>
+          )}
+          <Text style={md.groupSub}>Group · {conv.members.length} members</Text>
+        </View>
+        <ScrollView contentContainerStyle={{ paddingBottom: 48 }}>
+          <Text style={md.sectionLbl}>MEMBERS</Text>
           {conv.members.map(m => (
-            <View key={m.user_id} style={modalStyles.memberRow}>
-              <Avatar name={getMemberName(m)} size={42} imageUrl={m.profile?.profile_picture_url ?? undefined} />
+            <View key={m.user_id} style={md.row}>
+              <Avatar name={getMemberName(m)} size={44} imageUrl={m.profile?.profile_picture_url ?? undefined} />
               <View style={{ flex: 1 }}>
-                <Text style={modalStyles.memberName}>
-                  {getMemberName(m)}{m.user_id === currentUserId ? ' (you)' : ''}
-                </Text>
-                {m.role === 'admin' && (
-                  <Text style={modalStyles.adminBadge}>Admin</Text>
-                )}
+                <Text style={md.rowName}>{getMemberName(m)}{m.user_id === currentUserId ? ' (you)' : ''}</Text>
+                {m.role === 'admin' && <Text style={md.adminTag}>Group admin</Text>}
               </View>
               {isAdmin && m.user_id !== currentUserId && (
-                <TouchableOpacity
-                  onPress={async () => {
-                    Alert.alert('Remove Member', `Remove ${getMemberName(m)} from this group?`, [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Remove', style: 'destructive', onPress: async () => {
-                        setBusy(m.user_id);
-                        try { await onRemoveMember(m.user_id); } catch {}
-                        setBusy(null);
-                      }},
-                    ]);
-                  }}
-                  disabled={busy === m.user_id}
-                >
-                  <Ionicons name="remove-circle-outline" size={22} color={Colors.error} />
+                <TouchableOpacity onPress={() => Alert.alert('Remove', `Remove ${getMemberName(m)}?`, [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Remove', style: 'destructive', onPress: async () => { setBusy(m.user_id); try { await onRemoveMember(m.user_id); } catch {} setBusy(null); } },
+                ])} disabled={busy === m.user_id}>
+                  {busy === m.user_id ? <ActivityIndicator size="small" color={Colors.error} /> : <Ionicons name="remove-circle-outline" size={22} color={Colors.error} />}
                 </TouchableOpacity>
               )}
             </View>
           ))}
-
-          {/* Add members */}
-          {isAdmin && addableFriends.length > 0 && (
+          {isAdmin && addable.length > 0 && (
             <>
-              <TouchableOpacity style={modalStyles.addMemberBtn} onPress={() => setShowAddMembers(v => !v)}>
-                <Ionicons name="person-add-outline" size={18} color={Colors.primary} />
-                <Text style={modalStyles.addMemberText}>Add Members</Text>
-                <Ionicons name={showAddMembers ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textMuted} />
+              <TouchableOpacity style={md.addRow} onPress={() => setShowAdd(v => !v)}>
+                <View style={md.addIcon}><Ionicons name="person-add-outline" size={17} color={Colors.primary} /></View>
+                <Text style={md.addTxt}>Add Members</Text>
+                <Ionicons name={showAdd ? 'chevron-up' : 'chevron-down'} size={15} color={Colors.textMuted} />
               </TouchableOpacity>
-              {showAddMembers && addableFriends.map(f => (
-                <TouchableOpacity
-                  key={f.userId}
-                  style={modalStyles.memberRow}
-                  onPress={async () => {
-                    setBusy(f.userId);
-                    try { await onAddMember(f.userId); } catch {}
-                    setBusy(null);
-                  }}
-                  disabled={busy === f.userId}
-                >
-                  <Avatar name={f.name} size={42} imageUrl={f.avatar} />
-                  <Text style={[modalStyles.memberName, { flex: 1 }]}>{f.name}</Text>
-                  {busy === f.userId
-                    ? <ActivityIndicator size="small" color={Colors.primary} />
-                    : <Ionicons name="add-circle-outline" size={22} color={Colors.success} />
-                  }
+              {showAdd && addable.map(f => (
+                <TouchableOpacity key={f.userId} style={md.row} onPress={async () => { setBusy(f.userId); try { await onAddMember(f.userId); } catch {} setBusy(null); }} disabled={busy === f.userId}>
+                  <Avatar name={f.name} size={44} imageUrl={f.avatar} />
+                  <Text style={[md.rowName, { flex: 1 }]}>{f.name}</Text>
+                  {busy === f.userId ? <ActivityIndicator size="small" color={Colors.primary} /> : <Ionicons name="add-circle-outline" size={22} color={Colors.primary} />}
                 </TouchableOpacity>
               ))}
             </>
           )}
+          <TouchableOpacity style={md.leaveBtn} onPress={() => Alert.alert('Leave Group', 'Leave this group?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Leave', style: 'destructive', onPress: onLeaveGroup },
+          ])}>
+            <Ionicons name="exit-outline" size={18} color={Colors.error} />
+            <Text style={md.leaveTxt}>Leave Group</Text>
+          </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
     </Modal>
   );
 };
 
-// ── Main Component ────────────────────────────────────────────────────────────
+const md = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: Colors.background },
+  hdr: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.backgroundAlt, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
+  saveBtn: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs + 2, borderRadius: Radius.full, alignItems: 'center', minWidth: 56 },
+  saveTxt: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: '#fff' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Colors.surface, paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
+  nameIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
+  nameInput: { flex: 1, fontSize: FontSize.lg, color: Colors.text, borderBottomWidth: 2, borderBottomColor: Colors.primary, paddingBottom: 4 },
+  sectionLbl: { fontSize: 10, fontWeight: FontWeight.bold, color: Colors.textMuted, letterSpacing: 0.8, paddingHorizontal: Spacing.lg, paddingVertical: 10, backgroundColor: Colors.backgroundAlt, textTransform: 'uppercase' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingHorizontal: Spacing.lg, paddingVertical: 12, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
+  rowName: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.medium, color: Colors.text },
+  adminTag: { fontSize: 11, color: Colors.primary, fontWeight: FontWeight.semibold, marginTop: 2 },
+  chk: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
+  chkOn: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 12 },
+  emptyTxt: { fontSize: FontSize.sm, color: Colors.textMuted },
+  groupHero: { alignItems: 'center', paddingVertical: 24, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight, gap: 8 },
+  groupAvt: { width: 76, height: 76, borderRadius: 38, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
+  groupNameRow: { flexDirection: 'row', alignItems: 'center' },
+  groupName: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.text },
+  groupSub: { fontSize: FontSize.sm, color: Colors.textMuted },
+  renameRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: Spacing.lg },
+  renameInput: { flex: 1, fontSize: FontSize.lg, color: Colors.text, borderBottomWidth: 2, borderBottomColor: Colors.primary, paddingBottom: 4 },
+  addRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingHorizontal: Spacing.lg, paddingVertical: 12, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
+  addIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  addTxt: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.primary },
+  leaveBtn: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.lg, paddingVertical: 14, marginTop: Spacing.lg, backgroundColor: Colors.surface, borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.borderLight },
+  leaveTxt: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.error },
+});
+
+// ── Main Screen ────────────────────────────────────────────────────────────────
+
+type ActiveTab = 'chats' | 'friends' | 'requests' | 'blocked';
 
 export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ navigation, route }) => {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const {
     conversations, loading, sendMessage, getOrCreateDM, createGroupChat,
-    addMember, removeMember, deleteMessage, updateGroup,
+    addMember, removeMember, deleteMessage, updateGroup, leaveGroup,
     markConversationRead, getTotalUnread, getMyRole, refetch,
   } = useConversations();
-  const { friends, pendingReceived, pendingSent, loading: friendsLoading,
-    updateRequestStatus, refetch: refetchFriends } = useFriendRequests();
+  const { friends, pendingReceived, pendingSent, updateRequestStatus, cancelRequest, refetch: refetchFriends } = useFriendRequests();
+  const { blockedUsers, blockUser, unblockUser, unfriendUser, refetch: refetchBlocked } = useBlockedUsers();
+  const { isOnline } = useOnlinePresence();
 
-  const [activeTab, setActiveTab] = useState<'chats' | 'friends' | 'requests'>('chats');
-  const [selectedConvId, setSelectedConvId] = useState<string | null>(
-    route?.params?.openConvId ?? null
-  );
+  const [activeTab, setActiveTab] = useState<ActiveTab>('chats');
+  const [selectedConvId, setSelectedConvId] = useState<string | null>(route?.params?.openConvId ?? null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [friendSearch, setFriendSearch] = useState('');
   const [msgInput, setMsgInput] = useState('');
+  const [replyTo, setReplyTo] = useState<ConversationMessage | null>(null);
   const [sending, setSending] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [responding, setResponding] = useState<string | null>(null);
   const [showGroupCreate, setShowGroupCreate] = useState(false);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const [longPressMsg, setLongPressMsg] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
-  // Open a DM if navigation param provided
+  // Typing indicator only active in thread view
+  const { typingUsers, broadcastTyping } = useTypingIndicator(selectedConvId);
+
+  // open DM from deep link
   useEffect(() => {
-    const openUserId: string | undefined = route?.params?.openDMUserId;
-    if (openUserId && !loading) {
-      getOrCreateDM(openUserId).then(id => setSelectedConvId(id)).catch(() => {});
-    }
+    const uid: string | undefined = route?.params?.openDMUserId;
+    if (uid && !loading) getOrCreateDM(uid).then(id => openConv(id)).catch(() => {});
   }, [route?.params?.openDMUserId, loading]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refetch(), refetchFriends()]);
+    await Promise.all([refetch(), refetchFriends(), refetchBlocked()]);
     setRefreshing(false);
   };
 
   const openConv = async (id: string) => {
     setSelectedConvId(id);
+    setLongPressMsg(null);
+    setReplyTo(null);
     await markConversationRead(id);
   };
 
   const handleSend = async () => {
     if (!selectedConvId || !msgInput.trim()) return;
+    const text = msgInput.trim();
+    const replyId = replyTo?.id;
+    setMsgInput('');
+    setReplyTo(null);
     setSending(true);
     try {
-      await sendMessage(selectedConvId, msgInput.trim());
-      setMsgInput('');
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-    } catch {
-      Alert.alert('Error', 'Failed to send message.');
-    } finally {
-      setSending(false);
-    }
+      await sendMessage(selectedConvId, text, replyId);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
+    } catch { Alert.alert('Error', 'Failed to send.'); setMsgInput(text); }
+    finally { setSending(false); }
   };
 
-  const handleRespond = async (requestId: string, status: 'accepted' | 'declined') => {
-    setResponding(requestId);
-    try { await updateRequestStatus(requestId, status); }
-    catch (e: any) { Alert.alert('Error', e?.message || 'Failed to respond.'); }
+  const handleTyping = useCallback((text: string) => {
+    setMsgInput(text);
+    if (text.length > 0 && user) {
+      const name = `${(user as any).user_metadata?.first_name || ''}`.trim() || user.email || 'Someone';
+      broadcastTyping(name);
+    }
+  }, [broadcastTyping, user]);
+
+  const handleRespond = async (id: string, status: 'accepted' | 'declined') => {
+    setResponding(id);
+    try { await updateRequestStatus(id, status); }
+    catch (e: any) { Alert.alert('Error', e?.message); }
     finally { setResponding(null); }
   };
 
-  const handleDeleteMessage = (msgId: string) => {
-    Alert.alert('Delete Message', 'Delete this message for everyone?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        try { await deleteMessage(msgId); setLongPressMsg(null); }
-        catch { Alert.alert('Error', 'Failed to delete.'); }
-      }},
-    ]);
-  };
-
   const selectedConv = conversations.find(c => c.id === selectedConvId) ?? null;
-  const myRole = selectedConv ? getMyRole(selectedConv) : null;
-  const isAdmin = myRole === 'admin';
-
+  const isAdmin = selectedConv ? getMyRole(selectedConv) === 'admin' : false;
   const friendsList = friends.map(f => {
-    const friendUserId = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
+    const uid = f.sender_id === user?.id ? f.receiver_id : f.sender_id;
     const fd = f.sender_id === user?.id ? f.receiver : f.sender;
-    return { userId: friendUserId, name: fd?.name || 'Unknown', avatar: fd?.profile_picture_url };
+    return { userId: uid, name: fd?.name || 'Unknown', avatar: fd?.profile_picture_url ?? undefined };
+  });
+  const blockedIds = new Set(blockedUsers.map(b => b.blocked_user_id));
+
+  // Filter out blocked users' DM conversations
+  const visibleConvs = conversations.filter(c => {
+    if (c.is_group) return true;
+    const otherId = getConvOtherId(c, user?.id || '');
+    return !otherId || !blockedIds.has(otherId);
+  });
+
+  const filteredConvs = visibleConvs.filter(c =>
+    !searchQuery.trim() || getConvName(c, user?.id || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredFriends = friends.filter(req => {
+    const fd = req.sender_id === user?.id ? req.receiver : req.sender;
+    if (!fd) return false;
+    if (!friendSearch.trim()) return true;
+    return fd.name?.toLowerCase().includes(friendSearch.toLowerCase());
   });
 
   const unreadTotal = getTotalUnread();
-  const isLoading = loading && !refreshing;
 
-  // ── Thread Screen ─────────────────────────────────────────────────────────
+  // ── Thread View ──────────────────────────────────────────────────────────────
+
   if (selectedConvId && selectedConv) {
     const convName = getConvName(selectedConv, user?.id || '');
-    const convAvatarUrl = getConvAvatar(selectedConv, user?.id || '');
+    const convAvatar = getConvAvatar(selectedConv, user?.id || '');
+    const otherId = getConvOtherId(selectedConv, user?.id || '');
+    const otherIsOnline = otherId ? isOnline(otherId) : false;
+    const items = buildItems(selectedConv.messages);
+    const msgMap = new Map(selectedConv.messages.map(m => [m.id, m]));
 
     return (
-      <SafeAreaView style={styles.safe} edges={['bottom']}>
-        {/* Header */}
-        <View style={styles.threadHeader}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => setSelectedConvId(null)}>
-            <Ionicons name="chevron-back" size={26} color={Colors.primary} />
+      <View style={{ flex: 1, backgroundColor: C.chatBg }}>
+        {/* Thread header */}
+        <View style={[th.header, { paddingTop: insets.top }]}>
+          <TouchableOpacity style={th.backBtn} onPress={() => { setSelectedConvId(null); setReplyTo(null); }}>
+            <Ionicons name="chevron-back" size={26} color="#fff" />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.threadHeaderInfo}
-            onPress={() => selectedConv.is_group && setShowGroupInfo(true)}
-            activeOpacity={selectedConv.is_group ? 0.7 : 1}
-          >
-            <Avatar name={convName} size={36} imageUrl={convAvatarUrl} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.threadTitle} numberOfLines={1}>{convName}</Text>
-              {selectedConv.is_group && (
-                <Text style={styles.threadSub}>{selectedConv.members.length} members · tap to manage</Text>
-              )}
+          <TouchableOpacity style={th.identity} onPress={() => selectedConv.is_group && setShowGroupInfo(true)} activeOpacity={0.8}>
+            <View style={{ position: 'relative' }}>
+              {selectedConv.is_group
+                ? <View style={th.groupAvt}><Ionicons name="people" size={19} color={Colors.primary} /></View>
+                : <Avatar name={convName} size={36} imageUrl={convAvatar} />
+              }
+              {!selectedConv.is_group && <OnlineDot online={otherIsOnline} size={10} />}
+            </View>
+            <View style={th.nameCol}>
+              <Text style={th.name} numberOfLines={1}>{convName}</Text>
+              <Text style={th.sub} numberOfLines={1}>
+                {selectedConv.is_group
+                  ? `${selectedConv.members.length} members`
+                  : otherIsOnline ? 'Online' : 'tap for info'}
+              </Text>
             </View>
           </TouchableOpacity>
-          {selectedConv.is_group && (
-            <TouchableOpacity onPress={() => setShowGroupInfo(true)} style={styles.infoBtn}>
-              <Ionicons name="information-circle-outline" size={24} color={Colors.primary} />
-            </TouchableOpacity>
-          )}
+          <View style={th.actions}>
+            <TouchableOpacity style={th.iconBtn}><Ionicons name="videocam-outline" size={21} color="#fff" /></TouchableOpacity>
+            <TouchableOpacity style={th.iconBtn}><Ionicons name="call-outline" size={20} color="#fff" /></TouchableOpacity>
+            {selectedConv.is_group && (
+              <TouchableOpacity style={th.iconBtn} onPress={() => setShowGroupInfo(true)}>
+                <Ionicons name="ellipsis-vertical" size={18} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
-        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <FlatList
             ref={flatListRef}
-            data={selectedConv.messages}
-            keyExtractor={m => m.id}
-            contentContainerStyle={styles.threadContent}
+            data={items}
+            keyExtractor={i => i.key}
+            contentContainerStyle={th.listContent}
             showsVerticalScrollIndicator={false}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-            renderItem={({ item }) => {
-              const isMine = item.sender_id === user?.id;
-              const senderName = item.sender
-                ? `${item.sender.first_name || ''} ${item.sender.last_name || ''}`.trim() || item.sender.email
-                : 'Unknown';
-              const isLongPressed = longPressMsg === item.id;
-              return (
-                <TouchableOpacity
-                  onLongPress={() => (isMine || isAdmin) && setLongPressMsg(item.id)}
-                  activeOpacity={0.9}
-                  style={styles.msgWrap}
-                >
-                  {!isMine && selectedConv.is_group && (
-                    <View style={styles.senderRow}>
-                      <Avatar name={senderName} size={24} imageUrl={item.sender?.profile_picture_url ?? undefined} />
-                      <Text style={styles.senderName}>{senderName}</Text>
-                    </View>
-                  )}
-                  <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
-                    <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>{item.content}</Text>
-                    <Text style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}>{formatTime(item.created_at)}</Text>
+            renderItem={({ item, index }) => {
+              if (item.type === 'divider') {
+                return (
+                  <View style={th.divider}>
+                    <Text style={th.dividerTxt}>{item.label}</Text>
                   </View>
-                  {isLongPressed && (
-                    <View style={[styles.msgActions, isMine ? styles.msgActionsRight : styles.msgActionsLeft]}>
-                      <TouchableOpacity style={styles.msgActionBtn} onPress={() => handleDeleteMessage(item.id)}>
-                        <Ionicons name="trash-outline" size={14} color={Colors.error} />
-                        <Text style={styles.msgActionText}>Delete</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.msgActionBtn} onPress={() => setLongPressMsg(null)}>
-                        <Ionicons name="close" size={14} color={Colors.textMuted} />
-                        <Text style={[styles.msgActionText, { color: Colors.textMuted }]}>Cancel</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </TouchableOpacity>
+                );
+              }
+              const msg = item.data;
+              const isMine = msg.sender_id === user?.id;
+              const prev = index > 0 ? items[index - 1] : null;
+              const prevSameSender = prev?.type === 'message' && prev.data.sender_id === msg.sender_id;
+              const replySource = msg.reply_to_message_id ? msgMap.get(msg.reply_to_message_id) ?? null : null;
+              return (
+                <Bubble
+                  item={msg}
+                  replySource={replySource}
+                  isMine={isMine}
+                  isGroup={selectedConv.is_group}
+                  prevSameSender={prevSameSender}
+                  isLongPressed={longPressMsg === msg.id}
+                  onLongPress={() => (isMine || isAdmin) && setLongPressMsg(msg.id)}
+                  onReply={() => { setReplyTo(msg); setLongPressMsg(null); }}
+                  onDelete={() => Alert.alert('Delete', 'Delete this message?', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', style: 'destructive', onPress: async () => {
+                      try { await deleteMessage(msg.id); setLongPressMsg(null); }
+                      catch { Alert.alert('Error', 'Failed to delete.'); }
+                    }},
+                  ])}
+                  onCopy={() => { Clipboard.setString(msg.content); setLongPressMsg(null); }}
+                  onDismiss={() => setLongPressMsg(null)}
+                />
               );
             }}
             ListEmptyComponent={
-              <View style={styles.emptyThread}>
-                <Text style={styles.emptyThreadText}>No messages yet. Say hello!</Text>
+              <View style={th.emptyWrap}>
+                <View style={th.emptyPill}>
+                  <Ionicons name="lock-closed" size={12} color={C.muted} />
+                  <Text style={th.emptyPillTxt}>Messages are private</Text>
+                </View>
+                <Text style={th.emptyTxt}>Say hello to {convName} 👋</Text>
               </View>
             }
           />
-          <View style={styles.inputBar}>
-            <TextInput
-              style={styles.messageInput}
-              value={msgInput}
-              onChangeText={setMsgInput}
-              placeholder="Message..."
-              placeholderTextColor={Colors.textMuted}
-              multiline
-              maxLength={2000}
-            />
+
+          <TypingBar users={typingUsers} />
+
+          {replyTo && <ReplyPreview msg={replyTo} onClear={() => setReplyTo(null)} />}
+
+          <View style={[th.inputBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+            <View style={th.inputWrap}>
+              <TouchableOpacity style={th.emojiBtn}>
+                <Ionicons name="happy-outline" size={21} color={C.muted} />
+              </TouchableOpacity>
+              <TextInput
+                style={th.input}
+                value={msgInput}
+                onChangeText={handleTyping}
+                placeholder="Message"
+                placeholderTextColor={C.muted}
+                multiline
+                maxLength={2000}
+                onFocus={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 300)}
+              />
+              <TouchableOpacity style={th.attachBtn}>
+                <Ionicons name="attach-outline" size={21} color={C.muted} style={{ transform: [{ rotate: '45deg' }] }} />
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity
-              style={[styles.sendBtn, (!msgInput.trim() || sending) && styles.sendBtnDisabled]}
-              onPress={handleSend}
-              disabled={!msgInput.trim() || sending}
+              style={[th.sendBtn, msgInput.trim() && th.sendBtnActive]}
+              onPress={msgInput.trim() ? handleSend : undefined}
+              disabled={sending}
             >
               {sending
-                ? <ActivityIndicator size="small" color={Colors.textInverse} />
-                : <Ionicons name="send" size={18} color={Colors.textInverse} />
+                ? <ActivityIndicator size="small" color="#fff" />
+                : msgInput.trim()
+                  ? <Ionicons name="send" size={17} color="#fff" style={{ marginLeft: 2 }} />
+                  : <Ionicons name="mic-outline" size={19} color="#fff" />
               }
             </TouchableOpacity>
           </View>
@@ -458,212 +719,262 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
             onRemoveMember={uid => removeMember(selectedConv.id, uid)}
             onAddMember={uid => addMember(selectedConv.id, uid)}
             onRenameGroup={name => updateGroup(selectedConv.id, { name })}
+            onLeaveGroup={async () => {
+              await leaveGroup(selectedConv.id);
+              setSelectedConvId(null);
+              setShowGroupInfo(false);
+            }}
           />
         )}
-      </SafeAreaView>
+      </View>
     );
   }
 
-  // ── Conversations List ────────────────────────────────────────────────────
+  // ── List View ────────────────────────────────────────────────────────────────
 
-  const tabs: { key: typeof activeTab; label: string; badge?: number }[] = [
+  const TABS: { key: ActiveTab; label: string; badge?: number }[] = [
     { key: 'chats',    label: 'Chats',    badge: unreadTotal || undefined },
-    { key: 'friends',  label: 'Friends',  badge: undefined },
+    { key: 'friends',  label: 'Friends' },
     { key: 'requests', label: 'Requests', badge: pendingReceived.length || undefined },
+    { key: 'blocked',  label: 'Blocked' },
   ];
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <View style={styles.listHeader}>
-        <View>
-          <Text style={styles.listTitle}>Messages</Text>
-          {unreadTotal > 0 && <Text style={styles.listSub}>{unreadTotal} unread</Text>}
+    <SafeAreaView style={ls.safe} edges={['bottom']}>
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      <View style={[ls.header, { paddingTop: insets.top }]}>
+        <View style={ls.headerRow}>
+          <View style={ls.headerLeft}>
+            <Text style={ls.title}>Messages</Text>
+            <Text style={ls.sub}>
+              {unreadTotal > 0 ? `${unreadTotal} unread` : pendingReceived.length > 0 ? `${pendingReceived.length} request${pendingReceived.length > 1 ? 's' : ''}` : 'All caught up'}
+            </Text>
+          </View>
+          <View style={ls.headerRight}>
+            <TouchableOpacity style={ls.hBtn} onPress={() => setShowSearch(v => !v)}>
+              <Ionicons name={showSearch ? 'close' : 'search-outline'} size={19} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={ls.hBtn} onPress={() => setShowGroupCreate(true)}>
+              <Ionicons name="create-outline" size={19} color="#fff" />
+            </TouchableOpacity>
+          </View>
         </View>
-        <TouchableOpacity style={styles.newGroupBtn} onPress={() => setShowGroupCreate(true)}>
-          <Ionicons name="people-outline" size={18} color={Colors.primary} />
-          <Text style={styles.newGroupText}>New Group</Text>
-        </TouchableOpacity>
+
+        {/* Tab bar */}
+        <View style={ls.tabBar}>
+          {TABS.map(t => (
+            <TouchableOpacity key={t.key} style={[ls.tab, activeTab === t.key && ls.tabActive]} onPress={() => setActiveTab(t.key)}>
+              <Text style={[ls.tabTxt, activeTab === t.key && ls.tabTxtActive]}>{t.label}</Text>
+              {t.badge != null && t.badge > 0 && (
+                <View style={ls.tabBadge}><Text style={ls.tabBadgeTxt}>{t.badge > 9 ? '9+' : t.badge}</Text></View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
-      {/* Tabs */}
-      <View style={styles.tabBar}>
-        {tabs.map(t => (
-          <TouchableOpacity key={t.key} style={[styles.tab, activeTab === t.key && styles.tabActive]} onPress={() => setActiveTab(t.key)}>
-            <Text style={[styles.tabLabel, activeTab === t.key && styles.tabLabelActive]}>{t.label}</Text>
-            {t.badge != null && t.badge > 0 && (
-              <View style={styles.tabBadge}><Text style={styles.tabBadgeText}>{t.badge > 9 ? '9+' : t.badge}</Text></View>
-            )}
-          </TouchableOpacity>
-        ))}
-      </View>
+      {/* ── Search bar ──────────────────────────────────────────────────────── */}
+      {showSearch && (
+        <View style={ls.searchWrap}>
+          <Ionicons name="search-outline" size={15} color={Colors.textMuted} />
+          <TextInput
+            style={ls.searchInput}
+            placeholder={activeTab === 'friends' ? 'Search friends…' : 'Search chats…'}
+            placeholderTextColor={Colors.textMuted}
+            value={activeTab === 'friends' ? friendSearch : searchQuery}
+            onChangeText={activeTab === 'friends' ? setFriendSearch : setSearchQuery}
+            autoFocus
+          />
+          {(searchQuery.length > 0 || friendSearch.length > 0) && (
+            <TouchableOpacity onPress={() => { setSearchQuery(''); setFriendSearch(''); }}>
+              <Ionicons name="close-circle" size={15} color={Colors.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
-      {isLoading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color={Colors.primary} /></View>
+      {loading && !refreshing ? (
+        <View style={ls.center}><ActivityIndicator color={Colors.primary} size="large" /></View>
       ) : (
         <ScrollView
-          style={styles.flex}
-          contentContainerStyle={styles.scrollContent}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 32 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
         >
-          {/* CHATS TAB */}
+
+          {/* ── CHATS ── */}
           {activeTab === 'chats' && (
-            conversations.length === 0 ? (
-              <View style={styles.empty}>
-                <Ionicons name="chatbubbles-outline" size={56} color={Colors.textMuted} />
-                <Text style={styles.emptyTitle}>No chats yet</Text>
-                <Text style={styles.emptySubtitle}>Start a DM from the Friends tab or create a group chat</Text>
-                <TouchableOpacity style={styles.emptyBtn} onPress={() => setShowGroupCreate(true)}>
-                  <Ionicons name="people-outline" size={16} color="#fff" />
-                  <Text style={styles.emptyBtnText}>New Group</Text>
+            filteredConvs.length === 0 ? (
+              <EmptyState
+                icon="chatbubbles-outline"
+                title={searchQuery ? 'No results' : 'No chats yet'}
+                sub={searchQuery ? `Nothing matching "${searchQuery}"` : 'Message a friend or create a group'}
+                action={!searchQuery ? { label: 'New Group', onPress: () => setShowGroupCreate(true) } : undefined}
+              />
+            ) : filteredConvs.map(conv => {
+              const name = getConvName(conv, user?.id || '');
+              const avatarUrl = getConvAvatar(conv, user?.id || '');
+              const otherId = getConvOtherId(conv, user?.id || '');
+              const online = !!otherId && isOnline(otherId);
+              const last = conv.lastMessage;
+              const isMine = last?.sender_id === user?.id;
+              const preview = last
+                ? (conv.is_group && last.sender && !isMine
+                    ? `${last.sender.first_name || ''}: ${last.content}`
+                    : isMine ? `You: ${last.content}` : last.content)
+                : 'No messages yet';
+              const hasUnread = conv.unreadCount > 0;
+
+              return (
+                <TouchableOpacity key={conv.id} style={ls.convRow} onPress={() => openConv(conv.id)} activeOpacity={0.7}>
+                  <View style={{ position: 'relative' }}>
+                    {conv.is_group
+                      ? <View style={ls.groupAvt}><Ionicons name="people" size={24} color="#fff" /></View>
+                      : <Avatar name={name} size={50} imageUrl={avatarUrl} />
+                    }
+                    {!conv.is_group && <OnlineDot online={online} size={12} />}
+                  </View>
+                  <View style={ls.convBody}>
+                    <View style={ls.convTop}>
+                      <Text style={[ls.convName, hasUnread && ls.bold]} numberOfLines={1}>{name}</Text>
+                      <Text style={[ls.convTime, hasUnread && { color: Colors.primary, fontWeight: FontWeight.semibold }]}>
+                        {fmtConvTime(last?.created_at)}
+                      </Text>
+                    </View>
+                    <View style={ls.convBottom}>
+                      <Text style={[ls.convPrev, hasUnread && ls.bold]} numberOfLines={1}>{preview}</Text>
+                      {hasUnread && (
+                        <View style={ls.unreadBadge}>
+                          <Text style={ls.unreadTxt}>{conv.unreadCount > 99 ? '99+' : conv.unreadCount}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
                 </TouchableOpacity>
-              </View>
-            ) : (
-              conversations.map((conv, idx) => {
-                const name = getConvName(conv, user?.id || '');
-                const avatarUrl = getConvAvatar(conv, user?.id || '');
-                const preview = conv.lastMessage
-                  ? (conv.is_group && conv.lastMessage.sender
-                      ? `${conv.lastMessage.sender.first_name || ''}: ${conv.lastMessage.content}`
-                      : conv.lastMessage.content)
-                  : 'No messages yet';
-                return (
-                  <React.Fragment key={conv.id}>
-                    <TouchableOpacity style={styles.convRow} onPress={() => openConv(conv.id)} activeOpacity={0.7}>
-                      <View style={styles.convAvatarWrap}>
-                        {conv.is_group ? (
-                          <View style={styles.groupAvatarPlaceholder}>
-                            <Ionicons name="people" size={24} color={Colors.primary} />
-                          </View>
-                        ) : (
-                          <Avatar name={name} size={50} imageUrl={avatarUrl} />
-                        )}
-                        {conv.unreadCount > 0 && (
-                          <View style={styles.unreadDot}>
-                            <Text style={styles.unreadDotText}>{conv.unreadCount > 9 ? '9+' : conv.unreadCount}</Text>
-                          </View>
-                        )}
-                      </View>
-                      <View style={styles.convInfo}>
-                        <View style={styles.convTopRow}>
-                          <Text style={[styles.convName, conv.unreadCount > 0 && styles.convNameUnread]} numberOfLines={1}>{name}</Text>
-                          <Text style={styles.convTime}>{formatTime(conv.lastMessage?.created_at)}</Text>
-                        </View>
-                        <Text style={[styles.convPreview, conv.unreadCount > 0 && styles.convPreviewUnread]} numberOfLines={1}>{preview}</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
-                    </TouchableOpacity>
-                    {idx < conversations.length - 1 && <View style={styles.separator} />}
-                  </React.Fragment>
-                );
-              })
-            )
+              );
+            })
           )}
 
-          {/* FRIENDS TAB */}
+          {/* ── FRIENDS ── */}
           {activeTab === 'friends' && (
-            friends.length === 0 ? (
-              <View style={styles.empty}>
-                <Ionicons name="people-outline" size={56} color={Colors.textMuted} />
-                <Text style={styles.emptyTitle}>No friends yet</Text>
-                <Text style={styles.emptySubtitle}>Search for players in Build Your Network</Text>
-              </View>
-            ) : (
-              friends.map((req, idx) => {
-                const friend = req.sender_id === user?.id ? req.receiver : req.sender;
-                const friendUserId = req.sender_id === user?.id ? req.receiver_id : req.sender_id;
-                if (!friend) return null;
-                return (
-                  <React.Fragment key={req.id}>
-                    <TouchableOpacity
-                      style={styles.friendRow}
-                      onPress={async () => {
-                        try {
-                          const id = await getOrCreateDM(friendUserId);
-                          setActiveTab('chats');
-                          openConv(id);
-                        } catch { Alert.alert('Error', 'Failed to open chat.'); }
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Avatar name={friend.name || 'P'} size={48} imageUrl={friend.profile_picture_url} />
-                      <View style={styles.friendInfo}>
-                        <Text style={styles.friendName}>{friend.name}</Text>
-                        <View style={styles.friendMeta}>
-                          {friend.skill_level != null && <View style={styles.metaChip}><Text style={styles.metaChipText}>Level {friend.skill_level}</Text></View>}
-                          {friend.usta_rating && <View style={styles.metaChip}><Text style={styles.metaChipText}>USTA {friend.usta_rating}</Text></View>}
-                        </View>
+            filteredFriends.length === 0 ? (
+              <EmptyState icon="people-outline" title="No friends yet" sub="Find players in Build Your Network" />
+            ) : filteredFriends.map(req => {
+              const friend = req.sender_id === user?.id ? req.receiver : req.sender;
+              const friendUid = req.sender_id === user?.id ? req.receiver_id : req.sender_id;
+              if (!friend) return null;
+              const online = isOnline(friendUid);
+              return (
+                <TouchableOpacity key={req.id} style={ls.convRow}
+                  onPress={async () => {
+                    try { const id = await getOrCreateDM(friendUid); setActiveTab('chats'); openConv(id); }
+                    catch { Alert.alert('Error', 'Failed to open chat.'); }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={{ position: 'relative' }}>
+                    <Avatar name={friend.name || 'P'} size={50} imageUrl={friend.profile_picture_url} />
+                    <OnlineDot online={online} size={12} />
+                  </View>
+                  <View style={ls.convBody}>
+                    <View style={ls.convTop}>
+                      <Text style={ls.convName}>{friend.name}</Text>
+                      <View style={[ls.statusPill, online ? ls.statusOnline : ls.statusOffline]}>
+                        <Text style={[ls.statusTxt, online ? ls.statusOnlineTxt : ls.statusOfflineTxt]}>
+                          {online ? 'Online' : 'Offline'}
+                        </Text>
                       </View>
-                      <View style={styles.dmBtn}>
-                        <Ionicons name="chatbubble-outline" size={16} color={Colors.primary} />
-                      </View>
-                    </TouchableOpacity>
-                    {idx < friends.length - 1 && <View style={styles.separator} />}
-                  </React.Fragment>
-                );
-              })
-            )
+                    </View>
+                    <Text style={ls.convPrev}>
+                      {friend.usta_rating ? `USTA ${friend.usta_rating}` : friend.skill_level ? `Level ${friend.skill_level}/10` : 'Tennis player'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity style={ls.msgBtn} onPress={async () => {
+                    try { const id = await getOrCreateDM(friendUid); setActiveTab('chats'); openConv(id); }
+                    catch {}
+                  }}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={16} color={Colors.primary} />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              );
+            })
           )}
 
-          {/* REQUESTS TAB */}
+          {/* ── REQUESTS ── */}
           {activeTab === 'requests' && (
             pendingReceived.length === 0 && pendingSent.length === 0 ? (
-              <View style={styles.empty}>
-                <Ionicons name="person-add-outline" size={56} color={Colors.textMuted} />
-                <Text style={styles.emptyTitle}>No pending requests</Text>
-                <Text style={styles.emptySubtitle}>Search for players in Build Your Network to connect</Text>
-              </View>
+              <EmptyState icon="person-add-outline" title="No pending requests" sub="Search for players in Build Your Network" />
             ) : (
               <>
                 {pendingReceived.length > 0 && (
                   <>
-                    <Text style={styles.sectionLabel}>Received ({pendingReceived.length})</Text>
-                    {pendingReceived.map((req, idx) => (
-                      <React.Fragment key={req.id}>
-                        <View style={styles.requestRow}>
-                          <Avatar name={req.sender?.name || 'P'} size={48} imageUrl={req.sender?.profile_picture_url} />
-                          <View style={styles.friendInfo}>
-                            <Text style={styles.friendName}>{req.sender?.name || 'Unknown'}</Text>
-                            {req.sender?.skill_level != null && <Text style={styles.requestMeta}>Level {req.sender.skill_level}/10</Text>}
-                          </View>
-                          <View style={styles.requestActions}>
-                            <TouchableOpacity style={styles.acceptBtn} onPress={() => handleRespond(req.id, 'accepted')} disabled={responding === req.id}>
-                              {responding === req.id ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="checkmark" size={18} color="#fff" />}
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.declineBtn} onPress={() => handleRespond(req.id, 'declined')} disabled={responding === req.id}>
-                              <Ionicons name="close" size={18} color={Colors.error} />
-                            </TouchableOpacity>
-                          </View>
+                    <Text style={ls.sectionLbl}>RECEIVED · {pendingReceived.length}</Text>
+                    {pendingReceived.map(req => (
+                      <View key={req.id} style={ls.convRow}>
+                        <Avatar name={req.sender?.name || 'P'} size={50} imageUrl={req.sender?.profile_picture_url} />
+                        <View style={ls.convBody}>
+                          <Text style={ls.convName}>{req.sender?.name || 'Unknown'}</Text>
+                          {req.sender?.skill_level != null && <Text style={ls.convPrev}>Level {req.sender.skill_level}/10</Text>}
                         </View>
-                        {idx < pendingReceived.length - 1 && <View style={styles.separator} />}
-                      </React.Fragment>
+                        <View style={ls.reqBtns}>
+                          <TouchableOpacity style={ls.acceptBtn} onPress={() => handleRespond(req.id, 'accepted')} disabled={responding === req.id}>
+                            {responding === req.id ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="checkmark" size={17} color="#fff" />}
+                          </TouchableOpacity>
+                          <TouchableOpacity style={ls.declineBtn} onPress={() => handleRespond(req.id, 'declined')} disabled={responding === req.id}>
+                            <Ionicons name="close" size={17} color={Colors.error} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
                     ))}
                   </>
                 )}
                 {pendingSent.length > 0 && (
                   <>
-                    <Text style={[styles.sectionLabel, pendingReceived.length > 0 && { marginTop: Spacing.lg }]}>Sent ({pendingSent.length})</Text>
-                    {pendingSent.map((req, idx) => (
-                      <React.Fragment key={req.id}>
-                        <View style={styles.requestRow}>
-                          <Avatar name={req.receiver?.name || 'P'} size={48} imageUrl={req.receiver?.profile_picture_url} />
-                          <View style={styles.friendInfo}>
-                            <Text style={styles.friendName}>{req.receiver?.name || 'Unknown'}</Text>
-                            <Text style={styles.requestMeta}>Waiting for response</Text>
-                          </View>
-                          <View style={styles.pendingChip}>
-                            <Ionicons name="time-outline" size={13} color={Colors.warning} />
-                            <Text style={styles.pendingChipText}>Pending</Text>
-                          </View>
+                    <Text style={[ls.sectionLbl, pendingReceived.length > 0 && { marginTop: 8 }]}>SENT · {pendingSent.length}</Text>
+                    {pendingSent.map(req => (
+                      <View key={req.id} style={ls.convRow}>
+                        <Avatar name={req.receiver?.name || 'P'} size={50} imageUrl={req.receiver?.profile_picture_url} />
+                        <View style={ls.convBody}>
+                          <Text style={ls.convName}>{req.receiver?.name || 'Unknown'}</Text>
+                          <Text style={ls.convPrev}>Waiting for response…</Text>
                         </View>
-                        {idx < pendingSent.length - 1 && <View style={styles.separator} />}
-                      </React.Fragment>
+                        <TouchableOpacity style={ls.cancelBtn} onPress={() => Alert.alert('Cancel Request', 'Cancel this friend request?', [
+                          { text: 'No', style: 'cancel' },
+                          { text: 'Cancel Request', style: 'destructive', onPress: () => cancelRequest(req.id) },
+                        ])}>
+                          <Ionicons name="time-outline" size={13} color={Colors.warning} />
+                          <Text style={ls.cancelBtnTxt}>Pending</Text>
+                        </TouchableOpacity>
+                      </View>
                     ))}
                   </>
                 )}
               </>
             )
           )}
+
+          {/* ── BLOCKED ── */}
+          {activeTab === 'blocked' && (
+            blockedUsers.length === 0 ? (
+              <EmptyState icon="ban-outline" title="No blocked users" sub="Block a player from their profile or a conversation" />
+            ) : blockedUsers.map(b => (
+              <View key={b.id} style={ls.convRow}>
+                <Avatar name={b.blocked_user_name || '?'} size={50} imageUrl={b.blocked_user_profile_picture} />
+                <View style={ls.convBody}>
+                  <Text style={ls.convName}>{b.blocked_user_name || 'Unknown user'}</Text>
+                  {b.blocked_user_email && <Text style={ls.convPrev}>{b.blocked_user_email}</Text>}
+                </View>
+                <TouchableOpacity style={ls.unblockBtn} onPress={() => Alert.alert('Unblock', `Unblock ${b.blocked_user_name || 'this user'}?`, [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Unblock', onPress: () => unblockUser(b.blocked_user_id) },
+                ])}>
+                  <Text style={ls.unblockTxt}>Unblock</Text>
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+
         </ScrollView>
       )}
 
@@ -681,126 +992,122 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
   );
 };
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+// ── Empty state ────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
-  flex: { flex: 1 },
-  scrollContent: { paddingBottom: Spacing.xxxl },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-
-  // List header
-  listHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  listTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.text },
-  listSub: { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.medium, marginTop: 2 },
-  newGroupBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: Colors.primaryLight, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: Radius.full },
-  newGroupText: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
-
-  // Tab bar
-  tabBar: { flexDirection: 'row', backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.md, gap: 5, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabActive: { borderBottomColor: Colors.primary },
-  tabBadge: { backgroundColor: Colors.primary, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
-  tabBadgeText: { color: '#fff', fontSize: 9, fontWeight: FontWeight.bold },
-  tabLabel: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.medium },
-  tabLabelActive: { color: Colors.primary, fontWeight: FontWeight.semibold },
-
-  // Conversations
-  convRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, backgroundColor: Colors.surface, gap: Spacing.md },
-  convAvatarWrap: { position: 'relative' },
-  groupAvatarPlaceholder: { width: 50, height: 50, borderRadius: 25, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  unreadDot: { position: 'absolute', top: -2, right: -2, backgroundColor: Colors.primary, borderRadius: 9, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 2, borderColor: Colors.surface },
-  unreadDotText: { color: Colors.textInverse, fontSize: 9, fontWeight: FontWeight.bold },
-  convInfo: { flex: 1, minWidth: 0 },
-  convTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 },
-  convName: { fontSize: FontSize.md, fontWeight: FontWeight.medium, color: Colors.text, flex: 1 },
-  convNameUnread: { fontWeight: FontWeight.bold },
-  convTime: { fontSize: FontSize.xs, color: Colors.textMuted, marginLeft: 4 },
-  convPreview: { fontSize: FontSize.sm, color: Colors.textSecondary },
-  convPreviewUnread: { color: Colors.text, fontWeight: FontWeight.medium },
-  separator: { height: 1, backgroundColor: Colors.border, marginLeft: Spacing.lg + 50 + Spacing.md },
-
-  // Friends
-  friendRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, backgroundColor: Colors.surface, gap: Spacing.md },
-  friendInfo: { flex: 1 },
-  friendName: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text, marginBottom: 3 },
-  friendMeta: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  metaChip: { backgroundColor: Colors.primaryLight, paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.full },
-  metaChipText: { fontSize: FontSize.xs, color: Colors.primaryDark, fontWeight: FontWeight.medium },
-  dmBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-
-  // Requests
-  sectionLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, backgroundColor: Colors.background },
-  requestRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, backgroundColor: Colors.surface, gap: Spacing.md },
-  requestMeta: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
-  requestActions: { flexDirection: 'row', gap: 8 },
-  acceptBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.success, alignItems: 'center', justifyContent: 'center' },
-  declineBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: Colors.error, alignItems: 'center', justifyContent: 'center' },
-  pendingChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.warningLight, paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.full },
-  pendingChipText: { fontSize: FontSize.xs, color: Colors.warning, fontWeight: FontWeight.semibold },
-
-  // Thread
-  threadHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border, paddingHorizontal: Spacing.sm, paddingVertical: Spacing.sm, gap: Spacing.sm },
-  backBtn: { padding: Spacing.sm },
-  threadHeaderInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  threadTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
-  threadSub: { fontSize: FontSize.xs, color: Colors.textSecondary },
-  infoBtn: { padding: Spacing.sm },
-  threadContent: { padding: Spacing.md, paddingBottom: Spacing.lg },
-  msgWrap: { marginBottom: Spacing.sm },
-  senderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3, paddingLeft: 2 },
-  senderName: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
-  bubble: { maxWidth: '78%', borderRadius: Radius.lg, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
-  bubbleMine: { alignSelf: 'flex-end', backgroundColor: Colors.primary, borderBottomRightRadius: 4 },
-  bubbleTheirs: { alignSelf: 'flex-start', backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderBottomLeftRadius: 4 },
-  bubbleText: { fontSize: FontSize.md, color: Colors.text },
-  bubbleTextMine: { color: Colors.textInverse },
-  bubbleTime: { fontSize: 10, color: Colors.textMuted, alignSelf: 'flex-end', marginTop: 2 },
-  bubbleTimeMine: { color: 'rgba(255,255,255,0.7)' },
-  msgActions: { flexDirection: 'row', gap: 6, marginTop: 4 },
-  msgActionsRight: { justifyContent: 'flex-end' },
-  msgActionsLeft: { justifyContent: 'flex-start' },
-  msgActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.full },
-  msgActionText: { fontSize: FontSize.xs, color: Colors.error, fontWeight: FontWeight.medium },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, backgroundColor: Colors.surface, borderTopWidth: 1, borderTopColor: Colors.border, gap: Spacing.sm },
-  messageInput: { flex: 1, borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.xl, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, fontSize: FontSize.md, color: Colors.text, maxHeight: 120, backgroundColor: Colors.background },
-  sendBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
-  sendBtnDisabled: { backgroundColor: Colors.textMuted },
-  emptyThread: { alignItems: 'center', paddingTop: 60 },
-  emptyThreadText: { fontSize: FontSize.md, color: Colors.textMuted },
-
-  // Empty states
-  empty: { alignItems: 'center', justifyContent: 'center', gap: Spacing.md, paddingTop: 80, paddingHorizontal: Spacing.xl },
-  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
-  emptySubtitle: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center' },
-  emptyBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.primary, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, borderRadius: Radius.md, marginTop: Spacing.sm },
-  emptyBtnText: { color: '#fff', fontWeight: FontWeight.semibold, fontSize: FontSize.md },
+const EmptyState: React.FC<{
+  icon: any; title: string; sub: string;
+  action?: { label: string; onPress: () => void };
+}> = ({ icon, title, sub, action }) => (
+  <View style={em.wrap}>
+    <View style={em.circle}><Ionicons name={icon} size={36} color={Colors.primary} /></View>
+    <Text style={em.title}>{title}</Text>
+    <Text style={em.sub}>{sub}</Text>
+    {action && (
+      <TouchableOpacity style={em.btn} onPress={action.onPress}>
+        <Text style={em.btnTxt}>{action.label}</Text>
+      </TouchableOpacity>
+    )}
+  </View>
+);
+const em = StyleSheet.create({
+  wrap: { alignItems: 'center', paddingTop: 80, gap: 10, paddingHorizontal: 32 },
+  circle: { width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  title: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
+  sub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  btn: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, borderRadius: Radius.full, marginTop: Spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  btnTxt: { color: '#fff', fontWeight: FontWeight.semibold, fontSize: FontSize.md },
 });
 
-// ── Modal Styles ──────────────────────────────────────────────────────────────
+// ── Thread styles ──────────────────────────────────────────────────────────────
 
-const modalStyles = StyleSheet.create({
+const th = StyleSheet.create({
+  header: { backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.sm, paddingBottom: Spacing.sm, gap: 4 },
+  backBtn: { padding: 6, marginRight: 2 },
+  identity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  groupAvt: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
+  nameCol: { flex: 1 },
+  name: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: '#fff' },
+  sub: { fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 1 },
+  actions: { flexDirection: 'row', alignItems: 'center' },
+  iconBtn: { padding: 8 },
+  listContent: { paddingVertical: 10, paddingBottom: 12 },
+  divider: { alignItems: 'center', marginVertical: 8 },
+  dividerTxt: { fontSize: 11, fontWeight: FontWeight.semibold, color: C.divText, backgroundColor: C.divBg, paddingHorizontal: 14, paddingVertical: 4, borderRadius: Radius.full, overflow: 'hidden' },
+  emptyWrap: { alignItems: 'center', paddingTop: 80, gap: 12 },
+  emptyPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.07)', paddingHorizontal: 14, paddingVertical: 6, borderRadius: Radius.full },
+  emptyPillTxt: { fontSize: 12, color: C.muted },
+  emptyTxt: { fontSize: FontSize.sm, color: C.muted },
+  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: Spacing.sm, paddingTop: 8, backgroundColor: C.inputBar, gap: 8 },
+  inputWrap: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', backgroundColor: '#fff', borderRadius: 24, paddingHorizontal: 4, paddingVertical: 4, minHeight: 44, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
+  emojiBtn: { padding: 8 },
+  input: { flex: 1, fontSize: FontSize.md, color: Colors.text, maxHeight: 120, paddingVertical: 6, paddingHorizontal: 4, lineHeight: 20 },
+  attachBtn: { padding: 8 },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.muted, alignItems: 'center', justifyContent: 'center' },
+  sendBtnActive: { backgroundColor: Colors.primary, shadowColor: Colors.shadowOrange, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.5, shadowRadius: 8, elevation: 4 },
+});
+
+// ── List styles ────────────────────────────────────────────────────────────────
+
+const ls = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  title: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
-  cancel: { fontSize: FontSize.md, color: Colors.primary },
-  done: { fontSize: FontSize.md, color: Colors.primary, fontWeight: FontWeight.bold },
-  doneDim: { opacity: 0.4 },
-  nameWrap: { backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border, padding: Spacing.lg },
-  nameInput: { fontSize: FontSize.lg, color: Colors.text, borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, backgroundColor: Colors.background },
-  sectionLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, backgroundColor: Colors.background },
-  memberRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
-  memberName: { fontSize: FontSize.md, fontWeight: FontWeight.medium, color: Colors.text },
-  adminBadge: { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.semibold, marginTop: 2 },
-  checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
-  checkboxChecked: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  empty: { alignItems: 'center', padding: Spacing.xxxl, gap: Spacing.md },
-  emptyText: { fontSize: FontSize.sm, color: Colors.textMuted, textAlign: 'center' },
-  infoSection: { backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md },
-  infoLabel: { flex: 1, fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
-  renameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md },
-  renameInput: { flex: 1, fontSize: FontSize.md, color: Colors.text, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, backgroundColor: Colors.background },
-  addMemberBtn: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, backgroundColor: Colors.surface, borderTopWidth: 1, borderTopColor: Colors.border, marginTop: Spacing.md },
-  addMemberText: { flex: 1, fontSize: FontSize.md, color: Colors.primary, fontWeight: FontWeight.medium },
+
+  // Header (matches Schedule)
+  header: { backgroundColor: Colors.primary, paddingBottom: 4 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm, paddingBottom: 6 },
+  headerLeft: { flex: 1 },
+  title: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: '#fff' },
+  sub: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.75)', marginTop: 1 },
+  headerRight: { flexDirection: 'row', gap: Spacing.sm },
+  hBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+
+  // Tab bar inside header
+  tabBar: { flexDirection: 'row', paddingHorizontal: Spacing.sm, paddingBottom: Spacing.sm, gap: 4 },
+  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 7, borderRadius: Radius.full, gap: 4, backgroundColor: 'rgba(0,0,0,0.12)' },
+  tabActive: { backgroundColor: '#fff' },
+  tabTxt: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: 'rgba(255,255,255,0.8)' },
+  tabTxtActive: { color: Colors.primary },
+  tabBadge: { backgroundColor: Colors.error, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  tabBadgeTxt: { color: '#fff', fontSize: 9, fontWeight: FontWeight.bold },
+
+  // Search bar
+  searchWrap: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
+  searchInput: { flex: 1, fontSize: FontSize.sm, color: Colors.text, paddingVertical: 0 },
+
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
+
+  // Conversation rows
+  convRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 13, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight, gap: Spacing.md },
+  groupAvt: { width: 50, height: 50, borderRadius: 25, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
+  convBody: { flex: 1, minWidth: 0 },
+  convTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 },
+  convName: { fontSize: FontSize.md, fontWeight: FontWeight.medium, color: Colors.text, flex: 1, marginRight: 4 },
+  bold: { fontWeight: FontWeight.bold, color: Colors.text },
+  convTime: { fontSize: 11, color: Colors.textMuted },
+  convBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  convPrev: { fontSize: FontSize.sm, color: Colors.textSecondary, flex: 1, marginRight: 4 },
+  unreadBadge: { backgroundColor: Colors.primary, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  unreadTxt: { color: '#fff', fontSize: 11, fontWeight: FontWeight.bold },
+
+  // Friends tab
+  statusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full },
+  statusOnline: { backgroundColor: Colors.successLight },
+  statusOffline: { backgroundColor: Colors.backgroundAlt },
+  statusTxt: { fontSize: 10, fontWeight: FontWeight.semibold },
+  statusOnlineTxt: { color: Colors.success },
+  statusOfflineTxt: { color: Colors.textMuted },
+  msgBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+
+  // Section labels
+  sectionLbl: { fontSize: 10, fontWeight: FontWeight.bold, color: Colors.textMuted, letterSpacing: 0.8, paddingHorizontal: Spacing.lg, paddingVertical: 8, backgroundColor: Colors.backgroundAlt },
+
+  // Request buttons
+  reqBtns: { flexDirection: 'row', gap: 8 },
+  acceptBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.success, alignItems: 'center', justifyContent: 'center' },
+  declineBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: Colors.error, alignItems: 'center', justifyContent: 'center' },
+  cancelBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.warningLight, paddingHorizontal: Spacing.sm, paddingVertical: 5, borderRadius: Radius.full },
+  cancelBtnTxt: { fontSize: 11, color: Colors.warning, fontWeight: FontWeight.semibold },
+
+  // Blocked tab
+  unblockBtn: { backgroundColor: Colors.backgroundAlt, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: Spacing.sm, paddingVertical: 6, borderRadius: Radius.full },
+  unblockTxt: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: Colors.text },
 });

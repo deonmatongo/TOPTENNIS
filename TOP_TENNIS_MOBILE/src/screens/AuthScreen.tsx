@@ -12,7 +12,6 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/services/supabase';
@@ -42,11 +41,15 @@ const formatPhone = (raw: string): string => {
 
 function GoogleIcon() {
   return (
-    <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginRight: 10, borderWidth: 1, borderColor: '#e5e7eb' }}>
-      <Text style={{ fontSize: 13, fontWeight: '700', color: '#4285F4', lineHeight: 18 }}>G</Text>
+    <View style={gStyles.circle}>
+      <Text style={gStyles.letter}>G</Text>
     </View>
   );
 }
+const gStyles = StyleSheet.create({
+  circle: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginRight: 10, borderWidth: 1, borderColor: '#e5e7eb' },
+  letter: { fontSize: 12, fontWeight: '700', color: '#4285F4', lineHeight: 17 },
+});
 
 export const AuthScreen: React.FC = () => {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -162,55 +165,47 @@ export const AuthScreen: React.FC = () => {
   ];
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
-          <LinearGradient
-            colors={[Colors.primary, Colors.primaryDark]}
-            style={styles.header}
-          >
-            <View style={styles.logoCircle}>
-              <Ionicons name="tennisball" size={36} color={Colors.textInverse} />
+          {/* Logo */}
+          <View style={styles.logoSection}>
+            <View style={styles.iconCircle}>
+              <Ionicons name="tennisball" size={32} color={Colors.textInverse} />
             </View>
-            <Text style={styles.appName}>TOP TENNIS</Text>
+            <Text style={styles.appName}>Top Tennis</Text>
             <Text style={styles.tagline}>Find your perfect match</Text>
-          </LinearGradient>
+          </View>
 
-          {/* Form Card */}
-          <View style={styles.card}>
-            {/* Tab Toggle */}
-            <View style={styles.tabRow}>
-              <TouchableOpacity
-                style={[styles.tab, mode === 'signin' && styles.tabActive]}
-                onPress={() => switchMode('signin')}
-              >
-                <Text style={[styles.tabText, mode === 'signin' && styles.tabTextActive]}>Sign In</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tab, mode === 'signup' && styles.tabActive]}
-                onPress={() => switchMode('signup')}
-              >
-                <Text style={[styles.tabText, mode === 'signup' && styles.tabTextActive]}>Create Account</Text>
-              </TouchableOpacity>
-            </View>
+          {/* Mode Toggle */}
+          <View style={styles.toggleRow}>
+            <TouchableOpacity
+              style={[styles.toggleBtn, mode === 'signin' && styles.toggleBtnActive]}
+              onPress={() => switchMode('signin')}
+            >
+              <Text style={[styles.toggleText, mode === 'signin' && styles.toggleTextActive]}>Sign In</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleBtn, mode === 'signup' && styles.toggleBtnActive]}
+              onPress={() => switchMode('signup')}
+            >
+              <Text style={[styles.toggleText, mode === 'signup' && styles.toggleTextActive]}>Create Account</Text>
+            </TouchableOpacity>
+          </View>
 
-            {/* ── SIGNUP-ONLY FIELDS ── */}
+          {/* Form */}
+          <View style={styles.form}>
+
             {mode === 'signup' && (
               <>
-                {/* First + Last Name */}
-                <View style={styles.row}>
-                  <View style={[styles.inputWrapper, { flex: 1, marginRight: Spacing.sm }]}>
-                    <Text style={styles.label}>First Name *</Text>
+                <View style={styles.nameRow}>
+                  <View style={[styles.inputWrapper, { flex: 1, marginRight: 8 }]}>
+                    <Text style={styles.label}>First Name</Text>
                     <View style={inputStyle('firstName', !!errors.firstName)}>
-                      <Ionicons name="person-outline" size={16} color={Colors.textMuted} style={styles.icon} />
                       <TextInput
                         style={styles.textInput}
                         placeholder="John"
@@ -226,9 +221,8 @@ export const AuthScreen: React.FC = () => {
                     {!!errors.firstName && <Text style={styles.fieldError}>{errors.firstName}</Text>}
                   </View>
                   <View style={[styles.inputWrapper, { flex: 1 }]}>
-                    <Text style={styles.label}>Last Name *</Text>
+                    <Text style={styles.label}>Last Name</Text>
                     <View style={inputStyle('lastName', !!errors.lastName)}>
-                      <Ionicons name="person-outline" size={16} color={Colors.textMuted} style={styles.icon} />
                       <TextInput
                         style={styles.textInput}
                         placeholder="Doe"
@@ -245,11 +239,10 @@ export const AuthScreen: React.FC = () => {
                   </View>
                 </View>
 
-                {/* Phone */}
                 <View style={styles.inputWrapper}>
-                  <Text style={styles.label}>Phone Number *</Text>
+                  <Text style={styles.label}>Phone Number</Text>
                   <View style={inputStyle('phone', !!errors.phone)}>
-                    <Ionicons name="call-outline" size={16} color={Colors.textMuted} style={styles.icon} />
+                    <Ionicons name="call-outline" size={16} color={focusedField === 'phone' ? Colors.primary : Colors.textMuted} style={styles.icon} />
                     <TextInput
                       style={styles.textInput}
                       placeholder="(555) 123-4567"
@@ -267,11 +260,10 @@ export const AuthScreen: React.FC = () => {
               </>
             )}
 
-            {/* Email */}
             <View style={styles.inputWrapper}>
-              <Text style={styles.label}>Email Address *</Text>
+              <Text style={styles.label}>Email Address</Text>
               <View style={inputStyle('email', !!errors.email)}>
-                <Ionicons name="mail-outline" size={16} color={Colors.textMuted} style={styles.icon} />
+                <Ionicons name="mail-outline" size={16} color={focusedField === 'email' ? Colors.primary : Colors.textMuted} style={styles.icon} />
                 <TextInput
                   style={styles.textInput}
                   placeholder="you@example.com"
@@ -288,11 +280,10 @@ export const AuthScreen: React.FC = () => {
               {!!errors.email && <Text style={styles.fieldError}>{errors.email}</Text>}
             </View>
 
-            {/* Password */}
             <View style={styles.inputWrapper}>
-              <Text style={styles.label}>{mode === 'signup' ? 'Create your Password *' : 'Password'}</Text>
+              <Text style={styles.label}>Password</Text>
               <View style={inputStyle('password', !!errors.password)}>
-                <Ionicons name="lock-closed-outline" size={16} color={Colors.textMuted} style={styles.icon} />
+                <Ionicons name="lock-closed-outline" size={16} color={focusedField === 'password' ? Colors.primary : Colors.textMuted} style={styles.icon} />
                 <TextInput
                   style={styles.textInput}
                   placeholder={mode === 'signup' ? 'Minimum 8 characters' : '••••••••'}
@@ -309,18 +300,11 @@ export const AuthScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
               {!!errors.password && <Text style={styles.fieldError}>{errors.password}</Text>}
-              {/* Password strength (signup only) */}
               {mode === 'signup' && password.length > 0 && pwStrength && (
                 <View style={styles.strengthWrapper}>
                   <View style={styles.strengthBars}>
                     {[1, 2, 3, 4, 5].map(i => (
-                      <View
-                        key={i}
-                        style={[
-                          styles.strengthBar,
-                          { backgroundColor: i <= pwStrength.score ? pwStrength.color : Colors.borderLight },
-                        ]}
-                      />
+                      <View key={i} style={[styles.strengthBar, { backgroundColor: i <= pwStrength.score ? pwStrength.color : Colors.borderLight }]} />
                     ))}
                   </View>
                   <Text style={[styles.strengthLabel, { color: pwStrength.color }]}>{pwStrength.label}</Text>
@@ -331,15 +315,14 @@ export const AuthScreen: React.FC = () => {
               )}
             </View>
 
-            {/* Confirm Password (signup only) */}
             {mode === 'signup' && (
               <View style={styles.inputWrapper}>
-                <Text style={styles.label}>Confirm Password *</Text>
+                <Text style={styles.label}>Confirm Password</Text>
                 <View style={inputStyle('confirmPassword', !!errors.confirmPassword)}>
-                  <Ionicons name="lock-closed-outline" size={16} color={Colors.textMuted} style={styles.icon} />
+                  <Ionicons name="lock-closed-outline" size={16} color={focusedField === 'confirmPassword' ? Colors.primary : Colors.textMuted} style={styles.icon} />
                   <TextInput
                     style={styles.textInput}
-                    placeholder="Confirm your password"
+                    placeholder="Re-enter your password"
                     placeholderTextColor={Colors.textMuted}
                     value={confirmPassword}
                     onChangeText={v => { setConfirmPassword(v); clearError('confirmPassword'); }}
@@ -356,82 +339,60 @@ export const AuthScreen: React.FC = () => {
               </View>
             )}
 
-            {/* Terms & Conditions (signup only) */}
             {mode === 'signup' && (
-              <View style={styles.termsRow}>
+              <>
                 <TouchableOpacity
-                  style={[styles.checkbox, agreeToTerms && styles.checkboxChecked]}
+                  style={styles.termsRow}
                   onPress={() => { setAgreeToTerms(v => !v); clearError('agreeToTerms'); }}
                   activeOpacity={0.7}
                 >
-                  {agreeToTerms && <Ionicons name="checkmark" size={14} color={Colors.textInverse} />}
+                  <View style={[styles.checkbox, agreeToTerms && styles.checkboxChecked]}>
+                    {agreeToTerms && <Ionicons name="checkmark" size={13} color={Colors.textInverse} />}
+                  </View>
+                  <Text style={styles.termsText}>
+                    I agree to the <Text style={styles.termsLink}>Terms</Text> and <Text style={styles.termsLink}>Privacy Policy</Text>
+                  </Text>
                 </TouchableOpacity>
-                <Text style={styles.termsText}>
-                  I agree to the{' '}
-                  <Text style={styles.termsLink}>Terms and Conditions</Text>
-                  {' '}and{' '}
-                  <Text style={styles.termsLink}>Privacy Policy</Text>
-                </Text>
-              </View>
-            )}
-            {!!errors.agreeToTerms && mode === 'signup' && (
-              <Text style={[styles.fieldError, { marginTop: -Spacing.sm, marginBottom: Spacing.sm }]}>{errors.agreeToTerms}</Text>
+                {!!errors.agreeToTerms && <Text style={[styles.fieldError, { marginTop: -Spacing.xs }]}>{errors.agreeToTerms}</Text>}
+              </>
             )}
 
-            {/* Submit */}
             <TouchableOpacity
               style={[styles.submitBtn, (loading || googleLoading) && styles.submitBtnDisabled]}
               onPress={handleAuth}
               disabled={loading || googleLoading}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
-              {loading ? (
-                <ActivityIndicator color={Colors.textInverse} />
-              ) : (
-                <Text style={styles.submitText}>
-                  {mode === 'signin' ? 'SIGN IN' : 'CREATE ACCOUNT'}
-                </Text>
-              )}
+              {loading
+                ? <ActivityIndicator color={Colors.textInverse} />
+                : <Text style={styles.submitText}>{mode === 'signin' ? 'Sign In' : 'Create Account'}</Text>
+              }
             </TouchableOpacity>
 
-            {/* Divider */}
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>OR</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* Google */}
-            <TouchableOpacity
-              style={[styles.googleBtn, (loading || googleLoading) && styles.submitBtnDisabled]}
-              onPress={handleGoogleAuth}
-              disabled={loading || googleLoading}
-              activeOpacity={0.8}
-            >
-              {googleLoading ? (
-                <ActivityIndicator color={Colors.text} />
-              ) : (
-                <>
-                  <GoogleIcon />
-                  <Text style={styles.googleText}>
-                    {mode === 'signin' ? 'Continue with Google' : 'Sign up with Google'}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            {/* Forgot Password (sign-in only) */}
             {mode === 'signin' && (
-              <TouchableOpacity
-                style={styles.forgotBtn}
-                onPress={handleForgotPassword}
-                disabled={loading}
-              >
+              <TouchableOpacity style={styles.forgotBtn} onPress={handleForgotPassword} disabled={loading}>
                 <Text style={styles.forgotText}>Forgot password?</Text>
               </TouchableOpacity>
             )}
 
-            {/* Footer */}
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.googleBtn, (loading || googleLoading) && styles.submitBtnDisabled]}
+              onPress={handleGoogleAuth}
+              disabled={loading || googleLoading}
+              activeOpacity={0.85}
+            >
+              {googleLoading
+                ? <ActivityIndicator color={Colors.text} />
+                : <><GoogleIcon /><Text style={styles.googleText}>{mode === 'signin' ? 'Continue with Google' : 'Sign up with Google'}</Text></>
+              }
+            </TouchableOpacity>
+
             <Text style={styles.footerText}>
               {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
               <Text style={styles.footerLink} onPress={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}>
@@ -446,66 +407,78 @@ export const AuthScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.primary },
+  safe: { flex: 1, backgroundColor: Colors.surface },
   flex: { flex: 1 },
-  scroll: { flexGrow: 1 },
+  scroll: { flexGrow: 1, paddingBottom: Spacing.xxxl },
 
-  header: {
+  logoSection: {
     alignItems: 'center',
-    paddingTop: Spacing.xxl,
-    paddingBottom: Spacing.xxxl + 20,
+    paddingTop: Spacing.xxxl,
+    paddingBottom: Spacing.xl,
   },
-  logoCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  iconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.md,
+    shadowColor: Colors.shadowOrange,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 1,
+    shadowRadius: 16,
+    elevation: 8,
   },
   appName: {
-    fontSize: FontSize.xxxl,
+    fontSize: FontSize.xxl,
     fontWeight: FontWeight.extrabold,
-    color: Colors.textInverse,
-    letterSpacing: 2,
+    color: Colors.text,
+    letterSpacing: 0.5,
   },
   tagline: {
-    fontSize: FontSize.md,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: Spacing.xs,
+    fontSize: FontSize.sm,
+    color: Colors.textMuted,
+    marginTop: 4,
   },
 
-  card: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    marginTop: -20,
-    padding: Spacing.xl,
-    paddingTop: Spacing.xxl,
-  },
-
-  tabRow: {
+  toggleRow: {
     flexDirection: 'row',
-    backgroundColor: Colors.borderLight,
+    marginHorizontal: Spacing.xl,
+    marginBottom: Spacing.xl,
+    backgroundColor: Colors.backgroundAlt,
     borderRadius: Radius.md,
     padding: 4,
-    marginBottom: Spacing.xl,
   },
-  tab: {
+  toggleBtn: {
     flex: 1,
-    paddingVertical: Spacing.sm + 2,
+    paddingVertical: 10,
     alignItems: 'center',
     borderRadius: Radius.sm,
   },
-  tabActive: { backgroundColor: Colors.surface, shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 1, shadowRadius: 3, elevation: 2 },
-  tabText: { fontSize: FontSize.sm, fontWeight: FontWeight.medium, color: Colors.textSecondary },
-  tabTextActive: { color: Colors.text, fontWeight: FontWeight.semibold },
+  toggleBtnActive: {
+    backgroundColor: Colors.surface,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  toggleText: { fontSize: FontSize.sm, fontWeight: FontWeight.medium, color: Colors.textSecondary },
+  toggleTextActive: { color: Colors.text, fontWeight: FontWeight.semibold },
 
-  row: { flexDirection: 'row' },
+  form: { paddingHorizontal: Spacing.xl },
+
+  nameRow: { flexDirection: 'row' },
   inputWrapper: { marginBottom: Spacing.md },
-  label: { fontSize: FontSize.sm, fontWeight: FontWeight.medium, color: Colors.text, marginBottom: Spacing.xs },
+  label: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.semibold,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
   input: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -517,29 +490,28 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   inputFocused: { borderColor: Colors.primary, backgroundColor: Colors.surface },
-  inputError: { borderColor: '#ef4444' },
+  inputError: { borderColor: Colors.error },
   icon: { marginRight: Spacing.sm },
   textInput: { flex: 1, fontSize: FontSize.md, color: Colors.text },
   eyeBtn: { padding: Spacing.xs },
-
-  fieldError: { fontSize: FontSize.xs, color: '#ef4444', marginTop: 4 },
+  fieldError: { fontSize: FontSize.xs, color: Colors.error, marginTop: 4, marginBottom: 4 },
 
   strengthWrapper: { marginTop: Spacing.sm },
   strengthBars: { flexDirection: 'row', gap: 4, marginBottom: 4 },
-  strengthBar: { flex: 1, height: 4, borderRadius: 2 },
+  strengthBar: { flex: 1, height: 3, borderRadius: 2 },
   strengthLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold },
   strengthHint: { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 2 },
 
   termsRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: Spacing.md,
     gap: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   checkbox: {
     width: 20,
     height: 20,
-    borderRadius: 4,
+    borderRadius: 5,
     borderWidth: 2,
     borderColor: Colors.border,
     alignItems: 'center',
@@ -553,19 +525,21 @@ const styles = StyleSheet.create({
   submitBtn: {
     backgroundColor: Colors.primary,
     borderRadius: Radius.md,
-    height: 54,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: Spacing.sm,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.sm,
+    shadowColor: Colors.shadowOrange,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 6,
   },
   submitBtnDisabled: { opacity: 0.6 },
-  submitText: { color: Colors.textInverse, fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+  submitText: { color: Colors.textInverse, fontSize: FontSize.md, fontWeight: FontWeight.bold, letterSpacing: 0.3 },
 
-  footerText: { textAlign: 'center', fontSize: FontSize.sm, color: Colors.textSecondary },
-  footerLink: { color: Colors.primary, fontWeight: FontWeight.semibold },
-
-  forgotBtn: { alignItems: 'center', paddingVertical: Spacing.sm, marginBottom: Spacing.sm },
+  forgotBtn: { alignItems: 'center', paddingVertical: Spacing.sm, marginBottom: Spacing.xs },
   forgotText: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.medium },
 
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: Spacing.md },
@@ -576,12 +550,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 54,
+    height: 52,
     borderRadius: Radius.md,
     borderWidth: 1.5,
     borderColor: Colors.border,
     backgroundColor: Colors.surface,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xl,
   },
   googleText: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text },
+
+  footerText: { textAlign: 'center', fontSize: FontSize.sm, color: Colors.textSecondary, paddingBottom: Spacing.xl },
+  footerLink: { color: Colors.primary, fontWeight: FontWeight.semibold },
 });
