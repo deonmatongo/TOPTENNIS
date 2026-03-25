@@ -574,10 +574,10 @@ export const useMatchInvites = () => {
 
         logger.info('Successfully accepted invite and locked slot', { inviteId, result: acceptResult });
       } else {
-        // For declined invites, just update the status
+        // For declined invites, update status and unlock the availability slot
         const { data, error } = await supabase
           .from('match_invites')
-          .update({ 
+          .update({
             status,
             response_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -601,6 +601,12 @@ export const useMatchInvites = () => {
           toast.error(`Failed to ${status} match invite`);
           throw new Error('No data returned from update');
         }
+
+        // Free the availability slot so it becomes bookable again
+        await (supabase.rpc as any)('unlock_slots_for_invite', {
+          p_invite_id: inviteId,
+          p_user_id: user.id,
+        }).catch((err: any) => logger.warn('unlock_slots_for_invite failed', { err }));
       }
 
       // Notify the other party of the response (idempotent — unique index guards duplicates).
@@ -811,6 +817,14 @@ export const useMatchInvites = () => {
         .eq('id', inviteId);
 
       if (error) throw error;
+
+      // Free the availability slot so it becomes bookable again
+      if (user) {
+        await (supabase.rpc as any)('unlock_slots_for_invite', {
+          p_invite_id: inviteId,
+          p_user_id: user.id,
+        }).catch((err: any) => logger.warn('unlock_slots_for_invite failed on cancel', { err }));
+      }
 
       // Notify the other party of the cancellation
       const invite = invites.find(i => i.id === inviteId);

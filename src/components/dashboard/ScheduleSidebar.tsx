@@ -69,7 +69,7 @@ export const ScheduleSidebar: React.FC<ScheduleSidebarProps> = ({
 
   // Get availability slots for the selected date
   const selectedDateAvailability = availability.filter(
-    (slot) => isSameDay(new Date(slot.date), selectedDate) && slot.is_available && !slot.is_blocked
+    (slot) => isSameDay(new Date(slot.date), selectedDate) && slot.is_available && !slot.is_blocked && slot.booking_status !== 'booked'
   );
 
   // Get confirmed matches sorted by date
