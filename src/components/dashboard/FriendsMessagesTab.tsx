@@ -391,7 +391,7 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             {isBest && (
-                              <span style={{ fontSize: 10, fontWeight: 700, background: '#22C55E', color: '#fff', padding: '3px 9px', borderRadius: 999 }}>Best match</span>
+                              <span style={{ fontSize: 10, fontWeight: 700, background: '#22C55E', color: '#fff', padding: '3px 9px', borderRadius: 999 }}>Best availability</span>
                             )}
                             {isChosen && (
                               <div style={{ width: 22, height: 22, borderRadius: '50%', background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
