@@ -744,14 +744,12 @@ const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
             >
               <Trophy className="w-3.5 h-3.5" /> Send Match Request
             </button>
-            {isAdmin && (
-              <button
-                onClick={() => { onClose(); onAddPlayers(); }}
-                style={{ width: '100%', padding: '11px 0', borderRadius: 10, background: C.bg, color: C.text, border: `1.5px solid ${C.border}`, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-              >
-                <UserPlus className="w-3.5 h-3.5" /> Add Players
-              </button>
-            )}
+            <button
+              onClick={() => { onClose(); onAddPlayers(); }}
+              style={{ width: '100%', padding: '11px 0', borderRadius: 10, background: C.bg, color: C.text, border: `1.5px solid ${C.border}`, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+            >
+              <UserPlus className="w-3.5 h-3.5" /> Add Players
+            </button>
           </div>
 
           {/* ── Members ── */}
@@ -1825,7 +1823,7 @@ const FriendsMessagesTab = () => {
                             onMarkRead={() => markConversationRead(conv.id)}
                             onLeave={async () => { try { await leaveGroup(conv.id); if (selectedConvId === conv.id) setSelectedConvId(null); toast.success('Left group'); } catch { toast.error('Failed to leave'); } }}
                             onDelete={getMyRole(conv) === 'admin' ? async () => { try { await deleteGroup(conv.id); if (selectedConvId === conv.id) setSelectedConvId(null); toast.success('Group deleted'); } catch { toast.error('Failed to delete'); } } : undefined}
-                            onAddPlayers={getMyRole(conv) === 'admin' ? () => { setAddPlayersConvId(conv.id); setShowAddPlayers(true); } : undefined}
+                            onAddPlayers={() => { setAddPlayersConvId(conv.id); setShowAddPlayers(true); }}
                           />
                         ))}
                         <button onClick={() => setShowGroupCreate(true)} style={{ display: 'block', width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13, color: C.muted, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}
