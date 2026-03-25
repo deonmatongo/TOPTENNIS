@@ -374,7 +374,7 @@ const PlayerProfileModal = ({
             <div className="space-y-2 pt-1">
               <div className="grid grid-cols-2 gap-2">
                 <Button onClick={() => setShowScheduleMatch(true)} className="h-10 text-xs sm:text-sm">
-                  <Swords className="w-4 h-4 mr-1.5 sm:mr-2" />Challenge
+                  <Swords className="w-4 h-4 mr-1.5 sm:mr-2" />Match Request
                 </Button>
                 <Button onClick={handleOpenMessage} variant="outline" className="h-10 text-xs sm:text-sm" disabled={isOpeningDM}>
                   <MessageCircle className="w-4 h-4 mr-1.5 sm:mr-2" />

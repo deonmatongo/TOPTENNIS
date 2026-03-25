@@ -59,7 +59,7 @@ const PostRegistrationPrompt: React.FC<PostRegistrationPromptProps> = ({
             size="lg"
           >
             <Trophy className="w-5 h-5 mr-2" />
-            Send a challenge request
+            Send a match request
           </Button>
           
           <Button

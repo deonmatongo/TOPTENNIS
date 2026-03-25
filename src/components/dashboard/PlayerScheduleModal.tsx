@@ -215,7 +215,7 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
 
             <DialogTitle className="sr-only">Schedule Match with {opponentName}</DialogTitle>
             <DialogDescription className="sr-only">
-              View {opponentName}'s availability and send a match challenge
+              View {opponentName}'s availability and send a match request
             </DialogDescription>
 
             <div className="relative flex items-center gap-4">
@@ -232,7 +232,7 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
               </Avatar>
 
               <div className="flex-1 min-w-0">
-                <p className="text-white/70 text-xs font-medium uppercase tracking-widest mb-0.5">Challenge</p>
+                <p className="text-white/70 text-xs font-medium uppercase tracking-widest mb-0.5">Match Request</p>
                 <h2 className="text-xl font-bold text-white leading-tight truncate">{opponentName}</h2>
                 <div className="flex flex-wrap items-center gap-2 mt-1.5">
                   <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-white/20 text-white">
@@ -391,7 +391,7 @@ export const PlayerScheduleModal: React.FC<PlayerScheduleModalProps> = ({
 
               {/* How it works strip */}
               <div className="rounded-xl bg-muted/30 border border-border/50 px-5 py-4">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">How to challenge</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">How to send a match request</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-center">
                   {[
                     { step: '1', icon: Calendar, label: 'Pick a highlighted date on the calendar' },

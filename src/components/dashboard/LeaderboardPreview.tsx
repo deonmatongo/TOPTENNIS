@@ -231,12 +231,12 @@ const LeaderboardPreview: React.FC<LeaderboardPreviewProps> = ({
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 border rounded-lg">
-              <h4 className="font-medium mb-2">Next Challenge</h4>
+              <h4 className="font-medium mb-2">Next Match</h4>
               <p className="text-sm text-muted-foreground mb-3">
                 Beat Mike Johnson to move to #3
               </p>
               <Button size="sm" className="w-full">
-                Challenge Player
+                Match Request
               </Button>
             </div>
             

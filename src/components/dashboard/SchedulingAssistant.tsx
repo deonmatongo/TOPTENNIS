@@ -150,7 +150,7 @@ export const SchedulingAssistant: React.FC<SchedulingAssistantProps> = ({
         {myHasAny && !theirHasAny && (
           <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">
             <CalendarDays className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-            <span><strong>{theirName}</strong> hasn't published any availability yet. Try the Calendar or List tabs to challenge them directly.</span>
+            <span><strong>{theirName}</strong> hasn't published any availability yet. Try the Calendar or List tabs to send them a match request directly.</span>
           </div>
         )}
 

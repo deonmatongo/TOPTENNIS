@@ -8,6 +8,7 @@ import {
   Bell, Trophy, Calendar, Users, TrendingUp, X,
   Filter, Search, ChevronRight, MessageCircle, UserPlus,
   CheckCircle2, Circle, Trash2, MailOpen, Mail, CheckSquare,
+  Check, UserCheck, Loader2,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -15,6 +16,7 @@ import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import type { Notification } from '@/hooks/useNotifications';
 import { useNavigate } from 'react-router-dom';
 import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
+import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { InviteResponseDialog } from './InviteResponseDialog';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -104,7 +106,41 @@ const NotificationsTab = () => {
     removeNotification,
     isLoading,
   } = useNotificationsContext();
-  const { invites } = useMatchInvitesContext();
+  const { invites, respondToInvite } = useMatchInvitesContext();
+  const { requests, updateRequestStatus } = useFriendRequests();
+
+  // Per-notification action state: 'loading' | 'accepted' | 'declined'
+  const [actionState, setActionState] = React.useState<Record<string, 'loading' | 'accepted' | 'declined'>>({});
+
+  const handleInlineMatchResponse = async (e: React.MouseEvent, notification: Notification, response: 'accepted' | 'declined') => {
+    e.stopPropagation();
+    const inviteId = notification.metadata?.match_id;
+    if (!inviteId) return;
+    setActionState(prev => ({ ...prev, [notification.id]: 'loading' }));
+    try {
+      await respondToInvite(inviteId, response);
+      markAsRead(notification.id);
+      setActionState(prev => ({ ...prev, [notification.id]: response }));
+    } catch {
+      setActionState(prev => { const s = { ...prev }; delete s[notification.id]; return s; });
+    }
+  };
+
+  const handleInlineFriendResponse = async (e: React.MouseEvent, notification: Notification, status: 'accepted' | 'declined') => {
+    e.stopPropagation();
+    const senderId = notification.metadata?.sender_id;
+    if (!senderId) return;
+    const req = requests.find(r => r.sender_id === senderId && r.status === 'pending');
+    if (!req) return;
+    setActionState(prev => ({ ...prev, [notification.id]: 'loading' }));
+    try {
+      await updateRequestStatus(req.id, status);
+      markAsRead(notification.id);
+      setActionState(prev => ({ ...prev, [notification.id]: status }));
+    } catch {
+      setActionState(prev => { const s = { ...prev }; delete s[notification.id]; return s; });
+    }
+  };
 
   /** Resolve the actor's photo URL + initials for a notification. */
   const resolveActor = (n: Notification): { url: string | null; initials: string } => {
@@ -423,18 +459,32 @@ const NotificationsTab = () => {
                   const isSelected  = selectedIds.has(notification.id);
                   const actor       = resolveActor(notification);
 
+                  const nState = actionState[notification.id];
+                  const isMatchInvite = ['match_invite', 'match_rescheduled'].includes(notification.type);
+                  const isFriendReq = notification.type === 'friend_request';
+
+                  const showMatchActions = isMatchInvite &&
+                    notification.metadata?.match_id &&
+                    !nState &&
+                    (() => { const inv = invites.find(i => i.id === notification.metadata?.match_id); return inv?.status === 'pending'; })();
+
+                  const showFriendActions = isFriendReq &&
+                    notification.metadata?.sender_id &&
+                    !nState &&
+                    requests.some(r => r.sender_id === notification.metadata?.sender_id && r.status === 'pending');
+
                   return (
                     <div
                       key={notification.id}
                       className={`group flex items-start gap-3 sm:gap-4 p-4 sm:p-5 transition-colors touch-manipulation
-                        ${isClickable ? 'cursor-pointer' : selectionMode ? 'cursor-pointer' : 'cursor-default'}
+                        ${showMatchActions || showFriendActions || nState ? 'cursor-default' : isClickable ? 'cursor-pointer' : selectionMode ? 'cursor-pointer' : 'cursor-default'}
                         ${isSelected
                           ? 'bg-primary/10'
                           : !notification.read
                           ? 'bg-primary/5 hover:bg-primary/10'
                           : 'hover:bg-muted/30'
                         }`}
-                      onClick={() => handleNotificationClick(notification)}
+                      onClick={() => !(showMatchActions || showFriendActions || nState) && handleNotificationClick(notification)}
                     >
                       {/* Checkbox (selection mode) or icon */}
                       {selectionMode ? (
@@ -532,6 +582,59 @@ const NotificationsTab = () => {
                             </div>
                           )}
                         </div>
+
+                        {/* ── Inline accept / decline actions ── */}
+                        {showMatchActions && (
+                          <div className="flex flex-wrap gap-2 mt-3" onClick={e => e.stopPropagation()}>
+                            <Button
+                              size="sm"
+                              className="h-8 px-4 text-sm bg-green-600 hover:bg-green-700 text-white"
+                              onClick={e => handleInlineMatchResponse(e, notification, 'accepted')}
+                            >
+                              <Check className="w-3.5 h-3.5 mr-1.5" />Accept
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-4 text-sm"
+                              onClick={e => handleInlineMatchResponse(e, notification, 'declined')}
+                            >
+                              <X className="w-3.5 h-3.5 mr-1.5" />Decline
+                            </Button>
+                          </div>
+                        )}
+
+                        {showFriendActions && (
+                          <div className="flex flex-wrap gap-2 mt-3" onClick={e => e.stopPropagation()}>
+                            <Button
+                              size="sm"
+                              className="h-8 px-4 text-sm bg-green-600 hover:bg-green-700 text-white"
+                              onClick={e => handleInlineFriendResponse(e, notification, 'accepted')}
+                            >
+                              <UserCheck className="w-3.5 h-3.5 mr-1.5" />Accept
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-4 text-sm"
+                              onClick={e => handleInlineFriendResponse(e, notification, 'declined')}
+                            >
+                              <X className="w-3.5 h-3.5 mr-1.5" />Decline
+                            </Button>
+                          </div>
+                        )}
+
+                        {nState === 'loading' && (
+                          <div className="flex items-center gap-1.5 mt-3 text-sm text-muted-foreground">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />Processing…
+                          </div>
+                        )}
+
+                        {(nState === 'accepted' || nState === 'declined') && (
+                          <p className={`text-sm font-medium mt-3 ${nState === 'accepted' ? 'text-green-600' : 'text-muted-foreground'}`}>
+                            {nState === 'accepted' ? '✓ Accepted' : '✗ Declined'}
+                          </p>
+                        )}
                       </div>
                     </div>
                   );

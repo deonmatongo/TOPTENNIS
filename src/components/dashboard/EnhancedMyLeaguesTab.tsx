@@ -512,7 +512,7 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
                     {!isMe && (
                       <Button size="sm" variant="outline" className="h-7 text-xs hover:bg-primary hover:text-white hover:border-primary transition-colors"
                         onClick={() => handleScheduleMatch(p.user_id, p.name)}>
-                        <Swords className="w-3 h-3 mr-1" />Challenge
+                        <Swords className="w-3 h-3 mr-1" />Match Request
                       </Button>
                     )}
                   </div>
@@ -604,7 +604,7 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
                           </div>
                           {!isMe && (
                             <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-primary/10 hover:text-primary shrink-0"
-                              onClick={() => handleScheduleMatch(p.user_id, p.name)} title={`Challenge ${p.name}`}>
+                              onClick={() => handleScheduleMatch(p.user_id, p.name)} title={`Send match request to ${p.name}`}>
                               <Swords className="w-3.5 h-3.5" />
                             </Button>
                           )}
@@ -678,7 +678,7 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
                 {!isMe && (
                   <Button size="sm" variant="outline" className="h-7 text-xs shrink-0 hover:bg-primary hover:text-white hover:border-primary transition-colors"
                     onClick={() => handleScheduleMatch(p.user_id, p.name)}>
-                    <Swords className="w-3 h-3 mr-1" />Challenge
+                    <Swords className="w-3 h-3 mr-1" />Match Request
                   </Button>
                 )}
               </div>

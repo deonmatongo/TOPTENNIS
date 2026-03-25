@@ -260,7 +260,7 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
         <SheetHeader style={{ padding: '20px 20px 14px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           <Stepper />
           <SheetTitle style={{ fontSize: 16, fontWeight: 700, marginTop: 0 }}>
-            {step === 0 && 'Select players to challenge'}
+            {step === 0 && 'Select players for match request'}
             {step === 1 && 'Choose a time slot'}
             {step === 2 && 'Confirm match request'}
           </SheetTitle>
