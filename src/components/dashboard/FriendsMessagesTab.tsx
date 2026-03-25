@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import {
   Users, CalendarDays, User, Camera, Pencil, Star, Ban, Globe, Lock,
   Search, AlertTriangle, MessageCircle, Pin, Check, LogOut, Trash2,
-  UserMinus, Settings, CheckCheck, X, Trophy, Hand, ShieldOff
+  UserMinus, Settings, CheckCheck, X, Trophy, Hand, ShieldOff, UserPlus
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import Picker from '@emoji-mart/react';
@@ -624,11 +624,12 @@ interface GroupInfoSheetProps {
   onSetMemberRole: (uid: string, role: 'admin' | 'member') => Promise<void>;
   onViewProfile: (profile: NonNullable<Conversation['members'][0]['profile']>, uid: string) => void;
   onSendMatchRequest: () => void;
+  onAddPlayers: () => void;
 }
 const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
   open, onClose, conv, currentUserId, isAdmin, friends,
   onRemoveMember, onAddMember, onRenameGroup, onSetAvatar, onSetMemberRole, onViewProfile,
-  onSendMatchRequest,
+  onSendMatchRequest, onAddPlayers,
 }) => {
   const [renaming, setRenaming]       = useState(false);
   const [newName, setNewName]         = useState(conv.name || '');
@@ -735,19 +736,23 @@ const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
             </div>
           )}
 
-          {/* ── Send Match Request ── */}
-          <button
-            onClick={() => { onClose(); onSendMatchRequest(); }}
-            style={{
-              width: '100%', padding: '11px 0', borderRadius: 10,
-              background: C.accent, color: '#fff',
-              border: 'none', fontSize: 14, fontWeight: 700,
-              cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
-              marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            }}
-          >
-            <Trophy className="w-3.5 h-3.5" /> Send Match Request
-          </button>
+          {/* ── Quick actions ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+            <button
+              onClick={() => { onClose(); onSendMatchRequest(); }}
+              style={{ width: '100%', padding: '11px 0', borderRadius: 10, background: C.accent, color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+            >
+              <Trophy className="w-3.5 h-3.5" /> Send Match Request
+            </button>
+            {isAdmin && (
+              <button
+                onClick={() => { onClose(); onAddPlayers(); }}
+                style={{ width: '100%', padding: '11px 0', borderRadius: 10, background: C.bg, color: C.text, border: `1.5px solid ${C.border}`, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+              >
+                <UserPlus className="w-3.5 h-3.5" /> Add Players
+              </button>
+            )}
+          </div>
 
           {/* ── Members ── */}
           <p style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Members ({conv.members.length})</p>
@@ -851,6 +856,97 @@ const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
             </div>
           </div>
         )}
+      </SheetContent>
+    </Sheet>
+  );
+};
+
+// ── AddPlayersSheet ───────────────────────────────────────────────────────────
+interface AddPlayersSheetProps {
+  open: boolean;
+  onClose: () => void;
+  conv: Conversation;
+  friends: { userId: string; name: string; avatar?: string }[];
+  onAddMember: (uid: string) => Promise<void>;
+}
+const AddPlayersSheet: React.FC<AddPlayersSheetProps> = ({ open, onClose, conv, friends, onAddMember }) => {
+  const [busy, setBusy]     = useState<string | null>(null);
+  const [added, setAdded]   = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState('');
+
+  useEffect(() => { if (open) { setAdded(new Set()); setSearch(''); } }, [open]);
+
+  const existingIds    = new Set(conv.members.map(m => m.user_id));
+  const addableFriends = friends
+    .filter(f => !existingIds.has(f.userId) && !added.has(f.userId))
+    .filter(f => !search || f.name.toLowerCase().includes(search.toLowerCase()));
+
+  const handleAdd = async (f: { userId: string; name: string }) => {
+    setBusy(f.userId);
+    try {
+      await onAddMember(f.userId);
+      setAdded(prev => new Set(prev).add(f.userId));
+      toast.success(`${f.name} added to the group`);
+    } catch {
+      toast.error('Failed to add player');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const allExisting = friends.every(f => existingIds.has(f.userId) || added.has(f.userId));
+
+  return (
+    <Sheet open={open} onOpenChange={v => !v && onClose()}>
+      <SheetContent side="right" style={{ width: 380, padding: 0, display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif" }}>
+        <SheetHeader style={{ padding: '20px 20px 14px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+          <SheetTitle style={{ fontSize: 16, fontWeight: 700 }}>Add Players</SheetTitle>
+          <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>
+            Add friends to <strong>{conv.name || 'this group'}</strong>
+          </p>
+        </SheetHeader>
+
+        <div style={{ padding: '14px 20px 10px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search friends…"
+            style={{ width: '100%', border: `1.5px solid ${C.border}`, borderRadius: 9, padding: '9px 13px', fontSize: 13, outline: 'none', fontFamily: "'DM Sans', sans-serif", background: C.bg, boxSizing: 'border-box' }}
+          />
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px' }}>
+          {allExisting ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: C.muted }}>
+              <div style={{ fontSize: 32, marginBottom: 10 }}>👥</div>
+              <div style={{ fontWeight: 600, fontSize: 14, color: C.text, marginBottom: 6 }}>All friends are already members</div>
+              <div style={{ fontSize: 13 }}>Invite more friends to the platform to grow your group.</div>
+            </div>
+          ) : addableFriends.length === 0 && search ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: C.muted, fontSize: 13 }}>No friends match "{search}"</div>
+          ) : (
+            addableFriends.map(f => (
+              <div key={f.userId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
+                <Av name={f.name} src={f.avatar} size={38} />
+                <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: C.text }}>{f.name}</span>
+                <button
+                  disabled={busy === f.userId}
+                  onClick={() => handleAdd(f)}
+                  style={{ padding: '6px 16px', borderRadius: 8, background: C.accent, color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", opacity: busy === f.userId ? 0.6 : 1 }}
+                >
+                  {busy === f.userId ? '…' : '+ Add'}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={{ padding: '14px 20px', borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
+          <button
+            onClick={onClose}
+            style={{ width: '100%', padding: '11px 0', borderRadius: 10, border: `1.5px solid ${C.border}`, background: 'transparent', fontSize: 14, fontWeight: 600, color: C.muted, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
+          >Done</button>
+        </div>
       </SheetContent>
     </Sheet>
   );
@@ -1259,8 +1355,9 @@ interface ConvRowProps {
   onMarkRead: () => void;
   onLeave?: () => void;
   onDelete?: () => void;
+  onAddPlayers?: () => void;
 }
-const ConvRow: React.FC<ConvRowProps> = ({ conv, selected, userId, isOnlineFn, onClick, onPin, onMarkRead, onLeave, onDelete }) => {
+const ConvRow: React.FC<ConvRowProps> = ({ conv, selected, userId, isOnlineFn, onClick, onPin, onMarkRead, onLeave, onDelete, onAddPlayers }) => {
   const [hov, setHov]       = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const name    = getConvName(conv, userId);
@@ -1272,6 +1369,7 @@ const ConvRow: React.FC<ConvRowProps> = ({ conv, selected, userId, isOnlineFn, o
   const menuItems: { key: string; label: React.ReactNode; action: () => void; danger?: boolean }[] = [
     { key: 'pin', label: conv.isPinned ? <><Pin className="w-3.5 h-3.5 inline-block mr-1" />Unpin</> : <><Pin className="w-3.5 h-3.5 inline-block mr-1" />Pin</>, action: () => onPin(!conv.isPinned) },
     { key: 'read', label: <><Check className="w-3.5 h-3.5 inline-block mr-1" />Mark as read</>, action: onMarkRead },
+    ...(conv.is_group && onAddPlayers ? [{ key: 'addPlayers', label: <><UserPlus className="w-3.5 h-3.5 inline-block mr-1" />Add players</>, action: onAddPlayers }] : []),
     ...(conv.is_group && onLeave  ? [{ key: 'leave',  label: <><LogOut className="w-3.5 h-3.5 inline-block mr-1" />Leave group</>,  action: onLeave,  danger: false }] : []),
     ...(conv.is_group && onDelete ? [{ key: 'delete', label: <><Trash2 className="w-3.5 h-3.5 inline-block mr-1" />Delete group</>, action: onDelete, danger: true  }] : []),
   ];
@@ -1394,6 +1492,8 @@ const FriendsMessagesTab = () => {
   const [showGroupCreate, setShowGroupCreate]   = useState(false);
   const [showGroupInfo, setShowGroupInfo]       = useState(false);
   const [showGroupMatchRequest, setShowGroupMatchRequest] = useState(false);
+  const [showAddPlayers, setShowAddPlayers]     = useState(false);
+  const [addPlayersConvId, setAddPlayersConvId] = useState<string | null>(null);
   const [matchRequestQueue, setMatchRequestQueue] = useState<SearchResult[]>([]);
   const [matchRequestTarget, setMatchRequestTarget] = useState<SearchResult | null>(null);
   const [groupContextMembers, setGroupContextMembers] = useState<{ user_id: string; name: string }[] | null>(null);
@@ -1725,6 +1825,7 @@ const FriendsMessagesTab = () => {
                             onMarkRead={() => markConversationRead(conv.id)}
                             onLeave={async () => { try { await leaveGroup(conv.id); if (selectedConvId === conv.id) setSelectedConvId(null); toast.success('Left group'); } catch { toast.error('Failed to leave'); } }}
                             onDelete={getMyRole(conv) === 'admin' ? async () => { try { await deleteGroup(conv.id); if (selectedConvId === conv.id) setSelectedConvId(null); toast.success('Group deleted'); } catch { toast.error('Failed to delete'); } } : undefined}
+                            onAddPlayers={getMyRole(conv) === 'admin' ? () => { setAddPlayersConvId(conv.id); setShowAddPlayers(true); } : undefined}
                           />
                         ))}
                         <button onClick={() => setShowGroupCreate(true)} style={{ display: 'block', width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13, color: C.muted, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}
@@ -2229,8 +2330,25 @@ const FriendsMessagesTab = () => {
           onSetMemberRole={(uid, role) => setMemberRole(selectedConv.id, uid, role)}
           onViewProfile={(profile, uid) => { setShowGroupInfo(false); setProfilePlayer(buildProfile(profile, uid)); }}
           onSendMatchRequest={() => setShowGroupMatchRequest(true)}
+          onAddPlayers={() => { setAddPlayersConvId(selectedConv?.id || null); setShowAddPlayers(true); }}
         />
       )}
+
+      {/* Add Players Sheet */}
+      {(() => {
+        const apConv = addPlayersConvId
+          ? conversations.find(c => c.id === addPlayersConvId)
+          : selectedConv;
+        return apConv?.is_group ? (
+          <AddPlayersSheet
+            open={showAddPlayers}
+            onClose={() => setShowAddPlayers(false)}
+            conv={apConv}
+            friends={friendsList}
+            onAddMember={uid => addMember(apConv.id, uid)}
+          />
+        ) : null;
+      })()}
 
       <PlayerProfileModal player={profilePlayer} isOpen={!!profilePlayer} onClose={() => setProfilePlayer(null)} />
 
