@@ -18,6 +18,17 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import PlayerProfileModal from '@/components/dashboard/PlayerProfileModal';
+import { Users } from 'lucide-react';
+
+function parseGroupInvite(msg?: string | null): { isGroup: boolean; members: { id: string; name: string }[] } {
+  if (!msg?.startsWith('__group_invite__:')) return { isGroup: false, members: [] };
+  try {
+    const data = JSON.parse(msg.slice('__group_invite__:'.length));
+    return { isGroup: true, members: data.members || [] };
+  } catch {
+    return { isGroup: false, members: [] };
+  }
+}
 
 interface PendingInvitesPageProps {
   onBack: () => void;
@@ -105,6 +116,8 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
     const inviter = getInviterInfo(invite);
     const inviteDate = invite.date ? parseISO(invite.date) : null;
     const isExpired = isInviteExpired(invite);
+    const groupInfo = parseGroupInvite(invite.message);
+    const otherGroupMembers = groupInfo.members.filter(m => m.id !== invite.receiver_id);
 
     return (
       <Card className={`border-2 ${
@@ -127,6 +140,12 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
               <div className="mb-3">
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="font-semibold text-lg leading-tight">{inviter.name}</h3>
+                  {groupInfo.isGroup && (
+                    <Badge className="text-xs bg-purple-600 hover:bg-purple-600 text-white gap-1">
+                      <Users className="h-3 w-3" />
+                      Group Invite
+                    </Badge>
+                  )}
                   {isExpired && (
                     <Badge variant="destructive" className="text-xs">
                       Expired
@@ -135,6 +154,22 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
                 </div>
                 <p className="text-sm text-muted-foreground">{inviter.email}</p>
               </div>
+
+              {/* Group members */}
+              {groupInfo.isGroup && otherGroupMembers.length > 0 && (
+                <div className="mb-3 p-3 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                  <p className="text-xs font-semibold text-purple-700 dark:text-purple-300 mb-2">
+                    Also invited ({otherGroupMembers.length}):
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {otherGroupMembers.map(m => (
+                      <span key={m.id} className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 px-2 py-0.5 rounded-full">
+                        {m.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Sent Timestamp */}
               {invite.created_at && (
@@ -172,8 +207,8 @@ export const PendingInvitesPage: React.FC<PendingInvitesPageProps> = ({ onBack }
                 </div>
               )}
 
-              {/* Message */}
-              {invite.message && (
+              {/* Message — skip if it's encoded group metadata */}
+              {invite.message && !groupInfo.isGroup && (
                 <div className="mb-4 p-3 bg-background/80 rounded-lg border">
                   <p className="text-sm italic text-muted-foreground">"{invite.message}"</p>
                 </div>

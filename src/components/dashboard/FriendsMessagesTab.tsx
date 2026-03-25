@@ -214,9 +214,20 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
     if (!selectedSlot) return;
     setSending(true);
     try {
+      // Embed group membership in the message field so receivers can see who else is invited.
+      // Format: __group_invite__:<JSON> — parsed by display components; never shown as plain text.
+      const groupMsg = selected.size > 1
+        ? `__group_invite__:${JSON.stringify({
+            members: Array.from(selected).map(uid => {
+              const m = otherMembers.find(x => x.user_id === uid);
+              return { id: uid, name: m ? memberName(m) : uid };
+            }),
+          })}`
+        : undefined;
+
       await Promise.all(
         Array.from(selected).map(uid =>
-          sendInvite({ receiver_id: uid, date: selectedSlot.date, start_time: selectedSlot.start_time, end_time: selectedSlot.end_time })
+          sendInvite({ receiver_id: uid, date: selectedSlot.date, start_time: selectedSlot.start_time, end_time: selectedSlot.end_time, ...(groupMsg ? { message: groupMsg } : {}) })
         )
       );
       onComplete(selected.size);

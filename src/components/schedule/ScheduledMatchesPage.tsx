@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, MapPin, User, Trash2, XCircle, Globe } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, Trash2, XCircle, Globe, Users } from 'lucide-react';
 import { useMatchInvitesContext } from '@/contexts/MatchInvitesContext';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { convertTimeBetweenTimezones, getTimezoneDisplayName } from '@/utils/timezoneConversion';
@@ -25,6 +25,16 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+
+function parseGroupInvite(msg?: string | null): { isGroup: boolean; members: { id: string; name: string }[] } {
+  if (!msg?.startsWith('__group_invite__:')) return { isGroup: false, members: [] };
+  try {
+    const data = JSON.parse(msg.slice('__group_invite__:'.length));
+    return { isGroup: true, members: data.members || [] };
+  } catch {
+    return { isGroup: false, members: [] };
+  }
+}
 
 interface ScheduledMatchesPageProps {
   onBack: () => void;
@@ -95,6 +105,7 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
   const MatchCard = ({ match, isPast = false }: { match: any; isPast?: boolean }) => {
     const opponent = getOpponentInfo(match);
     const matchDate = match.date ? parseISO(match.date) : null;
+    const groupInfo = parseGroupInvite(match.message);
 
     return (
       <Card 
@@ -116,9 +127,17 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
               <div className="flex items-start justify-between gap-2 mb-2">
                 <div>
                   <h3 className="font-semibold text-lg leading-tight">{opponent.name}</h3>
-                  <Badge variant={isPast ? 'secondary' : 'default'} className="mt-1">
-                    {isPast ? 'Completed' : 'Upcoming'}
-                  </Badge>
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                    <Badge variant={isPast ? 'secondary' : 'default'}>
+                      {isPast ? 'Completed' : 'Upcoming'}
+                    </Badge>
+                    {groupInfo.isGroup && (
+                      <Badge className="text-xs bg-purple-600 hover:bg-purple-600 text-white gap-1">
+                        <Users className="h-3 w-3" />
+                        Group Match
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 {isPast ? (
                   <Button
@@ -171,8 +190,19 @@ export const ScheduledMatchesPage: React.FC<ScheduledMatchesPageProps> = ({ onBa
                 </div>
               )}
 
-              {/* Message Preview */}
-              {match.message && (
+              {/* Group members */}
+              {groupInfo.isGroup && groupInfo.members.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {groupInfo.members.map(m => (
+                    <span key={m.id} className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 px-2 py-0.5 rounded-full">
+                      {m.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Message Preview — skip encoded group metadata */}
+              {match.message && !groupInfo.isGroup && (
                 <div className="mt-3 p-2 bg-muted/50 rounded text-xs text-muted-foreground italic truncate">
                   "{match.message}"
                 </div>

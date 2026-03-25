@@ -1,10 +1,20 @@
 import React, { useState } from 'react';
-import { Calendar, Clock, MapPin, Trash2, Plus } from 'lucide-react';
+import { Calendar, Clock, MapPin, Trash2, Plus, Users } from 'lucide-react';
 import { format, isSameDay, isBefore, startOfDay } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tables } from '@/integrations/supabase/types';
+
+function parseGroupInvite(msg?: string | null): { isGroup: boolean; members: { id: string; name: string }[] } {
+  if (!msg?.startsWith('__group_invite__:')) return { isGroup: false, members: [] };
+  try {
+    const data = JSON.parse(msg.slice('__group_invite__:'.length));
+    return { isGroup: true, members: data.members || [] };
+  } catch {
+    return { isGroup: false, members: [] };
+  }
+}
 import { useAvailabilityContext } from '@/contexts/AvailabilityContext';
 import { cn } from '@/lib/utils';
 import {
@@ -177,16 +187,25 @@ export const ScheduleSidebar: React.FC<ScheduleSidebarProps> = ({
               {confirmedMatches.map((match, index) => {
                 const opponent = match.sender_id === userId ? match.receiver : match.sender;
                 const opponentName = opponent ? `${opponent.first_name} ${opponent.last_name}` : 'Unknown';
-                
+                const groupInfo = parseGroupInvite((match as any).message);
+
                 return (
-                  <div 
-                    key={match.id} 
+                  <div
+                    key={match.id}
                     className="p-3 bg-muted/50 rounded-lg border hover:bg-muted/70 transition-colors animate-scale-in"
                     style={{ animationDelay: `${(index + 1) * 50}ms` }}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm font-medium">{opponentName}</p>
-                      <Badge variant="outline" className="text-xs">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <p className="text-sm font-medium truncate">{opponentName}</p>
+                        {groupInfo.isGroup && (
+                          <Badge className="text-[10px] px-1.5 py-0 h-4 bg-purple-600 hover:bg-purple-600 text-white gap-0.5 shrink-0">
+                            <Users className="h-2.5 w-2.5" />
+                            Group
+                          </Badge>
+                        )}
+                      </div>
+                      <Badge variant="outline" className="text-xs shrink-0">
                         {format(new Date(match.date), 'MMM d')}
                       </Badge>
                     </div>
@@ -202,6 +221,15 @@ export const ScheduleSidebar: React.FC<ScheduleSidebarProps> = ({
                         </span>
                       )}
                     </div>
+                    {groupInfo.isGroup && groupInfo.members.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {groupInfo.members.map(m => (
+                          <span key={m.id} className="text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 px-1.5 py-0.5 rounded-full">
+                            {m.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
