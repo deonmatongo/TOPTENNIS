@@ -28,6 +28,8 @@ import {
   Zap,
   Globe,
   Crown,
+  XCircle,
+  FlaskConical,
 } from 'lucide-react';
 import { useDivisionMatches } from '@/hooks/useDivisionMatches';
 import { useDivisionLeaderboard } from '@/hooks/useDivisionLeaderboard';
@@ -37,6 +39,13 @@ import { usePlayoffBracket } from '@/hooks/usePlayoffBracket';
 import { supabase } from '@/integrations/supabase/client';
 import MatchScoringModal from './MatchScoringModal';
 import { toast } from 'sonner';
+import {
+  calculateMatchPoints,
+  calculateSeasonTotals,
+  formatScoreString,
+  validateSetScore,
+  isDeadlinePassed,
+} from '@/utils/scoringUtils';
 
 interface EnhancedMyLeaguesTabProps {
   player: any;
@@ -102,6 +111,220 @@ const PlayerAvatar = ({
         {name.slice(0, 2).toUpperCase()}
       </AvatarFallback>
     </Avatar>
+  );
+};
+
+// ── Scoring Engine Demo ───────────────────────────────────────────────────────
+// Dummy data wired to scoringUtils.js — remove this section once real
+// API data is connected.
+
+const DUMMY_MATCHES = [
+  {
+    id: 1,
+    opponent: 'Al Toure',
+    sets: [{ you: 6, them: 4 }, { you: 6, them: 3 }],
+    matchType: 'standard' as const,
+    isForfeitLoss: false,
+    deadline: '2026-04-01',
+  },
+  {
+    id: 2,
+    opponent: 'Priya Nair',
+    sets: [{ you: 4, them: 6 }, { you: 6, them: 3 }, { you: 7, them: 6 }],
+    matchType: 'standard' as const,
+    isForfeitLoss: false,
+    deadline: '2026-04-08',
+  },
+  {
+    id: 3,
+    opponent: 'Marcus Webb',
+    sets: [{ you: 3, them: 6 }, { you: 2, them: 6 }],
+    matchType: 'standard' as const,
+    isForfeitLoss: false,
+    deadline: '2025-03-15',
+  },
+  {
+    id: 4,
+    opponent: 'Sara Kim',
+    sets: [],
+    matchType: 'forfeit' as const,
+    isForfeitLoss: false,
+    deadline: '2026-04-15',
+  },
+  {
+    id: 5,
+    opponent: 'James Osei',
+    sets: [{ you: 6, them: 2 }],
+    matchType: 'retired' as const,
+    isForfeitLoss: false,
+    deadline: '2026-04-20',
+  },
+  {
+    id: 6,
+    opponent: 'Yuki Tanaka',
+    sets: [{ you: 6, them: 4 }, { you: 6, them: 2 }],
+    matchType: 'not_reported' as const,
+    isForfeitLoss: false,
+    deadline: '2026-03-01',
+  },
+];
+
+const DUMMY_VALIDATION_CASES = [
+  { you: 6, them: 4,  setIndex: 0, isJunior: false, label: '6-4 (standard)' },
+  { you: 7, them: 6,  setIndex: 1, isJunior: false, label: '7-6 (tiebreak)' },
+  { you: 6, them: 6,  setIndex: 0, isJunior: false, label: '6-6 (invalid)' },
+  { you: 6, them: 5,  setIndex: 0, isJunior: false, label: '6-5 (invalid)' },
+  { you: 10, them: 4, setIndex: 2, isJunior: true,  label: '10-4 junior 3rd' },
+  { you: 7, them: 6,  setIndex: 2, isJunior: true,  label: '7-6 junior 3rd (invalid)' },
+];
+
+const matchTypeLabel: Record<string, string> = {
+  standard:     'Standard',
+  forfeit:      'Forfeit Win',
+  retired:      'Retired',
+  not_reported: 'Not Reported',
+};
+
+const matchTypeBadgeClass: Record<string, string> = {
+  standard:     'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+  forfeit:      'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
+  retired:      'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
+  not_reported: 'bg-muted text-muted-foreground',
+};
+
+const ScoringEngineDemo: React.FC = () => {
+  const [open, setOpen] = React.useState(true);
+
+  const season = calculateSeasonTotals(DUMMY_MATCHES);
+
+  return (
+    <Card className="border-2 border-dashed border-primary/30">
+      <CardHeader className="pb-3 cursor-pointer select-none" onClick={() => setOpen(o => !o)}>
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <div className="p-1.5 bg-primary/10 rounded-lg">
+              <FlaskConical className="w-4 h-4 text-primary" />
+            </div>
+            Scoring Engine Demo
+            <Badge variant="outline" className="text-xs font-normal ml-1">dummy data</Badge>
+          </CardTitle>
+          <Button variant="ghost" size="sm" className="h-7 text-xs shrink-0">
+            {open ? 'Hide' : 'Show'}
+          </Button>
+        </div>
+        <CardDescription className="text-xs">
+          scoringUtils.js running against 6 sample matches — swap for your API data
+        </CardDescription>
+      </CardHeader>
+
+      {open && (
+        <CardContent className="space-y-6">
+
+          {/* ── Season totals ─────────────────────────────────────────── */}
+          <div>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              calculateSeasonTotals()
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: 'Points',   value: season.totalPoints,           sub: '≥ 9 to qualify' },
+                { label: 'Record',   value: `${season.wins}W – ${season.losses}L`, sub: `Sets ${season.setsWon}–${season.setsLost}` },
+                { label: 'Game Win%', value: `${season.gameWinPct}%`,      sub: 'games won / played' },
+                { label: 'Playoffs', value: season.qualifiesForPlayoffs ? 'Eligible ✓' : 'Not yet', sub: season.qualifiesForPlayoffs ? 'qualifies' : 'need more pts' },
+              ].map(s => (
+                <div key={s.label} className={`p-3 rounded-lg border text-center ${s.label === 'Playoffs' ? (season.qualifiesForPlayoffs ? 'bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800' : 'bg-muted/30') : 'bg-muted/30'}`}>
+                  <div className={`text-lg font-bold ${s.label === 'Playoffs' && season.qualifiesForPlayoffs ? 'text-green-600' : ''}`}>{s.value}</div>
+                  <div className="text-xs font-medium mt-0.5">{s.label}</div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">{s.sub}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Per-match breakdown ───────────────────────────────────── */}
+          <div>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              calculateMatchPoints() + formatScoreString() + isDeadlinePassed()
+            </h3>
+            <div className="space-y-2">
+              {DUMMY_MATCHES.map(m => {
+                const result  = calculateMatchPoints(m.sets, m.matchType);
+                const score   = formatScoreString(m.sets);
+                const expired = isDeadlinePassed(m.deadline);
+                const won     = result.winner === 'you';
+                const lost    = result.winner === 'opponent';
+
+                return (
+                  <div key={m.id} className={`flex items-center gap-3 p-3 rounded-lg border ${won ? 'border-green-200 bg-green-50 dark:bg-green-950/40' : lost ? 'border-red-200 bg-red-50 dark:bg-red-950/40' : 'border-muted bg-muted/20'}`}>
+                    {/* Result badge */}
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-white ${won ? 'bg-green-500' : lost ? 'bg-red-500' : 'bg-muted-foreground'}`}>
+                      {won ? 'W' : lost ? 'L' : '—'}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-sm">vs {m.opponent}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${matchTypeBadgeClass[m.matchType]}`}>
+                          {matchTypeLabel[m.matchType]}
+                        </span>
+                        {score && (
+                          <span className="text-xs font-mono text-muted-foreground">{score}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                        <span>You: <strong className="text-foreground">{result.yourPoints} pt{result.yourPoints !== 1 ? 's' : ''}</strong></span>
+                        <span>Opponent: <strong className="text-foreground">{result.opponentPoints} pt{result.opponentPoints !== 1 ? 's' : ''}</strong></span>
+                        <span>Sets {result.setsWon}–{result.setsLost}</span>
+                        <span className={`flex items-center gap-0.5 ${expired ? 'text-red-500' : 'text-green-600'}`}>
+                          {expired ? <XCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
+                          Deadline {expired ? 'passed' : 'open'} ({m.deadline})
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Points pill */}
+                    <div className="shrink-0 text-right">
+                      <div className={`text-lg font-bold ${won ? 'text-green-600' : lost ? 'text-red-500' : 'text-muted-foreground'}`}>
+                        +{result.yourPoints}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">pts</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── Validation ────────────────────────────────────────────── */}
+          <div>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              validateSetScore()
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {DUMMY_VALIDATION_CASES.map((c, i) => {
+                const v = validateSetScore(c.you, c.them, c.setIndex, c.isJunior);
+                return (
+                  <div key={i} className={`flex items-start gap-2 p-2.5 rounded-lg border text-xs ${v.valid ? 'bg-green-50 border-green-200 dark:bg-green-950/40' : 'bg-red-50 border-red-200 dark:bg-red-950/40'}`}>
+                    {v.valid
+                      ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0 mt-0.5" />
+                      : <XCircle     className="w-3.5 h-3.5 text-red-500   shrink-0 mt-0.5" />}
+                    <div>
+                      <span className="font-semibold">{c.label}</span>
+                      {!v.valid && <p className="text-red-600 dark:text-red-400 mt-0.5">{v.error}</p>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <p className="text-[11px] text-muted-foreground text-center pt-1 border-t">
+            Remove <code className="bg-muted px-1 rounded">&lt;ScoringEngineDemo /&gt;</code> from <code className="bg-muted px-1 rounded">renderOverview()</code> once real data is wired up.
+          </p>
+
+        </CardContent>
+      )}
+    </Card>
   );
 };
 
@@ -329,6 +552,9 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
             </CardContent>
           </Card>
         )}
+
+        {/* ── Scoring Engine Demo ────────────────────────────────────────── */}
+        <ScoringEngineDemo />
       </div>
     );
   };
