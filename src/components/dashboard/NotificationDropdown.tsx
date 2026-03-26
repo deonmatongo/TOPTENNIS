@@ -156,6 +156,15 @@ const NotificationDropdown = ({ children }: NotificationDropdownProps) => {
     e.stopPropagation();
     const inviteId = notification.metadata?.match_id;
     if (!inviteId) return;
+
+    // If invite is no longer in-memory as pending, fall back to the schedule tab
+    const invite = invites.find(i => i.id === inviteId);
+    if (!invite || invite.status !== 'pending') {
+      navigate('/dashboard?tab=schedule');
+      setIsOpen(false);
+      return;
+    }
+
     setActionState(prev => ({ ...prev, [notification.id]: 'loading' }));
     try {
       await respondToInvite(inviteId, response);
@@ -304,11 +313,12 @@ const NotificationDropdown = ({ children }: NotificationDropdownProps) => {
                 const isFriendReq = notification.type === 'friend_request';
                 const actor = resolveActor(notification);
 
-                // Determine if inline actions should be shown
+                // Show match-invite buttons whenever the notification type is right and
+                // hasn't been acted on yet — don't gate on invite lookup so buttons are
+                // always visible even if the context hasn't synced yet.
                 const showMatchActions = isMatchInvite &&
-                  notification.metadata?.match_id &&
-                  !nState &&
-                  (() => { const inv = invites.find(i => i.id === notification.metadata?.match_id); return inv?.status === 'pending' && inv?.receiver_id !== undefined; })();
+                  !!notification.metadata?.match_id &&
+                  !nState;
 
                 const showFriendActions = isFriendReq &&
                   notification.metadata?.sender_id &&

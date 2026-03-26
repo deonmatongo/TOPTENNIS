@@ -116,6 +116,14 @@ const NotificationsTab = () => {
     e.stopPropagation();
     const inviteId = notification.metadata?.match_id;
     if (!inviteId) return;
+
+    // If invite isn't in-memory as pending, navigate to schedule as fallback
+    const invite = invites.find(i => i.id === inviteId);
+    if (!invite || invite.status !== 'pending') {
+      navigate('/dashboard?tab=schedule');
+      return;
+    }
+
     setActionState(prev => ({ ...prev, [notification.id]: 'loading' }));
     try {
       await respondToInvite(inviteId, response);
@@ -463,10 +471,11 @@ const NotificationsTab = () => {
                   const isMatchInvite = ['match_invite', 'match_rescheduled'].includes(notification.type);
                   const isFriendReq = notification.type === 'friend_request';
 
+                  // Show buttons whenever the type is right and no action taken yet —
+                  // don't gate on context lookup so they're always visible.
                   const showMatchActions = isMatchInvite &&
-                    notification.metadata?.match_id &&
-                    !nState &&
-                    (() => { const inv = invites.find(i => i.id === notification.metadata?.match_id); return inv?.status === 'pending'; })();
+                    !!notification.metadata?.match_id &&
+                    !nState;
 
                   const showFriendActions = isFriendReq &&
                     notification.metadata?.sender_id &&
