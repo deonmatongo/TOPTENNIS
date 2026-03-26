@@ -187,20 +187,37 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
         .order('date', { ascending: true })
         .order('start_time', { ascending: true });
       if (error) throw error;
-      const slotMap = new Map<string, SlotEntry>();
-      (data || []).forEach(row => {
-        const key = `${row.date}|${row.start_time}|${row.end_time}`;
-        const ex = slotMap.get(key);
-        if (ex) ex.playerIds.push(row.user_id);
-        else slotMap.set(key, { date: row.date, start_time: row.start_time, end_time: row.end_time, playerIds: [row.user_id] });
+
+      // Enumerate 1-hour windows from each availability block so that
+      // overlapping-but-not-identical blocks (e.g. 09:00-10:00 vs 09:00-11:00)
+      // all contribute to the same candidate slots.
+      const windowMap = new Map<string, Set<string>>(); // key → Set<userId>
+      for (const row of (data || [])) {
+        const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+        const pad2  = (n: number) => String(n).padStart(2, '0');
+        let cur     = toMin(row.start_time);
+        const end   = toMin(row.end_time);
+        while (cur + 60 <= end) {
+          const sh = Math.floor(cur / 60), sm = cur % 60;
+          const eh = Math.floor((cur + 60) / 60), em = (cur + 60) % 60;
+          const key = `${row.date}|${pad2(sh)}:${pad2(sm)}:00|${pad2(eh)}:${pad2(em)}:00`;
+          if (!windowMap.has(key)) windowMap.set(key, new Set());
+          windowMap.get(key)!.add(row.user_id);
+          cur += 60;
+        }
+      }
+
+      // Convert to SlotEntry array, sort by coverage then date/time, cap at 7
+      const slots: SlotEntry[] = Array.from(windowMap.entries()).map(([key, userSet]) => {
+        const [date, start_time, end_time] = key.split('|');
+        return { date, start_time, end_time, playerIds: Array.from(userSet) };
       });
-      setRankedSlots(
-        Array.from(slotMap.values()).sort((a, b) =>
-          b.playerIds.length - a.playerIds.length ||
-          a.date.localeCompare(b.date) ||
-          a.start_time.localeCompare(b.start_time)
-        )
+      slots.sort((a, b) =>
+        b.playerIds.length - a.playerIds.length ||
+        a.date.localeCompare(b.date) ||
+        a.start_time.localeCompare(b.start_time)
       );
+      setRankedSlots(slots.slice(0, 7));
     } catch (err) {
       console.error(err);
       toast.error('Failed to load availability');
@@ -383,56 +400,76 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
                 </div>
               ) : (
                 <>
-                  <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.8 }}>
-                    {rankedSlots.length} slot{rankedSlots.length !== 1 ? 's' : ''} found — ranked by player overlap
+                  {/* Legend */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: 3, background: '#22C55E' }} />
+                      <span style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>All available</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: 3, background: '#F97316' }} />
+                      <span style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>Partial</span>
+                    </div>
                   </div>
+
+                  {/* Slot list — up to 7 */}
                   {rankedSlots.map((slot, idx) => {
-                    const ratio      = slot.playerIds.length / selected.size;
-                    const isChosen   = !customMode && selectedSlot?.date === slot.date && selectedSlot?.start_time === slot.start_time && selectedSlot?.end_time === slot.end_time;
-                    const isBest     = idx === 0;
+                    const allAvail = slot.playerIds.length === selected.size;
+                    const ratio    = slot.playerIds.length / selected.size;
+                    const isChosen = !customMode && selectedSlot?.date === slot.date && selectedSlot?.start_time === slot.start_time && selectedSlot?.end_time === slot.end_time;
+                    const accentColor = allAvail ? '#22C55E' : '#F97316';
+                    const borderColor = isChosen ? accentColor : (allAvail ? 'rgba(34,197,94,0.4)' : C.border);
+                    const bg          = isChosen ? (allAvail ? 'rgba(34,197,94,0.08)' : C.accentLight) : (allAvail ? 'rgba(34,197,94,0.04)' : C.white);
+
                     return (
                       <div key={`${slot.date}|${slot.start_time}`} onClick={() => { setCustomMode(false); setSelectedSlot(slot); }}
-                        style={{ padding: '13px 14px', borderRadius: 12, border: `2px solid ${isChosen ? C.accent : C.border}`, background: isChosen ? C.accentLight : C.white, marginBottom: 10, cursor: 'pointer', transition: 'all 0.15s' }}>
+                        style={{ padding: '13px 14px', borderRadius: 12, border: `2px solid ${borderColor}`, background: bg, marginBottom: 10, cursor: 'pointer', transition: 'all 0.15s' }}>
 
-                        {/* Top row: date/time + badge */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                           <div>
                             <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{fmtDate(slot.date)}</div>
                             <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{fmtTime(slot.start_time, slot.end_time)}</div>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            {isBest && (
-                              <span style={{ fontSize: 10, fontWeight: 700, background: '#22C55E', color: '#fff', padding: '3px 9px', borderRadius: 999 }}>Best availability</span>
+                            {allAvail && (
+                              <span style={{ fontSize: 10, fontWeight: 700, background: '#22C55E', color: '#fff', padding: '3px 9px', borderRadius: 999 }}>
+                                {idx === 0 ? 'Best availability' : 'All free'}
+                              </span>
                             )}
                             {isChosen && (
-                              <div style={{ width: 22, height: 22, borderRadius: '50%', background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <div style={{ width: 22, height: 22, borderRadius: '50%', background: accentColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>✓</span>
                               </div>
                             )}
                           </div>
                         </div>
 
-                        {/* Availability bar */}
+                        {/* Coverage bar */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <div style={{ flex: 1, height: 6, borderRadius: 3, background: C.border, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${ratio * 100}%`, background: isBest ? '#22C55E' : C.accent, borderRadius: 3, transition: 'width 0.3s' }} />
+                            <div style={{ height: '100%', width: `${ratio * 100}%`, background: accentColor, borderRadius: 3, transition: 'width 0.3s' }} />
                           </div>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: isBest ? '#22C55E' : C.accent, whiteSpace: 'nowrap' }}>
-                            {slot.playerIds.length}/{selected.size} players
+                          <span style={{ fontSize: 11, fontWeight: 700, color: accentColor, whiteSpace: 'nowrap' }}>
+                            {slot.playerIds.length}/{selected.size} available
                           </span>
                         </div>
                       </div>
                     );
                   })}
 
-                  {/* ── Custom time option ── */}
-                  <div style={{ marginTop: 8, borderTop: `1px dashed ${C.border}`, paddingTop: 14 }}>
-                    <button onClick={() => { setCustomMode(m => !m); setSelectedSlot(null); }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", marginBottom: customMode ? 12 : 0 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: C.accent }}>{customMode ? '▲ Hide custom time' : '▼ Pick a different date & time'}</span>
+                  {/* ── Custom time — always shown below the list ── */}
+                  <div style={{ marginTop: 12, border: `1.5px dashed ${customMode ? C.accent : C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+                    <button
+                      onClick={() => { setCustomMode(m => !m); if (!customMode) setSelectedSlot(null); }}
+                      style={{ width: '100%', padding: '11px 14px', background: customMode ? C.accentLight : 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: "'DM Sans', sans-serif" }}
+                    >
+                      <span style={{ fontSize: 13, fontWeight: 700, color: customMode ? C.accent : C.text }}>
+                        {customMode ? '✕  Cancel custom time' : '＋  Choose a custom date & time'}
+                      </span>
+                      {customMode && <span style={{ fontSize: 11, color: C.accent, fontWeight: 600 }}>Selected</span>}
                     </button>
                     {customMode && (
-                      <div style={{ background: C.accentLight, border: `1.5px solid ${C.accent}`, borderRadius: 14, padding: '14px 14px 16px' }}>
+                      <div style={{ padding: '0 14px 16px', background: C.accentLight }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                           <div>
                             <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 4 }}>DATE</div>
