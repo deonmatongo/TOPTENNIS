@@ -161,11 +161,29 @@ export const useGlobalPresence = () => {
           console.error('Presence sync error:', error);
         }
       })
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        console.debug('User joined presence:', key, newPresences);
+      .on('presence', { event: 'join' }, ({ key }: { key: string }) => {
+        setOnlineUserIds(prev => new Set(prev).add(key));
+        setStableOnlineUserIds(prev => new Set(prev).add(key));
+        lastUpdateTime.current.set(key, Date.now());
       })
-      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-        console.debug('User left presence:', key, leftPresences);
+      .on('presence', { event: 'leave' }, ({ key }: { key: string }) => {
+        setOnlineUserIds(prev => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+        const existingTimeout = pendingUpdates.current.get(key);
+        if (existingTimeout) clearTimeout(existingTimeout);
+        const timeout = setTimeout(() => {
+          setStableOnlineUserIds(prev => {
+            const next = new Set(prev);
+            next.delete(key);
+            return next;
+          });
+          lastUpdateTime.current.delete(key);
+          pendingUpdates.current.delete(key);
+        }, DEBOUNCE_TIME * 2);
+        pendingUpdates.current.set(key, timeout);
       })
       .subscribe(async status => {
         if (status === 'SUBSCRIBED') {
