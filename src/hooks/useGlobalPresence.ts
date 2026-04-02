@@ -20,16 +20,20 @@ import { useAuth } from '@/contexts/AuthContext';
  *
  * A user is considered online if their last_seen_at is within 5 minutes.
  */
+const SUPABASE_URL  = 'https://qrhladnnblgbobcnxjsz.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFyaGxhZG5uYmxnYm9iY254anN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE0NDcxNzEsImV4cCI6MjA2NzAyMzE3MX0.XtnqHLXk6WguDHQLetYYEkhS1hNj52NPnuxOHHdhVKY';
+
 export const useGlobalPresence = () => {
   const { user } = useAuth();
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
   const [stableOnlineUserIds, setStableOnlineUserIds] = useState<Set<string>>(new Set());
 
-  const heartbeatRef  = useRef<NodeJS.Timeout | null>(null);
-  const channelRef    = useRef<any>(null);
+  const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
+  const channelRef   = useRef<any>(null);
+  const tokenRef     = useRef<string | null>(null);
 
-  const HEARTBEAT_INTERVAL = 2 * 60 * 1000; // 2 minutes — update own last_seen_at
-  const ONLINE_THRESHOLD   = 5 * 60 * 1000; // 5 minutes — cutoff for "online"
+  const HEARTBEAT_INTERVAL = 20 * 1000;  // 20 seconds — keep own row fresh + prune stale
+  const ONLINE_THRESHOLD   = 60 * 1000;  // 60 seconds — cutoff for "online"
 
   // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -60,6 +64,18 @@ export const useGlobalPresence = () => {
     }
   }, []);
 
+  // ── cache access token for use in beforeunload ────────────────────────────
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      tokenRef.current = data.session?.access_token ?? null;
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      tokenRef.current = session?.access_token ?? null;
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   // ── main effect ────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -72,54 +88,45 @@ export const useGlobalPresence = () => {
     // Mark self online immediately, then fetch everyone
     updateOwnPresence(user.id).then(() => fetchOnlineUsers());
 
-    // Heartbeat: keep own row fresh and prune stale users
+    // Heartbeat: keep own row fresh and re-fetch to prune stale users
     heartbeatRef.current = setInterval(() => {
       updateOwnPresence(user.id);
       fetchOnlineUsers();
     }, HEARTBEAT_INTERVAL);
 
-    // Subscribe to postgres_changes on user_presence
+    // Subscribe to postgres_changes — on any change just re-fetch the full list.
+    // This avoids fragile payload parsing and works regardless of REPLICA IDENTITY setting.
     const channel = supabase
-      .channel('user-presence-changes')
+      .channel(`user-presence-changes-${user.id}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'user_presence' },
-        (payload: any) => {
-          if (payload.eventType === 'DELETE') {
-            const userId = payload.old?.user_id;
-            if (userId) {
-              setOnlineUserIds(prev => { const n = new Set(prev); n.delete(userId); return n; });
-              setStableOnlineUserIds(prev => { const n = new Set(prev); n.delete(userId); return n; });
-            }
-          } else {
-            // INSERT or UPDATE
-            const userId   = payload.new?.user_id;
-            const lastSeen = payload.new?.last_seen_at;
-            if (!userId || !lastSeen) return;
-
-            const isOnlineNow = Date.now() - new Date(lastSeen).getTime() < ONLINE_THRESHOLD;
-            if (isOnlineNow) {
-              setOnlineUserIds(prev => new Set(prev).add(userId));
-              setStableOnlineUserIds(prev => new Set(prev).add(userId));
-            } else {
-              setOnlineUserIds(prev => { const n = new Set(prev); n.delete(userId); return n; });
-              setStableOnlineUserIds(prev => { const n = new Set(prev); n.delete(userId); return n; });
-            }
-          }
-        }
+        () => { fetchOnlineUsers(); }
       )
       .subscribe((status: string) => {
-        if (status === 'SUBSCRIBED') {
-          // Re-fetch once subscribed to catch any updates we missed before subscribing
-          fetchOnlineUsers();
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        if (status === 'SUBSCRIBED') fetchOnlineUsers();
+        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT')
           console.warn('[presence] channel status:', status);
-        }
       });
 
     channelRef.current = channel;
 
+    // On tab close: delete own row immediately so others see us offline right away
+    const handleUnload = () => {
+      if (!tokenRef.current) return;
+      fetch(`${SUPABASE_URL}/rest/v1/user_presence?user_id=eq.${user.id}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': SUPABASE_ANON,
+          'Authorization': `Bearer ${tokenRef.current}`,
+        },
+        keepalive: true,
+      });
+    };
+    window.addEventListener('beforeunload', handleUnload);
+
     return () => {
+      window.removeEventListener('beforeunload', handleUnload);
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
       if (channelRef.current) supabase.removeChannel(channelRef.current);
       channelRef.current = null;
