@@ -105,6 +105,143 @@ const PlayerAvatar = ({
   );
 };
 
+// ── Dummy data (shown when user has no real league registrations) ────────────
+
+const _d = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
+const _p = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
+
+const DUMMY_REGISTRATIONS = [
+  {
+    id: '__demo_1',
+    league_id: '__demo_league_1',
+    league_name: 'Spring Open Singles 2026',
+    status: 'active',
+    created_at: _p(28),
+    registration_date: _p(28),
+    is_demo: true,
+  },
+  {
+    id: '__demo_2',
+    league_id: '__demo_league_2',
+    league_name: 'City Doubles Championship',
+    status: 'active',
+    created_at: _p(14),
+    registration_date: _p(14),
+    is_demo: true,
+  },
+  {
+    id: '__demo_3',
+    league_id: '__demo_league_3',
+    league_name: 'Intermediate League — Season 3',
+    status: 'completed',
+    created_at: _p(120),
+    registration_date: _p(120),
+    is_demo: true,
+  },
+];
+
+const DUMMY_MATCHES = [
+  // ── User's upcoming matches
+  {
+    id: '__dm_1',
+    match_date: _d(3),
+    player1_name: 'You',
+    player2_name: 'Alex Chen',
+    player1_id: '__me__',
+    player2_id: '__p2__',
+    winner_id: undefined,
+    status: 'scheduled',
+    court_location: 'Court 3 — North Club',
+    isUserMatch: true,
+    userIsPlayer1: true,
+    opponent_name: 'Alex Chen',
+    result: 'pending' as const,
+  },
+  {
+    id: '__dm_2',
+    match_date: _d(7),
+    player1_name: 'Jordan Lee',
+    player2_name: 'You',
+    player1_id: '__p3__',
+    player2_id: '__me__',
+    winner_id: undefined,
+    status: 'scheduled',
+    court_location: 'Court 1 — East Wing',
+    isUserMatch: true,
+    userIsPlayer1: false,
+    opponent_name: 'Jordan Lee',
+    result: 'pending' as const,
+  },
+  // ── Other division matches (upcoming)
+  {
+    id: '__dm_3',
+    match_date: _d(2),
+    player1_name: 'Marcus Webb',
+    player2_name: 'Sam Rivera',
+    player1_id: '__p4__',
+    player2_id: '__p5__',
+    winner_id: undefined,
+    status: 'scheduled',
+    court_location: 'Court 5 — South Club',
+    isUserMatch: false,
+    userIsPlayer1: false,
+    opponent_name: '',
+    result: 'pending' as const,
+  },
+  {
+    id: '__dm_4',
+    match_date: _d(5),
+    player1_name: 'Priya Nair',
+    player2_name: 'Taylor Brooks',
+    player1_id: '__p6__',
+    player2_id: '__p7__',
+    winner_id: undefined,
+    status: 'scheduled',
+    court_location: 'Court 2 — West Side',
+    isUserMatch: false,
+    userIsPlayer1: false,
+    opponent_name: '',
+    result: 'pending' as const,
+  },
+  // ── Completed matches
+  {
+    id: '__dm_5',
+    match_date: _p(3),
+    player1_name: 'You',
+    player2_name: 'Marcus Webb',
+    player1_id: '__me__',
+    player2_id: '__p4__',
+    winner_id: '__me__',
+    status: 'completed',
+    court_location: 'Court 3 — North Club',
+    set1_player1: 6, set1_player2: 3,
+    set2_player1: 6, set2_player2: 4,
+    set3_player1: null, set3_player2: null,
+    isUserMatch: true,
+    userIsPlayer1: true,
+    opponent_name: 'Marcus Webb',
+    result: 'win' as const,
+  },
+  {
+    id: '__dm_6',
+    match_date: _p(6),
+    player1_name: 'Alex Chen',
+    player2_name: 'Sam Rivera',
+    player1_id: '__p2__',
+    player2_id: '__p5__',
+    winner_id: '__p2__',
+    status: 'completed',
+    court_location: 'Court 1 — East Wing',
+    set1_player1: 7, set1_player2: 5,
+    set2_player1: 4, set2_player2: 6,
+    set3_player1: 6, set3_player2: 3,
+    isUserMatch: false,
+    userIsPlayer1: false,
+    opponent_name: '',
+    result: 'pending' as const,
+  },
+];
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
@@ -126,6 +263,12 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
   const completedRegistrations = registrations.filter(
     (l) => getLeagueStatus(l) === 'Completed',
   );
+
+  // When user has no real leagues yet, fall back to demo data for the overview
+  const displayRegs = registrations.length > 0 ? registrations : DUMMY_REGISTRATIONS;
+  const displayActive = displayRegs.filter((l) => getLeagueStatus(l) === 'In Progress');
+  const displayCompleted = displayRegs.filter((l) => getLeagueStatus(l) === 'Completed');
+  const isDisplayingDemo = registrations.length === 0;
 
   const { assignments } = useDivisionAssignments();
 
@@ -198,13 +341,13 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
         </div>
 
         {/* Aggregate stat strip */}
-        {totalMatches > 0 && (
+        {(totalMatches > 0 || isDisplayingDemo) && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: 'Record', value: `${totalWins}W–${totalLosses}L`, icon: <Swords className="w-4 h-4 text-primary" />, sub: `${wr(totalWins, totalMatches)}% win rate` },
-              { label: 'Active', value: activeRegistrations.length, icon: <Flame className="w-4 h-4 text-orange-500" />, sub: `${completedRegistrations.length} completed` },
-              { label: 'Streak', value: streak > 0 ? `${streak}W` : '—', icon: <Zap className="w-4 h-4 text-yellow-500" />, sub: 'win streak' },
-              { label: 'Rating', value: player?.usta_rating ?? player?.skill_level ?? '—', icon: <Star className="w-4 h-4 text-primary" />, sub: player?.usta_rating ? 'USTA' : 'skill level' },
+              { label: 'Record', value: isDisplayingDemo ? '4W–1L' : `${totalWins}W–${totalLosses}L`, icon: <Swords className="w-4 h-4 text-primary" />, sub: isDisplayingDemo ? '80% win rate' : `${wr(totalWins, totalMatches)}% win rate` },
+              { label: 'Active', value: displayActive.length, icon: <Flame className="w-4 h-4 text-orange-500" />, sub: `${displayCompleted.length} completed` },
+              { label: 'Streak', value: isDisplayingDemo ? '2W' : (streak > 0 ? `${streak}W` : '—'), icon: <Zap className="w-4 h-4 text-yellow-500" />, sub: 'win streak' },
+              { label: 'Rating', value: player?.usta_rating ?? player?.skill_level ?? (isDisplayingDemo ? '3.5' : '—'), icon: <Star className="w-4 h-4 text-primary" />, sub: player?.usta_rating ? 'USTA' : 'skill level' },
             ].map((s) => (
               <Card key={s.label} className="bg-muted/30">
                 <CardContent className="p-4">
@@ -218,15 +361,19 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
         )}
 
         {/* Active leagues */}
-        {activeRegistrations.length > 0 && (
+        {displayActive.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Active</h2>
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+              Active
+              {isDisplayingDemo && <Badge variant="outline" className="text-[10px] py-0 px-1.5 normal-case font-normal">demo</Badge>}
+            </h2>
             <div className="grid gap-3">
-              {activeRegistrations.map((league) => {
+              {displayActive.map((league) => {
                 const asgn = assignments.find((a) => a.league_registration_id === league.id);
-                const completed = asgn?.matches_completed ?? 0;
-                const required = asgn?.matches_required ?? 5;
-                const eligible = asgn?.playoff_eligible ?? false;
+                const completed = league.is_demo ? 3 : (asgn?.matches_completed ?? 0);
+                const required = league.is_demo ? 5 : (asgn?.matches_required ?? 5);
+                const eligible = league.is_demo ? false : (asgn?.playoff_eligible ?? false);
+                const divLabel = league.is_demo ? 'Division A · Level 3.5' : (asgn?.division ? `${asgn.division.division_name} · Level ${asgn.division.skill_level_range}` : null);
                 const pct = Math.min(100, Math.round((completed / required) * 100));
                 return (
                   <Card
@@ -245,10 +392,8 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
                               <Badge variant="secondary" className="text-xs shrink-0">In Progress</Badge>
                             )}
                           </div>
-                          {asgn?.division && (
-                            <p className="text-sm text-muted-foreground mb-3">
-                              {asgn.division.division_name} · Level {asgn.division.skill_level_range}
-                            </p>
+                          {divLabel && (
+                            <p className="text-sm text-muted-foreground mb-3">{divLabel}</p>
                           )}
                           <div className="space-y-1.5">
                             <div className="flex justify-between text-xs text-muted-foreground">
@@ -272,11 +417,11 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
         )}
 
         {/* Completed leagues */}
-        {completedRegistrations.length > 0 && (
+        {displayCompleted.length > 0 && (
           <div className="space-y-3">
             <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Completed</h2>
             <div className="grid gap-3">
-              {completedRegistrations.map((league) => (
+              {displayCompleted.map((league) => (
                 <Card key={league.id} className="cursor-pointer hover:shadow-md opacity-75 hover:opacity-100 group"
                   onClick={() => setViewState({ view: 'details', selectedLeague: league })}>
                   <CardContent className="p-5">
@@ -297,38 +442,21 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
           </div>
         )}
 
-        {/* Empty */}
-        {registrations.length === 0 && (
-          <Card className="border-dashed">
-            <CardContent className="text-center py-16">
-              <div className="p-4 bg-primary/5 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
-                <Trophy className="w-10 h-10 text-primary" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">No Leagues Yet</h3>
-              <p className="text-muted-foreground mb-6 max-w-xs mx-auto">Join a league to compete and track your progress.</p>
-              <Button size="lg" className="bg-primary hover:bg-primary/90" onClick={() => navigate('/dashboard?tab=register')}>
-                <Trophy className="w-4 h-4 mr-2" />Browse Leagues
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {registrations.length > 0 && (
-          <Card className="border border-primary/20 bg-primary/5">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary/10 rounded-lg shrink-0"><Trophy className="w-4 h-4 text-primary" /></div>
-                  <div>
-                    <p className="font-medium text-sm">Looking for more competition?</p>
-                    <p className="text-xs text-muted-foreground">Browse open leagues to join</p>
-                  </div>
+        {/* "Browse leagues" CTA — always shown */}
+        <Card className="border border-primary/20 bg-primary/5">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg shrink-0"><Trophy className="w-4 h-4 text-primary" /></div>
+                <div>
+                  <p className="font-medium text-sm">{isDisplayingDemo ? 'Ready to compete for real?' : 'Looking for more competition?'}</p>
+                  <p className="text-xs text-muted-foreground">{isDisplayingDemo ? 'Join a league to start playing' : 'Browse open leagues to join'}</p>
                 </div>
-                <Button size="sm" variant="outline" className="shrink-0" onClick={() => navigate('/dashboard?tab=register')}>Browse</Button>
               </div>
-            </CardContent>
-          </Card>
-        )}
+              <Button size="sm" variant="outline" className="shrink-0" onClick={() => navigate('/dashboard?tab=register')}>Browse</Button>
+            </div>
+          </CardContent>
+        </Card>
 
       </div>
     );
@@ -337,13 +465,19 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
   // ── Detail: Matches ─────────────────────────────────────────────────────────
 
   const renderMatches = () => {
-    if (matchesLoading) return <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-muted/40 animate-pulse" />)}</div>;
-    const userMatches = matches.filter((m) => m.isUserMatch);
-    const upcoming = userMatches.filter((m) => m.status === 'scheduled');
-    const recent = userMatches.filter((m) => m.status === 'completed');
-    const isTournament = divisionInfo?.tournament_status === 'active';
+    const isDemoLeague = !!(viewState.selectedLeague?.is_demo);
 
-    if (userMatches.length === 0) return (
+    if (matchesLoading && !isDemoLeague)
+      return <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-muted/40 animate-pulse" />)}</div>;
+
+    // Use dummy matches for demo leagues; real matches for real leagues
+    const allMatches: any[] = isDemoLeague ? DUMMY_MATCHES : matches;
+    const isTournament = !isDemoLeague && divisionInfo?.tournament_status === 'active';
+
+    const upcoming = allMatches.filter((m) => m.status === 'scheduled');
+    const recent   = allMatches.filter((m) => m.status === 'completed');
+
+    if (allMatches.length === 0) return (
       <Card><CardContent className="text-center py-10">
         <Clock className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
         <h3 className="font-medium mb-1">No matches yet</h3>
@@ -351,57 +485,97 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
       </CardContent></Card>
     );
 
-    const MatchCard = ({ match }: { match: (typeof userMatches)[0] }) => {
+    const MatchCard = ({ match }: { match: any }) => {
       const isScheduled = match.status === 'scheduled';
       const isCompleted = match.status === 'completed';
-      // Show "Enter Score" when: no winner yet AND (match completed OR date already passed)
-      const matchDatePassed =
-        match.match_date && new Date(match.match_date) < new Date();
-      const needsScore =
-        !match.winner_id && match.isUserMatch && (isCompleted || (isScheduled && matchDatePassed));
-      const borderColor = isTournament && isScheduled ? 'border-l-blue-500'
-        : match.result === 'win' ? 'border-l-green-500'
-        : match.result === 'loss' ? 'border-l-red-500'
+      const matchDatePassed = match.match_date && new Date(match.match_date) < new Date();
+      // "Enter Score" = user is a participant, match has no winner yet, and match has passed or is marked complete
+      const needsScore = !match.winner_id && match.isUserMatch && (isCompleted || (isScheduled && matchDatePassed));
+
+      // Border colour: user matches get result-based colour; other division matches are neutral
+      const borderColor = match.isUserMatch
+        ? (isTournament && isScheduled ? 'border-l-blue-500'
+          : match.result === 'win'  ? 'border-l-green-500'
+          : match.result === 'loss' ? 'border-l-red-500'
+          : 'border-l-primary/40')
         : 'border-l-muted-foreground/20';
-      const iconBg = match.result === 'win' ? 'bg-green-100 dark:bg-green-900 text-green-600'
-        : match.result === 'loss' ? 'bg-red-100 dark:bg-red-900 text-red-600'
-        : 'bg-blue-100 dark:bg-blue-900 text-blue-600';
-      const Icon = match.result === 'win' ? Trophy : match.result === 'loss' ? Target : Clock;
+
+      // Icon/bg for user matches; neutral icon for other division matches
+      const iconBg = match.isUserMatch
+        ? (match.result === 'win'  ? 'bg-green-100 dark:bg-green-900 text-green-600'
+          : match.result === 'loss' ? 'bg-red-100 dark:bg-red-900 text-red-600'
+          : 'bg-blue-100 dark:bg-blue-900 text-blue-600')
+        : 'bg-muted/50 text-muted-foreground';
+      const Icon = match.isUserMatch
+        ? (match.result === 'win' ? Trophy : match.result === 'loss' ? Target : Clock)
+        : Swords;
+
+      // Match title: user matches show "vs Opponent"; other division matches show both names
+      const matchTitle = match.isUserMatch
+        ? `vs ${match.opponent_name}`
+        : `${match.player1_name} vs ${match.player2_name}`;
 
       return (
         <Card className={`border-l-4 ${borderColor}`}>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${iconBg}`}><Icon className="w-4 h-4" /></div>
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${iconBg}`}>
+                <Icon className="w-4 h-4" />
+              </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <span className="font-semibold text-sm">vs {match.opponent_name}</span>
-                  {match.result === 'win' && <Badge className="bg-green-600 text-white text-xs">Win</Badge>}
-                  {match.result === 'loss' && <Badge variant="destructive" className="text-xs">Loss</Badge>}
+                  <span className="font-semibold text-sm">{matchTitle}</span>
+                  {match.isUserMatch && match.result === 'win'  && <Badge className="bg-green-600 text-white text-xs">Win</Badge>}
+                  {match.isUserMatch && match.result === 'loss' && <Badge variant="destructive" className="text-xs">Loss</Badge>}
                   {isScheduled && <Badge variant="secondary" className="text-xs">Upcoming</Badge>}
+                  {isCompleted && !match.isUserMatch && <Badge variant="outline" className="text-xs">Completed</Badge>}
                   {needsScore && <Badge className="bg-primary/90 text-white text-xs">Enter Score</Badge>}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                  {match.match_date && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(match.match_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
-                  {match.court_location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{match.court_location}</span>}
-                  {isCompleted && match.set1_player1 !== null && match.set1_player2 !== null && (
+                  {match.match_date && (
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      {new Date(match.match_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  )}
+                  {match.court_location && (
+                    <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{match.court_location}</span>
+                  )}
+                  {isCompleted && match.set1_player1 != null && match.set1_player2 != null && (
                     <span className="font-medium text-foreground">
                       {match.set1_player1}–{match.set1_player2}
-                      {match.set2_player1 !== null && `, ${match.set2_player1}–${match.set2_player2}`}
-                      {match.set3_player1 !== null && `, ${match.set3_player1}–${match.set3_player2}`}
+                      {match.set2_player1 != null && `, ${match.set2_player1}–${match.set2_player2}`}
+                      {match.set3_player1 != null && `, ${match.set3_player1}–${match.set3_player2}`}
                     </span>
                   )}
                 </div>
               </div>
               <div className="flex flex-col gap-1.5 shrink-0">
                 {needsScore && (
-                  <Button size="sm" className="bg-primary hover:bg-primary/90 text-white h-7 text-xs" onClick={() => setScoringMatch(match)}>
+                  <Button
+                    size="sm"
+                    className="bg-primary hover:bg-primary/90 text-white h-7 text-xs"
+                    onClick={() => {
+                      if (isDemoLeague) {
+                        toast.info('Join a real league to submit scores.', { duration: 3000 });
+                        return;
+                      }
+                      setScoringMatch(match);
+                    }}
+                  >
                     <Trophy className="w-3 h-3 mr-1" />I Won
                   </Button>
                 )}
-                {isScheduled && (
-                  <Button size="sm" variant="outline" className="h-7 text-xs"
-                    onClick={() => handleScheduleMatch(match.userIsPlayer1 ? match.player2_id : match.player1_id, match.opponent_name)}>
+                {isScheduled && match.isUserMatch && !isDemoLeague && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    onClick={() => handleScheduleMatch(
+                      match.userIsPlayer1 ? match.player2_id : match.player1_id,
+                      match.opponent_name,
+                    )}
+                  >
                     <Calendar className="w-3 h-3 mr-1" />Schedule
                   </Button>
                 )}
@@ -414,6 +588,12 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
 
     return (
       <div className="space-y-5">
+        {isDemoLeague && (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/40 border border-dashed text-xs text-muted-foreground">
+            <Star className="w-3.5 h-3.5 shrink-0" />
+            Demo data — join a real league to see your live match schedule and enter scores.
+          </div>
+        )}
         {isTournament && (
           <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
@@ -421,8 +601,22 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
             <Badge className="ml-auto bg-green-600 text-white text-xs">Live</Badge>
           </div>
         )}
-        {upcoming.length > 0 && <div className="space-y-2"><h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Upcoming ({upcoming.length})</h3>{upcoming.map(m => <MatchCard key={m.id} match={m} />)}</div>}
-        {recent.length > 0 && <div className="space-y-2"><h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Recent Results ({recent.length})</h3>{recent.map(m => <MatchCard key={m.id} match={m} />)}</div>}
+        {upcoming.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Upcoming ({upcoming.length})
+            </h3>
+            {upcoming.map(m => <MatchCard key={m.id} match={m} />)}
+          </div>
+        )}
+        {recent.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Recent Results ({recent.length})
+            </h3>
+            {recent.map(m => <MatchCard key={m.id} match={m} />)}
+          </div>
+        )}
       </div>
     );
   };
@@ -909,6 +1103,7 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-bold truncate">{league.league_name}</h1>
               <Badge variant="secondary" className={`text-white shrink-0 ${status === 'In Progress' ? 'bg-green-500' : 'bg-gray-500'}`}>{status}</Badge>
+              {league.is_demo && <Badge variant="outline" className="text-xs shrink-0">Demo</Badge>}
             </div>
             <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
               <CalendarDays className="w-3.5 h-3.5" />
@@ -919,7 +1114,7 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
         </div>
 
         {/* 5-tab layout */}
-        <Tabs defaultValue="my-group" className="space-y-4">
+        <Tabs defaultValue={league.is_demo ? 'matches' : 'my-group'} className="space-y-4">
           <TabsList className="grid w-full grid-cols-5 h-auto">
             <TabsTrigger value="matches"    className="flex items-center gap-1 py-2.5"><Calendar  className="w-4 h-4 shrink-0" /><span className="hidden sm:inline text-xs">Matches</span></TabsTrigger>
             <TabsTrigger value="my-group"   className="flex items-center gap-1 py-2.5"><BarChart3 className="w-4 h-4 shrink-0" /><span className="hidden sm:inline text-xs">My Group</span></TabsTrigger>
