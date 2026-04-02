@@ -3,6 +3,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import momentTimezonePlugin from '@fullcalendar/moment-timezone';
 import type { EventClickArg, DateClickArg, EventContentArg } from '@fullcalendar/core';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -583,7 +584,8 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
           <div className="border rounded-lg bg-card overflow-hidden fc-wrapper">
             <FullCalendar
               ref={calendarRef}
-              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, momentTimezonePlugin]}
+              timeZone={timezone}
               initialView="timeGridDay"
               headerToolbar={false}
               events={fcEvents}
