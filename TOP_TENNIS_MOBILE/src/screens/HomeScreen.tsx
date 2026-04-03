@@ -1,27 +1,35 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  TextInput,
-  ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  RefreshControl, TextInput, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useMatches } from '@/hooks/useMatches';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Avatar } from '@/components/ui/Avatar';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { Colors, FontSize, FontWeight, Spacing, Radius, Shadow, Palette } from '@/theme/colors';
 import { format } from 'date-fns';
 import { supabase } from '@/services/supabase';
 import { PlayerProfileSheet, PlayerSearchResult } from '@/components/ui/PlayerProfileSheet';
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+const QUICK_ACTIONS = [
+  { icon: 'calendar-outline'       as const, label: 'Schedule',   screen: 'Schedule',    color: Palette.orange500, bg: Palette.orange50  },
+  { icon: 'tennisball-outline'     as const, label: 'Matches',    screen: 'Matches',     color: Palette.red500,    bg: Palette.redBg     },
+  { icon: 'people-outline'         as const, label: 'Find',       screen: 'CasualMatch', color: Palette.green500,  bg: Palette.greenBg   },
+  { icon: 'chatbubbles-outline'    as const, label: 'Messages',   screen: 'Messages',    color: Palette.blue500,   bg: Palette.blueBg    },
+  { icon: 'trophy-outline'         as const, label: 'Leagues',    screen: 'MyLeagues',   color: Palette.yellow500, bg: Palette.yellowBg  },
+  { icon: 'document-text-outline'  as const, label: 'Join',       screen: 'JoinLeague',  color: Palette.purple500, bg: Palette.purpleBg  },
+  { icon: 'people-circle-outline'  as const, label: 'Network',    screen: 'Social',      color: Palette.pink500,   bg: Palette.pinkBg    },
+  { icon: 'bar-chart-outline'      as const, label: 'Stats',      screen: 'Performance', color: Palette.blue600,   bg: Palette.blueBg    },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuth();
@@ -29,29 +37,28 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { upcoming, pendingReceived, loading: matchesLoading, refetch: refetchMatches } = useMatches();
   const { unreadCount } = useNotifications();
 
-  const [refreshing, setRefreshing] = React.useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerSearchResult | null>(null);
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleSearch = useCallback((q: string) => {
-    setSearchQuery(q);
-    if (q.trim().length < 1) { setSearchResults([]); setSearching(false); return; }
+  const search = useCallback((q: string) => {
+    setQuery(q);
+    if (q.trim().length < 1) { setResults([]); setSearching(false); return; }
     setSearching(true);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(async () => {
+    if (debounce.current) clearTimeout(debounce.current);
+    debounce.current = setTimeout(async () => {
       const { data } = await supabase
         .from('players')
         .select('id, name, skill_level, usta_rating, city, user_id, profile_picture_url')
         .ilike('name', `%${q}%`)
         .neq('user_id', user?.id || '')
         .limit(8);
-      setSearchResults(data || []);
+      setResults(data || []);
       setSearching(false);
-    }, 350);
+    }, 320);
   }, [user?.id]);
 
   const onRefresh = async () => {
@@ -63,263 +70,301 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const fullName = profile
     ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
     : user?.email?.split('@')[0] || 'Player';
+  const firstName = fullName.split(' ')[0];
 
+  const wins    = profile?.wins    ?? 0;
+  const losses  = profile?.losses  ?? 0;
+  const total   = wins + losses;
+  const winRate = total > 0 ? Math.round((wins / total) * 100) : null;
   const nextMatch = upcoming[0];
-
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  };
 
   const skillLabel = (level?: number) => {
     if (!level) return 'Unrated';
-    if (level < 3) return 'Beginner';
-    if (level < 7) return 'Intermediate';
+    if (level <= 3) return 'Beginner';
+    if (level <= 6) return 'Intermediate';
     return 'Advanced';
   };
 
-  const winRate = profile?.wins && profile?.losses
-    ? Math.round((profile.wins / (profile.wins + profile.losses)) * 100)
-    : null;
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? '☀️ Good morning' : hour < 17 ? '👋 Good afternoon' : '🌙 Good evening';
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={s.safe} edges={['top']}>
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={s.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
       >
-        {/* Top Bar */}
-        <View style={styles.topBar}>
-          <View style={styles.greetingBlock}>
-            <Text style={styles.greetingText}>{getGreeting()}</Text>
-            <Text style={styles.nameText}>{fullName} 👋</Text>
+
+        {/* ── Top bar ─────────────────────────────────────────────────── */}
+        <View style={s.topBar}>
+          <View>
+            <Text style={s.brandText}>Top<Text style={s.brandAccent}>Tennis</Text></Text>
           </View>
-          <View style={styles.topBarRight}>
-            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Notifications')}>
+          <View style={s.topBarRight}>
+            <TouchableOpacity style={s.iconBtn} onPress={() => navigation.navigate('Notifications')} activeOpacity={0.7}>
               <Ionicons name="notifications-outline" size={22} color={Colors.text} />
               {unreadCount > 0 && (
-                <View style={styles.notifDot}>
-                  <Text style={styles.notifDotText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                <View style={s.notifPip}>
+                  <Text style={s.notifPipText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
                 </View>
               )}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+            <TouchableOpacity onPress={() => navigation.navigate('Profile')} activeOpacity={0.8}>
               <Avatar name={fullName} size={38} imageUrl={profile?.profile_picture_url} />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Stats Strip */}
-        <View style={styles.statsStrip}>
-          <View style={styles.statPill}>
-            <Text style={styles.statNum}>{profile?.wins ?? 0}</Text>
-            <Text style={styles.statLbl}>Wins</Text>
-          </View>
-          <View style={styles.statSep} />
-          <View style={styles.statPill}>
-            <Text style={styles.statNum}>{profile?.losses ?? 0}</Text>
-            <Text style={styles.statLbl}>Losses</Text>
-          </View>
-          <View style={styles.statSep} />
-          <View style={styles.statPill}>
-            <Text style={styles.statNum}>{winRate != null ? `${winRate}%` : '—'}</Text>
-            <Text style={styles.statLbl}>Win Rate</Text>
-          </View>
-          <View style={styles.statSep} />
-          <View style={styles.statPill}>
-            <Text style={[styles.statNum, pendingReceived.length > 0 && { color: Colors.primary }]}>
-              {pendingReceived.length}
-            </Text>
-            <Text style={styles.statLbl}>Pending</Text>
-          </View>
+        {/* ── Player card ──────────────────────────────────────────────── */}
+        <View style={s.heroWrap}>
+          <LinearGradient
+            colors={[Palette.dark900, Palette.dark700, Palette.dark600]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={s.heroCard}
+          >
+            {/* Tennis ball watermark */}
+            <View style={s.ballWatermark} pointerEvents="none">
+              <Ionicons name="tennisball" size={130} color="rgba(255,255,255,0.04)" />
+            </View>
+
+            <View style={s.heroTop}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.greeting}>{greeting},</Text>
+                <Text style={s.heroName}>{firstName}</Text>
+              </View>
+              <View style={s.levelBadge}>
+                <Text style={s.levelBadgeText}>
+                  {profile?.usta_rating ? `USTA ${profile.usta_rating}` : skillLabel(profile?.skill_level)}
+                </Text>
+              </View>
+            </View>
+
+            <View style={s.statsRow}>
+              {[
+                { value: wins,                              label: 'Wins'     },
+                { value: losses,                            label: 'Losses'   },
+                { value: winRate != null ? `${winRate}%` : '—', label: 'Win Rate' },
+                { value: pendingReceived.length,            label: 'Pending', accent: pendingReceived.length > 0 },
+              ].map((st, i, arr) => (
+                <React.Fragment key={st.label}>
+                  <View style={s.statCol}>
+                    <Text style={[s.statNum, st.accent && s.statNumAccent]}>{st.value}</Text>
+                    <Text style={s.statLbl}>{st.label}</Text>
+                  </View>
+                  {i < arr.length - 1 && <View style={s.statDiv} />}
+                </React.Fragment>
+              ))}
+            </View>
+          </LinearGradient>
         </View>
 
-        {/* Player Search */}
-        <View style={styles.searchSection}>
-          <View style={styles.searchBar}>
-            <Ionicons name="search-outline" size={17} color={Colors.textMuted} />
+        {/* ── Search ───────────────────────────────────────────────────── */}
+        <View style={s.searchWrap}>
+          <View style={s.searchBar}>
+            <Ionicons name="search" size={17} color={Colors.textMuted} />
             <TextInput
-              style={styles.searchInput}
-              placeholder="Search players..."
+              style={s.searchInput}
+              placeholder="Search players by name..."
               placeholderTextColor={Colors.textMuted}
-              value={searchQuery}
-              onChangeText={handleSearch}
+              value={query}
+              onChangeText={search}
               returnKeyType="search"
             />
             {searching
               ? <ActivityIndicator size="small" color={Colors.primary} />
-              : searchQuery.length > 0
-                ? <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults([]); }}>
-                    <Ionicons name="close-circle" size={17} color={Colors.textMuted} />
-                  </TouchableOpacity>
-                : null}
+              : query.length > 0
+              ? <TouchableOpacity onPress={() => { setQuery(''); setResults([]); }}>
+                  <Ionicons name="close-circle" size={17} color={Colors.textMuted} />
+                </TouchableOpacity>
+              : null
+            }
           </View>
-          {searchResults.length > 0 && (
-            <View style={styles.searchDropdown}>
-              {searchResults.map(p => (
+          {results.length > 0 && (
+            <View style={s.dropdown}>
+              {results.map((p, i) => (
                 <TouchableOpacity
                   key={p.id}
-                  style={styles.searchResultRow}
-                  onPress={() => { setSearchQuery(''); setSearchResults([]); setSelectedPlayer(p); }}
+                  style={[s.dropRow, i < results.length - 1 && s.dropDivider]}
+                  onPress={() => { setQuery(''); setResults([]); setSelectedPlayer(p); }}
+                  activeOpacity={0.7}
                 >
                   <Avatar name={p.name || '?'} size={36} imageUrl={p.profile_picture_url} />
-                  <View style={styles.searchResultInfo}>
-                    <Text style={styles.searchResultName}>{p.name}</Text>
-                    <Text style={styles.searchResultMeta}>
-                      {p.usta_rating ? `USTA ${p.usta_rating}` : p.skill_level ? `Level ${p.skill_level}/10` : ''}
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.dropName}>{p.name}</Text>
+                    <Text style={s.dropMeta}>
+                      {p.usta_rating ? `USTA ${p.usta_rating}` : p.skill_level ? `Level ${p.skill_level}/10` : 'Unrated'}
                       {p.city ? `  ·  ${p.city}` : ''}
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={15} color={Colors.textMuted} />
+                  <Ionicons name="chevron-forward" size={14} color={Colors.textMuted} />
                 </TouchableOpacity>
               ))}
             </View>
           )}
         </View>
 
-        {/* Pending Invites */}
+        {/* ── Invitations ──────────────────────────────────────────────── */}
         {pendingReceived.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Match Invitations</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Matches')}>
-                <Text style={styles.sectionAction}>See all</Text>
+          <View style={s.section}>
+            <View style={s.sectionHead}>
+              <Text style={s.sectionTitle}>Invitations</Text>
+              <View style={s.sectionPill}>
+                <Text style={s.sectionPillText}>{pendingReceived.length}</Text>
+              </View>
+              <TouchableOpacity style={s.seeAllBtn} onPress={() => navigation.navigate('Matches')}>
+                <Text style={s.seeAllText}>See all</Text>
+                <Ionicons name="chevron-forward" size={13} color={Colors.primary} />
               </TouchableOpacity>
             </View>
-            {pendingReceived.slice(0, 2).map(invite => {
-              const senderName = invite.sender
-                ? `${invite.sender.first_name} ${invite.sender.last_name}`.trim()
-                : 'Unknown';
-              return (
-                <Card key={invite.id} elevated style={styles.inviteCard}>
-                  <View style={styles.inviteRow}>
-                    <Avatar name={senderName} size={42} imageUrl={invite.sender?.profile_picture_url} />
-                    <View style={styles.inviteInfo}>
-                      <Text style={styles.inviteName}>{senderName}</Text>
-                      <Text style={styles.inviteDetail}>
-                        {format(new Date(invite.date), 'EEE, MMM d')} · {invite.start_time} – {invite.end_time}
-                      </Text>
-                      {invite.court_location && (
-                        <Text style={styles.inviteLocation}>
-                          <Ionicons name="location-outline" size={11} /> {invite.court_location}
-                        </Text>
-                      )}
+
+            <View style={s.inviteScroll}>
+              {pendingReceived.map(inv => {
+                const sender = inv.sender;
+                const name = sender ? `${sender.first_name} ${sender.last_name}`.trim() : 'Unknown';
+                return (
+                  <TouchableOpacity
+                    key={inv.id}
+                    style={s.inviteCard}
+                    onPress={() => navigation.navigate('Matches')}
+                    activeOpacity={0.85}
+                  >
+                    <View style={s.inviteCardTop}>
+                      <Avatar name={name} size={44} imageUrl={sender?.profile_picture_url} />
+                      <View style={s.inviteTypeBadge}>
+                        <Text style={s.inviteTypeBadgeText}>{inv.is_league_match ? 'League' : 'Match'}</Text>
+                      </View>
                     </View>
-                    <TouchableOpacity
-                      style={styles.viewBtn}
-                      onPress={() => navigation.navigate('Matches')}
-                    >
-                      <Text style={styles.viewBtnText}>View</Text>
-                    </TouchableOpacity>
-                  </View>
-                </Card>
-              );
-            })}
+                    <Text style={s.inviteName} numberOfLines={1}>{name}</Text>
+                    <Text style={s.inviteDate}>{format(new Date(inv.date), 'EEE, MMM d')}</Text>
+                    <Text style={s.inviteTime}>{inv.start_time.slice(0, 5)}</Text>
+                    {inv.court_location && (
+                      <View style={s.inviteLocRow}>
+                        <Ionicons name="location-outline" size={11} color={Colors.textMuted} />
+                        <Text style={s.inviteLoc} numberOfLines={1}>{inv.court_location}</Text>
+                      </View>
+                    )}
+                    <View style={s.inviteRespondBtn}>
+                      <Text style={s.inviteRespondText}>Respond</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
         )}
 
-        {/* Next Match */}
+        {/* ── Next match ───────────────────────────────────────────────── */}
         {nextMatch && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Next Match</Text>
-            <Card elevated style={styles.nextMatchCard}>
-              <View style={styles.nextMatchTop}>
-                <Badge label="Upcoming" variant="success" />
-                <Text style={styles.nextMatchDate}>
-                  {format(new Date(nextMatch.date), 'EEEE, MMMM d')}
-                </Text>
+          <View style={s.section}>
+            <View style={s.sectionHead}>
+              <Text style={s.sectionTitle}>Next Match</Text>
+              <View style={[s.sectionPill, s.sectionPillGreen]}>
+                <View style={s.dotGreen} />
+                <Text style={[s.sectionPillText, { color: Colors.success }]}>Confirmed</Text>
               </View>
-              <View style={styles.nextMatchPlayers}>
-                <View style={styles.playerCol}>
-                  <Avatar name={fullName} size={50} imageUrl={profile?.profile_picture_url} />
-                  <Text style={styles.playerName}>You</Text>
-                  <Text style={styles.playerSkill}>{skillLabel(profile?.skill_level)}</Text>
-                </View>
-                <View style={styles.vsCircle}>
-                  <Text style={styles.vsText}>VS</Text>
-                </View>
-                <View style={styles.playerCol}>
-                  {(() => {
-                    const opponent = nextMatch.sender_id === user?.id ? nextMatch.receiver : nextMatch.sender;
-                    const oppName = opponent ? `${opponent.first_name} ${opponent.last_name}`.trim() : 'Opponent';
-                    return (
-                      <>
-                        <Avatar name={oppName} size={50} imageUrl={opponent?.profile_picture_url} />
-                        <Text style={styles.playerName}>{oppName}</Text>
-                        <Text style={styles.playerSkill}>{skillLabel(opponent?.skill_level)}</Text>
-                      </>
-                    );
-                  })()}
-                </View>
-              </View>
-              <View style={styles.nextMatchFooter}>
-                <View style={styles.matchDetail}>
-                  <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
-                  <Text style={styles.matchDetailText}>{nextMatch.start_time} – {nextMatch.end_time}</Text>
-                </View>
-                {nextMatch.court_location && (
-                  <View style={styles.matchDetail}>
-                    <Ionicons name="location-outline" size={13} color={Colors.textMuted} />
-                    <Text style={styles.matchDetailText}>{nextMatch.court_location}</Text>
+            </View>
+
+            <LinearGradient
+              colors={[Palette.dark900, Palette.dark700]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={s.matchCard}
+            >
+              <Text style={s.matchDateLabel}>
+                {format(new Date(nextMatch.date), 'EEEE, MMMM d')}
+              </Text>
+
+              <View style={s.playersRow}>
+                {/* You */}
+                <View style={s.playerCol}>
+                  <View style={s.avatarRing}>
+                    <Avatar name={fullName} size={60} imageUrl={profile?.profile_picture_url} />
                   </View>
-                )}
+                  <Text style={s.playerName} numberOfLines={1}>You</Text>
+                  <Text style={s.playerSub}>{skillLabel(profile?.skill_level)}</Text>
+                </View>
+
+                {/* VS */}
+                <View style={s.vsWrap}>
+                  <LinearGradient colors={[Palette.orange500, Palette.orange600]} style={s.vsOrb}>
+                    <Text style={s.vsText}>VS</Text>
+                  </LinearGradient>
+                  <Text style={s.matchTimeInline}>
+                    {nextMatch.start_time.slice(0, 5)}
+                  </Text>
+                </View>
+
+                {/* Opponent */}
+                {(() => {
+                  const opp = nextMatch.sender_id === user?.id ? nextMatch.receiver : nextMatch.sender;
+                  const oppName = opp ? `${opp.first_name} ${opp.last_name}`.trim() : 'Opponent';
+                  return (
+                    <View style={s.playerCol}>
+                      <View style={s.avatarRing}>
+                        <Avatar name={oppName} size={60} imageUrl={opp?.profile_picture_url} />
+                      </View>
+                      <Text style={s.playerName} numberOfLines={1}>{oppName.split(' ')[0]}</Text>
+                      <Text style={s.playerSub}>{skillLabel(opp?.skill_level)}</Text>
+                    </View>
+                  );
+                })()}
               </View>
-            </Card>
+
+              {nextMatch.court_location && (
+                <View style={s.matchLocRow}>
+                  <Ionicons name="location-outline" size={13} color="rgba(255,255,255,0.5)" />
+                  <Text style={s.matchLocText}>{nextMatch.court_location}</Text>
+                </View>
+              )}
+            </LinearGradient>
           </View>
         )}
 
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.actionsGrid}>
-            {[
-              { icon: 'calendar-outline' as const, label: 'Schedule', screen: 'Schedule', color: Colors.primary },
-              { icon: 'tennisball-outline' as const, label: 'Matches', screen: 'Matches', color: Colors.accent },
-              { icon: 'people-outline' as const, label: 'Find Match', screen: 'CasualMatch', color: Colors.success },
-              { icon: 'chatbubbles-outline' as const, label: 'Messages', screen: 'Messages', color: '#6366F1' },
-              { icon: 'trophy-outline' as const, label: 'My Leagues', screen: 'MyLeagues', color: '#F59E0B' },
-              { icon: 'document-text-outline' as const, label: 'Join League', screen: 'JoinLeague', color: '#8B5CF6' },
-              { icon: 'share-social-outline' as const, label: 'Network', screen: 'Social', color: '#EC4899' },
-              { icon: 'trending-up-outline' as const, label: 'Performance', screen: 'Performance', color: '#0EA5E9' },
-            ].map(action => (
+        {/* ── Quick actions ─────────────────────────────────────────────── */}
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>Quick Access</Text>
+          <View style={s.grid}>
+            {QUICK_ACTIONS.map(a => (
               <TouchableOpacity
-                key={action.screen}
-                style={styles.actionBtn}
-                onPress={() => navigation.navigate(action.screen)}
-                activeOpacity={0.7}
+                key={a.screen}
+                style={s.gridItem}
+                onPress={() => navigation.navigate(a.screen)}
+                activeOpacity={0.75}
               >
-                <View style={[styles.actionIcon, { backgroundColor: action.color + '15' }]}>
-                  <Ionicons name={action.icon} size={22} color={action.color} />
+                <View style={[s.gridIcon, { backgroundColor: a.bg }]}>
+                  <Ionicons name={a.icon} size={26} color={a.color} />
                 </View>
-                <Text style={styles.actionLabel}>{action.label}</Text>
+                <Text style={s.gridLabel}>{a.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* Profile Completion Prompt */}
+        {/* ── Profile prompt ────────────────────────────────────────────── */}
         {profile && !profile.skill_level && (
-          <TouchableOpacity
-            style={styles.profilePrompt}
-            onPress={() => navigation.navigate('Profile')}
-            activeOpacity={0.8}
-          >
-            <View style={styles.profilePromptInner}>
-              <View style={styles.promptIcon}>
-                <Ionicons name="person-outline" size={18} color={Colors.primary} />
+          <View style={s.section}>
+            <TouchableOpacity
+              style={s.promptCard}
+              onPress={() => navigation.navigate('Profile')}
+              activeOpacity={0.85}
+            >
+              <View style={[s.promptIcon, { backgroundColor: Colors.primaryLight }]}>
+                <Ionicons name="person-circle-outline" size={28} color={Colors.primary} />
               </View>
-              <View style={styles.promptText}>
-                <Text style={styles.promptTitle}>Complete your profile</Text>
-                <Text style={styles.promptSub}>Add your skill level for better match suggestions</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.promptTitle}>Complete your profile</Text>
+                <Text style={s.promptSub}>Add your skill level for better matches</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
-            </View>
-          </TouchableOpacity>
+              <View style={s.promptChevron}>
+                <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
+              </View>
+            </TouchableOpacity>
+          </View>
         )}
+
+        <View style={{ height: 32 }} />
       </ScrollView>
 
       <PlayerProfileSheet
@@ -331,11 +376,13 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
-  scroll: { flex: 1 },
-  content: { paddingBottom: Spacing.xxxl },
+// ─────────────────────────────────────────────────────────────────────────────
 
+const s = StyleSheet.create({
+  safe:  { flex: 1, backgroundColor: Colors.background },
+  scroll: { paddingBottom: 40 },
+
+  // Top bar
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -343,152 +390,317 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
   },
-  greetingBlock: {},
-  greetingText: { fontSize: FontSize.xs, color: Colors.textMuted, fontWeight: FontWeight.medium },
-  nameText: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text, marginTop: 1 },
+  brandText: { fontSize: FontSize.xl, fontWeight: FontWeight.black, color: Colors.text, letterSpacing: -0.5 },
+  brandAccent: { color: Colors.primary },
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  iconBtn: { position: 'relative', width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.backgroundAlt, alignItems: 'center', justifyContent: 'center' },
-  notifDot: {
-    position: 'absolute', top: 4, right: 4,
-    backgroundColor: Colors.error, borderRadius: 6,
-    minWidth: 14, height: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2,
-  },
-  notifDotText: { color: '#fff', fontSize: 8, fontWeight: FontWeight.bold },
-
-  statsStrip: {
-    flexDirection: 'row',
+  iconBtn: {
+    width: 40, height: 40, borderRadius: 20,
     backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
+    alignItems: 'center', justifyContent: 'center',
+    ...Shadow.xs,
   },
-  statPill: { flex: 1, alignItems: 'center' },
-  statNum: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
-  statLbl: { fontSize: 10, color: Colors.textMuted, marginTop: 2, fontWeight: FontWeight.medium },
-  statSep: { width: 1, backgroundColor: Colors.borderLight, marginVertical: 4 },
+  notifPip: {
+    position: 'absolute', top: 7, right: 7,
+    minWidth: 14, height: 14, borderRadius: 7,
+    backgroundColor: Colors.error,
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 2,
+    borderWidth: 1.5, borderColor: Colors.background,
+  },
+  notifPipText: { color: '#fff', fontSize: 8, fontWeight: FontWeight.black },
 
-  searchSection: { paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg },
+  // Hero card
+  heroWrap: { paddingHorizontal: Spacing.lg, marginBottom: Spacing.sm },
+  heroCard: {
+    borderRadius: Radius.xl,
+    padding: Spacing.xl,
+    overflow: 'hidden',
+    ...Shadow.lg,
+  },
+  ballWatermark: {
+    position: 'absolute', right: -20, bottom: -20,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: Spacing.xl,
+  },
+  greeting: {
+    fontSize: FontSize.sm,
+    color: 'rgba(255,255,255,0.55)',
+    fontWeight: FontWeight.medium,
+  },
+  heroName: {
+    fontSize: FontSize.xxxl,
+    fontWeight: FontWeight.black,
+    color: '#fff',
+    letterSpacing: -1,
+    marginTop: 2,
+  },
+  levelBadge: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 5,
+    borderRadius: Radius.full,
+    ...Shadow.orange,
+  },
+  levelBadgeText: {
+    color: '#fff',
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+    letterSpacing: 0.3,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: Radius.lg,
+    paddingVertical: Spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+  },
+  statCol: { flex: 1, alignItems: 'center', gap: 3 },
+  statNum: {
+    fontSize: FontSize.xl,
+    fontWeight: FontWeight.black,
+    color: '#fff',
+    letterSpacing: -0.5,
+  },
+  statNumAccent: { color: Palette.yellow400 },
+  statLbl: {
+    fontSize: FontSize.xxs,
+    color: 'rgba(255,255,255,0.50)',
+    fontWeight: FontWeight.semibold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  statDiv: {
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    marginVertical: 4,
+  },
+
+  // Search
+  searchWrap: {
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
+    zIndex: 20,
+  },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
     backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.lg,
+    height: 50,
     borderWidth: 1,
     borderColor: Colors.border,
-    paddingHorizontal: Spacing.md,
-    height: 46,
+    ...Shadow.md,
   },
-  searchInput: { flex: 1, fontSize: FontSize.md, color: Colors.text },
-  searchDropdown: {
+  searchInput: { flex: 1, fontSize: FontSize.md, color: Colors.text, paddingVertical: 0 },
+  dropdown: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
     marginTop: 6,
     overflow: 'hidden',
-  },
-  searchResultRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  searchResultInfo: { flex: 1 },
-  searchResultName: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text },
-  searchResultMeta: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 1 },
-
-  section: { marginBottom: Spacing.xl, paddingHorizontal: Spacing.lg },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md },
-  sectionTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text, marginBottom: Spacing.md },
-  sectionAction: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
-
-  inviteCard: { marginBottom: Spacing.sm },
-  inviteRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  inviteInfo: { flex: 1 },
-  inviteName: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text },
-  inviteDetail: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
-  inviteLocation: { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 2 },
-  viewBtn: {
-    backgroundColor: Colors.primaryLight,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 6,
-    borderRadius: Radius.full,
-  },
-  viewBtnText: { color: Colors.primary, fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
-
-  nextMatchCard: { padding: Spacing.lg },
-  nextMatchTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.lg,
-  },
-  nextMatchDate: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.medium },
-  nextMatchPlayers: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.lg,
-  },
-  playerCol: { alignItems: 'center', gap: 4 },
-  playerName: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
-  playerSkill: { fontSize: FontSize.xs, color: Colors.textMuted },
-  vsCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: Colors.backgroundAlt,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  vsText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.textSecondary, letterSpacing: 1 },
-  nextMatchFooter: { flexDirection: 'row', gap: Spacing.lg, borderTopWidth: 1, borderTopColor: Colors.borderLight, paddingTop: Spacing.md },
-  matchDetail: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  matchDetailText: { fontSize: FontSize.sm, color: Colors.textSecondary },
-
-  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md },
-  actionBtn: { width: '21%', alignItems: 'center', gap: 6 },
-  actionIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: Radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionLabel: { fontSize: 10, color: Colors.textSecondary, fontWeight: FontWeight.medium, textAlign: 'center' },
-
-  profilePrompt: {
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.lg,
-    borderRadius: Radius.lg,
-    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
-    overflow: 'hidden',
+    ...Shadow.md,
   },
-  profilePromptInner: {
+  dropRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
-    padding: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 12,
   },
-  promptIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  dropDivider: { borderBottomWidth: 1, borderBottomColor: Colors.separator },
+  dropName: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text },
+  dropMeta: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 1 },
+
+  // Sections
+  section: { paddingHorizontal: Spacing.lg, marginBottom: Spacing.xxl },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  sectionTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.extrabold,
+    color: Colors.text,
+    letterSpacing: -0.3,
+    flex: 1,
+  },
+  sectionPill: {
     backgroundColor: Colors.primaryLight,
+    borderRadius: Radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  sectionPillGreen: { backgroundColor: Colors.successLight },
+  sectionPillText: {
+    fontSize: FontSize.xxs,
+    fontWeight: FontWeight.bold,
+    color: Colors.primary,
+  },
+  dotGreen: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.success },
+  seeAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 1 },
+  seeAllText: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
+
+  // Invite cards (horizontal scroll)
+  inviteScroll: { gap: Spacing.sm },
+  inviteCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 5,
+    ...Shadow.sm,
+  },
+  inviteCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 },
+  inviteTypeBadge: {
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+  },
+  inviteTypeBadgeText: { fontSize: FontSize.xxs, color: Colors.primary, fontWeight: FontWeight.bold },
+  inviteName: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.text },
+  inviteDate: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+  inviteTime: { fontSize: FontSize.xxl, fontWeight: FontWeight.black, color: Colors.text, letterSpacing: -0.5 },
+  inviteLocRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  inviteLoc: { fontSize: FontSize.xxs, color: Colors.textMuted, flex: 1 },
+  inviteRespondBtn: {
+    marginTop: 8,
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.sm,
+    paddingVertical: 7,
+    alignItems: 'center',
+    ...Shadow.orange,
+  },
+  inviteRespondText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+
+  // Next match card
+  matchCard: {
+    borderRadius: Radius.xl,
+    padding: Spacing.xl,
+    overflow: 'hidden',
+    ...Shadow.lg,
+  },
+  matchDateLabel: {
+    fontSize: FontSize.xs,
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: FontWeight.semibold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: Spacing.xl,
+  },
+  playersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.lg,
+  },
+  playerCol: { alignItems: 'center', gap: 6, flex: 1 },
+  avatarRing: {
+    borderRadius: 34,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.20)',
+    padding: 2,
+  },
+  playerName: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    color: '#fff',
+    textAlign: 'center',
+  },
+  playerSub: {
+    fontSize: FontSize.xxs,
+    color: 'rgba(255,255,255,0.45)',
+    textAlign: 'center',
+  },
+  vsWrap: { alignItems: 'center', gap: 8, paddingHorizontal: Spacing.sm },
+  vsOrb: {
+    width: 46, height: 46, borderRadius: 23,
+    alignItems: 'center', justifyContent: 'center',
+    ...Shadow.orange,
+  },
+  vsText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.black, letterSpacing: 1 },
+  matchTimeInline: {
+    fontSize: FontSize.sm,
+    color: 'rgba(255,255,255,0.65)',
+    fontWeight: FontWeight.bold,
+  },
+  matchLocRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.10)',
+    paddingTop: Spacing.md,
+  },
+  matchLocText: {
+    fontSize: FontSize.sm,
+    color: 'rgba(255,255,255,0.55)',
+    fontWeight: FontWeight.medium,
+    flex: 1,
+  },
+
+  // Quick actions grid
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.md,
+  },
+  gridItem: {
+    width: '21.5%',
+    alignItems: 'center',
+  },
+  gridIcon: {
+    width: 60, height: 60,
+    borderRadius: Radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
+    ...Shadow.xs,
   },
-  promptText: { flex: 1 },
-  promptTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
-  promptSub: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 1 },
+  gridLabel: {
+    fontSize: FontSize.xxs,
+    fontWeight: FontWeight.bold,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    letterSpacing: 0.1,
+    marginTop: 7,
+  },
+
+  // Profile prompt
+  promptCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    borderWidth: 1.5,
+    borderColor: Colors.primaryMuted,
+    ...Shadow.xs,
+  },
+  promptIcon: {
+    width: 48, height: 48, borderRadius: 24,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  promptTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
+  promptSub: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
+  promptChevron: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center', justifyContent: 'center',
+  },
 });

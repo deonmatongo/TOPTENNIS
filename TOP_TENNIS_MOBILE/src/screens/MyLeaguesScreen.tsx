@@ -16,9 +16,31 @@ import { PlayerProfileModal, PlayerSearchResult } from '@/components/ui/PlayerPr
 import { useAuth } from '@/contexts/AuthContext';
 import type { LeagueMatch } from '@/hooks/useLeagueMatches';
 import { useDivisionLeaderboard } from '@/hooks/useDivisionLeaderboard';
+import { useDivisionMatches } from '@/hooks/useDivisionMatches';
 import { useLeagueLeaderboard } from '@/hooks/useLeagueLeaderboard';
 import { supabase } from '@/services/supabase';
-import { Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { Palette, Colors, Shadow, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { LinearGradient } from 'expo-linear-gradient';
+
+// ── Dummy data (shown when user has no real registrations) ────────────────────
+
+const _d = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
+const _p = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
+
+const DUMMY_REGISTRATIONS = [
+  { id: '__demo_1', league_id: '__demo_l1', league_name: 'Spring Open Singles 2026', status: 'active',    created_at: _p(28),  is_demo: true },
+  { id: '__demo_2', league_id: '__demo_l2', league_name: 'City Doubles Championship', status: 'active',   created_at: _p(14),  is_demo: true },
+  { id: '__demo_3', league_id: '__demo_l3', league_name: 'Intermediate League S3',    status: 'completed', created_at: _p(120), is_demo: true },
+];
+
+const DUMMY_MATCHES = [
+  { id: '__dm1', match_date: _d(3),  player1_name: 'You',         player2_name: 'Alex Chen',     player1_id: '__me__', player2_id: '__p2__', winner_id: undefined, status: 'scheduled', court_location: 'Court 3 — North Club', isUserMatch: true,  userIsPlayer1: true,  opponent_name: 'Alex Chen',   opponent_user_id: '__p2__', result: 'pending' as const, set1_player1: null, set1_player2: null },
+  { id: '__dm2', match_date: _d(7),  player1_name: 'Jordan Lee',  player2_name: 'You',           player1_id: '__p3__', player2_id: '__me__', winner_id: undefined, status: 'scheduled', court_location: 'Court 1 — East Wing',  isUserMatch: true,  userIsPlayer1: false, opponent_name: 'Jordan Lee',  opponent_user_id: '__p3__', result: 'pending' as const, set1_player1: null, set1_player2: null },
+  { id: '__dm3', match_date: _d(2),  player1_name: 'Marcus Webb', player2_name: 'Sam Rivera',    player1_id: '__p4__', player2_id: '__p5__', winner_id: undefined, status: 'scheduled', court_location: 'Court 5 — South Club', isUserMatch: false, userIsPlayer1: false, opponent_name: '',            opponent_user_id: '',        result: 'pending' as const, set1_player1: null, set1_player2: null },
+  { id: '__dm4', match_date: _d(5),  player1_name: 'Priya Nair',  player2_name: 'Taylor Brooks', player1_id: '__p6__', player2_id: '__p7__', winner_id: undefined, status: 'scheduled', court_location: 'Court 2 — West Side',  isUserMatch: false, userIsPlayer1: false, opponent_name: '',            opponent_user_id: '',        result: 'pending' as const, set1_player1: null, set1_player2: null },
+  { id: '__dm5', match_date: _p(3),  player1_name: 'You',         player2_name: 'Marcus Webb',   player1_id: '__me__', player2_id: '__p4__', winner_id: '__me__',  status: 'completed', court_location: 'Court 3 — North Club', isUserMatch: true,  userIsPlayer1: true,  opponent_name: 'Marcus Webb', opponent_user_id: '__p4__', result: 'win'  as const, set1_player1: 6, set1_player2: 3 },
+  { id: '__dm6', match_date: _p(6),  player1_name: 'Alex Chen',   player2_name: 'Sam Rivera',    player1_id: '__p2__', player2_id: '__p5__', winner_id: '__p2__',  status: 'completed', court_location: 'Court 1 — East Wing',  isUserMatch: false, userIsPlayer1: false, opponent_name: '',            opponent_user_id: '',        result: 'pending' as const, set1_player1: 7, set1_player2: 5 },
+];
 
 type Tab = 'matches' | 'division' | 'league' | 'playoffs';
 const TABS: { key: Tab; label: string; icon: string }[] = [
@@ -45,6 +67,8 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
   const { assignments } = useDivisionAssignments();
   const divisionId = assignments.find(a => a.league_registration_id === registration.id)?.division_id;
   const { userMatches, playoffMatches, loading: matchesLoading, submitScore, scheduleMatch } = useLeagueMatches(divisionId);
+  const { matches: allDivMatches, loading: divMatchesLoading } = useDivisionMatches(divisionId);
+  const isDemoLeague = !!(registration.is_demo);
   const { leaderboard, loading: leaderboardLoading } = useDivisionLeaderboard(divisionId);
   const { leaderboard: leagueLeaderboard, loading: leagueLeaderboardLoading, currentUser: leagueCurrentUser } = useLeagueLeaderboard(registration.league_id);
 
@@ -57,15 +81,175 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
   const status = getLeagueStatus(registration);
 
   const renderMatches = () => {
-    if (matchesLoading) return <ActivityIndicator color={Colors.primary} style={{ marginTop: 32 }} />;
-    const isTournamentActive = divisionInfo?.tournament_status === 'active';
+    const isLoading = isDemoLeague ? false : (matchesLoading || divMatchesLoading);
+    if (isLoading) return <ActivityIndicator color={Colors.primary} style={{ marginTop: 32 }} />;
+
+    // Use demo matches for demo leagues; real division matches for real leagues
+    const allMatches: any[] = isDemoLeague ? DUMMY_MATCHES : allDivMatches;
+    const isTournamentActive = !isDemoLeague && divisionInfo?.tournament_status === 'active';
+
+    const upcoming  = allMatches.filter(m => m.status === 'scheduled' || m.status === 'pending');
+    const completed = allMatches.filter(m => m.status === 'completed');
+
+    const MatchCard = ({ match }: { match: any }) => {
+      const isUserMatch  = !!match.isUserMatch;
+      const isWin        = isUserMatch && match.result === 'win';
+      const isLoss       = isUserMatch && match.result === 'loss';
+      const isScheduled  = match.status === 'scheduled' || match.status === 'pending';
+      const isCompleted  = match.status === 'completed';
+
+      // For user matches, look up the corresponding LeagueMatch for the scoring modal
+      const leagueMatch  = isUserMatch ? userMatches.find(m => m.id === match.id) : undefined;
+
+      const canReport = isUserMatch && !isDemoLeague && leagueMatch &&
+        ((isScheduled) || (isCompleted && leagueMatch.needsScoreReport));
+      const awaitingConfirmation = isUserMatch && !isDemoLeague && leagueMatch && isCompleted &&
+        leagueMatch.winner_id && leagueMatch.score?.reported_by &&
+        leagueMatch.score.reported_by !== user?.id && !leagueMatch.score?.confirmed_by;
+
+      // Title: user matches → "vs Opponent"; other matches → "P1 vs P2"
+      const matchTitle = isUserMatch
+        ? `vs ${match.opponent_name}`
+        : `${match.player1_name} vs ${match.player2_name}`;
+
+      const iconName  = isWin ? 'trophy' : isLoss ? 'person' : isUserMatch ? 'time-outline' : 'tennisball-outline';
+      const iconColor = isWin ? Colors.success : isLoss ? Colors.error : isUserMatch ? Colors.info : Colors.textMuted;
+      const iconBg    = isWin ? styles.matchIconWin : isLoss ? styles.matchIconLoss : isUserMatch ? styles.matchIconPending : styles.matchIconOther;
+
+      // Score display (set scores stored as set1_player1 / set1_player2 etc.)
+      const hasSetScores = match.set1_player1 != null && match.set1_player2 != null;
+      const scoreText = hasSetScores
+        ? [
+            `${match.set1_player1}–${match.set1_player2}`,
+            match.set2_player1 != null ? `${match.set2_player1}–${match.set2_player2}` : null,
+            match.set3_player1 != null ? `${match.set3_player1}–${match.set3_player2}` : null,
+          ].filter(Boolean).join(', ')
+        : (leagueMatch?.score?.sets ? leagueMatch.score.sets.map((s: any) => `${s.p1}-${s.p2}`).join(', ') : null);
+
+      const displayDate = match.match_date || leagueMatch?.scheduled_date;
+      const displayTime = leagueMatch?.scheduled_time;
+      const displayLoc  = match.court_location || leagueMatch?.court_location;
+
+      return (
+        <View style={[
+          styles.matchCard,
+          isWin  && styles.matchCardWin,
+          isLoss && styles.matchCardLoss,
+          isTournamentActive && isScheduled && isUserMatch && styles.matchCardActive,
+          !isUserMatch && styles.matchCardOther,
+        ]}>
+          <View style={styles.matchCardTop}>
+            <View style={[styles.matchIcon, iconBg]}>
+              <Ionicons name={iconName as any} size={18} color={iconColor} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.matchOpponent, !isUserMatch && { color: Colors.textSecondary }]}>
+                {matchTitle}
+              </Text>
+              <View style={styles.matchBadgeRow}>
+                {isUserMatch && (
+                  <View style={[styles.resultBadge, isWin ? styles.resultBadgeWin : isLoss ? styles.resultBadgeLoss : styles.resultBadgePending]}>
+                    <Text style={[styles.resultBadgeText, { color: isWin ? Colors.success : isLoss ? Colors.error : Colors.info }]}>
+                      {isWin ? 'Victory' : isLoss ? 'Defeat' : isScheduled ? 'Upcoming' : 'Pending'}
+                    </Text>
+                  </View>
+                )}
+                {!isUserMatch && isScheduled && (
+                  <View style={[styles.resultBadge, styles.resultBadgeOther]}>
+                    <Text style={[styles.resultBadgeText, { color: Colors.textMuted }]}>Upcoming</Text>
+                  </View>
+                )}
+                {!isUserMatch && isCompleted && (
+                  <View style={[styles.resultBadge, styles.resultBadgeOther]}>
+                    <Text style={[styles.resultBadgeText, { color: Colors.textMuted }]}>Completed</Text>
+                  </View>
+                )}
+                {canReport && (
+                  <View style={styles.enterScoreBadge}>
+                    <Text style={styles.enterScoreBadgeText}>Enter Score</Text>
+                  </View>
+                )}
+                {leagueMatch?.is_playoff && (
+                  <View style={styles.playoffMatchBadge}>
+                    <Text style={styles.playoffMatchBadgeText}>Playoff</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.matchMeta}>
+            {displayDate && (
+              <View style={styles.matchMetaItem}>
+                <Ionicons name="calendar-outline" size={13} color={Colors.textMuted} />
+                <Text style={styles.matchMetaText}>
+                  {new Date(displayDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </Text>
+              </View>
+            )}
+            {displayTime && (
+              <View style={styles.matchMetaItem}>
+                <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
+                <Text style={styles.matchMetaText}>{displayTime.slice(0, 5)}</Text>
+              </View>
+            )}
+            {displayLoc && (
+              <View style={styles.matchMetaItem}>
+                <Ionicons name="location-outline" size={13} color={Colors.textMuted} />
+                <Text style={styles.matchMetaText}>{displayLoc}</Text>
+              </View>
+            )}
+          </View>
+
+          {isCompleted && scoreText && (
+            <View style={styles.scoreBox}>
+              <Text style={styles.scoreLabel}>Final Score</Text>
+              <Text style={styles.scoreValue}>{scoreText}</Text>
+            </View>
+          )}
+
+          {/* Action buttons — only for user's own matches */}
+          {(canReport || awaitingConfirmation) && (
+            <View style={styles.matchActions}>
+              {awaitingConfirmation && leagueMatch && (
+                <TouchableOpacity
+                  style={[styles.matchActionBtn, { borderColor: Colors.success }]}
+                  onPress={() => setConfirmMatch(leagueMatch)}
+                >
+                  <Ionicons name="checkmark-circle-outline" size={14} color={Colors.success} />
+                  <Text style={[styles.matchActionBtnText, { color: Colors.success }]}>Confirm Score</Text>
+                </TouchableOpacity>
+              )}
+              {canReport && !awaitingConfirmation && leagueMatch && (
+                <TouchableOpacity
+                  style={[styles.matchActionBtn, styles.matchActionBtnOrange]}
+                  onPress={() => setScoringMatch(leagueMatch)}
+                >
+                  <Ionicons name="trophy" size={14} color="#fff" />
+                  <Text style={[styles.matchActionBtnText, { color: '#fff' }]}>I Won</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </View>
+      );
+    };
+
     return (
       <View style={styles.tabContent}>
-        {/* Schedule new match button */}
-        <TouchableOpacity style={styles.scheduleNewBtn} onPress={() => setShowSchedule(true)}>
-          <Ionicons name="add-circle-outline" size={20} color={Colors.primary} />
-          <Text style={styles.scheduleNewBtnText}>Schedule a Match</Text>
-        </TouchableOpacity>
+        {isDemoLeague && (
+          <View style={styles.demoBanner}>
+            <Ionicons name="information-circle-outline" size={16} color={Colors.textMuted} />
+            <Text style={styles.demoBannerText}>Demo data — join a real league to see live matches and enter scores.</Text>
+          </View>
+        )}
+
+        {!isDemoLeague && (
+          <TouchableOpacity style={styles.scheduleNewBtn} onPress={() => setShowSchedule(true)}>
+            <Ionicons name="add-circle-outline" size={20} color={Colors.primary} />
+            <Text style={styles.scheduleNewBtnText}>Schedule a Match</Text>
+          </TouchableOpacity>
+        )}
 
         {isTournamentActive && (
           <View style={styles.tournamentBanner}>
@@ -78,117 +262,27 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
           </View>
         )}
 
-        {userMatches.length === 0 ? (
+        {allMatches.length === 0 ? (
           <View style={styles.tabEmpty}>
             <Ionicons name="time-outline" size={40} color={Colors.textMuted} />
             <Text style={styles.tabEmptyTitle}>No matches yet</Text>
-            <Text style={styles.tabEmptySub}>Schedule a match with a division opponent above to get started.</Text>
+            <Text style={styles.tabEmptySub}>Schedule a match with a division opponent to get started.</Text>
           </View>
         ) : (
-          userMatches.map(match => {
-            const isWin = match.result === 'win';
-            const isLoss = match.result === 'loss';
-            const isPending = match.status === 'pending';
-            const isScheduled = match.status === 'scheduled';
-            const isCompleted = match.status === 'completed';
-            const score = match.score as any;
-            const hasScore = score?.sets && score.sets.length > 0;
-            return (
-              <View key={match.id} style={[
-                styles.matchCard,
-                isWin && styles.matchCardWin,
-                isLoss && styles.matchCardLoss,
-                isTournamentActive && isScheduled && styles.matchCardActive,
-              ]}>
-                <View style={styles.matchCardTop}>
-                  <View style={[styles.matchIcon, isWin ? styles.matchIconWin : isLoss ? styles.matchIconLoss : styles.matchIconPending]}>
-                    <Ionicons name={isWin ? 'trophy' : isLoss ? 'person' : 'time-outline'} size={18} color={isWin ? Colors.success : isLoss ? Colors.error : Colors.info} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.matchOpponent}>vs {match.opponent_name}</Text>
-                    <View style={styles.matchBadgeRow}>
-                      <View style={[styles.resultBadge, isWin ? styles.resultBadgeWin : isLoss ? styles.resultBadgeLoss : styles.resultBadgePending]}>
-                        <Text style={[styles.resultBadgeText, { color: isWin ? Colors.success : isLoss ? Colors.error : Colors.info }]}>
-                          {isWin ? 'Victory' : isLoss ? 'Defeat' : isPending ? 'Pending' : isScheduled ? 'Scheduled' : 'Upcoming'}
-                        </Text>
-                      </View>
-                      {match.is_playoff && (
-                        <View style={styles.playoffMatchBadge}>
-                          <Text style={styles.playoffMatchBadgeText}>Playoff</Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.matchMeta}>
-                  {match.scheduled_date && (
-                    <View style={styles.matchMetaItem}>
-                      <Ionicons name="calendar-outline" size={13} color={Colors.textMuted} />
-                      <Text style={styles.matchMetaText}>
-                        {new Date(match.scheduled_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </Text>
-                    </View>
-                  )}
-                  {match.scheduled_time && (
-                    <View style={styles.matchMetaItem}>
-                      <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
-                      <Text style={styles.matchMetaText}>{match.scheduled_time.slice(0, 5)}</Text>
-                    </View>
-                  )}
-                  {match.court_location && (
-                    <View style={styles.matchMetaItem}>
-                      <Ionicons name="location-outline" size={13} color={Colors.textMuted} />
-                      <Text style={styles.matchMetaText}>{match.court_location}</Text>
-                    </View>
-                  )}
-                </View>
-
-                {hasScore && (
-                  <View style={styles.scoreBox}>
-                    <Text style={styles.scoreLabel}>Final Score</Text>
-                    <Text style={styles.scoreValue}>
-                      {score.sets.map((s: any, i: number) => `${s.p1}-${s.p2}`).join(', ')}
-                    </Text>
-                  </View>
-                )}
-
-                {/* Action buttons */}
-                {(() => {
-                  // Match where opponent submitted score — current user needs to confirm
-                  const awaitingConfirmation = isCompleted && match.winner_id && match.score &&
-                    match.score?.reported_by && match.score.reported_by !== user?.id &&
-                    !match.score?.confirmed_by;
-                  // Match played but no score yet — current user should report
-                  const canReport = (isPending || isScheduled) ||
-                    (isCompleted && match.needsScoreReport);
-                  if (!awaitingConfirmation && !canReport) return null;
-                  return (
-                    <View style={styles.matchActions}>
-                      {awaitingConfirmation && (
-                        <TouchableOpacity
-                          style={[styles.matchActionBtn, { borderColor: Colors.success }]}
-                          onPress={() => setConfirmMatch(match)}
-                        >
-                          <Ionicons name="checkmark-circle-outline" size={14} color={Colors.success} />
-                          <Text style={[styles.matchActionBtnText, { color: Colors.success }]}>Confirm Score</Text>
-                        </TouchableOpacity>
-                      )}
-                      {canReport && !awaitingConfirmation && (
-                        <TouchableOpacity
-                          style={[styles.matchActionBtn, styles.matchActionBtnOrange]}
-                          onPress={() => setScoringMatch(match)}
-                        >
-                          <Ionicons name="trophy" size={14} color="#fff" />
-                          <Text style={[styles.matchActionBtnText, { color: '#fff' }]}>Report Score</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  );
-                })()}
+          <>
+            {upcoming.length > 0 && (
+              <View style={styles.matchSection}>
+                <Text style={styles.matchSectionLabel}>Upcoming ({upcoming.length})</Text>
+                {upcoming.map(m => <MatchCard key={m.id} match={m} />)}
               </View>
-            );
-          })
+            )}
+            {completed.length > 0 && (
+              <View style={styles.matchSection}>
+                <Text style={styles.matchSectionLabel}>Recent Results ({completed.length})</Text>
+                {completed.map(m => <MatchCard key={m.id} match={m} />)}
+              </View>
+            )}
+          </>
         )}
       </View>
     );
@@ -533,7 +627,11 @@ export const MyLeaguesScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
   const activeRegs = registrations.filter(r => getLeagueStatus(r) === 'In Progress');
   const completedRegs = registrations.filter(r => getLeagueStatus(r) === 'Completed');
-  const displayRegs = showHistory ? completedRegs : activeRegs;
+  const isDisplayingDemo = registrations.length === 0;
+  const sourceRegs = isDisplayingDemo ? DUMMY_REGISTRATIONS : registrations;
+  const sourceActive = sourceRegs.filter(r => getLeagueStatus(r) === 'In Progress');
+  const sourceCompleted = sourceRegs.filter(r => getLeagueStatus(r) === 'Completed');
+  const displayRegs = showHistory ? sourceCompleted : sourceActive;
 
   if (selectedReg) {
     return (
@@ -570,23 +668,31 @@ export const MyLeaguesScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                 <Text style={styles.historyToggleText}>{showHistory ? 'View Active Leagues' : 'View History'}</Text>
               </TouchableOpacity>
 
+              {/* Demo notice */}
+              {isDisplayingDemo && (
+                <View style={styles.demoBanner}>
+                  <Ionicons name="information-circle-outline" size={15} color={Colors.textMuted} />
+                  <Text style={styles.demoBannerText}>Showing example leagues. Join a real league to see your data.</Text>
+                </View>
+              )}
+
               {/* Summary stats */}
               <View style={styles.summaryRow}>
                 <View style={styles.summaryCard}>
-                  <Text style={styles.summaryNum}>{registrations.length}</Text>
+                  <Text style={styles.summaryNum}>{sourceRegs.length}</Text>
                   <Text style={styles.summaryLabel}>Registered</Text>
                 </View>
                 <View style={styles.summaryCard}>
-                  <Text style={styles.summaryNum}>{activeRegs.length}</Text>
+                  <Text style={styles.summaryNum}>{sourceActive.length}</Text>
                   <Text style={styles.summaryLabel}>Active</Text>
                 </View>
                 <View style={styles.summaryCard}>
-                  <Text style={styles.summaryNum}>{completedRegs.length}</Text>
+                  <Text style={styles.summaryNum}>{sourceCompleted.length}</Text>
                   <Text style={styles.summaryLabel}>Completed</Text>
                 </View>
               </View>
 
-              {displayRegs.length === 0 ? (
+              {displayRegs.length === 0 && !isDisplayingDemo ? (
                 <View style={styles.emptyCard}>
                   <Ionicons name="trophy-outline" size={48} color={Colors.textMuted} />
                   <Text style={styles.emptyTitle}>{showHistory ? 'No past leagues' : 'No active leagues'}</Text>
@@ -747,6 +853,23 @@ const styles = StyleSheet.create({
   // Schedule new match button
   scheduleNewBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, paddingVertical: Spacing.md, borderRadius: Radius.md, borderWidth: 1.5, borderColor: Colors.primary, borderStyle: 'dashed' },
   scheduleNewBtnText: { fontSize: FontSize.md, color: Colors.primary, fontWeight: FontWeight.semibold },
+
+  // Demo banner
+  demoBanner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, backgroundColor: Colors.borderLight, borderRadius: Radius.md, padding: Spacing.sm, borderWidth: 1, borderColor: Colors.border, borderStyle: 'dashed' },
+  demoBannerText: { fontSize: FontSize.xs, color: Colors.textMuted, flex: 1, lineHeight: 18 },
+
+  // Match sections (Upcoming / Recent Results grouping)
+  matchSection: { gap: Spacing.sm },
+  matchSectionLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 2 },
+
+  // Other-player (non-user) match card styling
+  matchCardOther: { opacity: 0.85 },
+  matchIconOther: { backgroundColor: Colors.borderLight },
+
+  // Badge variants
+  resultBadgeOther: { backgroundColor: Colors.borderLight },
+  enterScoreBadge: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: Radius.full },
+  enterScoreBadgeText: { fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.bold },
 
   // Match action buttons
   matchActions: { flexDirection: 'row', gap: Spacing.sm, paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.borderLight },

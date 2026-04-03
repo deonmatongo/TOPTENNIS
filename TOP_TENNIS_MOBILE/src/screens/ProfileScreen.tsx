@@ -4,58 +4,53 @@ import {
   TextInput, Alert, ActivityIndicator, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { useProfilePicture } from '@/hooks/useProfilePicture';
-import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Avatar } from '@/components/ui/Avatar';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { Colors, FontSize, FontWeight, Spacing, Radius, Shadow, Palette } from '@/theme/colors';
 
-const SKILL_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const SKILL_LEVELS   = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const COMPETITIVENESS = ['casual', 'competitive', 'serious'];
-const AGE_RANGES = ['18-25', '26-35', '36-45', '46-55', '55+'];
+const AGE_RANGES     = ['18-25', '26-35', '36-45', '46-55', '55+'];
 
-const skillLabel = (level?: number) => {
-  if (!level) return 'Unrated';
-  if (level <= 3) return 'Beginner';
-  if (level <= 6) return 'Intermediate';
-  return 'Advanced';
-};
+const skillLabel = (l?: number) => !l ? 'Unrated' : l <= 3 ? 'Beginner' : l <= 6 ? 'Intermediate' : 'Advanced';
+const skillColor = (l?: number): string => !l ? Palette.gray400 : l <= 3 ? Palette.green500 : l <= 6 ? Palette.yellow500 : Palette.orange500;
 
-const skillColor = (level?: number): 'success' | 'warning' | 'error' | 'default' => {
-  if (!level) return 'default';
-  if (level <= 3) return 'success';
-  if (level <= 6) return 'warning';
-  return 'error';
-};
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const { user, signOut } = useAuth();
   const { player: profile, loading, updatePlayerProfile: updateProfile } = usePlayerProfile();
   const { uploading: uploadingPic, showPicker } = useProfilePicture();
+
   const fullName = profile?.name || user?.email?.split('@')[0] || 'Player';
+  const wins   = profile?.wins   ?? 0;
+  const losses = profile?.losses ?? 0;
+  const total  = wins + losses;
+  const winRate = total > 0 ? Math.round((wins / total) * 100) : null;
+
   const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<Record<string, any>>({});
+  const [saving, setSaving]   = useState(false);
+  const [form, setForm]       = useState<Record<string, any>>({});
   const [localPicUrl, setLocalPicUrl] = useState<string | null>(null);
 
   const startEdit = () => {
-    const nameParts = (profile?.name || '').split(' ');
+    const parts = (profile?.name || '').split(' ');
     setForm({
-      first_name: profile?.first_name || nameParts[0] || '',
-      last_name: profile?.last_name || nameParts.slice(1).join(' ') || '',
-      phone: profile?.phone || '',
-      city: profile?.city || '',
-      zip_code: profile?.zip_code || '',
-      usta_rating: profile?.usta_rating || '',
-      skill_level: profile?.skill_level,
-      competitiveness: profile?.competitiveness || '',
-      age_range: profile?.age_range || '',
-      bio: profile?.bio || '',
-      networking_enabled: profile?.networking_enabled ?? true,
+      first_name:          profile?.first_name || parts[0] || '',
+      last_name:           profile?.last_name  || parts.slice(1).join(' ') || '',
+      phone:               profile?.phone || '',
+      city:                profile?.city || '',
+      zip_code:            profile?.zip_code || '',
+      usta_rating:         profile?.usta_rating || '',
+      skill_level:         profile?.skill_level,
+      competitiveness:     profile?.competitiveness || '',
+      age_range:           profile?.age_range || '',
+      bio:                 profile?.bio || '',
+      networking_enabled:  profile?.networking_enabled ?? true,
     });
     setEditing(true);
   };
@@ -74,7 +69,7 @@ export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
   };
 
   const handleSignOut = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+    Alert.alert('Sign Out', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign Out', style: 'destructive', onPress: signOut },
     ]);
@@ -82,344 +77,429 @@ export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={styles.center}><ActivityIndicator size="large" color={Colors.primary} /></View>
+      <SafeAreaView style={s.safe} edges={['top']}>
+        <View style={s.center}><ActivityIndicator size="large" color={Colors.primary} /></View>
       </SafeAreaView>
     );
   }
 
-  const displayName = fullName;
-
-  const editBtn = (
-    <TouchableOpacity
-      onPress={editing ? handleSave : startEdit}
-      disabled={saving}
-      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-    >
-      {saving
-        ? <ActivityIndicator size="small" color="#fff" />
-        : <Text style={styles.editBtnText}>{editing ? 'Save' : 'Edit'}</Text>}
-    </TouchableOpacity>
-  );
-
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScreenHeader title="My Profile" subtitle="Personal settings & stats" navigation={navigation} showBack rightElement={editBtn} />
-
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Profile Hero */}
-        <Card elevated style={styles.heroCard}>
-          <View style={styles.heroRow}>
-            <View style={styles.avatarWrap}>
-              <TouchableOpacity
-                onPress={() => showPicker(url => { setLocalPicUrl(url); })}
-                activeOpacity={0.75}
-                disabled={uploadingPic}
-              >
-                <Avatar
-                  name={displayName}
-                  size={80}
-                  imageUrl={localPicUrl || profile?.profile_picture_url}
-                />
-                <View style={styles.avatarOverlay}>
-                  {uploadingPic
-                    ? <ActivityIndicator size={16} color="#fff" />
-                    : <Ionicons name="camera" size={18} color="#fff" />
-                  }
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.changePhotoBtn}
-                onPress={() => showPicker(url => { setLocalPicUrl(url); })}
-                disabled={uploadingPic}
-              >
-                <Text style={styles.changePhotoText}>
-                  {uploadingPic ? 'Uploading...' : 'Change Photo'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.heroInfo}>
-              <Text style={styles.heroName}>{displayName}</Text>
-              <Text style={styles.heroEmail}>{user?.email}</Text>
-              <View style={styles.heroBadges}>
-                <Badge label={skillLabel(profile?.skill_level)} variant={skillColor(profile?.skill_level)} />
-                {profile?.usta_rating && <Badge label={`USTA ${profile.usta_rating}`} variant="info" />}
-              </View>
-            </View>
-          </View>
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{profile?.wins ?? 0}</Text>
-              <Text style={styles.statLabel}>Wins</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{profile?.losses ?? 0}</Text>
-              <Text style={styles.statLabel}>Losses</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>
-                {profile?.wins && profile?.losses
-                  ? `${Math.round((profile.wins / (profile.wins + profile.losses)) * 100)}%`
-                  : '—'}
-              </Text>
-              <Text style={styles.statLabel}>Win Rate</Text>
-            </View>
-          </View>
-        </Card>
-
-        {/* Personal Info */}
-        <Text style={styles.sectionTitle}>Personal Information</Text>
-        <Card style={styles.infoCard}>
-          {editing ? (
-            <>
-              <View style={styles.formRow}>
-                <View style={[styles.formGroup, { flex: 1, marginRight: Spacing.sm }]}>
-                  <Text style={styles.formLabel}>First Name</Text>
-                  <TextInput style={styles.formInput} value={form.first_name} onChangeText={v => setForm(f => ({ ...f, first_name: v }))} placeholder="First name" placeholderTextColor={Colors.textMuted} />
-                </View>
-                <View style={[styles.formGroup, { flex: 1 }]}>
-                  <Text style={styles.formLabel}>Last Name</Text>
-                  <TextInput style={styles.formInput} value={form.last_name} onChangeText={v => setForm(f => ({ ...f, last_name: v }))} placeholder="Last name" placeholderTextColor={Colors.textMuted} />
-                </View>
-              </View>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Phone</Text>
-                <TextInput style={styles.formInput} value={form.phone} onChangeText={v => setForm(f => ({ ...f, phone: v }))} placeholder="+1 (555) 000-0000" placeholderTextColor={Colors.textMuted} keyboardType="phone-pad" />
-              </View>
-              <View style={styles.formRow}>
-                <View style={[styles.formGroup, { flex: 2, marginRight: Spacing.sm }]}>
-                  <Text style={styles.formLabel}>City</Text>
-                  <TextInput style={styles.formInput} value={form.city} onChangeText={v => setForm(f => ({ ...f, city: v }))} placeholder="City" placeholderTextColor={Colors.textMuted} />
-                </View>
-                <View style={[styles.formGroup, { flex: 1 }]}>
-                  <Text style={styles.formLabel}>ZIP</Text>
-                  <TextInput style={styles.formInput} value={form.zip_code} onChangeText={v => setForm(f => ({ ...f, zip_code: v }))} placeholder="ZIP" placeholderTextColor={Colors.textMuted} keyboardType="numeric" />
-                </View>
-              </View>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Bio</Text>
-                <TextInput style={[styles.formInput, styles.textArea]} value={form.bio} onChangeText={v => setForm(f => ({ ...f, bio: v }))} placeholder="Tell others about yourself..." placeholderTextColor={Colors.textMuted} multiline numberOfLines={3} />
-              </View>
-            </>
-          ) : (
-            <>
-              <InfoRow icon="person-outline" label="Name" value={displayName} />
-              <InfoRow icon="mail-outline" label="Email" value={user?.email || '—'} />
-              <InfoRow icon="call-outline" label="Phone" value={profile?.phone || '—'} />
-              <InfoRow icon="location-outline" label="Location" value={profile?.city && profile?.zip_code ? `${profile.city}, ${profile.zip_code}` : profile?.city || '—'} />
-              {profile?.bio && <InfoRow icon="document-text-outline" label="Bio" value={profile.bio} />}
-            </>
-          )}
-        </Card>
-
-        {/* Tennis Profile */}
-        <Text style={styles.sectionTitle}>Tennis Profile</Text>
-        <Card style={styles.infoCard}>
-          {editing ? (
-            <>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Skill Level (1–10)</Text>
-                <View style={styles.skillGrid}>
-                  {SKILL_LEVELS.map(l => (
-                    <TouchableOpacity key={l} style={[styles.skillBtn, form.skill_level === l && styles.skillBtnActive]} onPress={() => setForm(f => ({ ...f, skill_level: l }))}>
-                      <Text style={[styles.skillBtnText, form.skill_level === l && styles.skillBtnTextActive]}>{l}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>USTA Rating</Text>
-                <TextInput style={styles.formInput} value={form.usta_rating} onChangeText={v => setForm(f => ({ ...f, usta_rating: v }))} placeholder="e.g. 3.5" placeholderTextColor={Colors.textMuted} />
-              </View>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Competitiveness</Text>
-                <View style={styles.chipRow}>
-                  {COMPETITIVENESS.map(c => (
-                    <TouchableOpacity key={c} style={[styles.chip, form.competitiveness === c && styles.chipActive]} onPress={() => setForm(f => ({ ...f, competitiveness: c }))}>
-                      <Text style={[styles.chipText, form.competitiveness === c && styles.chipTextActive]} >{c.charAt(0).toUpperCase() + c.slice(1)}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Age Range</Text>
-                <View style={styles.chipRow}>
-                  {AGE_RANGES.map(a => (
-                    <TouchableOpacity key={a} style={[styles.chip, form.age_range === a && styles.chipActive]} onPress={() => setForm(f => ({ ...f, age_range: a }))}>
-                      <Text style={[styles.chipText, form.age_range === a && styles.chipTextActive]}>{a}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-              <View style={styles.switchRow}>
-                <View style={styles.switchInfo}>
-                  <Text style={styles.switchLabel}>Open to Networking</Text>
-                  <Text style={styles.switchSub}>Allow others to find and contact you</Text>
-                </View>
-                <Switch value={form.networking_enabled} onValueChange={v => setForm(f => ({ ...f, networking_enabled: v }))} trackColor={{ false: Colors.border, true: Colors.primary }} thumbColor={Colors.surface} />
-              </View>
-            </>
-          ) : (
-            <>
-              <InfoRow icon="tennisball-outline" label="Skill Level" value={profile?.skill_level ? `${profile.skill_level}/10 — ${skillLabel(profile.skill_level)}` : '—'} />
-              <InfoRow icon="ribbon-outline" label="USTA Rating" value={profile?.usta_rating || '—'} />
-              <InfoRow icon="flame-outline" label="Competitiveness" value={profile?.competitiveness ? profile.competitiveness.charAt(0).toUpperCase() + profile.competitiveness.slice(1) : '—'} />
-              <InfoRow icon="people-outline" label="Age Range" value={profile?.age_range || '—'} />
-              <InfoRow icon="wifi-outline" label="Networking" value={profile?.networking_enabled ? 'Enabled' : 'Disabled'} />
-            </>
-          )}
-        </Card>
-
-        {/* Settings */}
-        {navigation && (
-          <TouchableOpacity style={styles.settingsBtn} onPress={() => navigation.navigate('Settings')} activeOpacity={0.7}>
-            <Ionicons name="settings-outline" size={20} color={Colors.textSecondary} />
-            <Text style={styles.settingsBtnText}>App Settings</Text>
-            <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} style={{ marginLeft: 'auto' }} />
+    <SafeAreaView style={s.safe} edges={['top']}>
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <View style={s.header}>
+        {navigation?.canGoBack?.() && (
+          <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+            <Ionicons name="chevron-back" size={20} color={Colors.text} />
           </TouchableOpacity>
         )}
-
-        {/* Sign Out */}
-        <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.7}>
-          <Ionicons name="log-out-outline" size={20} color={Colors.error} />
-          <Text style={styles.signOutText}>Sign Out</Text>
+        <Text style={s.headerTitle}>Profile</Text>
+        <TouchableOpacity
+          style={[s.editBtn, editing && s.editBtnSave]}
+          onPress={editing ? handleSave : startEdit}
+          disabled={saving}
+          activeOpacity={0.8}
+        >
+          {saving
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Text style={s.editBtnText}>{editing ? 'Save' : 'Edit'}</Text>
+          }
         </TouchableOpacity>
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+
+        {/* ── Hero ──────────────────────────────────────────────────────── */}
+        <LinearGradient
+          colors={[Palette.dark900, Palette.dark700, Palette.dark600]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={s.hero}
+        >
+          {/* Avatar */}
+          <TouchableOpacity
+            style={s.avatarWrap}
+            onPress={() => showPicker(url => setLocalPicUrl(url))}
+            disabled={uploadingPic}
+            activeOpacity={0.8}
+          >
+            <Avatar name={fullName} size={88} imageUrl={localPicUrl || profile?.profile_picture_url} />
+            <View style={s.cameraOverlay}>
+              {uploadingPic
+                ? <ActivityIndicator size={16} color="#fff" />
+                : <Ionicons name="camera" size={18} color="#fff" />
+              }
+            </View>
+          </TouchableOpacity>
+
+          <Text style={s.heroName}>{fullName}</Text>
+          <Text style={s.heroEmail}>{user?.email}</Text>
+
+          <View style={s.heroBadges}>
+            <View style={[s.levelBadge, { backgroundColor: skillColor(profile?.skill_level) }]}>
+              <Text style={s.levelBadgeText}>{skillLabel(profile?.skill_level)}</Text>
+            </View>
+            {profile?.usta_rating && (
+              <View style={s.ustaBadge}>
+                <Ionicons name="tennisball" size={11} color={Colors.primary} />
+                <Text style={s.ustaBadgeText}>USTA {profile.usta_rating}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Stats row */}
+          <View style={s.statsRow}>
+            {[
+              { label: 'Wins',     value: wins   },
+              { label: 'Losses',   value: losses  },
+              { label: 'Win Rate', value: winRate != null ? `${winRate}%` : '—' },
+              { label: 'Matches',  value: total   },
+            ].map((st, i, arr) => (
+              <React.Fragment key={st.label}>
+                <View style={s.statCol}>
+                  <Text style={s.statNum}>{st.value}</Text>
+                  <Text style={s.statLbl}>{st.label}</Text>
+                </View>
+                {i < arr.length - 1 && <View style={s.statDiv} />}
+              </React.Fragment>
+            ))}
+          </View>
+        </LinearGradient>
+
+        {/* ── Personal Info ──────────────────────────────────────────────── */}
+        <SectionLabel>Personal Information</SectionLabel>
+        <View style={s.card}>
+          {editing ? (
+            <>
+              <View style={s.twoCol}>
+                <View style={{ flex: 1 }}>
+                  <FieldLabel>First Name</FieldLabel>
+                  <TextInput style={s.input} value={form.first_name} onChangeText={v => setForm(f => ({ ...f, first_name: v }))} placeholder="First name" placeholderTextColor={Colors.textMuted} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <FieldLabel>Last Name</FieldLabel>
+                  <TextInput style={s.input} value={form.last_name} onChangeText={v => setForm(f => ({ ...f, last_name: v }))} placeholder="Last name" placeholderTextColor={Colors.textMuted} />
+                </View>
+              </View>
+              <FieldLabel>Phone</FieldLabel>
+              <TextInput style={s.input} value={form.phone} onChangeText={v => setForm(f => ({ ...f, phone: v }))} placeholder="+1 (555) 000-0000" placeholderTextColor={Colors.textMuted} keyboardType="phone-pad" />
+              <View style={s.twoCol}>
+                <View style={{ flex: 2 }}>
+                  <FieldLabel>City</FieldLabel>
+                  <TextInput style={s.input} value={form.city} onChangeText={v => setForm(f => ({ ...f, city: v }))} placeholder="City" placeholderTextColor={Colors.textMuted} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <FieldLabel>ZIP</FieldLabel>
+                  <TextInput style={s.input} value={form.zip_code} onChangeText={v => setForm(f => ({ ...f, zip_code: v }))} placeholder="ZIP" placeholderTextColor={Colors.textMuted} keyboardType="numeric" />
+                </View>
+              </View>
+              <FieldLabel>Bio</FieldLabel>
+              <TextInput style={[s.input, s.textArea]} value={form.bio} onChangeText={v => setForm(f => ({ ...f, bio: v }))} placeholder="Tell others about yourself..." placeholderTextColor={Colors.textMuted} multiline numberOfLines={3} />
+            </>
+          ) : (
+            <>
+              <InfoRow icon="person-outline"   label="Name"     value={fullName} />
+              <InfoRow icon="mail-outline"      label="Email"    value={user?.email || '—'} />
+              <InfoRow icon="call-outline"      label="Phone"    value={profile?.phone || '—'} />
+              <InfoRow icon="location-outline"  label="Location" value={profile?.city && profile?.zip_code ? `${profile.city}, ${profile.zip_code}` : profile?.city || '—'} last={!profile?.bio} />
+              {profile?.bio && <InfoRow icon="document-text-outline" label="Bio" value={profile.bio} last />}
+            </>
+          )}
+        </View>
+
+        {/* ── Tennis Profile ─────────────────────────────────────────────── */}
+        <SectionLabel>Tennis Profile</SectionLabel>
+        <View style={s.card}>
+          {editing ? (
+            <>
+              <FieldLabel>Skill Level (1–10)</FieldLabel>
+              <View style={s.skillGrid}>
+                {SKILL_LEVELS.map(l => (
+                  <TouchableOpacity
+                    key={l}
+                    style={[s.skillBtn, form.skill_level === l && { backgroundColor: skillColor(l), borderColor: skillColor(l) }]}
+                    onPress={() => setForm(f => ({ ...f, skill_level: l }))}
+                  >
+                    <Text style={[s.skillBtnText, form.skill_level === l && { color: '#fff' }]}>{l}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <FieldLabel>USTA Rating</FieldLabel>
+              <TextInput style={s.input} value={form.usta_rating} onChangeText={v => setForm(f => ({ ...f, usta_rating: v }))} placeholder="e.g. 3.5" placeholderTextColor={Colors.textMuted} />
+              <FieldLabel>Playing Style</FieldLabel>
+              <View style={s.chips}>
+                {COMPETITIVENESS.map(c => (
+                  <TouchableOpacity key={c} style={[s.chip, form.competitiveness === c && s.chipActive]} onPress={() => setForm(f => ({ ...f, competitiveness: c }))}>
+                    <Text style={[s.chipText, form.competitiveness === c && s.chipTextActive]}>{c.charAt(0).toUpperCase() + c.slice(1)}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <FieldLabel>Age Range</FieldLabel>
+              <View style={s.chips}>
+                {AGE_RANGES.map(a => (
+                  <TouchableOpacity key={a} style={[s.chip, form.age_range === a && s.chipActive]} onPress={() => setForm(f => ({ ...f, age_range: a }))}>
+                    <Text style={[s.chipText, form.age_range === a && s.chipTextActive]}>{a}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View style={s.switchRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.switchLabel}>Open to Networking</Text>
+                  <Text style={s.switchSub}>Allow others to find and contact you</Text>
+                </View>
+                <Switch value={form.networking_enabled} onValueChange={v => setForm(f => ({ ...f, networking_enabled: v }))} trackColor={{ false: Colors.border, true: Colors.primary }} thumbColor="#fff" />
+              </View>
+            </>
+          ) : (
+            <>
+              <InfoRow icon="tennisball-outline" label="Skill Level"     value={profile?.skill_level ? `${profile.skill_level}/10 — ${skillLabel(profile.skill_level)}` : '—'} />
+              <InfoRow icon="ribbon-outline"     label="USTA Rating"     value={profile?.usta_rating || '—'} />
+              <InfoRow icon="flame-outline"      label="Playing Style"   value={profile?.competitiveness ? profile.competitiveness.charAt(0).toUpperCase() + profile.competitiveness.slice(1) : '—'} />
+              <InfoRow icon="people-outline"     label="Age Range"       value={profile?.age_range || '—'} />
+              <InfoRow icon="wifi-outline"       label="Networking"      value={profile?.networking_enabled !== false ? 'Enabled' : 'Disabled'} last />
+            </>
+          )}
+        </View>
+
+        {/* ── Actions ────────────────────────────────────────────────────── */}
+        <View style={s.actionsSection}>
+          {navigation && (
+            <TouchableOpacity style={s.actionRow} onPress={() => navigation.navigate('Settings')} activeOpacity={0.75}>
+              <View style={[s.actionIcon, { backgroundColor: Palette.gray100 }]}>
+                <Ionicons name="settings-outline" size={18} color={Palette.gray500} />
+              </View>
+              <Text style={s.actionLabel}>App Settings</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+            </TouchableOpacity>
+          )}
+          <View style={s.actionDivider} />
+          <TouchableOpacity style={s.actionRow} onPress={handleSignOut} activeOpacity={0.75}>
+            <View style={[s.actionIcon, { backgroundColor: Palette.redBg }]}>
+              <Ionicons name="log-out-outline" size={18} color={Palette.red500} />
+            </View>
+            <Text style={[s.actionLabel, { color: Palette.red500 }]}>Sign Out</Text>
+            <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-const InfoRow: React.FC<{ icon: keyof typeof Ionicons.glyphMap; label: string; value: string }> = ({ icon, label, value }) => (
-  <View style={infoStyles.row}>
-    <Ionicons name={icon} size={16} color={Colors.textMuted} style={infoStyles.icon} />
-    <View style={infoStyles.content}>
-      <Text style={infoStyles.label}>{label}</Text>
-      <Text style={infoStyles.value}>{value}</Text>
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+const SectionLabel: React.FC<{ children: string }> = ({ children }) => (
+  <Text style={sl.text}>{children}</Text>
+);
+const sl = StyleSheet.create({
+  text: {
+    fontSize: FontSize.xxs,
+    fontWeight: FontWeight.black,
+    color: Palette.gray400,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.xl,
+  },
+});
+
+const FieldLabel: React.FC<{ children: string }> = ({ children }) => (
+  <Text style={fl.text}>{children}</Text>
+);
+const fl = StyleSheet.create({
+  text: {
+    fontSize: FontSize.xxs,
+    fontWeight: FontWeight.bold,
+    color: Palette.gray400,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 5,
+    marginTop: Spacing.md,
+  },
+});
+
+const InfoRow: React.FC<{ icon: any; label: string; value: string; last?: boolean }> = ({ icon, label, value, last = false }) => (
+  <View style={[ir.row, !last && ir.divider]}>
+    <View style={ir.iconWrap}>
+      <Ionicons name={icon} size={16} color={Palette.gray400} />
+    </View>
+    <View style={{ flex: 1 }}>
+      <Text style={ir.label}>{label}</Text>
+      <Text style={ir.value}>{value}</Text>
     </View>
   </View>
 );
-
-const infoStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
-  icon: { marginRight: Spacing.md, marginTop: 2 },
-  content: { flex: 1 },
-  label: { fontSize: FontSize.xs, color: Colors.textMuted, fontWeight: FontWeight.medium, marginBottom: 2 },
-  value: { fontSize: FontSize.md, color: Colors.text },
+const ir = StyleSheet.create({
+  row:    { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 12, gap: Spacing.md },
+  divider:{ borderBottomWidth: 1, borderBottomColor: Colors.separator },
+  iconWrap: { width: 32, height: 32, borderRadius: 8, backgroundColor: Colors.backgroundAlt, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  label:  { fontSize: FontSize.xxs, fontWeight: FontWeight.semibold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
+  value:  { fontSize: FontSize.md, color: Colors.text, fontWeight: FontWeight.medium },
 });
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+// ─────────────────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
+  safe:   { flex: 1, backgroundColor: Colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  editBtnText: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
-  scroll: { flex: 1 },
-  content: { paddingBottom: Spacing.xxxl },
+  scroll: { paddingBottom: 40 },
 
-  heroCard: { margin: Spacing.lg, marginBottom: Spacing.sm },
-  heroRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.lg, marginBottom: Spacing.lg },
-  avatarWrap: { alignItems: 'center', gap: 6 },
-  avatarOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, top: 0, borderRadius: 40, backgroundColor: 'rgba(0,0,0,0.32)', alignItems: 'center', justifyContent: 'center' },
-  changePhotoBtn: { paddingHorizontal: Spacing.xs, paddingVertical: 2 },
-  changePhotoText: { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.semibold },
-  heroInfo: { flex: 1 },
-  heroName: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.text, marginBottom: 2 },
-  heroEmail: { fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: Spacing.sm },
-  heroBadges: { flexDirection: 'row', gap: Spacing.xs, flexWrap: 'wrap' },
-
-  statsRow: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: Colors.borderLight, paddingTop: Spacing.md },
-  statItem: { flex: 1, alignItems: 'center', gap: 2 },
-  statValue: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.text },
-  statLabel: { fontSize: FontSize.xs, color: Colors.textMuted },
-  statDivider: { width: 1, backgroundColor: Colors.borderLight },
-
-  sectionTitle: {
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.semibold,
-    color: Colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginTop: Spacing.xl,
-    marginBottom: Spacing.xs,
-    paddingHorizontal: Spacing.lg,
-  },
-  infoCard: { marginHorizontal: Spacing.lg },
-
-  formRow: { flexDirection: 'row' },
-  formGroup: { marginBottom: Spacing.md },
-  formLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: Spacing.xs },
-  formInput: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm + 2,
-    fontSize: FontSize.md,
-    color: Colors.text,
-    backgroundColor: Colors.surface,
-  },
-  textArea: { height: 80, textAlignVertical: 'top' },
-
-  skillGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  skillBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
+  // Header
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.surface,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+    gap: Spacing.sm,
+    backgroundColor: Colors.background,
   },
-  skillBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  skillBtnText: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.textSecondary },
-  skillBtnTextActive: { color: Colors.textInverse },
-
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  chip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs + 2,
+  backBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: Colors.surface,
+    alignItems: 'center', justifyContent: 'center',
+    ...Shadow.xs,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: FontSize.xxxl,
+    fontWeight: FontWeight.black,
+    color: Colors.text,
+    letterSpacing: -1,
+  },
+  editBtn: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 9,
     borderRadius: Radius.full,
+    backgroundColor: Colors.backgroundAlt,
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  editBtnSave: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+    ...Shadow.orange,
+  },
+  editBtnText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    color: Colors.text,
+  },
+
+  // Hero
+  hero: {
+    marginHorizontal: Spacing.lg,
+    borderRadius: Radius.xl,
+    padding: Spacing.xl,
+    alignItems: 'center',
+    gap: Spacing.sm,
+    overflow: 'hidden',
+    ...Shadow.lg,
+  },
+  avatarWrap: { position: 'relative', marginBottom: 4 },
+  cameraOverlay: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, top: 0,
+    borderRadius: 44,
+    backgroundColor: 'rgba(0,0,0,0.38)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  heroName:  { fontSize: FontSize.xxl, fontWeight: FontWeight.black, color: '#fff', letterSpacing: -0.5, marginTop: 4 },
+  heroEmail: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.55)', fontWeight: FontWeight.medium },
+  heroBadges:{ flexDirection: 'row', gap: 8, marginTop: 4 },
+  levelBadge:{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.full },
+  levelBadgeText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  ustaBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: Radius.full,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.20)',
+  },
+  ustaBadgeText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+
+  statsRow: {
+    flexDirection: 'row',
+    width: '100%',
+    marginTop: Spacing.md,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: Radius.lg,
+    paddingVertical: Spacing.md,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+  },
+  statCol:  { flex: 1, alignItems: 'center', gap: 3 },
+  statNum:  { fontSize: FontSize.xl, fontWeight: FontWeight.black, color: '#fff', letterSpacing: -0.5 },
+  statLbl:  { fontSize: FontSize.xxs, color: 'rgba(255,255,255,0.50)', fontWeight: FontWeight.semibold, textTransform: 'uppercase', letterSpacing: 0.3 },
+  statDiv:  { width: 1, backgroundColor: 'rgba(255,255,255,0.12)', marginVertical: 4 },
+
+  // Card
+  card: {
+    marginHorizontal: Spacing.lg,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderWidth: 1, borderColor: Colors.border,
+    ...Shadow.xs,
+  },
+
+  // Form
+  twoCol: { flexDirection: 'row', gap: Spacing.md },
+  input: {
+    height: 46,
+    borderWidth: 1, borderColor: Colors.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    fontSize: FontSize.md, color: Colors.text,
+    backgroundColor: Colors.surface,
+    marginBottom: 2,
+  },
+  textArea: { height: 80, textAlignVertical: 'top', paddingTop: Spacing.sm },
+
+  skillGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 2 },
+  skillBtn: {
+    width: 46, height: 46, borderRadius: Radius.sm,
+    borderWidth: 1.5, borderColor: Colors.border,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.surface,
+  },
+  skillBtnText: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.textSecondary },
+
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 2 },
+  chip: {
+    paddingHorizontal: Spacing.md, paddingVertical: 7,
+    borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.border,
     backgroundColor: Colors.surface,
   },
   chipActive: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary },
-  chipText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.medium },
-  chipTextActive: { color: Colors.primary, fontWeight: FontWeight.semibold },
+  chipText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
+  chipTextActive: { color: Colors.primary },
 
-  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.sm },
-  switchInfo: { flex: 1 },
-  switchLabel: { fontSize: FontSize.md, fontWeight: FontWeight.medium, color: Colors.text },
-  switchSub: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
-
-  settingsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
+  switchRow: {
+    flexDirection: 'row', alignItems: 'center',
     paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    marginTop: Spacing.lg,
-    marginHorizontal: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.lg,
-    backgroundColor: Colors.surface,
-  },
-  settingsBtnText: { fontSize: FontSize.md, color: Colors.text, fontWeight: FontWeight.medium },
-
-  signOutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.md,
+    borderTopWidth: 1, borderTopColor: Colors.separator,
     marginTop: Spacing.sm,
-    marginHorizontal: Spacing.lg,
-    borderRadius: Radius.lg,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
   },
-  signOutText: { fontSize: FontSize.md, color: Colors.error, fontWeight: FontWeight.semibold },
+  switchLabel: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text },
+  switchSub:   { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
+
+  // Actions section
+  actionsSection: {
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.xl,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+    borderWidth: 1, borderColor: Colors.border,
+    ...Shadow.xs,
+  },
+  actionRow: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg, paddingVertical: 14,
+  },
+  actionIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  actionLabel: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text },
+  actionDivider: { height: 1, backgroundColor: Colors.separator, marginHorizontal: Spacing.lg },
 });

@@ -5,10 +5,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLeagueRegistrations } from '@/hooks/useLeagueRegistrations';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
-import { Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { Palette, Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { LeagueRegistrationModal } from '@/components/ui/LeagueRegistrationModal';
 import type { League } from '@/hooks/useLeagueRegistrations';
 
@@ -58,13 +58,16 @@ export const JoinLeagueScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   const closedLeagues = allLeagues.filter(l => l.status === 'Closed' || l.status === 'Completed');
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScreenHeader
-        title="Join a League"
-        subtitle={player?.skill_level ? `Your level: ${player.skill_level}/10` : 'League registration'}
-        navigation={navigation}
-        showBack
-      />
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <LinearGradient colors={[Palette.dark900, Palette.dark700]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gradHeader}>
+        <TouchableOpacity style={styles.gradBackBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={24} color="#fff" />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.gradTitle}>Join a League</Text>
+          <Text style={styles.gradSub}>{player?.skill_level ? `Your level: ${player.skill_level}/10` : 'League registration'}</Text>
+        </View>
+      </LinearGradient>
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
@@ -260,6 +263,10 @@ export const JoinLeagueScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
+  gradHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.lg, gap: Spacing.md },
+  gradBackBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  gradTitle: { fontSize: 22, fontWeight: FontWeight.black, color: '#fff' },
+  gradSub: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
   content: { padding: Spacing.lg, gap: Spacing.md },
   sectionTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
   sectionSub: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 20, marginTop: -Spacing.sm },

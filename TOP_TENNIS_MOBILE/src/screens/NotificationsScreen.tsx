@@ -1,27 +1,22 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  RefreshControl, ActivityIndicator, TextInput, Animated,
-  Alert, Platform,
+  RefreshControl, ActivityIndicator, TextInput, Alert, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { useNotifications, Notification, NotificationType } from '@/hooks/useNotifications';
-import { Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { Colors, FontSize, FontWeight, Spacing, Radius, Shadow, Palette } from '@/theme/colors';
 import * as ExpoNotifications from 'expo-notifications';
 
 ExpoNotifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
+    shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: true,
+    shouldShowBanner: true, shouldShowList: true,
   }),
 });
 
-async function registerForPushNotificationsAsync(): Promise<string | null> {
+async function registerForPush(): Promise<string | null> {
   if (__DEV__ && Platform.OS === 'web') return null;
   const { status: existing } = await ExpoNotifications.getPermissionsAsync();
   let finalStatus = existing;
@@ -38,90 +33,62 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
       lightColor: '#FF231F7C',
     });
   }
-  const token = await ExpoNotifications.getExpoPushTokenAsync();
-  return token.data;
+  return (await ExpoNotifications.getExpoPushTokenAsync()).data;
 }
 
 type ReadFilter = 'all' | 'unread' | 'read';
 type TypeFilter = 'all' | NotificationType;
 
-const TYPE_LABELS: Record<string, string> = {
-  all: 'All Types',
-  match_invite: 'Match Invites',
-  match_accepted: 'Accepted',
-  match_declined: 'Declined',
-  match_cancelled: 'Cancelled',
-  match_rescheduled: 'Rescheduled',
-  match_scheduled: 'Scheduled',
-  match_result: 'Results',
-  match_suggestion: 'Suggestions',
-  friend_request: 'Friend Requests',
-  friend_accepted: 'Friends',
-  message_received: 'Messages',
-  league_update: 'League',
-  achievement: 'Achievements',
-  general: 'General',
-};
-
 const getIcon = (type: NotificationType): keyof typeof Ionicons.glyphMap => {
   switch (type) {
-    case 'friend_request': return 'person-add-outline';
-    case 'friend_accepted': return 'people-outline';
-    case 'match_invite': return 'tennisball-outline';
+    case 'friend_request':     return 'person-add-outline';
+    case 'friend_accepted':    return 'people-outline';
+    case 'match_invite':       return 'tennisball-outline';
     case 'match_accepted':
-    case 'match_confirmed': return 'checkmark-circle-outline';
+    case 'match_confirmed':    return 'checkmark-circle-outline';
     case 'match_declined':
-    case 'match_cancelled': return 'close-circle-outline';
-    case 'match_rescheduled': return 'calendar-outline';
-    case 'match_scheduled': return 'calendar-outline';
-    case 'match_result': return 'trophy-outline';
-    case 'match_suggestion': return 'people-outline';
-    case 'message_received': return 'chatbubble-outline';
-    case 'league_update': return 'trophy-outline';
-    case 'achievement': return 'ribbon-outline';
-    default: return 'notifications-outline';
+    case 'match_cancelled':    return 'close-circle-outline';
+    case 'match_rescheduled':  return 'calendar-outline';
+    case 'match_scheduled':    return 'calendar-outline';
+    case 'match_result':       return 'trophy-outline';
+    case 'match_suggestion':   return 'people-outline';
+    case 'message_received':   return 'chatbubble-outline';
+    case 'league_update':      return 'trophy-outline';
+    case 'achievement':        return 'ribbon-outline';
+    default:                   return 'notifications-outline';
   }
 };
 
-const getIconColor = (type: NotificationType) => {
+const getIconColor = (type: NotificationType): string => {
   switch (type) {
     case 'friend_request':
-    case 'friend_accepted': return '#3b82f6';
+    case 'friend_accepted':    return Palette.blue500;
     case 'match_invite':
-    case 'match_scheduled': return Colors.primary;
+    case 'match_scheduled':    return Colors.primary;
     case 'match_accepted':
-    case 'match_confirmed': return Colors.success;
+    case 'match_confirmed':    return Palette.green500;
     case 'match_declined':
-    case 'match_cancelled': return Colors.error;
-    case 'match_rescheduled': return Colors.accent;
-    case 'match_result': return '#f59e0b';
-    case 'match_suggestion': return '#8b5cf6';
-    case 'message_received': return '#3b82f6';
-    case 'league_update': return '#10b981';
-    case 'achievement': return '#f59e0b';
-    default: return Colors.textSecondary;
+    case 'match_cancelled':    return Palette.red500;
+    case 'match_rescheduled':  return Colors.accent;
+    case 'match_result':       return Palette.yellow500;
+    case 'match_suggestion':   return Palette.purple500;
+    case 'message_received':   return Palette.blue500;
+    case 'league_update':      return Palette.green500;
+    case 'achievement':        return Palette.yellow500;
+    default:                   return Colors.textSecondary;
   }
-};
-
-const fmtTimeAgo = (date: Date): string => {
-  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (diff < 60) return 'Just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return date.toLocaleDateString();
 };
 
 const getActionLabel = (type: NotificationType): string | null => {
   switch (type) {
-    case 'match_invite': return 'View Invite';
+    case 'match_invite':    return 'View Invite';
     case 'match_accepted':
     case 'match_confirmed': return 'View Match';
-    case 'friend_request': return 'View Request';
-    case 'message_received': return 'Open Chat';
-    case 'league_update': return 'View League';
-    case 'match_suggestion': return 'Find Matches';
-    default: return null;
+    case 'friend_request':  return 'View Request';
+    case 'message_received':return 'Open Chat';
+    case 'league_update':   return 'View League';
+    case 'match_suggestion':return 'Find Matches';
+    default:                return null;
   }
 };
 
@@ -134,71 +101,45 @@ const getNavTarget = (type: NotificationType): string | null => {
     case 'match_cancelled':
     case 'match_rescheduled':
     case 'match_scheduled':
-    case 'match_result': return 'Matches';
+    case 'match_result':   return 'Matches';
     case 'friend_request':
-    case 'friend_accepted': return 'Social';
-    case 'message_received': return 'Messages';
-    case 'league_update': return 'MyLeagues';
-    case 'match_suggestion': return 'CasualMatch';
-    default: return null;
+    case 'friend_accepted':return 'Social';
+    case 'message_received':return 'Messages';
+    case 'league_update':  return 'MyLeagues';
+    case 'match_suggestion':return 'CasualMatch';
+    default:               return null;
   }
 };
 
-function SwipeableRow({ children, onDelete }: { children: React.ReactNode; onDelete: () => void }) {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const [swiped, setSwiped] = useState(false);
+const fmtAgo = (date: Date): string => {
+  const d = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (d < 60)     return 'Just now';
+  if (d < 3600)   return `${Math.floor(d / 60)}m ago`;
+  if (d < 86400)  return `${Math.floor(d / 3600)}h ago`;
+  if (d < 604800) return `${Math.floor(d / 86400)}d ago`;
+  return date.toLocaleDateString();
+};
 
-  const handleSwipe = () => {
-    if (swiped) {
-      Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-      setSwiped(false);
-    } else {
-      Animated.spring(translateX, { toValue: -72, useNativeDriver: true }).start();
-      setSwiped(true);
-    }
-  };
-
-  return (
-    <View style={sw.container}>
-      <View style={sw.deleteAction}>
-        <TouchableOpacity style={sw.deleteBtn} onPress={onDelete}>
-          <Ionicons name="trash-outline" size={22} color="#fff" />
-        </TouchableOpacity>
-      </View>
-      <Animated.View style={{ transform: [{ translateX }] }}>
-        <TouchableOpacity activeOpacity={1} onLongPress={handleSwipe} onPress={() => { if (swiped) { Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start(); setSwiped(false); } }}>
-          {children}
-        </TouchableOpacity>
-      </Animated.View>
-    </View>
-  );
-}
-
-const sw = StyleSheet.create({
-  container: { overflow: 'hidden' },
-  deleteAction: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 72, backgroundColor: Colors.error, alignItems: 'center', justifyContent: 'center' },
-  deleteBtn: { width: 72, height: '100%', alignItems: 'center', justifyContent: 'center' },
-});
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { notifications, unreadCount, loading, markAsRead, markAllAsRead, deleteNotification, markVisibleAsRead, refetch } = useNotifications();
-  const [refreshing, setRefreshing] = useState(false);
-  const [search, setSearch] = useState('');
-  const [readFilter, setReadFilter] = useState<ReadFilter>('all');
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+  const { notifications, unreadCount, loading, markAsRead, markAllAsRead,
+          deleteNotification, markVisibleAsRead, refetch } = useNotifications();
+  const [refreshing, setRefreshing]   = useState(false);
+  const [search, setSearch]           = useState('');
+  const [readFilter, setReadFilter]   = useState<ReadFilter>('all');
+  const [typeFilter, setTypeFilter]   = useState<TypeFilter>('all');
   const [showTypeMenu, setShowTypeMenu] = useState(false);
   const autoMarkedRef = useRef(false);
 
-  useEffect(() => {
-    registerForPushNotificationsAsync().catch(() => {});
-  }, []);
+  useEffect(() => { registerForPush().catch(() => {}); }, []);
 
   useEffect(() => {
     if (loading || autoMarkedRef.current || notifications.length === 0) return;
-    const unreadIds = notifications.slice(0, 20).filter(n => !n.read).map(n => n.id);
-    if (unreadIds.length === 0) return;
+    const ids = notifications.slice(0, 20).filter(n => !n.read).map(n => n.id);
+    if (!ids.length) return;
     autoMarkedRef.current = true;
-    const t = setTimeout(() => markVisibleAsRead(unreadIds), 1500);
+    const t = setTimeout(() => markVisibleAsRead(ids), 1500);
     return () => clearTimeout(t);
   }, [loading, notifications, markVisibleAsRead]);
 
@@ -209,229 +150,317 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
     setRefreshing(false);
   };
 
-  const filtered = useMemo(() => {
-    return notifications.filter(n => {
-      if (readFilter === 'unread' && n.read) return false;
-      if (readFilter === 'read' && !n.read) return false;
-      if (typeFilter !== 'all' && n.type !== typeFilter) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        if (!n.title.toLowerCase().includes(q) && !n.message.toLowerCase().includes(q)) return false;
-      }
-      return true;
-    });
-  }, [notifications, readFilter, typeFilter, search]);
+  const filtered = useMemo(() => notifications.filter(n => {
+    if (readFilter === 'unread' && n.read)   return false;
+    if (readFilter === 'read'   && !n.read)  return false;
+    if (typeFilter !== 'all' && n.type !== typeFilter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      if (!n.title.toLowerCase().includes(q) && !n.message.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  }), [notifications, readFilter, typeFilter, search]);
 
   const handleTap = useCallback((item: Notification) => {
     if (!item.read) markAsRead(item.id);
     const target = getNavTarget(item.type);
-    if (target) {
-      try { navigation.navigate(target); } catch {}
-    }
+    if (target) try { navigation.navigate(target); } catch {}
   }, [markAsRead, navigation]);
-
-  const rightEl = unreadCount > 0 ? (
-    <TouchableOpacity onPress={markAllAsRead} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-      <Text style={styles.markAllText}>All read</Text>
-    </TouchableOpacity>
-  ) : undefined;
-
-  const renderItem = ({ item }: { item: Notification }) => {
-    const iconName = getIcon(item.type);
-    const iconColor = getIconColor(item.type);
-    const actionLabel = getActionLabel(item.type);
-
-    return (
-      <SwipeableRow onDelete={() => {
-        Alert.alert('Delete', 'Remove this notification?', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: () => deleteNotification(item.id) },
-        ]);
-      }}>
-        <TouchableOpacity
-          style={[styles.row, !item.read && styles.rowUnread]}
-          onPress={() => handleTap(item)}
-          activeOpacity={0.75}
-        >
-          <View style={[styles.iconWrap, { backgroundColor: iconColor + '18' }]}>
-            <Ionicons name={iconName} size={22} color={iconColor} />
-          </View>
-          <View style={styles.content}>
-            <View style={styles.titleRow}>
-              <Text style={[styles.title, !item.read && styles.titleUnread]} numberOfLines={1}>
-                {item.title}
-              </Text>
-              {!item.read && <View style={styles.dot} />}
-            </View>
-            <Text style={styles.message} numberOfLines={2}>{item.message}</Text>
-            <View style={styles.meta}>
-              <Text style={styles.time}>{fmtTimeAgo(item.createdAt)}</Text>
-              <View style={styles.typeBadge}>
-                <Text style={styles.typeBadgeText}>{item.type.replace(/_/g, ' ')}</Text>
-              </View>
-            </View>
-            {actionLabel && (
-              <TouchableOpacity style={styles.actionBtn} onPress={() => handleTap(item)}>
-                <Text style={styles.actionBtnText}>{actionLabel}</Text>
-                <Ionicons name="chevron-forward" size={12} color={Colors.primary} />
-              </TouchableOpacity>
-            )}
-          </View>
-        </TouchableOpacity>
-      </SwipeableRow>
-    );
-  };
 
   const hasFilters = readFilter !== 'all' || typeFilter !== 'all' || search !== '';
 
-  return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScreenHeader
-        title="Notifications"
-        subtitle={unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
-        navigation={navigation}
-        showBack
-        rightElement={rightEl}
-      />
+  const TYPE_OPTIONS: [TypeFilter, string][] = [
+    ['all', 'All Types'], ['match_invite', 'Invites'], ['match_accepted', 'Accepted'],
+    ['match_result', 'Results'], ['friend_request', 'Friend Requests'],
+    ['message_received', 'Messages'], ['league_update', 'League'],
+    ['achievement', 'Achievements'], ['general', 'General'],
+  ];
 
-      {/* Search bar */}
-      <View style={styles.searchWrap}>
-        <View style={styles.searchBox}>
-          <Ionicons name="search-outline" size={16} color={Colors.textMuted} />
-          <TextInput
-            style={styles.searchInput}
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search notifications..."
-            placeholderTextColor={Colors.textMuted}
-            returnKeyType="search"
-            clearButtonMode="while-editing"
-          />
+  const renderItem = ({ item }: { item: Notification }) => {
+    const icon       = getIcon(item.type);
+    const iconColor  = getIconColor(item.type);
+    const actionLbl  = getActionLabel(item.type);
+
+    return (
+      <TouchableOpacity
+        style={[s.notifRow, !item.read && s.notifRowUnread]}
+        onPress={() => handleTap(item)}
+        onLongPress={() => Alert.alert('Delete Notification', 'Remove this notification?', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', style: 'destructive', onPress: () => deleteNotification(item.id) },
+        ])}
+        activeOpacity={0.8}
+      >
+        <View style={[s.iconBox, { backgroundColor: iconColor + '18' }]}>
+          <Ionicons name={icon} size={20} color={iconColor} />
+          {!item.read && <View style={s.unreadDot} />}
         </View>
+
+        <View style={{ flex: 1 }}>
+          <View style={s.notifTitleRow}>
+            <Text style={[s.notifTitle, !item.read && s.notifTitleBold]} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <Text style={s.notifTime}>{fmtAgo(item.createdAt)}</Text>
+          </View>
+          <Text style={s.notifMsg} numberOfLines={2}>{item.message}</Text>
+          {actionLbl && (
+            <TouchableOpacity style={s.actionPill} onPress={() => handleTap(item)}>
+              <Text style={s.actionPillText}>{actionLbl}</Text>
+              <Ionicons name="chevron-forward" size={11} color={Colors.primary} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <SafeAreaView style={s.safe} edges={['top']}>
+
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <View style={s.header}>
+        <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <Ionicons name="chevron-back" size={20} color={Colors.text} />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={s.headerTitle}>Notifications</Text>
+          {unreadCount > 0 && <Text style={s.headerSub}>{unreadCount} unread</Text>}
+        </View>
+        {unreadCount > 0 && (
+          <TouchableOpacity style={s.markAllBtn} onPress={markAllAsRead} activeOpacity={0.8}>
+            <Text style={s.markAllTxt}>Mark all read</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Filter bar */}
-      <View style={styles.filterBar}>
-        {(['all', 'unread', 'read'] as ReadFilter[]).map(f => (
-          <TouchableOpacity
-            key={f}
-            style={[styles.filterChip, readFilter === f && styles.filterChipActive]}
-            onPress={() => setReadFilter(f)}
-          >
-            <Text style={[styles.filterChipText, readFilter === f && styles.filterChipTextActive]}>
-              {f === 'all' ? 'All' : f === 'unread' ? 'Unread' : 'Read'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-        <TouchableOpacity
-          style={[styles.filterChip, typeFilter !== 'all' && styles.filterChipActive]}
-          onPress={() => setShowTypeMenu(v => !v)}
-        >
-          <Ionicons name="funnel-outline" size={13} color={typeFilter !== 'all' ? '#fff' : Colors.textSecondary} />
-          <Text style={[styles.filterChipText, typeFilter !== 'all' && styles.filterChipTextActive]}>
-            {typeFilter === 'all' ? 'Type' : TYPE_LABELS[typeFilter] ?? typeFilter}
-          </Text>
-        </TouchableOpacity>
-        {hasFilters && (
-          <TouchableOpacity style={styles.clearBtn} onPress={() => { setSearch(''); setReadFilter('all'); setTypeFilter('all'); setShowTypeMenu(false); }}>
+      {/* ── Search ──────────────────────────────────────────────────────── */}
+      <View style={s.searchWrap}>
+        <Ionicons name="search" size={16} color={Colors.textMuted} />
+        <TextInput
+          style={s.searchInput}
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search notifications..."
+          placeholderTextColor={Colors.textMuted}
+          returnKeyType="search"
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')}>
             <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Type filter dropdown */}
+      {/* ── Filter pills ────────────────────────────────────────────────── */}
+      <View style={s.filterBar}>
+        {(['all', 'unread', 'read'] as ReadFilter[]).map(f => (
+          <TouchableOpacity
+            key={f}
+            style={[s.filterPill, readFilter === f && s.filterPillActive]}
+            onPress={() => setReadFilter(f)}
+          >
+            <Text style={[s.filterPillText, readFilter === f && s.filterPillTextActive]}>
+              {f === 'all' ? 'All' : f === 'unread' ? 'Unread' : 'Read'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity
+          style={[s.filterPill, typeFilter !== 'all' && s.filterPillActive]}
+          onPress={() => setShowTypeMenu(v => !v)}
+        >
+          <Ionicons name="funnel-outline" size={12} color={typeFilter !== 'all' ? '#fff' : Colors.textMuted} />
+          <Text style={[s.filterPillText, typeFilter !== 'all' && s.filterPillTextActive]}>
+            {typeFilter === 'all' ? 'Type' : typeFilter.replace(/_/g, ' ')}
+          </Text>
+        </TouchableOpacity>
+        {hasFilters && (
+          <TouchableOpacity onPress={() => { setSearch(''); setReadFilter('all'); setTypeFilter('all'); setShowTypeMenu(false); }}>
+            <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* ── Type dropdown ───────────────────────────────────────────────── */}
       {showTypeMenu && (
-        <View style={styles.typeMenu}>
-          {Object.entries(TYPE_LABELS).map(([val, label]) => (
+        <View style={s.typeMenu}>
+          {TYPE_OPTIONS.map(([val, label]) => (
             <TouchableOpacity
               key={val}
-              style={[styles.typeMenuItem, typeFilter === val && styles.typeMenuItemActive]}
-              onPress={() => { setTypeFilter(val as TypeFilter); setShowTypeMenu(false); }}
+              style={[s.typeMenuItem, typeFilter === val && s.typeMenuItemActive]}
+              onPress={() => { setTypeFilter(val); setShowTypeMenu(false); }}
             >
-              <Text style={[styles.typeMenuText, typeFilter === val && styles.typeMenuTextActive]}>{label}</Text>
+              <Text style={[s.typeMenuText, typeFilter === val && { color: Colors.primary, fontWeight: FontWeight.bold }]}>{label}</Text>
               {typeFilter === val && <Ionicons name="checkmark" size={14} color={Colors.primary} />}
             </TouchableOpacity>
           ))}
         </View>
       )}
 
+      {/* ── List ────────────────────────────────────────────────────────── */}
       {loading && !refreshing ? (
-        <View style={styles.center}><ActivityIndicator size="large" color={Colors.primary} /></View>
+        <View style={s.center}><ActivityIndicator size="large" color={Colors.primary} /></View>
       ) : (
         <FlatList
           data={filtered}
           keyExtractor={n => n.id}
-          contentContainerStyle={filtered.length === 0 ? styles.emptyContainer : styles.listContent}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={filtered.length === 0 ? s.emptyContainer : s.listContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ItemSeparatorComponent={() => <View style={s.sep} />}
+          renderItem={renderItem}
           ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="notifications-off-outline" size={56} color={Colors.textMuted} />
-              <Text style={styles.emptyTitle}>
-                {hasFilters ? 'No matching notifications' : 'No notifications'}
-              </Text>
-              <Text style={styles.emptySub}>
-                {hasFilters ? 'Try adjusting your search or filters' : "You're all caught up! Notifications will appear here."}
-              </Text>
+            <View style={s.empty}>
+              <View style={s.emptyIcon}>
+                <Ionicons name="notifications-off-outline" size={32} color={Colors.textMuted} />
+              </View>
+              <Text style={s.emptyTitle}>{hasFilters ? 'No matching notifications' : 'All caught up'}</Text>
+              <Text style={s.emptySub}>{hasFilters ? 'Try adjusting your search or filters' : 'Notifications will appear here.'}</Text>
               {hasFilters && (
-                <TouchableOpacity style={styles.clearFiltersBtn} onPress={() => { setSearch(''); setReadFilter('all'); setTypeFilter('all'); }}>
-                  <Text style={styles.clearFiltersBtnText}>Clear Filters</Text>
+                <TouchableOpacity style={s.clearBtn} onPress={() => { setSearch(''); setReadFilter('all'); setTypeFilter('all'); }}>
+                  <Text style={s.clearBtnText}>Clear Filters</Text>
                 </TouchableOpacity>
               )}
             </View>
           }
-          renderItem={renderItem}
         />
       )}
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+// ─────────────────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  markAllText: { fontSize: FontSize.sm, color: '#fff', fontWeight: FontWeight.semibold },
 
-  searchWrap: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, paddingBottom: Spacing.xs },
-  searchBox: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
-  searchInput: { flex: 1, fontSize: FontSize.sm, color: Colors.text },
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+    gap: Spacing.sm,
+    backgroundColor: Colors.background,
+  },
+  backBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: Colors.surface,
+    alignItems: 'center', justifyContent: 'center',
+    ...Shadow.xs,
+  },
+  headerTitle: { fontSize: FontSize.xxxl, fontWeight: FontWeight.black, color: Colors.text, letterSpacing: -1 },
+  headerSub:   { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.semibold, marginTop: 1 },
+  markAllBtn:  {
+    paddingHorizontal: Spacing.md, paddingVertical: 7,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.primaryLight,
+  },
+  markAllTxt:  { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.bold },
 
-  filterBar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm, flexWrap: 'nowrap' },
-  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: Spacing.sm, paddingVertical: 6, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
-  filterChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  filterChipText: { fontSize: FontSize.xs, fontWeight: FontWeight.medium, color: Colors.textSecondary },
-  filterChipTextActive: { color: '#fff' },
-  clearBtn: { marginLeft: Spacing.xs },
+  // Search
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.lg,
+    height: 46,
+    borderWidth: 1, borderColor: Colors.border,
+    ...Shadow.xs,
+  },
+  searchInput: { flex: 1, fontSize: FontSize.sm, color: Colors.text, paddingVertical: 0 },
 
-  typeMenu: { position: 'absolute', top: 180, left: Spacing.md, right: Spacing.md, backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, zIndex: 100, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 8 },
-  typeMenuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
+  // Filters
+  filterBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
+    flexWrap: 'nowrap',
+  },
+  filterPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: Spacing.md, paddingVertical: 6,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surface,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  filterPillActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  filterPillText:   { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: Colors.textSecondary },
+  filterPillTextActive: { color: '#fff' },
+
+  // Type dropdown
+  typeMenu: {
+    position: 'absolute', top: 200, left: Spacing.lg, right: Spacing.lg,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    borderWidth: 1, borderColor: Colors.border,
+    zIndex: 100,
+    ...Shadow.lg,
+  },
+  typeMenuItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: Colors.separator,
+  },
   typeMenuItemActive: { backgroundColor: Colors.primaryLight },
   typeMenuText: { fontSize: FontSize.sm, color: Colors.text },
-  typeMenuTextActive: { color: Colors.primary, fontWeight: FontWeight.semibold },
 
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  listContent: { paddingBottom: Spacing.xxxl },
+  // List
+  listContent:    { paddingBottom: 40 },
   emptyContainer: { flex: 1 },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md, paddingTop: 60, paddingHorizontal: Spacing.xl },
-  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text, textAlign: 'center' },
-  emptySub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
-  clearFiltersBtn: { marginTop: Spacing.sm, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.primary },
-  clearFiltersBtnText: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
+  sep:            { height: 1, backgroundColor: Colors.separator },
 
-  separator: { height: 1, backgroundColor: Colors.borderLight },
-  row: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, backgroundColor: Colors.surface, gap: Spacing.md },
-  rowUnread: { backgroundColor: '#eff6ff' },
-  iconWrap: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
-  content: { flex: 1 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginBottom: 2 },
-  title: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.medium, color: Colors.text },
-  titleUnread: { fontWeight: FontWeight.semibold },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.primary, flexShrink: 0 },
-  message: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 18, marginBottom: Spacing.xs },
-  meta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  time: { fontSize: FontSize.xs, color: Colors.textMuted },
-  typeBadge: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.sm, paddingHorizontal: 6, paddingVertical: 2 },
-  typeBadgeText: { fontSize: 10, color: Colors.textSecondary, textTransform: 'capitalize' },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: Spacing.xs, alignSelf: 'flex-start' },
-  actionBtnText: { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.semibold },
+  // Notification row
+  notifRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 14,
+    backgroundColor: Colors.surface,
+    gap: Spacing.md,
+  },
+  notifRowUnread: { backgroundColor: '#F0F5FF' },
+  iconBox: {
+    width: 46, height: 46,
+    borderRadius: 23,
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+    position: 'relative',
+  },
+  unreadDot: {
+    position: 'absolute', top: 2, right: 2,
+    width: 10, height: 10, borderRadius: 5,
+    backgroundColor: Colors.primary,
+    borderWidth: 1.5, borderColor: Colors.surface,
+  },
+  notifTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 3 },
+  notifTitle: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.medium, color: Colors.text },
+  notifTitleBold: { fontWeight: FontWeight.bold },
+  notifTime:  { fontSize: FontSize.xxs, color: Colors.textMuted, flexShrink: 0 },
+  notifMsg:   { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 19 },
+  actionPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: Radius.full,
+  },
+  actionPillText: { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.bold },
+
+  // Empty
+  center:     { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  empty:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: Spacing.md },
+  emptyIcon:  { width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.backgroundAlt, alignItems: 'center', justifyContent: 'center' },
+  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
+  emptySub:   { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', paddingHorizontal: 32, lineHeight: 20 },
+  clearBtn:   { backgroundColor: Colors.primaryLight, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderRadius: Radius.full },
+  clearBtnText:{ fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.bold },
 });

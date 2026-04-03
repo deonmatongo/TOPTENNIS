@@ -5,13 +5,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useMatches } from '@/hooks/useMatches';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar } from '@/components/ui/Avatar';
 import { MatchInviteResponseModal } from '@/components/ui/MatchInviteResponseModal';
 import { supabase } from '@/services/supabase';
-import { Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { Palette, Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { format, differenceInHours } from 'date-fns';
 
 type StatusFilter = 'all' | 'pending' | 'accepted' | 'declined' | 'cancelled';
@@ -237,8 +237,16 @@ export const ManageBookingsScreen: React.FC<{ navigation: any }> = ({ navigation
   const currentData = tabData[activeTab];
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScreenHeader title="Manage Bookings" subtitle="All your match invitations" navigation={navigation} showBack />
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <LinearGradient colors={[Palette.dark900, Palette.dark700]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gradHeader}>
+        <TouchableOpacity style={styles.gradBackBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={24} color="#fff" />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.gradTitle}>Manage Bookings</Text>
+          <Text style={styles.gradSub}>All your match invitations</Text>
+        </View>
+      </LinearGradient>
 
       {/* Search */}
       <View style={styles.searchRow}>
@@ -329,6 +337,10 @@ export const ManageBookingsScreen: React.FC<{ navigation: any }> = ({ navigation
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
+  gradHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.lg, gap: Spacing.md },
+  gradBackBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  gradTitle: { fontSize: 22, fontWeight: FontWeight.black, color: '#fff' },
+  gradSub: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
 
   searchRow: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.background, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderWidth: 1, borderColor: Colors.border },

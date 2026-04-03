@@ -5,6 +5,7 @@ import {
   ActivityIndicator, Alert, ScrollView, Clipboard, Modal,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useConversations, Conversation, ConversationMember, ConversationMessage } from '@/hooks/useConversations';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
@@ -13,23 +14,8 @@ import { useOnlinePresence } from '@/hooks/useOnlinePresence';
 import { useTypingIndicator, TypingUser } from '@/hooks/useTypingIndicator';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar } from '@/components/ui/Avatar';
-import { Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { Palette, Colors, Shadow, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
-
-// ── Chat design tokens ─────────────────────────────────────────────────────────
-const C = {
-  chatBg:    '#ECE5DD',
-  sentBg:    '#FFF7ED',       // warm orange tint — brand-consistent
-  sentText:  '#0F172A',
-  recvBg:    '#FFFFFF',
-  recvText:  '#0F172A',
-  inputBar:  '#F0F2F5',
-  muted:     '#667781',
-  tick:      '#53BDEB',
-  divBg:     Colors.primaryLight,
-  divText:   Colors.primary,
-  onlineDot: '#25D366',
-};
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -44,9 +30,9 @@ const fmtConvTime = (d?: string) => {
 const fmtMsgTime = (d: string) => format(new Date(d), 'h:mm a');
 const fmtDivider = (d: string) => {
   const date = new Date(d);
-  if (isToday(date)) return 'TODAY';
-  if (isYesterday(date)) return 'YESTERDAY';
-  return format(date, 'MMMM d, yyyy').toUpperCase();
+  if (isToday(date)) return 'Today';
+  if (isYesterday(date)) return 'Yesterday';
+  return format(date, 'MMMM d, yyyy');
 };
 
 function getConvName(conv: Conversation, uid: string): string {
@@ -83,7 +69,7 @@ function buildItems(messages: ConversationMessage[]): ListItem[] {
     (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
   for (const msg of sorted) {
-    if (msg.deleted_at) continue; // skip hard-deleted messages
+    if (msg.deleted_at) continue;
     const d = new Date(msg.created_at);
     if (!lastDate || !isSameDay(d, lastDate)) {
       items.push({ type: 'divider', label: fmtDivider(msg.created_at), key: `div_${msg.id}` });
@@ -94,22 +80,37 @@ function buildItems(messages: ConversationMessage[]): ListItem[] {
   return items;
 }
 
+// ── Chat tokens ────────────────────────────────────────────────────────────────
+
+const CHAT = {
+  bg: '#F1F0EE',
+  sentBg: '#FFF7ED',
+  sentBorder: Colors.primaryMuted,
+  recvBg: '#FFFFFF',
+  recvBorder: Colors.borderLight,
+  muted: '#8696A0',
+  tick: Colors.primary,
+  inputBg: '#F0F2F5',
+  divBg: 'rgba(241,240,238,0.9)',
+  divText: Colors.textSecondary,
+};
+
 // ── Online dot ─────────────────────────────────────────────────────────────────
 
 const OnlineDot: React.FC<{ online: boolean; size?: number }> = ({ online, size = 12 }) => {
   if (!online) return null;
   return (
-    <View style={[dot.ring, { width: size + 4, height: size + 4, borderRadius: (size + 4) / 2 }]}>
-      <View style={[dot.dot, { width: size, height: size, borderRadius: size / 2 }]} />
+    <View style={[od.ring, { width: size + 4, height: size + 4, borderRadius: (size + 4) / 2 }]}>
+      <View style={[od.dot, { width: size, height: size, borderRadius: size / 2 }]} />
     </View>
   );
 };
-const dot = StyleSheet.create({
+const od = StyleSheet.create({
   ring: { backgroundColor: '#fff', position: 'absolute', bottom: 0, right: 0, alignItems: 'center', justifyContent: 'center' },
-  dot: { backgroundColor: C.onlineDot },
+  dot: { backgroundColor: '#25D366' },
 });
 
-// ── Typing Indicator bar ───────────────────────────────────────────────────────
+// ── Typing indicator ───────────────────────────────────────────────────────────
 
 const TypingBar: React.FC<{ users: TypingUser[] }> = ({ users }) => {
   if (users.length === 0) return null;
@@ -126,10 +127,10 @@ const TypingBar: React.FC<{ users: TypingUser[] }> = ({ users }) => {
   );
 };
 const ty = StyleSheet.create({
-  wrap: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: Spacing.lg, paddingVertical: 5, backgroundColor: 'rgba(236,229,221,0.9)' },
+  wrap: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: Spacing.lg, paddingVertical: 5, backgroundColor: CHAT.bg },
   dots: { flexDirection: 'row', gap: 3 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.muted },
-  txt: { fontSize: 12, color: C.muted, fontStyle: 'italic' },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: CHAT.muted },
+  txt: { fontSize: 12, color: CHAT.muted, fontStyle: 'italic' },
 });
 
 // ── Reply preview ──────────────────────────────────────────────────────────────
@@ -147,7 +148,7 @@ const ReplyPreview: React.FC<{ msg: ConversationMessage; onClear: () => void }> 
   </View>
 );
 const rp = StyleSheet.create({
-  wrap: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F0F2F5', paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.borderLight },
+  wrap: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.borderLight },
   bar: { width: 3, height: '100%', borderRadius: 2, backgroundColor: Colors.primary },
   name: { fontSize: 12, fontWeight: FontWeight.bold, color: Colors.primary },
   content: { fontSize: 12, color: Colors.textSecondary },
@@ -187,11 +188,8 @@ const Bubble: React.FC<{
       <View style={bub.col}>
         {showName && <Text style={bub.senderName}>{senderName}</Text>}
 
-        <TouchableOpacity onLongPress={onLongPress} activeOpacity={0.85} delayLongPress={300}>
+        <TouchableOpacity onLongPress={onLongPress} activeOpacity={0.88} delayLongPress={300}>
           <View style={[bub.bubble, isMine ? bub.bubR : bub.bubL]}>
-            {!prevSameSender && (isMine ? <View style={bub.tailR} /> : <View style={bub.tailL} />)}
-
-            {/* Reply context */}
             {replySource && (
               <View style={bub.replyBox}>
                 <View style={bub.replyBar} />
@@ -201,11 +199,10 @@ const Bubble: React.FC<{
                 </View>
               </View>
             )}
-
             <Text style={[bub.text, isMine ? bub.textR : bub.textL]}>{item.content}</Text>
             <View style={bub.meta}>
               <Text style={[bub.time, isMine ? bub.timeR : bub.timeL]}>{fmtMsgTime(item.created_at)}</Text>
-              {isMine && <Ionicons name="checkmark-done" size={13} color={C.tick} style={{ marginLeft: 2 }} />}
+              {isMine && <Ionicons name="checkmark-done" size={13} color={CHAT.tick} style={{ marginLeft: 2 }} />}
             </View>
           </View>
         </TouchableOpacity>
@@ -232,8 +229,8 @@ const Bubble: React.FC<{
             )}
             <View style={bub.menuSep} />
             <TouchableOpacity style={bub.menuItem} onPress={onDismiss}>
-              <Ionicons name="close" size={14} color={C.muted} />
-              <Text style={[bub.menuTxt, { color: C.muted }]}>Cancel</Text>
+              <Ionicons name="close" size={14} color={CHAT.muted} />
+              <Text style={[bub.menuTxt, { color: CHAT.muted }]}>Dismiss</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -250,23 +247,21 @@ const bub = StyleSheet.create({
   avatarCol: { width: 32, alignItems: 'flex-start', justifyContent: 'flex-end', marginRight: 4 },
   col: { maxWidth: '76%' },
   senderName: { fontSize: 11, fontWeight: FontWeight.semibold, color: Colors.primary, marginBottom: 2, marginLeft: 10 },
-  bubble: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, paddingBottom: 5 },
-  bubR: { backgroundColor: C.sentBg, borderTopRightRadius: 2, borderWidth: 1, borderColor: Colors.primaryMuted },
-  bubL: { backgroundColor: C.recvBg, borderTopLeftRadius: 2, borderWidth: 1, borderColor: Colors.borderLight, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
-  tailR: { position: 'absolute', top: 0, right: -7, width: 0, height: 0, borderTopWidth: 10, borderLeftWidth: 8, borderTopColor: Colors.primaryMuted, borderLeftColor: 'transparent' },
-  tailL: { position: 'absolute', top: 0, left: -7, width: 0, height: 0, borderTopWidth: 10, borderRightWidth: 8, borderTopColor: Colors.borderLight, borderRightColor: 'transparent' },
-  replyBox: { flexDirection: 'row', gap: 6, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 6, padding: 6, marginBottom: 5 },
+  bubble: { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, paddingBottom: 5 },
+  bubR: { backgroundColor: CHAT.sentBg, borderTopRightRadius: 3, borderWidth: 1, borderColor: CHAT.sentBorder },
+  bubL: { backgroundColor: CHAT.recvBg, borderTopLeftRadius: 3, borderWidth: 1, borderColor: CHAT.recvBorder, ...Shadow.xs },
+  replyBox: { flexDirection: 'row', gap: 6, backgroundColor: 'rgba(0,0,0,0.06)', borderRadius: 8, padding: 6, marginBottom: 6 },
   replyBar: { width: 3, borderRadius: 2, backgroundColor: Colors.primary, alignSelf: 'stretch' },
   replyName: { fontSize: 11, fontWeight: FontWeight.semibold, color: Colors.primary },
   replyContent: { fontSize: 11, color: Colors.textSecondary },
-  text: { fontSize: FontSize.md, lineHeight: 21, color: C.sentText },
-  textR: { color: C.sentText },
-  textL: { color: C.recvText },
-  meta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 2, gap: 1 },
+  text: { fontSize: FontSize.md, lineHeight: 21 },
+  textR: { color: '#1A1A2E' },
+  textL: { color: '#1A1A2E' },
+  meta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 3, gap: 1 },
   time: { fontSize: 10 },
   timeR: { color: Colors.primary },
-  timeL: { color: C.muted },
-  menu: { flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: 10, marginTop: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6, overflow: 'hidden', alignSelf: 'flex-start' },
+  timeL: { color: CHAT.muted },
+  menu: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 12, marginTop: 4, ...Shadow.md, overflow: 'hidden', alignSelf: 'flex-start' },
   menuR: { alignSelf: 'flex-end' },
   menuL: { alignSelf: 'flex-start' },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 10 },
@@ -293,55 +288,101 @@ const GroupCreateModal: React.FC<{
   const handleCreate = async () => {
     if (!name.trim() || selected.size === 0) return;
     setCreating(true);
-    try { await onSubmit(name.trim(), Array.from(selected)); setName(''); setSelected(new Set()); onClose(); }
-    catch (e: any) { Alert.alert('Error', e?.message || 'Failed to create group'); }
+    try {
+      await onSubmit(name.trim(), Array.from(selected));
+      setName(''); setSelected(new Set()); onClose();
+    } catch (e: any) { Alert.alert('Error', e?.message || 'Failed to create group'); }
     finally { setCreating(false); }
   };
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={md.safe}>
-        <View style={md.hdr}>
-          <TouchableOpacity onPress={onClose} style={md.closeBtn}>
+      <SafeAreaView style={gcm.safe}>
+        <View style={gcm.header}>
+          <TouchableOpacity onPress={onClose} style={gcm.closeBtn}>
             <Ionicons name="close" size={20} color={Colors.textSecondary} />
           </TouchableOpacity>
-          <Text style={md.title}>New Group</Text>
-          <TouchableOpacity onPress={handleCreate} disabled={!name.trim() || selected.size < 1 || creating} style={[md.saveBtn, (!name.trim() || selected.size < 1) && { opacity: 0.4 }]}>
-            {creating ? <ActivityIndicator size="small" color="#fff" /> : <Text style={md.saveTxt}>Create</Text>}
+          <Text style={gcm.title}>New Group</Text>
+          <TouchableOpacity
+            onPress={handleCreate}
+            disabled={!name.trim() || selected.size < 1 || creating}
+            style={[gcm.createBtn, (!name.trim() || selected.size < 1) && { opacity: 0.4 }]}
+          >
+            {creating ? <ActivityIndicator size="small" color="#fff" /> : <Text style={gcm.createBtnTxt}>Create</Text>}
           </TouchableOpacity>
         </View>
-        <View style={md.nameRow}>
-          <View style={md.nameIcon}><Ionicons name="people" size={20} color="#fff" /></View>
-          <TextInput style={md.nameInput} placeholder="Group name" placeholderTextColor={Colors.textMuted} value={name} onChangeText={setName} maxLength={50} autoFocus />
+
+        <View style={gcm.nameRow}>
+          <View style={gcm.nameIcon}>
+            <Ionicons name="people" size={20} color="#fff" />
+          </View>
+          <TextInput
+            style={gcm.nameInput}
+            placeholder="Group name..."
+            placeholderTextColor={Colors.textMuted}
+            value={name}
+            onChangeText={setName}
+            maxLength={50}
+          />
         </View>
-        <Text style={md.sectionLbl}>ADD MEMBERS{selected.size > 0 ? ` · ${selected.size} selected` : ''}</Text>
-        <ScrollView>
-          {friends.length === 0
-            ? <View style={md.emptyWrap}><Ionicons name="people-outline" size={36} color={Colors.textMuted} /><Text style={md.emptyTxt}>Add friends first</Text></View>
-            : friends.map(f => {
-                const on = selected.has(f.userId);
-                return (
-                  <TouchableOpacity key={f.userId} style={md.row} onPress={() => toggle(f.userId)} activeOpacity={0.7}>
-                    <Avatar name={f.name} size={44} imageUrl={f.avatar} />
-                    <Text style={md.rowName}>{f.name}</Text>
-                    <View style={[md.chk, on && md.chkOn]}>
-                      {on && <Ionicons name="checkmark" size={13} color="#fff" />}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })
-          }
+
+        {selected.size > 0 && (
+          <Text style={gcm.selCount}>{selected.size} member{selected.size > 1 ? 's' : ''} selected</Text>
+        )}
+
+        <Text style={gcm.sectionLbl}>SELECT FRIENDS</Text>
+        <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
+          {friends.map(f => {
+            const on = selected.has(f.userId);
+            return (
+              <TouchableOpacity key={f.userId} style={gcm.row} onPress={() => toggle(f.userId)}>
+                <Avatar name={f.name} size={44} imageUrl={f.avatar} />
+                <Text style={gcm.rowName}>{f.name}</Text>
+                <View style={[gcm.chk, on && gcm.chkOn]}>
+                  {on && <Ionicons name="checkmark" size={14} color="#fff" />}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+          {friends.length === 0 && (
+            <View style={gcm.emptyWrap}>
+              <Text style={gcm.emptyTxt}>No friends to add yet</Text>
+            </View>
+          )}
         </ScrollView>
       </SafeAreaView>
     </Modal>
   );
 };
 
+const gcm = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: Colors.background },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  closeBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.backgroundAlt, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
+  createBtn: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.md, paddingVertical: 8, borderRadius: Radius.full },
+  createBtnTxt: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: '#fff' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Colors.surface, paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
+  nameIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
+  nameInput: { flex: 1, fontSize: FontSize.lg, color: Colors.text },
+  selCount: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: Colors.primary, paddingHorizontal: Spacing.lg, paddingVertical: 8, backgroundColor: Colors.primaryLight },
+  sectionLbl: { fontSize: 10, fontWeight: FontWeight.bold, color: Colors.textMuted, letterSpacing: 0.8, paddingHorizontal: Spacing.lg, paddingVertical: 10, backgroundColor: Colors.backgroundAlt, textTransform: 'uppercase' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingHorizontal: Spacing.lg, paddingVertical: 12, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
+  rowName: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.medium, color: Colors.text },
+  chk: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
+  chkOn: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  emptyWrap: { alignItems: 'center', paddingTop: 48, gap: 8 },
+  emptyTxt: { fontSize: FontSize.sm, color: Colors.textMuted },
+});
+
 // ── Group Info Modal ───────────────────────────────────────────────────────────
 
 const GroupInfoModal: React.FC<{
-  visible: boolean; onClose: () => void;
-  conv: Conversation; currentUserId: string; isAdmin: boolean;
+  visible: boolean;
+  onClose: () => void;
+  conv: Conversation;
+  currentUserId: string;
+  isAdmin: boolean;
   friends: { userId: string; name: string; avatar?: string }[];
   onRemoveMember: (uid: string) => Promise<void>;
   onAddMember: (uid: string) => Promise<void>;
@@ -357,37 +398,37 @@ const GroupInfoModal: React.FC<{
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={md.safe}>
-        <View style={md.hdr}>
+      <SafeAreaView style={gim.safe}>
+        <View style={gim.header}>
           <View style={{ width: 64 }} />
-          <Text style={md.title}>Group Info</Text>
-          <TouchableOpacity onPress={onClose} style={md.saveBtn}><Text style={md.saveTxt}>Done</Text></TouchableOpacity>
+          <Text style={gim.title}>Group Info</Text>
+          <TouchableOpacity onPress={onClose} style={gim.doneBtn}><Text style={gim.doneTxt}>Done</Text></TouchableOpacity>
         </View>
-        <View style={md.groupHero}>
-          <View style={md.groupAvt}><Ionicons name="people" size={34} color="#fff" /></View>
+        <View style={gim.hero}>
+          <View style={gim.heroAvt}><Ionicons name="people" size={34} color="#fff" /></View>
           {renaming ? (
-            <View style={md.renameRow}>
-              <TextInput style={md.renameInput} value={newName} onChangeText={setNewName} autoFocus maxLength={50} />
+            <View style={gim.renameRow}>
+              <TextInput style={gim.renameInput} value={newName} onChangeText={setNewName} autoFocus maxLength={50} />
               <TouchableOpacity onPress={async () => { if (newName.trim()) { await onRenameGroup(newName.trim()); setRenaming(false); } }}>
-                <Text style={md.saveTxt}>Save</Text>
+                <Text style={gim.doneTxt}>Save</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity style={md.groupNameRow} onPress={() => isAdmin && setRenaming(true)} activeOpacity={isAdmin ? 0.7 : 1}>
-              <Text style={md.groupName}>{conv.name || 'Group Chat'}</Text>
+            <TouchableOpacity style={gim.nameRow} onPress={() => isAdmin && setRenaming(true)} activeOpacity={isAdmin ? 0.7 : 1}>
+              <Text style={gim.heroName}>{conv.name || 'Group Chat'}</Text>
               {isAdmin && <Ionicons name="pencil-outline" size={13} color={Colors.textMuted} style={{ marginLeft: 5 }} />}
             </TouchableOpacity>
           )}
-          <Text style={md.groupSub}>Group · {conv.members.length} members</Text>
+          <Text style={gim.heroSub}>Group · {conv.members.length} members</Text>
         </View>
         <ScrollView contentContainerStyle={{ paddingBottom: 48 }}>
-          <Text style={md.sectionLbl}>MEMBERS</Text>
+          <Text style={gim.sectionLbl}>MEMBERS</Text>
           {conv.members.map(m => (
-            <View key={m.user_id} style={md.row}>
+            <View key={m.user_id} style={gim.row}>
               <Avatar name={getMemberName(m)} size={44} imageUrl={m.profile?.profile_picture_url ?? undefined} />
               <View style={{ flex: 1 }}>
-                <Text style={md.rowName}>{getMemberName(m)}{m.user_id === currentUserId ? ' (you)' : ''}</Text>
-                {m.role === 'admin' && <Text style={md.adminTag}>Group admin</Text>}
+                <Text style={gim.rowName}>{getMemberName(m)}{m.user_id === currentUserId ? ' (you)' : ''}</Text>
+                {m.role === 'admin' && <Text style={gim.adminTag}>Admin</Text>}
               </View>
               {isAdmin && m.user_id !== currentUserId && (
                 <TouchableOpacity onPress={() => Alert.alert('Remove', `Remove ${getMemberName(m)}?`, [
@@ -401,26 +442,26 @@ const GroupInfoModal: React.FC<{
           ))}
           {isAdmin && addable.length > 0 && (
             <>
-              <TouchableOpacity style={md.addRow} onPress={() => setShowAdd(v => !v)}>
-                <View style={md.addIcon}><Ionicons name="person-add-outline" size={17} color={Colors.primary} /></View>
-                <Text style={md.addTxt}>Add Members</Text>
+              <TouchableOpacity style={gim.addRow} onPress={() => setShowAdd(v => !v)}>
+                <View style={gim.addIcon}><Ionicons name="person-add-outline" size={17} color={Colors.primary} /></View>
+                <Text style={gim.addTxt}>Add Members</Text>
                 <Ionicons name={showAdd ? 'chevron-up' : 'chevron-down'} size={15} color={Colors.textMuted} />
               </TouchableOpacity>
               {showAdd && addable.map(f => (
-                <TouchableOpacity key={f.userId} style={md.row} onPress={async () => { setBusy(f.userId); try { await onAddMember(f.userId); } catch {} setBusy(null); }} disabled={busy === f.userId}>
+                <TouchableOpacity key={f.userId} style={gim.row} onPress={async () => { setBusy(f.userId); try { await onAddMember(f.userId); } catch {} setBusy(null); }} disabled={busy === f.userId}>
                   <Avatar name={f.name} size={44} imageUrl={f.avatar} />
-                  <Text style={[md.rowName, { flex: 1 }]}>{f.name}</Text>
+                  <Text style={[gim.rowName, { flex: 1 }]}>{f.name}</Text>
                   {busy === f.userId ? <ActivityIndicator size="small" color={Colors.primary} /> : <Ionicons name="add-circle-outline" size={22} color={Colors.primary} />}
                 </TouchableOpacity>
               ))}
             </>
           )}
-          <TouchableOpacity style={md.leaveBtn} onPress={() => Alert.alert('Leave Group', 'Leave this group?', [
+          <TouchableOpacity style={gim.leaveBtn} onPress={() => Alert.alert('Leave Group', 'Leave this group?', [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Leave', style: 'destructive', onPress: onLeaveGroup },
           ])}>
             <Ionicons name="exit-outline" size={18} color={Colors.error} />
-            <Text style={md.leaveTxt}>Leave Group</Text>
+            <Text style={gim.leaveTxt}>Leave Group</Text>
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
@@ -428,31 +469,23 @@ const GroupInfoModal: React.FC<{
   );
 };
 
-const md = StyleSheet.create({
+const gim = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  hdr: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.backgroundAlt, alignItems: 'center', justifyContent: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border },
   title: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
-  saveBtn: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs + 2, borderRadius: Radius.full, alignItems: 'center', minWidth: 56 },
-  saveTxt: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: '#fff' },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Colors.surface, paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
-  nameIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
-  nameInput: { flex: 1, fontSize: FontSize.lg, color: Colors.text, borderBottomWidth: 2, borderBottomColor: Colors.primary, paddingBottom: 4 },
-  sectionLbl: { fontSize: 10, fontWeight: FontWeight.bold, color: Colors.textMuted, letterSpacing: 0.8, paddingHorizontal: Spacing.lg, paddingVertical: 10, backgroundColor: Colors.backgroundAlt, textTransform: 'uppercase' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingHorizontal: Spacing.lg, paddingVertical: 12, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
-  rowName: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.medium, color: Colors.text },
-  adminTag: { fontSize: 11, color: Colors.primary, fontWeight: FontWeight.semibold, marginTop: 2 },
-  chk: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
-  chkOn: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 12 },
-  emptyTxt: { fontSize: FontSize.sm, color: Colors.textMuted },
-  groupHero: { alignItems: 'center', paddingVertical: 24, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight, gap: 8 },
-  groupAvt: { width: 76, height: 76, borderRadius: 38, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
-  groupNameRow: { flexDirection: 'row', alignItems: 'center' },
-  groupName: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.text },
-  groupSub: { fontSize: FontSize.sm, color: Colors.textMuted },
+  doneBtn: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.md, paddingVertical: 8, borderRadius: Radius.full, minWidth: 64, alignItems: 'center' },
+  doneTxt: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: '#fff' },
+  hero: { alignItems: 'center', paddingVertical: 24, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight, gap: 8 },
+  heroAvt: { width: 76, height: 76, borderRadius: 38, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
+  nameRow: { flexDirection: 'row', alignItems: 'center' },
+  heroName: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.text },
+  heroSub: { fontSize: FontSize.sm, color: Colors.textMuted },
   renameRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: Spacing.lg },
   renameInput: { flex: 1, fontSize: FontSize.lg, color: Colors.text, borderBottomWidth: 2, borderBottomColor: Colors.primary, paddingBottom: 4 },
+  sectionLbl: { fontSize: 10, fontWeight: FontWeight.bold, color: Colors.textMuted, letterSpacing: 0.8, paddingHorizontal: Spacing.lg, paddingVertical: 10, backgroundColor: Colors.backgroundAlt, textTransform: 'uppercase' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingHorizontal: Spacing.lg, paddingVertical: 12, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
+  rowName: { fontSize: FontSize.md, fontWeight: FontWeight.medium, color: Colors.text },
+  adminTag: { fontSize: 11, color: Colors.primary, fontWeight: FontWeight.semibold, marginTop: 2 },
   addRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingHorizontal: Spacing.lg, paddingVertical: 12, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
   addIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
   addTxt: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.primary },
@@ -460,9 +493,42 @@ const md = StyleSheet.create({
   leaveTxt: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.error },
 });
 
+// ── Empty state ────────────────────────────────────────────────────────────────
+
+const EmptyState: React.FC<{
+  icon: any; title: string; sub: string;
+  action?: { label: string; onPress: () => void };
+}> = ({ icon, title, sub, action }) => (
+  <View style={em.wrap}>
+    <View style={em.circle}><Ionicons name={icon} size={32} color={Colors.primary} /></View>
+    <Text style={em.title}>{title}</Text>
+    <Text style={em.sub}>{sub}</Text>
+    {action && (
+      <TouchableOpacity style={em.btn} onPress={action.onPress}>
+        <Text style={em.btnTxt}>{action.label}</Text>
+      </TouchableOpacity>
+    )}
+  </View>
+);
+const em = StyleSheet.create({
+  wrap: { alignItems: 'center', paddingTop: 80, gap: 10, paddingHorizontal: 32 },
+  circle: { width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  title: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
+  sub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  btn: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.sm, borderRadius: Radius.full, marginTop: Spacing.sm },
+  btnTxt: { color: '#fff', fontWeight: FontWeight.semibold, fontSize: FontSize.md },
+});
+
 // ── Main Screen ────────────────────────────────────────────────────────────────
 
 type ActiveTab = 'chats' | 'friends' | 'requests' | 'blocked';
+
+const LIST_TABS: { key: ActiveTab; label: string }[] = [
+  { key: 'chats', label: 'Chats' },
+  { key: 'friends', label: 'Friends' },
+  { key: 'requests', label: 'Requests' },
+  { key: 'blocked', label: 'Blocked' },
+];
 
 export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ navigation, route }) => {
   const { user } = useAuth();
@@ -491,10 +557,8 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
   const [longPressMsg, setLongPressMsg] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
-  // Typing indicator only active in thread view
   const { typingUsers, broadcastTyping } = useTypingIndicator(selectedConvId);
 
-  // open DM from deep link
   useEffect(() => {
     const uid: string | undefined = route?.params?.openDMUserId;
     if (uid && !loading) getOrCreateDM(uid).then(id => openConv(id)).catch(() => {});
@@ -551,7 +615,6 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
   });
   const blockedIds = new Set(blockedUsers.map(b => b.blocked_user_id));
 
-  // Filter out blocked users' DM conversations
   const visibleConvs = conversations.filter(c => {
     if (c.is_group) return true;
     const otherId = getConvOtherId(c, user?.id || '');
@@ -571,7 +634,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
 
   const unreadTotal = getTotalUnread();
 
-  // ── Thread View ──────────────────────────────────────────────────────────────
+  // ── Thread view ──────────────────────────────────────────────────────────────
 
   if (selectedConvId && selectedConv) {
     const convName = getConvName(selectedConv, user?.id || '');
@@ -582,9 +645,14 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
     const msgMap = new Map(selectedConv.messages.map(m => [m.id, m]));
 
     return (
-      <View style={{ flex: 1, backgroundColor: C.chatBg }}>
+      <View style={{ flex: 1, backgroundColor: CHAT.bg }}>
         {/* Thread header */}
-        <View style={[th.header, { paddingTop: insets.top }]}>
+        <LinearGradient
+          colors={[Palette.dark900, Palette.dark800]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[th.header, { paddingTop: insets.top + 8 }]}
+        >
           <TouchableOpacity style={th.backBtn} onPress={() => { setSelectedConvId(null); setReplyTo(null); }}>
             <Ionicons name="chevron-back" size={26} color="#fff" />
           </TouchableOpacity>
@@ -592,7 +660,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
             <View style={{ position: 'relative' }}>
               {selectedConv.is_group
                 ? <View style={th.groupAvt}><Ionicons name="people" size={19} color={Colors.primary} /></View>
-                : <Avatar name={convName} size={36} imageUrl={convAvatar} />
+                : <Avatar name={convName} size={38} imageUrl={convAvatar} />
               }
               {!selectedConv.is_group && <OnlineDot online={otherIsOnline} size={10} />}
             </View>
@@ -601,20 +669,20 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
               <Text style={th.sub} numberOfLines={1}>
                 {selectedConv.is_group
                   ? `${selectedConv.members.length} members`
-                  : otherIsOnline ? 'Online' : 'tap for info'}
+                  : otherIsOnline ? 'Online now' : 'tap for info'}
               </Text>
             </View>
           </TouchableOpacity>
           <View style={th.actions}>
-            <TouchableOpacity style={th.iconBtn}><Ionicons name="videocam-outline" size={21} color="#fff" /></TouchableOpacity>
-            <TouchableOpacity style={th.iconBtn}><Ionicons name="call-outline" size={20} color="#fff" /></TouchableOpacity>
+            <TouchableOpacity style={th.iconBtn}><Ionicons name="videocam-outline" size={22} color="rgba(255,255,255,0.8)" /></TouchableOpacity>
+            <TouchableOpacity style={th.iconBtn}><Ionicons name="call-outline" size={20} color="rgba(255,255,255,0.8)" /></TouchableOpacity>
             {selectedConv.is_group && (
               <TouchableOpacity style={th.iconBtn} onPress={() => setShowGroupInfo(true)}>
-                <Ionicons name="ellipsis-vertical" size={18} color="#fff" />
+                <Ionicons name="ellipsis-vertical" size={18} color="rgba(255,255,255,0.8)" />
               </TouchableOpacity>
             )}
           </View>
-        </View>
+        </LinearGradient>
 
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <FlatList
@@ -662,7 +730,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
             ListEmptyComponent={
               <View style={th.emptyWrap}>
                 <View style={th.emptyPill}>
-                  <Ionicons name="lock-closed" size={12} color={C.muted} />
+                  <Ionicons name="lock-closed" size={12} color={CHAT.muted} />
                   <Text style={th.emptyPillTxt}>Messages are private</Text>
                 </View>
                 <Text style={th.emptyTxt}>Say hello to {convName} 👋</Text>
@@ -671,26 +739,25 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
           />
 
           <TypingBar users={typingUsers} />
-
           {replyTo && <ReplyPreview msg={replyTo} onClear={() => setReplyTo(null)} />}
 
           <View style={[th.inputBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
             <View style={th.inputWrap}>
               <TouchableOpacity style={th.emojiBtn}>
-                <Ionicons name="happy-outline" size={21} color={C.muted} />
+                <Ionicons name="happy-outline" size={22} color={CHAT.muted} />
               </TouchableOpacity>
               <TextInput
                 style={th.input}
                 value={msgInput}
                 onChangeText={handleTyping}
                 placeholder="Message"
-                placeholderTextColor={C.muted}
+                placeholderTextColor={CHAT.muted}
                 multiline
                 maxLength={2000}
                 onFocus={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 300)}
               />
               <TouchableOpacity style={th.attachBtn}>
-                <Ionicons name="attach-outline" size={21} color={C.muted} style={{ transform: [{ rotate: '45deg' }] }} />
+                <Ionicons name="attach-outline" size={22} color={CHAT.muted} style={{ transform: [{ rotate: '45deg' }] }} />
               </TouchableOpacity>
             </View>
             <TouchableOpacity
@@ -702,7 +769,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
                 ? <ActivityIndicator size="small" color="#fff" />
                 : msgInput.trim()
                   ? <Ionicons name="send" size={17} color="#fff" style={{ marginLeft: 2 }} />
-                  : <Ionicons name="mic-outline" size={19} color="#fff" />
+                  : <Ionicons name="mic-outline" size={20} color="#fff" />
               }
             </TouchableOpacity>
           </View>
@@ -730,27 +797,25 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
     );
   }
 
-  // ── List View ────────────────────────────────────────────────────────────────
-
-  const TABS: { key: ActiveTab; label: string; badge?: number }[] = [
-    { key: 'chats',    label: 'Chats',    badge: unreadTotal || undefined },
-    { key: 'friends',  label: 'Friends' },
-    { key: 'requests', label: 'Requests', badge: pendingReceived.length || undefined },
-    { key: 'blocked',  label: 'Blocked' },
-  ];
+  // ── List view ────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={ls.safe} edges={['bottom']}>
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <View style={[ls.header, { paddingTop: insets.top }]}>
+    <SafeAreaView style={ls.safe} edges={['top']}>
+      {/* Header */}
+      <LinearGradient
+        colors={[Palette.dark900, Palette.dark700]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={ls.header}
+      >
         <View style={ls.headerRow}>
-          <View style={ls.headerLeft}>
+          <View style={{ flex: 1 }}>
             <Text style={ls.title}>Messages</Text>
-            <Text style={ls.sub}>
+            <Text style={ls.headerSub}>
               {unreadTotal > 0 ? `${unreadTotal} unread` : pendingReceived.length > 0 ? `${pendingReceived.length} request${pendingReceived.length > 1 ? 's' : ''}` : 'All caught up'}
             </Text>
           </View>
-          <View style={ls.headerRight}>
+          <View style={ls.headerActions}>
             <TouchableOpacity style={ls.hBtn} onPress={() => setShowSearch(v => !v)}>
               <Ionicons name={showSearch ? 'close' : 'search-outline'} size={19} color="#fff" />
             </TouchableOpacity>
@@ -760,23 +825,27 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
           </View>
         </View>
 
-        {/* Tab bar */}
-        <View style={ls.tabBar}>
-          {TABS.map(t => (
-            <TouchableOpacity key={t.key} style={[ls.tab, activeTab === t.key && ls.tabActive]} onPress={() => setActiveTab(t.key)}>
-              <Text style={[ls.tabTxt, activeTab === t.key && ls.tabTxtActive]}>{t.label}</Text>
-              {t.badge != null && t.badge > 0 && (
-                <View style={ls.tabBadge}><Text style={ls.tabBadgeTxt}>{t.badge > 9 ? '9+' : t.badge}</Text></View>
-              )}
-            </TouchableOpacity>
-          ))}
+        {/* Pill tabs */}
+        <View style={ls.tabRow}>
+          {LIST_TABS.map(t => {
+            const badge = t.key === 'chats' ? (unreadTotal || undefined) : t.key === 'requests' ? (pendingReceived.length || undefined) : undefined;
+            const active = activeTab === t.key;
+            return (
+              <TouchableOpacity key={t.key} style={[ls.tab, active && ls.tabActive]} onPress={() => setActiveTab(t.key)}>
+                <Text style={[ls.tabTxt, active && ls.tabTxtActive]}>{t.label}</Text>
+                {badge != null && badge > 0 && (
+                  <View style={ls.tabBadge}><Text style={ls.tabBadgeTxt}>{badge > 9 ? '9+' : badge}</Text></View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
-      </View>
+      </LinearGradient>
 
-      {/* ── Search bar ──────────────────────────────────────────────────────── */}
+      {/* Search bar */}
       {showSearch && (
-        <View style={ls.searchWrap}>
-          <Ionicons name="search-outline" size={15} color={Colors.textMuted} />
+        <View style={ls.searchBar}>
+          <Ionicons name="search-outline" size={16} color={Colors.textMuted} />
           <TextInput
             style={ls.searchInput}
             placeholder={activeTab === 'friends' ? 'Search friends…' : 'Search chats…'}
@@ -787,7 +856,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
           />
           {(searchQuery.length > 0 || friendSearch.length > 0) && (
             <TouchableOpacity onPress={() => { setSearchQuery(''); setFriendSearch(''); }}>
-              <Ionicons name="close-circle" size={15} color={Colors.textMuted} />
+              <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
             </TouchableOpacity>
           )}
         </View>
@@ -802,8 +871,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
         >
-
-          {/* ── CHATS ── */}
+          {/* Chats */}
           {activeTab === 'chats' && (
             filteredConvs.length === 0 ? (
               <EmptyState
@@ -827,23 +895,21 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
               const hasUnread = conv.unreadCount > 0;
 
               return (
-                <TouchableOpacity key={conv.id} style={ls.convRow} onPress={() => openConv(conv.id)} activeOpacity={0.7}>
+                <TouchableOpacity key={conv.id} style={ls.convRow} onPress={() => openConv(conv.id)} activeOpacity={0.75}>
                   <View style={{ position: 'relative' }}>
                     {conv.is_group
-                      ? <View style={ls.groupAvt}><Ionicons name="people" size={24} color="#fff" /></View>
-                      : <Avatar name={name} size={50} imageUrl={avatarUrl} />
+                      ? <View style={ls.groupAvt}><Ionicons name="people" size={22} color="#fff" /></View>
+                      : <Avatar name={name} size={52} imageUrl={avatarUrl} />
                     }
                     {!conv.is_group && <OnlineDot online={online} size={12} />}
                   </View>
                   <View style={ls.convBody}>
                     <View style={ls.convTop}>
-                      <Text style={[ls.convName, hasUnread && ls.bold]} numberOfLines={1}>{name}</Text>
-                      <Text style={[ls.convTime, hasUnread && { color: Colors.primary, fontWeight: FontWeight.semibold }]}>
-                        {fmtConvTime(last?.created_at)}
-                      </Text>
+                      <Text style={[ls.convName, hasUnread && ls.convNameBold]} numberOfLines={1}>{name}</Text>
+                      <Text style={[ls.convTime, hasUnread && ls.convTimeUnread]}>{fmtConvTime(last?.created_at)}</Text>
                     </View>
                     <View style={ls.convBottom}>
-                      <Text style={[ls.convPrev, hasUnread && ls.bold]} numberOfLines={1}>{preview}</Text>
+                      <Text style={[ls.convPrev, hasUnread && ls.convPrevBold]} numberOfLines={1}>{preview}</Text>
                       {hasUnread && (
                         <View style={ls.unreadBadge}>
                           <Text style={ls.unreadTxt}>{conv.unreadCount > 99 ? '99+' : conv.unreadCount}</Text>
@@ -856,7 +922,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
             })
           )}
 
-          {/* ── FRIENDS ── */}
+          {/* Friends */}
           {activeTab === 'friends' && (
             filteredFriends.length === 0 ? (
               <EmptyState icon="people-outline" title="No friends yet" sub="Find players in Build Your Network" />
@@ -866,15 +932,17 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
               if (!friend) return null;
               const online = isOnline(friendUid);
               return (
-                <TouchableOpacity key={req.id} style={ls.convRow}
+                <TouchableOpacity
+                  key={req.id}
+                  style={ls.convRow}
                   onPress={async () => {
                     try { const id = await getOrCreateDM(friendUid); setActiveTab('chats'); openConv(id); }
                     catch { Alert.alert('Error', 'Failed to open chat.'); }
                   }}
-                  activeOpacity={0.7}
+                  activeOpacity={0.75}
                 >
                   <View style={{ position: 'relative' }}>
-                    <Avatar name={friend.name || 'P'} size={50} imageUrl={friend.profile_picture_url} />
+                    <Avatar name={friend.name || 'P'} size={52} imageUrl={friend.profile_picture_url} />
                     <OnlineDot online={online} size={12} />
                   </View>
                   <View style={ls.convBody}>
@@ -891,8 +959,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
                     </Text>
                   </View>
                   <TouchableOpacity style={ls.msgBtn} onPress={async () => {
-                    try { const id = await getOrCreateDM(friendUid); setActiveTab('chats'); openConv(id); }
-                    catch {}
+                    try { const id = await getOrCreateDM(friendUid); setActiveTab('chats'); openConv(id); } catch {}
                   }}>
                     <Ionicons name="chatbubble-ellipses-outline" size={16} color={Colors.primary} />
                   </TouchableOpacity>
@@ -901,7 +968,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
             })
           )}
 
-          {/* ── REQUESTS ── */}
+          {/* Requests */}
           {activeTab === 'requests' && (
             pendingReceived.length === 0 && pendingSent.length === 0 ? (
               <EmptyState icon="person-add-outline" title="No pending requests" sub="Search for players in Build Your Network" />
@@ -912,7 +979,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
                     <Text style={ls.sectionLbl}>RECEIVED · {pendingReceived.length}</Text>
                     {pendingReceived.map(req => (
                       <View key={req.id} style={ls.convRow}>
-                        <Avatar name={req.sender?.name || 'P'} size={50} imageUrl={req.sender?.profile_picture_url} />
+                        <Avatar name={req.sender?.name || 'P'} size={52} imageUrl={req.sender?.profile_picture_url} />
                         <View style={ls.convBody}>
                           <Text style={ls.convName}>{req.sender?.name || 'Unknown'}</Text>
                           {req.sender?.skill_level != null && <Text style={ls.convPrev}>Level {req.sender.skill_level}/10</Text>}
@@ -934,7 +1001,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
                     <Text style={[ls.sectionLbl, pendingReceived.length > 0 && { marginTop: 8 }]}>SENT · {pendingSent.length}</Text>
                     {pendingSent.map(req => (
                       <View key={req.id} style={ls.convRow}>
-                        <Avatar name={req.receiver?.name || 'P'} size={50} imageUrl={req.receiver?.profile_picture_url} />
+                        <Avatar name={req.receiver?.name || 'P'} size={52} imageUrl={req.receiver?.profile_picture_url} />
                         <View style={ls.convBody}>
                           <Text style={ls.convName}>{req.receiver?.name || 'Unknown'}</Text>
                           <Text style={ls.convPrev}>Waiting for response…</Text>
@@ -954,13 +1021,13 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
             )
           )}
 
-          {/* ── BLOCKED ── */}
+          {/* Blocked */}
           {activeTab === 'blocked' && (
             blockedUsers.length === 0 ? (
               <EmptyState icon="ban-outline" title="No blocked users" sub="Block a player from their profile or a conversation" />
             ) : blockedUsers.map(b => (
               <View key={b.id} style={ls.convRow}>
-                <Avatar name={b.blocked_user_name || '?'} size={50} imageUrl={b.blocked_user_profile_picture} />
+                <Avatar name={b.blocked_user_name || '?'} size={52} imageUrl={b.blocked_user_profile_picture} />
                 <View style={ls.convBody}>
                   <Text style={ls.convName}>{b.blocked_user_name || 'Unknown user'}</Text>
                   {b.blocked_user_email && <Text style={ls.convPrev}>{b.blocked_user_email}</Text>}
@@ -974,7 +1041,6 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
               </View>
             ))
           )}
-
         </ScrollView>
       )}
 
@@ -992,122 +1058,88 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
   );
 };
 
-// ── Empty state ────────────────────────────────────────────────────────────────
-
-const EmptyState: React.FC<{
-  icon: any; title: string; sub: string;
-  action?: { label: string; onPress: () => void };
-}> = ({ icon, title, sub, action }) => (
-  <View style={em.wrap}>
-    <View style={em.circle}><Ionicons name={icon} size={36} color={Colors.primary} /></View>
-    <Text style={em.title}>{title}</Text>
-    <Text style={em.sub}>{sub}</Text>
-    {action && (
-      <TouchableOpacity style={em.btn} onPress={action.onPress}>
-        <Text style={em.btnTxt}>{action.label}</Text>
-      </TouchableOpacity>
-    )}
-  </View>
-);
-const em = StyleSheet.create({
-  wrap: { alignItems: 'center', paddingTop: 80, gap: 10, paddingHorizontal: 32 },
-  circle: { width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  title: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
-  sub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
-  btn: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, borderRadius: Radius.full, marginTop: Spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  btnTxt: { color: '#fff', fontWeight: FontWeight.semibold, fontSize: FontSize.md },
-});
-
 // ── Thread styles ──────────────────────────────────────────────────────────────
 
 const th = StyleSheet.create({
-  header: { backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.sm, paddingBottom: Spacing.sm, gap: 4 },
-  backBtn: { padding: 6, marginRight: 2 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.sm, paddingBottom: Spacing.sm, gap: 4 },
+  backBtn: { padding: 8, marginRight: 2 },
   identity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  groupAvt: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
+  groupAvt: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(249,115,22,0.2)', alignItems: 'center', justifyContent: 'center' },
   nameCol: { flex: 1 },
   name: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: '#fff' },
-  sub: { fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 1 },
+  sub: { fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 1 },
   actions: { flexDirection: 'row', alignItems: 'center' },
   iconBtn: { padding: 8 },
   listContent: { paddingVertical: 10, paddingBottom: 12 },
-  divider: { alignItems: 'center', marginVertical: 8 },
-  dividerTxt: { fontSize: 11, fontWeight: FontWeight.semibold, color: C.divText, backgroundColor: C.divBg, paddingHorizontal: 14, paddingVertical: 4, borderRadius: Radius.full, overflow: 'hidden' },
+  divider: { alignItems: 'center', marginVertical: 10 },
+  dividerTxt: { fontSize: 11, fontWeight: FontWeight.semibold, color: Colors.textSecondary, backgroundColor: CHAT.divBg, paddingHorizontal: 14, paddingVertical: 5, borderRadius: Radius.full, overflow: 'hidden' },
   emptyWrap: { alignItems: 'center', paddingTop: 80, gap: 12 },
   emptyPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.07)', paddingHorizontal: 14, paddingVertical: 6, borderRadius: Radius.full },
-  emptyPillTxt: { fontSize: 12, color: C.muted },
-  emptyTxt: { fontSize: FontSize.sm, color: C.muted },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: Spacing.sm, paddingTop: 8, backgroundColor: C.inputBar, gap: 8 },
-  inputWrap: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', backgroundColor: '#fff', borderRadius: 24, paddingHorizontal: 4, paddingVertical: 4, minHeight: 44, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
+  emptyPillTxt: { fontSize: 12, color: CHAT.muted },
+  emptyTxt: { fontSize: FontSize.sm, color: CHAT.muted },
+  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: Spacing.sm, paddingTop: 8, backgroundColor: CHAT.inputBg, gap: 8 },
+  inputWrap: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', backgroundColor: '#fff', borderRadius: 26, paddingHorizontal: 4, paddingVertical: 4, minHeight: 44, ...Shadow.xs },
   emojiBtn: { padding: 8 },
   input: { flex: 1, fontSize: FontSize.md, color: Colors.text, maxHeight: 120, paddingVertical: 6, paddingHorizontal: 4, lineHeight: 20 },
   attachBtn: { padding: 8 },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.muted, alignItems: 'center', justifyContent: 'center' },
-  sendBtnActive: { backgroundColor: Colors.primary, shadowColor: Colors.shadowOrange, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.5, shadowRadius: 8, elevation: 4 },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: CHAT.muted, alignItems: 'center', justifyContent: 'center' },
+  sendBtnActive: { backgroundColor: Colors.primary, ...Shadow.orange },
 });
 
 // ── List styles ────────────────────────────────────────────────────────────────
 
 const ls = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
+  header: { paddingBottom: 8 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: 8 },
+  title: { fontSize: 28, fontWeight: FontWeight.black, color: '#fff' },
+  headerSub: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
+  headerActions: { flexDirection: 'row', gap: Spacing.sm },
+  hBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
 
-  // Header (matches Schedule)
-  header: { backgroundColor: Colors.primary, paddingBottom: 4 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm, paddingBottom: 6 },
-  headerLeft: { flex: 1 },
-  title: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: '#fff' },
-  sub: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.75)', marginTop: 1 },
-  headerRight: { flexDirection: 'row', gap: Spacing.sm },
-  hBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-
-  // Tab bar inside header
-  tabBar: { flexDirection: 'row', paddingHorizontal: Spacing.sm, paddingBottom: Spacing.sm, gap: 4 },
-  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 7, borderRadius: Radius.full, gap: 4, backgroundColor: 'rgba(0,0,0,0.12)' },
+  tabRow: { flexDirection: 'row', paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm, gap: 6 },
+  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, borderRadius: Radius.full, gap: 4, backgroundColor: 'rgba(255,255,255,0.12)' },
   tabActive: { backgroundColor: '#fff' },
-  tabTxt: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: 'rgba(255,255,255,0.8)' },
-  tabTxtActive: { color: Colors.primary },
+  tabTxt: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: 'rgba(255,255,255,0.75)' },
+  tabTxtActive: { color: Palette.dark900 },
   tabBadge: { backgroundColor: Colors.error, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   tabBadgeTxt: { color: '#fff', fontSize: 9, fontWeight: FontWeight.bold },
 
-  // Search bar
-  searchWrap: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
+  searchBar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, paddingHorizontal: Spacing.lg, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
   searchInput: { flex: 1, fontSize: FontSize.sm, color: Colors.text, paddingVertical: 0 },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
 
-  // Conversation rows
-  convRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 13, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight, gap: Spacing.md },
-  groupAvt: { width: 50, height: 50, borderRadius: 25, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
+  convRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: 14, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight, gap: Spacing.md },
+  groupAvt: { width: 52, height: 52, borderRadius: 26, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
   convBody: { flex: 1, minWidth: 0 },
   convTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 },
   convName: { fontSize: FontSize.md, fontWeight: FontWeight.medium, color: Colors.text, flex: 1, marginRight: 4 },
-  bold: { fontWeight: FontWeight.bold, color: Colors.text },
+  convNameBold: { fontWeight: FontWeight.bold },
   convTime: { fontSize: 11, color: Colors.textMuted },
+  convTimeUnread: { color: Colors.primary, fontWeight: FontWeight.semibold },
   convBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   convPrev: { fontSize: FontSize.sm, color: Colors.textSecondary, flex: 1, marginRight: 4 },
+  convPrevBold: { fontWeight: FontWeight.semibold, color: Colors.text },
   unreadBadge: { backgroundColor: Colors.primary, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
   unreadTxt: { color: '#fff', fontSize: 11, fontWeight: FontWeight.bold },
 
-  // Friends tab
   statusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full },
   statusOnline: { backgroundColor: Colors.successLight },
   statusOffline: { backgroundColor: Colors.backgroundAlt },
   statusTxt: { fontSize: 10, fontWeight: FontWeight.semibold },
   statusOnlineTxt: { color: Colors.success },
   statusOfflineTxt: { color: Colors.textMuted },
-  msgBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  msgBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
 
-  // Section labels
-  sectionLbl: { fontSize: 10, fontWeight: FontWeight.bold, color: Colors.textMuted, letterSpacing: 0.8, paddingHorizontal: Spacing.lg, paddingVertical: 8, backgroundColor: Colors.backgroundAlt },
+  sectionLbl: { fontSize: 10, fontWeight: FontWeight.bold, color: Colors.textMuted, letterSpacing: 0.8, paddingHorizontal: Spacing.lg, paddingVertical: 8, backgroundColor: Colors.backgroundAlt, textTransform: 'uppercase' },
 
-  // Request buttons
   reqBtns: { flexDirection: 'row', gap: 8 },
-  acceptBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.success, alignItems: 'center', justifyContent: 'center' },
-  declineBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: Colors.error, alignItems: 'center', justifyContent: 'center' },
+  acceptBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.success, alignItems: 'center', justifyContent: 'center' },
+  declineBtn: { width: 38, height: 38, borderRadius: 19, borderWidth: 1.5, borderColor: Colors.error, alignItems: 'center', justifyContent: 'center' },
   cancelBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.warningLight, paddingHorizontal: Spacing.sm, paddingVertical: 5, borderRadius: Radius.full },
   cancelBtnTxt: { fontSize: 11, color: Colors.warning, fontWeight: FontWeight.semibold },
 
-  // Blocked tab
   unblockBtn: { backgroundColor: Colors.backgroundAlt, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: Spacing.sm, paddingVertical: 6, borderRadius: Radius.full },
   unblockTxt: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: Colors.text },
 });

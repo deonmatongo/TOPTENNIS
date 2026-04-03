@@ -341,8 +341,7 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
         </div>
 
         {/* Aggregate stat strip */}
-        {(totalMatches > 0 || isDisplayingDemo) && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: 'Record', value: isDisplayingDemo ? '4W–1L' : `${totalWins}W–${totalLosses}L`, icon: <Swords className="w-4 h-4 text-primary" />, sub: isDisplayingDemo ? '80% win rate' : `${wr(totalWins, totalMatches)}% win rate` },
               { label: 'Active', value: displayActive.length, icon: <Flame className="w-4 h-4 text-orange-500" />, sub: `${displayCompleted.length} completed` },
@@ -357,8 +356,7 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
                 </CardContent>
               </Card>
             ))}
-          </div>
-        )}
+        </div>
 
         {/* Active leagues */}
         {displayActive.length > 0 && (

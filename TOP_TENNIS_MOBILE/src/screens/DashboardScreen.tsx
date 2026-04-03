@@ -12,7 +12,8 @@ import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { useMatches } from '@/hooks/useMatches';
 import { useLeagueRegistrations } from '@/hooks/useLeagueRegistrations';
 import { useNotifications } from '@/hooks/useNotifications';
-import { Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { Avatar } from '@/components/ui/Avatar';
+import { Palette, Colors, Shadow, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
 
 const ACHIEVEMENTS = [
   { id: 'first_win', icon: 'trophy' as const, label: 'First Win', desc: 'Win your first match', color: '#f59e0b', condition: (w: number) => w >= 1 },
@@ -23,15 +24,29 @@ const ACHIEVEMENTS = [
 ];
 
 const QUICK_ACTIONS = [
-  { label: 'Schedule', icon: 'calendar-outline' as const, screen: 'Schedule', color: Colors.primary },
-  { label: 'Matches', icon: 'tennisball-outline' as const, screen: 'Matches', color: '#ea580c' },
-  { label: 'My Leagues', icon: 'trophy-outline' as const, screen: 'MyLeagues', color: '#f59e0b' },
-  { label: 'Rankings', icon: 'podium-outline' as const, screen: 'Competition', color: '#f59e0b' },
-  { label: 'Performance', icon: 'bar-chart-outline' as const, screen: 'Performance', color: '#8b5cf6' },
-  { label: 'Social', icon: 'people-outline' as const, screen: 'Social', color: '#3b82f6' },
-  { label: 'Messages', icon: 'chatbubble-outline' as const, screen: 'Messages', color: '#10b981' },
-  { label: 'Settings', icon: 'settings-outline' as const, screen: 'Settings', color: Colors.textSecondary },
+  { label: 'Schedule', icon: 'calendar-outline' as const, screen: 'Schedule', bg: '#FFF7ED', color: Palette.orange500 },
+  { label: 'Matches', icon: 'tennisball-outline' as const, screen: 'Matches', bg: '#FEF2F2', color: '#ef4444' },
+  { label: 'My Leagues', icon: 'trophy-outline' as const, screen: 'MyLeagues', bg: '#FEFCE8', color: '#f59e0b' },
+  { label: 'Rankings', icon: 'podium-outline' as const, screen: 'Competition', bg: '#FFF7ED', color: Palette.orange600 },
+  { label: 'Performance', icon: 'bar-chart-outline' as const, screen: 'Performance', bg: '#F5F3FF', color: '#8b5cf6' },
+  { label: 'Social', icon: 'people-outline' as const, screen: 'Social', bg: '#EFF6FF', color: '#3b82f6' },
+  { label: 'Messages', icon: 'chatbubble-outline' as const, screen: 'Messages', bg: '#F0FDF4', color: '#10b981' },
+  { label: 'Settings', icon: 'settings-outline' as const, screen: 'Settings', bg: '#F8FAFC', color: Colors.textSecondary },
 ];
+
+const getGreeting = () => {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+};
+
+const SectionLabel: React.FC<{ text: string; onAction?: () => void; actionText?: string }> = ({ text, onAction, actionText }) => (
+  <View style={s.sectionHead}>
+    <Text style={s.sectionTitle}>{text}</Text>
+    {onAction && <TouchableOpacity onPress={onAction}><Text style={s.sectionLink}>{actionText || 'View All'}</Text></TouchableOpacity>}
+  </View>
+);
 
 export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuth();
@@ -51,6 +66,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const fullName = profile
     ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
     : user?.email?.split('@')[0] || 'Player';
+  const avatarUrl = (profile as any)?.profile_picture_url ?? undefined;
 
   const wins = player?.wins ?? 0;
   const losses = player?.losses ?? 0;
@@ -58,197 +74,197 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
   const streak = player?.current_streak ?? 0;
 
-  const getGreeting = () => {
-    const h = new Date().getHours();
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    return 'Good evening';
-  };
-
   const nextMatch = upcoming[0];
   const activeLeagues = registrations.filter(r => {
     const months = (Date.now() - new Date(r.created_at).getTime()) / (1000 * 60 * 60 * 24 * 30);
     return months < 3;
   });
 
-  const unlockedAchievements = ACHIEVEMENTS.filter(a =>
-    a.condition(wins, losses, streak, registrations.length)
-  );
-
+  const unlockedAchievements = ACHIEVEMENTS.filter(a => a.condition(wins, losses, streak, registrations.length));
   const readinessScore = Math.min(100, (wins * 10) + (streak * 15) + (total > 0 ? 30 : 0));
-  const readinessColor = readinessScore >= 70 ? Colors.success : readinessScore >= 40 ? '#f59e0b' : Colors.error;
 
   const loading = profileLoading || matchesLoading;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={s.safe} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={s.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
       >
-        {/* Hero Banner */}
+        {/* ── Hero card ── */}
         <LinearGradient
-          colors={['#ea580c', '#f97316', '#fb923c']}
+          colors={[Palette.dark900, Palette.dark700]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.hero}
+          style={s.hero}
         >
-          <View style={styles.heroTop}>
+          {/* Top row */}
+          <View style={s.heroTop}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.greeting}>{getGreeting()},</Text>
-              <Text style={styles.heroName}>{fullName} 🎾</Text>
-              <View style={styles.readinessRow}>
-                <View style={[styles.readinessDot, { backgroundColor: readinessColor }]} />
-                <Text style={styles.readinessText}>Match readiness: {readinessScore}%</Text>
+              <Text style={s.greeting}>{getGreeting()}</Text>
+              <Text style={s.heroName}>{fullName}</Text>
+              <View style={s.readinessRow}>
+                <View style={[s.readinessDot, { backgroundColor: readinessScore >= 70 ? '#4ade80' : readinessScore >= 40 ? '#fbbf24' : '#f87171' }]} />
+                <Text style={s.readinessTxt}>Match readiness {readinessScore}%</Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.notifBtn} onPress={() => navigation.navigate('Notifications')}>
-              <Ionicons name="notifications-outline" size={24} color="rgba(255,255,255,0.9)" />
-              {unreadCount > 0 && (
-                <View style={styles.notifBadge}>
-                  <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+            <View style={s.heroRight}>
+              <TouchableOpacity
+                style={s.notifBtn}
+                onPress={() => navigation.navigate('Notifications')}
+              >
+                <Ionicons name="notifications-outline" size={22} color="#fff" />
+                {unreadCount > 0 && (
+                  <View style={s.notifDot}>
+                    <Text style={s.notifDotTxt}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              <Avatar name={fullName} size={44} imageUrl={avatarUrl} style={s.heroAvatar} />
+            </View>
           </View>
 
-          {/* Stat pills */}
-          <View style={styles.heroPills}>
-            <View style={styles.heroPill}>
-              <Text style={styles.heroPillNum}>{wins}</Text>
-              <Text style={styles.heroPillLabel}>Wins</Text>
-            </View>
-            <View style={styles.heroPillDivider} />
-            <View style={styles.heroPill}>
-              <Text style={styles.heroPillNum}>{losses}</Text>
-              <Text style={styles.heroPillLabel}>Losses</Text>
-            </View>
-            <View style={styles.heroPillDivider} />
-            <View style={styles.heroPill}>
-              <Text style={styles.heroPillNum}>{winRate}%</Text>
-              <Text style={styles.heroPillLabel}>Win Rate</Text>
-            </View>
-            <View style={styles.heroPillDivider} />
-            <View style={styles.heroPill}>
-              <Text style={styles.heroPillNum}>{streak}</Text>
-              <Text style={styles.heroPillLabel}>Streak</Text>
-            </View>
+          {/* Stats strip */}
+          <View style={s.statsStrip}>
+            {[
+              { val: wins, label: 'Wins' },
+              { val: losses, label: 'Losses' },
+              { val: `${winRate}%`, label: 'Win Rate' },
+              { val: streak, label: 'Streak' },
+            ].map((stat, i) => (
+              <React.Fragment key={stat.label}>
+                {i > 0 && <View style={s.statDiv} />}
+                <View style={s.statItem}>
+                  <Text style={s.statVal}>{stat.val}</Text>
+                  <Text style={s.statLabel}>{stat.label}</Text>
+                </View>
+              </React.Fragment>
+            ))}
           </View>
         </LinearGradient>
 
-        <View style={styles.content}>
+        <View style={s.body}>
           {/* Pending invites alert */}
           {pendingReceived.length > 0 && (
-            <TouchableOpacity style={styles.alertCard} onPress={() => navigation.navigate('Matches')}>
-              <View style={styles.alertDot} />
+            <TouchableOpacity style={s.alertCard} onPress={() => navigation.navigate('Matches')}>
+              <View style={s.alertPip} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.alertTitle}>
-                  {pendingReceived.length} pending match {pendingReceived.length === 1 ? 'invitation' : 'invitations'}
-                </Text>
-                <Text style={styles.alertSub}>Tap to view and respond</Text>
+                <Text style={s.alertTitle}>{pendingReceived.length} pending match {pendingReceived.length === 1 ? 'invitation' : 'invitations'}</Text>
+                <Text style={s.alertSub}>Tap to view and respond</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={Colors.primary} />
             </TouchableOpacity>
           )}
 
-          {/* Next match */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Next Match</Text>
+          {/* Next Match */}
+          <View style={s.section}>
+            <SectionLabel text="Next Match" onAction={() => navigation.navigate('Schedule')} actionText="Schedule" />
             {matchesLoading ? (
               <ActivityIndicator color={Colors.primary} style={{ marginTop: 16 }} />
             ) : nextMatch ? (
-              <TouchableOpacity style={styles.nextMatchCard} onPress={() => navigation.navigate('Schedule')}>
-                <View style={styles.nextMatchIcon}>
-                  <Ionicons name="tennisball" size={24} color={Colors.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.nextMatchOpponent}>
-                    vs {nextMatch.sender
-                      ? `${nextMatch.sender.first_name || ''} ${nextMatch.sender.last_name || ''}`.trim()
-                      : nextMatch.receiver
-                      ? `${nextMatch.receiver.first_name || ''} ${nextMatch.receiver.last_name || ''}`.trim()
-                      : 'Opponent'}
-                  </Text>
-                  <View style={styles.nextMatchMeta}>
-                    <Ionicons name="calendar-outline" size={13} color={Colors.textMuted} />
-                    <Text style={styles.nextMatchMetaText}>
-                      {new Date(nextMatch.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+              <TouchableOpacity style={s.nextCard} onPress={() => navigation.navigate('Schedule')} activeOpacity={0.85}>
+                <LinearGradient
+                  colors={[Palette.dark800, Palette.dark600]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={s.nextCardGrad}
+                >
+                  <View style={s.nextIcon}>
+                    <Ionicons name="tennisball" size={22} color={Colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.nextOpponent}>
+                      vs {nextMatch.sender
+                        ? `${nextMatch.sender.first_name || ''} ${nextMatch.sender.last_name || ''}`.trim()
+                        : nextMatch.receiver
+                        ? `${nextMatch.receiver.first_name || ''} ${nextMatch.receiver.last_name || ''}`.trim()
+                        : 'Opponent'}
                     </Text>
-                    {nextMatch.start_time && (
-                      <>
-                        <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
-                        <Text style={styles.nextMatchMetaText}>{nextMatch.start_time}</Text>
-                      </>
+                    <View style={s.nextMeta}>
+                      <Ionicons name="calendar-outline" size={12} color="rgba(255,255,255,0.6)" />
+                      <Text style={s.nextMetaTxt}>
+                        {new Date(nextMatch.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                      </Text>
+                      {nextMatch.start_time && (
+                        <>
+                          <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.6)" />
+                          <Text style={s.nextMetaTxt}>{nextMatch.start_time}</Text>
+                        </>
+                      )}
+                    </View>
+                    {nextMatch.court_location && (
+                      <View style={s.nextMeta}>
+                        <Ionicons name="location-outline" size={12} color="rgba(255,255,255,0.6)" />
+                        <Text style={s.nextMetaTxt}>{nextMatch.court_location}</Text>
+                      </View>
                     )}
                   </View>
-                  {nextMatch.court_location && (
-                    <View style={styles.nextMatchMeta}>
-                      <Ionicons name="location-outline" size={13} color={Colors.textMuted} />
-                      <Text style={styles.nextMatchMetaText}>{nextMatch.court_location}</Text>
-                    </View>
-                  )}
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={Colors.primary} />
+                  <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.5)" />
+                </LinearGradient>
               </TouchableOpacity>
             ) : (
-              <View style={styles.emptyCard}>
-                <Ionicons name="calendar-outline" size={32} color={Colors.textMuted} />
-                <Text style={styles.emptyText}>No upcoming matches</Text>
-                <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate('Schedule')}>
-                  <Text style={styles.emptyBtnText}>Schedule a Match</Text>
+              <View style={s.emptyCard}>
+                <View style={s.emptyIconCircle}>
+                  <Ionicons name="calendar-outline" size={28} color={Colors.primary} />
+                </View>
+                <Text style={s.emptyTitle}>No upcoming matches</Text>
+                <Text style={s.emptySub}>Schedule your next game</Text>
+                <TouchableOpacity style={s.emptyBtn} onPress={() => navigation.navigate('Schedule')}>
+                  <Text style={s.emptyBtnTxt}>Schedule a Match</Text>
                 </TouchableOpacity>
               </View>
             )}
           </View>
 
-          {/* Quick actions */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-            <View style={styles.quickGrid}>
-              {QUICK_ACTIONS.map(action => (
+          {/* Quick Actions */}
+          <View style={s.section}>
+            <SectionLabel text="Quick Actions" />
+            <View style={s.quickGrid}>
+              {QUICK_ACTIONS.map(a => (
                 <TouchableOpacity
-                  key={action.screen}
-                  style={styles.quickCard}
-                  onPress={() => navigation.navigate(action.screen)}
+                  key={a.screen}
+                  style={s.quickItem}
+                  onPress={() => navigation.navigate(a.screen)}
+                  activeOpacity={0.8}
                 >
-                  <View style={[styles.quickIcon, { backgroundColor: action.color + '20' }]}>
-                    <Ionicons name={action.icon} size={22} color={action.color} />
+                  <View style={[s.quickIcon, { backgroundColor: a.bg }]}>
+                    <Ionicons name={a.icon} size={22} color={a.color} />
                   </View>
-                  <Text style={styles.quickLabel}>{action.label}</Text>
+                  <Text style={s.quickLabel}>{a.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
 
-          {/* Active leagues */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Active Leagues</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('MyLeagues')}>
-                <Text style={styles.sectionLink}>View All</Text>
-              </TouchableOpacity>
-            </View>
+          {/* Active Leagues */}
+          <View style={s.section}>
+            <SectionLabel text="Active Leagues" onAction={() => navigation.navigate('MyLeagues')} />
             {activeLeagues.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Ionicons name="trophy-outline" size={32} color={Colors.textMuted} />
-                <Text style={styles.emptyText}>No active leagues</Text>
-                <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate('JoinLeague')}>
-                  <Text style={styles.emptyBtnText}>Browse Leagues</Text>
+              <View style={s.emptyCard}>
+                <View style={s.emptyIconCircle}>
+                  <Ionicons name="trophy-outline" size={28} color="#f59e0b" />
+                </View>
+                <Text style={s.emptyTitle}>No active leagues</Text>
+                <Text style={s.emptySub}>Compete with players in your area</Text>
+                <TouchableOpacity style={s.emptyBtn} onPress={() => navigation.navigate('JoinLeague')}>
+                  <Text style={s.emptyBtnTxt}>Browse Leagues</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               activeLeagues.slice(0, 3).map(reg => (
                 <TouchableOpacity
                   key={reg.id}
-                  style={styles.leagueRow}
+                  style={s.leagueRow}
                   onPress={() => navigation.navigate('MyLeagues')}
+                  activeOpacity={0.85}
                 >
-                  <View style={styles.leagueRowIcon}>
+                  <View style={s.leagueBadge}>
                     <Ionicons name="trophy" size={18} color="#f59e0b" />
                   </View>
-                  <Text style={styles.leagueRowName} numberOfLines={1}>{reg.league_name || 'League'}</Text>
-                  <View style={styles.leagueRowBadge}>
-                    <Text style={styles.leagueRowBadgeText}>Active</Text>
+                  <Text style={s.leagueName} numberOfLines={1}>{reg.league_name || 'League'}</Text>
+                  <View style={s.leagueActivePill}>
+                    <Text style={s.leagueActiveTxt}>Active</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
                 </TouchableOpacity>
@@ -257,109 +273,127 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           </View>
 
           {/* Achievements */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Achievements</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Performance')}>
-                <Text style={styles.sectionLink}>View All</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.achievementsRow}>
+          <View style={s.section}>
+            <SectionLabel text="Achievements" onAction={() => navigation.navigate('Performance')} />
+            <View style={s.achieveRow}>
               {ACHIEVEMENTS.map(a => {
                 const unlocked = a.condition(wins, losses, streak, registrations.length);
                 return (
-                  <View key={a.id} style={[styles.achievementBadge, !unlocked && styles.achievementBadgeLocked]}>
-                    <View style={[styles.achievementIcon, { backgroundColor: unlocked ? a.color + '20' : Colors.borderLight }]}>
+                  <View key={a.id} style={[s.achieveItem, !unlocked && s.achieveLocked]}>
+                    <View style={[s.achieveIcon, { backgroundColor: unlocked ? a.color + '20' : Colors.borderLight }]}>
                       <Ionicons name={a.icon} size={20} color={unlocked ? a.color : Colors.textMuted} />
                     </View>
-                    <Text style={[styles.achievementLabel, !unlocked && styles.achievementLabelLocked]} numberOfLines={1}>
-                      {a.label}
-                    </Text>
-                    {!unlocked && <Text style={styles.achievementLockText}>{a.desc}</Text>}
+                    <Text style={[s.achieveLabel, !unlocked && s.achieveLabelGray]} numberOfLines={1}>{a.label}</Text>
+                    {!unlocked && <Text style={s.achieveSub}>{a.desc}</Text>}
                   </View>
                 );
               })}
             </View>
           </View>
 
-          {/* Settings shortcut */}
-          <TouchableOpacity style={styles.settingsRow} onPress={() => navigation.navigate('NotificationSettings')}>
-            <Ionicons name="notifications-outline" size={20} color={Colors.textSecondary} />
-            <Text style={styles.settingsRowText}>Notification Settings</Text>
-            <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.settingsRow} onPress={() => navigation.navigate('Profile')}>
-            <Ionicons name="person-outline" size={20} color={Colors.textSecondary} />
-            <Text style={styles.settingsRowText}>Edit Profile</Text>
-            <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
-          </TouchableOpacity>
+          {/* Shortcuts */}
+          <View style={s.shortcutsCard}>
+            <TouchableOpacity style={s.shortcutRow} onPress={() => navigation.navigate('NotificationSettings')}>
+              <View style={[s.shortcutIcon, { backgroundColor: '#FFF7ED' }]}>
+                <Ionicons name="notifications-outline" size={18} color={Colors.primary} />
+              </View>
+              <Text style={s.shortcutTxt}>Notification Settings</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+            </TouchableOpacity>
+            <View style={s.shortcutDiv} />
+            <TouchableOpacity style={s.shortcutRow} onPress={() => navigation.navigate('Profile')}>
+              <View style={[s.shortcutIcon, { backgroundColor: '#F0FDF4' }]}>
+                <Ionicons name="person-outline" size={18} color="#10b981" />
+              </View>
+              <Text style={s.shortcutTxt}>Edit Profile</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
+  scroll: { paddingBottom: 32 },
 
-  hero: { paddingTop: Spacing.xl, paddingBottom: Spacing.xl, paddingHorizontal: Spacing.lg, gap: Spacing.lg },
-  heroTop: { flexDirection: 'row', alignItems: 'flex-start' },
-  greeting: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.8)', fontWeight: FontWeight.medium },
-  heroName: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: '#fff', marginTop: 2 },
-  readinessRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginTop: Spacing.xs },
+  // ── Hero ──
+  hero: { paddingTop: Spacing.lg, paddingBottom: Spacing.lg, paddingHorizontal: Spacing.lg, gap: Spacing.lg },
+  heroTop: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md },
+  greeting: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.55)', fontWeight: FontWeight.medium, marginBottom: 2 },
+  heroName: { fontSize: 28, fontWeight: FontWeight.black, color: '#fff' },
+  readinessRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
   readinessDot: { width: 8, height: 8, borderRadius: 4 },
-  readinessText: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.85)' },
-  notifBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  notifBadge: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, backgroundColor: '#dc2626', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#ea580c' },
-  notifBadgeText: { fontSize: 9, color: '#fff', fontWeight: FontWeight.bold },
-  heroPills: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: Radius.lg, padding: Spacing.md },
-  heroPill: { flex: 1, alignItems: 'center', gap: 2 },
-  heroPillNum: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: '#fff' },
-  heroPillLabel: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.8)' },
-  heroPillDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.3)', marginVertical: 4 },
+  readinessTxt: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)' },
+  heroRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingTop: 2 },
+  notifBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  notifDot: { position: 'absolute', top: -3, right: -3, width: 18, height: 18, borderRadius: 9, backgroundColor: '#ef4444', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: Palette.dark900 },
+  notifDotTxt: { fontSize: 9, color: '#fff', fontWeight: FontWeight.bold },
+  heroAvatar: { borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)' },
 
-  content: { padding: Spacing.lg, gap: Spacing.lg },
+  statsStrip: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  statItem: { flex: 1, alignItems: 'center', gap: 2 },
+  statVal: { fontSize: FontSize.xl, fontWeight: FontWeight.black, color: '#fff' },
+  statLabel: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)' },
+  statDiv: { width: 1, backgroundColor: 'rgba(255,255,255,0.15)', marginVertical: 4 },
+
+  // ── Body ──
+  body: { padding: Spacing.lg, gap: Spacing.xl },
 
   alertCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.primaryLight, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1.5, borderColor: Colors.primaryMuted },
-  alertDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary },
+  alertPip: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary },
   alertTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.primaryDark },
   alertSub: { fontSize: FontSize.xs, color: Colors.primary, marginTop: 1 },
 
   section: { gap: Spacing.sm },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
   sectionLink: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
 
-  nextMatchCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: Colors.border, borderLeftWidth: 4, borderLeftColor: Colors.primary },
-  nextMatchIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  nextMatchOpponent: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
-  nextMatchMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  nextMatchMetaText: { fontSize: FontSize.xs, color: Colors.textSecondary },
+  // ── Next match card ──
+  nextCard: { borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.md },
+  nextCardGrad: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.lg },
+  nextIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(249,115,22,0.18)', alignItems: 'center', justifyContent: 'center' },
+  nextOpponent: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: '#fff' },
+  nextMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  nextMetaTxt: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)' },
 
-  emptyCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.xl, alignItems: 'center', gap: Spacing.sm, borderWidth: 1, borderColor: Colors.border },
-  emptyText: { fontSize: FontSize.sm, color: Colors.textSecondary },
-  emptyBtn: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderRadius: Radius.md, marginTop: 4 },
-  emptyBtnText: { color: '#fff', fontWeight: FontWeight.semibold, fontSize: FontSize.sm },
+  // ── Empty state ──
+  emptyCard: { backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: Spacing.xl, alignItems: 'center', gap: Spacing.xs, borderWidth: 1, borderColor: Colors.border },
+  emptyIconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.surfaceWarm, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  emptyTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
+  emptySub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center' },
+  emptyBtn: { marginTop: 8, backgroundColor: Colors.primary, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.sm, borderRadius: Radius.full },
+  emptyBtnTxt: { color: '#fff', fontWeight: FontWeight.semibold, fontSize: FontSize.sm },
 
-  quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  quickCard: { width: '30%', backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, alignItems: 'center', gap: Spacing.xs, borderWidth: 1, borderColor: Colors.border },
-  quickIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  quickLabel: { fontSize: FontSize.xs, color: Colors.text, fontWeight: FontWeight.semibold, textAlign: 'center' },
+  // ── Quick actions ──
+  quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  quickItem: { width: '22%', alignItems: 'center', gap: 6 },
+  quickIcon: { width: 52, height: 52, borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center' },
+  quickLabel: { fontSize: 10, fontWeight: FontWeight.semibold, color: Colors.text, textAlign: 'center' },
 
-  leagueRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, borderRadius: Radius.md, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border },
-  leagueRowIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fef9c3', alignItems: 'center', justifyContent: 'center' },
-  leagueRowName: { flex: 1, fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
-  leagueRowBadge: { backgroundColor: '#dcfce7', paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.full },
-  leagueRowBadgeText: { fontSize: FontSize.xs, color: Colors.success, fontWeight: FontWeight.semibold },
+  // ── Active leagues ──
+  leagueRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border, ...Shadow.xs },
+  leagueBadge: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FEFCE8', alignItems: 'center', justifyContent: 'center' },
+  leagueName: { flex: 1, fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
+  leagueActivePill: { backgroundColor: '#DCFCE7', paddingHorizontal: 10, paddingVertical: 3, borderRadius: Radius.full },
+  leagueActiveTxt: { fontSize: FontSize.xs, color: Colors.success, fontWeight: FontWeight.semibold },
 
-  achievementsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  achievementBadge: { width: '18%', alignItems: 'center', gap: 4 },
-  achievementBadgeLocked: { opacity: 0.45 },
-  achievementIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  achievementLabel: { fontSize: 10, fontWeight: FontWeight.semibold, color: Colors.text, textAlign: 'center' },
-  achievementLabelLocked: { color: Colors.textMuted },
-  achievementLockText: { fontSize: 9, color: Colors.textMuted, textAlign: 'center' },
+  // ── Achievements ──
+  achieveRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  achieveItem: { width: '18%', alignItems: 'center', gap: 4 },
+  achieveLocked: { opacity: 0.4 },
+  achieveIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  achieveLabel: { fontSize: 10, fontWeight: FontWeight.semibold, color: Colors.text, textAlign: 'center' },
+  achieveLabelGray: { color: Colors.textMuted },
+  achieveSub: { fontSize: 9, color: Colors.textMuted, textAlign: 'center' },
 
-  settingsRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, borderRadius: Radius.md, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border },
-  settingsRowText: { flex: 1, fontSize: FontSize.sm, color: Colors.text, fontWeight: FontWeight.medium },
+  // ── Shortcuts ──
+  shortcutsCard: { backgroundColor: Colors.surface, borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' },
+  shortcutRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md },
+  shortcutDiv: { height: 1, backgroundColor: Colors.borderLight, marginHorizontal: Spacing.md },
+  shortcutIcon: { width: 36, height: 36, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
+  shortcutTxt: { flex: 1, fontSize: FontSize.sm, color: Colors.text, fontWeight: FontWeight.medium },
 });

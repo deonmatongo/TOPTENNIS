@@ -3,65 +3,106 @@ import { AppState, AppStateStatus } from 'react-native';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
-const HEARTBEAT_INTERVAL = 30_000; // 30 s
-
 /**
- * Tracks Supabase Realtime Presence so components can call isOnline(userId).
- * Uses AppState to un-track when the app goes to background and re-track on foreground.
+ * Tracks online status using the user_presence postgres table + postgres_changes.
+ * Matches the web useGlobalPresence approach (same table, same threshold).
+ *
+ * - Upserts own row on mount / foreground
+ * - 20 s heartbeat to keep last_seen_at fresh
+ * - Deletes own row immediately when app backgrounds
+ * - A user is "online" when last_seen_at is within 60 s
  */
+const HEARTBEAT_INTERVAL = 20_000;   // 20 s
+const ONLINE_THRESHOLD_MS = 60_000;  // 60 s
+
 export const useOnlinePresence = () => {
   const { user } = useAuth();
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
-  const channelRef = useRef<any>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const channelRef = useRef<any>(null);
 
-  const isOnline = useCallback((userId: string) => onlineUserIds.has(userId), [onlineUserIds]);
+  const isOnline = useCallback(
+    (userId: string) => onlineUserIds.has(userId),
+    [onlineUserIds],
+  );
+
+  const fetchOnlineUsers = useCallback(async () => {
+    const cutoff = new Date(Date.now() - ONLINE_THRESHOLD_MS).toISOString();
+    const { data, error } = await supabase
+      .from('user_presence')
+      .select('user_id')
+      .gte('last_seen_at', cutoff);
+    if (error) {
+      console.warn('[presence] fetch error:', error.message);
+      return;
+    }
+    setOnlineUserIds(new Set((data || []).map((r: any) => r.user_id)));
+  }, []);
+
+  const updateOwnPresence = useCallback(async (userId: string) => {
+    const { error } = await supabase
+      .from('user_presence')
+      .upsert({ user_id: userId, last_seen_at: new Date().toISOString() });
+    if (error) console.warn('[presence] upsert error:', error.message);
+  }, []);
+
+  const removeOwnPresence = useCallback(async (userId: string) => {
+    try {
+      await supabase.from('user_presence').delete().eq('user_id', userId);
+    } catch {}
+  }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setOnlineUserIds(new Set());
+      return;
+    }
 
-    const channel = (supabase as any).channel('global-online-presence', {
-      config: { presence: { key: user.id } },
-    });
-    channelRef.current = channel;
+    // Mark self online, then fetch everyone
+    updateOwnPresence(user.id).then(() => fetchOnlineUsers());
 
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        try {
-          const state = channel.presenceState();
-          setOnlineUserIds(new Set(Object.keys(state)));
-        } catch {}
-      })
-      .subscribe(async (status: string) => {
-        if (status === 'SUBSCRIBED') {
-          try {
-            await channel.track({ user_id: user.id, online_at: new Date().toISOString() });
-            if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-            heartbeatRef.current = setInterval(async () => {
-              try { await channel.track({ user_id: user.id, online_at: new Date().toISOString() }); } catch {}
-            }, HEARTBEAT_INTERVAL);
-          } catch {}
-        }
+    // Heartbeat: keep own row fresh + prune stale users
+    heartbeatRef.current = setInterval(() => {
+      updateOwnPresence(user.id);
+      fetchOnlineUsers();
+    }, HEARTBEAT_INTERVAL);
+
+    // Subscribe to postgres_changes — any change = re-fetch the full list
+    const channel = supabase
+      .channel(`mobile-presence-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_presence' },
+        () => { fetchOnlineUsers(); },
+      )
+      .subscribe((status: string) => {
+        if (status === 'SUBSCRIBED') fetchOnlineUsers();
+        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT')
+          console.warn('[presence] channel status:', status);
       });
 
+    channelRef.current = channel;
+
+    // AppState: re-track on foreground, remove on background
     const handleAppState = async (nextState: AppStateStatus) => {
-      if (!channelRef.current) return;
       if (nextState === 'active') {
-        try { await channelRef.current.track({ user_id: user.id, online_at: new Date().toISOString() }); } catch {}
+        await updateOwnPresence(user.id);
+        await fetchOnlineUsers();
       } else if (nextState === 'background' || nextState === 'inactive') {
-        try { await channelRef.current.untrack(); } catch {}
+        if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+        await removeOwnPresence(user.id);
       }
     };
 
-    const sub = AppState.addEventListener('change', handleAppState);
+    const appStateSub = AppState.addEventListener('change', handleAppState);
 
     return () => {
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-      sub.remove();
+      appStateSub.remove();
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
       channelRef.current = null;
-      supabase.removeChannel(channel);
     };
-  }, [user?.id]);
+  }, [user?.id, updateOwnPresence, fetchOnlineUsers, removeOwnPresence]);
 
   return { onlineUserIds, isOnline };
 };

@@ -35,7 +35,9 @@ import { CompetitionScreen } from '@/screens/CompetitionScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { ResetPasswordScreen } from '@/screens/ResetPasswordScreen';
 
-import { Colors } from '@/theme/colors';
+import { Colors, Spacing, Radius, FontSize, FontWeight, Shadow, Palette } from '@/theme/colors';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Avatar } from '@/components/ui/Avatar';
 import { NetworkBanner } from '@/components/ui/NetworkBanner';
 import { supabase } from '@/services/supabase';
 
@@ -50,69 +52,44 @@ function TabNavigator() {
   const unreadMessages = getTotalUnread();
   const totalSocialBadge = friendRequests.length;
 
+  const TAB_ITEMS = [
+    { name: 'Home',     label: 'Home',     icon: 'home',         iconOut: 'home-outline',         badge: 0                                        },
+    { name: 'Schedule', label: 'Schedule', icon: 'calendar',     iconOut: 'calendar-outline',     badge: pendingReceived.length                   },
+    { name: 'Matches',  label: 'Matches',  icon: 'tennisball',   iconOut: 'tennisball-outline',   badge: 0                                        },
+    { name: 'Messages', label: 'Messages', icon: 'chatbubbles',  iconOut: 'chatbubbles-outline',  badge: unreadMessages                           },
+    { name: 'More',     label: 'More',     icon: 'grid',         iconOut: 'grid-outline',         badge: notifCount + totalSocialBadge            },
+  ];
+
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: Colors.tabBar,
-          borderTopColor: Colors.tabBarBorder,
-          borderTopWidth: 1,
-          height: 64,
-          paddingBottom: 8,
-          paddingTop: 6,
+        tabBarStyle: tabStyles.bar,
+        tabBarShowLabel: false,
+        tabBarIcon: ({ focused }) => {
+          const item = TAB_ITEMS.find(t => t.name === route.name)!;
+          return (
+            <View style={[tabStyles.iconWrap, focused && tabStyles.iconWrapActive]}>
+              <Ionicons
+                name={(focused ? item.icon : item.iconOut) as any}
+                size={22}
+                color={focused ? '#fff' : Palette.gray400}
+              />
+              {item.badge > 0 && (
+                <View style={[tabStyles.pip, route.name === 'More' && tabStyles.pipRed]}>
+                  <Text style={tabStyles.pipText}>{item.badge > 9 ? '9+' : item.badge}</Text>
+                </View>
+              )}
+            </View>
+          );
         },
-        tabBarActiveTintColor: Colors.tabBarActive,
-        tabBarInactiveTintColor: Colors.tabBarInactive,
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
-      }}
+      })}
     >
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{
-          tabBarLabel: 'Home',
-          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
-        }}
-      />
-      <Tab.Screen
-        name="Schedule"
-        component={ScheduleScreen}
-        options={{
-          tabBarLabel: 'Schedule',
-          tabBarIcon: ({ color, size }) => <Ionicons name="calendar-outline" size={size} color={color} />,
-          tabBarBadge: pendingReceived.length > 0 ? pendingReceived.length : undefined,
-          tabBarBadgeStyle: { backgroundColor: Colors.primary, fontSize: 10 },
-        }}
-      />
-      <Tab.Screen
-        name="Matches"
-        component={MatchesScreen}
-        options={{
-          tabBarLabel: 'Matches',
-          tabBarIcon: ({ color, size }) => <Ionicons name="tennisball-outline" size={size} color={color} />,
-        }}
-      />
-      <Tab.Screen
-        name="Messages"
-        component={MessagesScreen}
-        options={{
-          tabBarLabel: 'Messages',
-          tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles-outline" size={size} color={color} />,
-          tabBarBadge: unreadMessages > 0 ? unreadMessages : undefined,
-          tabBarBadgeStyle: { backgroundColor: Colors.primary, fontSize: 10 },
-        }}
-      />
-      <Tab.Screen
-        name="More"
-        component={MoreNavigator}
-        options={{
-          tabBarLabel: 'More',
-          tabBarIcon: ({ color, size }) => <Ionicons name="grid-outline" size={size} color={color} />,
-          tabBarBadge: (notifCount + totalSocialBadge) > 0 ? (notifCount + totalSocialBadge) : undefined,
-          tabBarBadgeStyle: { backgroundColor: Colors.error, fontSize: 10 },
-        }}
-      />
+      <Tab.Screen name="Home"     component={HomeScreen}    />
+      <Tab.Screen name="Schedule" component={ScheduleScreen}/>
+      <Tab.Screen name="Matches"  component={MatchesScreen} />
+      <Tab.Screen name="Messages" component={MessagesScreen}/>
+      <Tab.Screen name="More"     component={MoreNavigator} />
     </Tab.Navigator>
   );
 }
@@ -140,84 +117,140 @@ function MoreNavigator() {
   );
 }
 
-// More Menu Screen — mirrors the web sidebar
+// ─── More Menu Screen ─────────────────────────────────────────────────────────
 function MoreMenuScreen({ navigation }: { navigation: any }) {
   const { unreadCount: notifCount } = useNotifications();
   const { pendingReceived: friendRequests } = useFriendRequests();
   const { player } = usePlayerProfile();
   const { signOut } = useAuth();
 
-  const items = [
-    { label: 'Dashboard', sub: 'Overview & quick actions', icon: 'grid-outline', screen: 'Dashboard', badge: 0, color: Colors.primary },
-    { label: 'My Profile', sub: 'Personal settings & stats', icon: 'person-outline', screen: 'Profile', badge: 0, color: Colors.primary },
-    { label: 'My Performance', sub: 'Stats & analytics', icon: 'trending-up-outline', screen: 'Performance', badge: 0, color: Colors.accent },
-    { label: 'My Leagues', sub: 'League history & progress', icon: 'trophy-outline', screen: 'MyLeagues', badge: 0, color: '#F59E0B' },
-    { label: 'Join a League', sub: 'League registration', icon: 'document-text-outline', screen: 'JoinLeague', badge: 0, color: '#8B5CF6' },
-    { label: 'Casual Match', sub: 'Find an opponent', icon: 'people-outline', screen: 'CasualMatch', badge: 0, color: Colors.success },
-    { label: 'Build Your Network', sub: 'Friends & connections', icon: 'share-social-outline', screen: 'Social', badge: friendRequests.length, color: '#EC4899' },
-    { label: 'Notifications', sub: 'Updates & alerts', icon: 'notifications-outline', screen: 'Notifications', badge: notifCount, color: Colors.error },
-    { label: 'Notification Settings', sub: 'Manage your alerts', icon: 'settings-outline', screen: 'NotificationSettings', badge: 0, color: Colors.textSecondary },
-    { label: 'Manage Bookings', sub: 'All match invitations', icon: 'calendar-outline', screen: 'ManageBookings', badge: 0, color: '#3b82f6' },
-    { label: 'Competition', sub: 'Rankings & league standings', icon: 'trophy-outline', screen: 'Competition', badge: 0, color: '#f59e0b' },
-    { label: 'Settings', sub: 'Privacy, preferences & more', icon: 'settings-outline', screen: 'Settings', badge: 0, color: Colors.textSecondary },
+  const rating = player?.usta_rating
+    ? `USTA ${player.usta_rating}`
+    : player?.skill_level ? `Level ${player.skill_level}/10`
+    : 'Unrated';
+
+  type Item = { label: string; sub: string; icon: string; screen: string; badge: number; color: string; bg: string };
+  type Group = { title: string; items: Item[] };
+
+  const groups: Group[] = [
+    {
+      title: 'YOUR ACCOUNT',
+      items: [
+        { label: 'My Profile',    sub: 'Edit personal info',          icon: 'person-circle-outline',  screen: 'Profile',              badge: 0,                    color: Palette.purple500, bg: Palette.purpleBg  },
+        { label: 'Performance',   sub: 'Match stats & analytics',     icon: 'bar-chart-outline',      screen: 'Performance',          badge: 0,                    color: Palette.blue500,   bg: Palette.blueBg    },
+        { label: 'Dashboard',     sub: 'Activity overview',           icon: 'grid-outline',           screen: 'Dashboard',            badge: 0,                    color: Palette.orange500, bg: Palette.orange50  },
+      ],
+    },
+    {
+      title: 'PLAY',
+      items: [
+        { label: 'My Leagues',    sub: 'Active league standings',     icon: 'trophy-outline',         screen: 'MyLeagues',            badge: 0,                    color: Palette.yellow500, bg: Palette.yellowBg  },
+        { label: 'Join a League', sub: 'Find & register',             icon: 'add-circle-outline',     screen: 'JoinLeague',           badge: 0,                    color: Palette.purple500, bg: Palette.purpleBg  },
+        { label: 'Casual Match',  sub: 'Challenge someone nearby',    icon: 'tennisball-outline',     screen: 'CasualMatch',          badge: 0,                    color: Palette.green500,  bg: Palette.greenBg   },
+        { label: 'Competition',   sub: 'Rankings & standings',        icon: 'podium-outline',         screen: 'Competition',          badge: 0,                    color: Palette.orange600, bg: Palette.orange50  },
+        { label: 'Bookings',      sub: 'Manage match invitations',    icon: 'calendar-outline',       screen: 'ManageBookings',       badge: 0,                    color: Palette.blue500,   bg: Palette.blueBg    },
+      ],
+    },
+    {
+      title: 'COMMUNITY',
+      items: [
+        { label: 'My Network',    sub: 'Friends & connections',       icon: 'people-outline',         screen: 'Social',               badge: friendRequests.length, color: Palette.pink500,   bg: Palette.pinkBg    },
+        { label: 'Notifications', sub: 'Updates & alerts',            icon: 'notifications-outline',  screen: 'Notifications',        badge: notifCount,            color: Palette.red500,    bg: Palette.redBg     },
+      ],
+    },
+    {
+      title: 'PREFERENCES',
+      items: [
+        { label: 'Alert Settings',sub: 'Manage notification types',   icon: 'options-outline',        screen: 'NotificationSettings', badge: 0,                    color: Palette.gray500,   bg: Palette.gray100   },
+        { label: 'Settings',      sub: 'Privacy & preferences',       icon: 'settings-outline',       screen: 'Settings',             badge: 0,                    color: Palette.gray500,   bg: Palette.gray100   },
+      ],
+    },
   ];
 
-  const subtitle = player?.usta_rating
-    ? `USTA ${player.usta_rating}`
-    : player?.skill_level
-    ? `Level ${player.skill_level}/10`
-    : 'Complete your profile';
-
   return (
-    <SafeAreaView style={moreStyles.safe} edges={['bottom']}>
-      <ScreenHeader title={player?.name || 'My Account'} subtitle={subtitle} />
-      <ScrollView style={moreStyles.list} showsVerticalScrollIndicator={false}>
-        {items.map(item => (
-          <TouchableRow
-            key={item.screen}
-            onPress={() => navigation.navigate(item.screen)}
-            icon={item.icon}
-            label={item.label}
-            sub={item.sub}
-            badge={item.badge}
-            color={item.color}
-          />
+    <SafeAreaView style={ms.safe} edges={['top']}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+
+        {/* ── Profile hero ──────────────────────────────────────────────── */}
+        <LinearGradient
+          colors={[Palette.dark900, Palette.dark700, Palette.dark600]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={ms.hero}
+        >
+          <View style={ms.heroInner}>
+            <View style={ms.avatarWrap}>
+              <Avatar name={player?.name || 'U'} size={64} />
+              <View style={ms.onlineDot} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={ms.heroName}>{player?.name || 'My Account'}</Text>
+              <View style={ms.ratingRow}>
+                <View style={ms.ratingBadge}>
+                  <Ionicons name="tennisball" size={11} color={Colors.primary} />
+                  <Text style={ms.ratingText}>{rating}</Text>
+                </View>
+                {(player?.wins !== undefined) && (
+                  <Text style={ms.heroRecord}>{player.wins}W – {player.losses ?? 0}L</Text>
+                )}
+              </View>
+            </View>
+            <TouchableOpacity style={ms.editBtn} onPress={() => navigation.navigate('Profile')} activeOpacity={0.8}>
+              <Ionicons name="pencil-outline" size={15} color="#fff" />
+              <Text style={ms.editBtnText}>Edit</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+
+        {/* ── Menu groups ───────────────────────────────────────────────── */}
+        {groups.map((group, gi) => (
+          <View key={gi} style={ms.group}>
+            <Text style={ms.groupLabel}>{group.title}</Text>
+            <View style={ms.groupCard}>
+              {group.items.map((item, idx) => (
+                <TouchableOpacity
+                  key={item.screen}
+                  style={[ms.row, idx < group.items.length - 1 && ms.rowDivider]}
+                  onPress={() => navigation.navigate(item.screen)}
+                  activeOpacity={0.75}
+                >
+                  <View style={[ms.rowIcon, { backgroundColor: item.bg }]}>
+                    <Ionicons name={item.icon as any} size={19} color={item.color} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={ms.rowLabel}>{item.label}</Text>
+                    <Text style={ms.rowSub}>{item.sub}</Text>
+                  </View>
+                  <View style={ms.rowRight}>
+                    {item.badge > 0 && (
+                      <View style={[ms.pip, item.screen === 'Notifications' && ms.pipRed]}>
+                        <Text style={ms.pipText}>{item.badge > 99 ? '99+' : item.badge}</Text>
+                      </View>
+                    )}
+                    <Ionicons name="chevron-forward" size={14} color={Palette.gray300} />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
         ))}
-        <View style={moreStyles.divider} />
-        <TouchableRow
-          onPress={signOut}
-          icon="log-out-outline"
-          label="Sign Out"
-          sub=""
-          badge={0}
-          color={Colors.error}
-          danger
-        />
-        <View style={{ height: 32 }} />
+
+        {/* ── Sign out ─────────────────────────────────────────────────── */}
+        <View style={ms.group}>
+          <View style={ms.groupCard}>
+            <TouchableOpacity style={ms.row} onPress={signOut} activeOpacity={0.75}>
+              <View style={[ms.rowIcon, { backgroundColor: Palette.redBg }]}>
+                <Ionicons name="log-out-outline" size={19} color={Palette.red500} />
+              </View>
+              <Text style={[ms.rowLabel, { color: Palette.red500 }]}>Sign Out</Text>
+              <View style={ms.rowRight}>
+                <Ionicons name="chevron-forward" size={14} color={Palette.gray300} />
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function TouchableRow({ onPress, icon, label, sub, badge, color, danger }: any) {
-  return (
-    <TouchableOpacity style={moreStyles.menuItem} onPress={onPress} activeOpacity={0.7}>
-      <View style={[moreStyles.menuIcon, { backgroundColor: color + '18' }]}>
-        <Ionicons name={icon} size={22} color={danger ? Colors.error : color} />
-      </View>
-      <View style={moreStyles.menuText}>
-        <Text style={[moreStyles.menuLabel, danger && { color: Colors.error }]}>{label}</Text>
-        {sub ? <Text style={moreStyles.menuSub}>{sub}</Text> : null}
-      </View>
-      <View style={moreStyles.menuRight}>
-        {badge > 0 && (
-          <View style={moreStyles.badge}>
-            <Text style={moreStyles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
-          </View>
-        )}
-        <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
-      </View>
-    </TouchableOpacity>
   );
 }
 
@@ -359,20 +392,170 @@ export default function App() {
   );
 }
 
+// ─── Global styles ─────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
 });
 
-const moreStyles = StyleSheet.create({
+// ─── Tab bar styles ───────────────────────────────────────────────────────────
+const tabStyles = StyleSheet.create({
+  bar: {
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: Palette.gray150,
+    height: Platform.OS === 'ios' ? 82 : 66,
+    paddingBottom: Platform.OS === 'ios' ? 22 : 8,
+    paddingTop: 8,
+    shadowColor: 'rgba(13,13,24,0.12)',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 1,
+    shadowRadius: 16,
+    elevation: 18,
+  } as any,
+  iconWrap: {
+    width: 48,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconWrapActive: {
+    backgroundColor: Palette.orange500,
+    shadowColor: Palette.orange500,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  pip: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    minWidth: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+    borderWidth: 1.5,
+    borderColor: '#fff',
+  },
+  pipRed: { backgroundColor: Colors.error },
+  pipText: { color: '#fff', fontSize: 8, fontWeight: FontWeight.black },
+});
+
+// ─── More Menu styles ─────────────────────────────────────────────────────────
+const ms = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  list: { flex: 1 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight, gap: 14 },
-  menuIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  menuText: { flex: 1 },
-  menuLabel: { fontSize: 15, fontWeight: '600', color: Colors.text },
-  menuSub: { fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
-  menuRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  badge: { backgroundColor: Colors.error, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  divider: { height: 8, backgroundColor: Colors.background },
+
+  // Hero
+  hero: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.xxl,
+  },
+  heroInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  avatarWrap: {
+    position: 'relative',
+  },
+  onlineDot: {
+    position: 'absolute',
+    bottom: 2, right: 2,
+    width: 14, height: 14,
+    borderRadius: 7,
+    backgroundColor: Palette.green400,
+    borderWidth: 2,
+    borderColor: Palette.dark900,
+  },
+  heroName: {
+    fontSize: FontSize.xl,
+    fontWeight: FontWeight.black,
+    color: '#fff',
+    letterSpacing: -0.4,
+  },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 },
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.20)',
+  },
+  ratingText: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.85)', fontWeight: FontWeight.semibold },
+  heroRecord: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.50)', fontWeight: FontWeight.medium },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 7,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  editBtnText: { color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
+
+  // Groups
+  group: {
+    paddingHorizontal: Spacing.lg,
+    marginTop: Spacing.xl,
+  },
+  groupLabel: {
+    fontSize: FontSize.xxs,
+    fontWeight: FontWeight.black,
+    color: Palette.gray400,
+    letterSpacing: 1.0,
+    marginBottom: Spacing.sm,
+    paddingHorizontal: 2,
+  },
+  groupCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Shadow.xs,
+  },
+
+  // Rows
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 13,
+    gap: Spacing.md,
+  },
+  rowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.separator,
+  },
+  rowIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: Radius.sm + 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowLabel: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text },
+  rowSub: { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 1 },
+  rowRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pip: {
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.full,
+    minWidth: 20, height: 20,
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  pipRed: { backgroundColor: Colors.error },
+  pipText: { color: '#fff', fontSize: FontSize.xxs, fontWeight: FontWeight.black },
 });

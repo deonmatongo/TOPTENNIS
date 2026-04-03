@@ -11,7 +11,8 @@ import { useMatches } from '@/hooks/useMatches';
 import { useDivisionAssignments } from '@/hooks/useDivisionAssignments';
 import { useLeagueMatches } from '@/hooks/useLeagueMatches';
 import { useCalendarExport } from '@/hooks/useCalendarExport';
-import { Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { Palette, Colors, Shadow, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   format, addDays, subDays, addWeeks, subWeeks,
   startOfWeek, endOfWeek, eachDayOfInterval,
@@ -292,7 +293,12 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
   return (
     <SafeAreaView style={s.safe} edges={['bottom']}>
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <View style={[s.header, { paddingTop: insets.top }]}>
+      <LinearGradient
+        colors={[Palette.dark900, Palette.dark700]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[s.header, { paddingTop: insets.top }]}
+      >
         <View style={s.headerInner}>
           <View style={s.headerLeft}>
             <Text style={s.headerTitle}>Schedule</Text>
@@ -337,7 +343,7 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* ── Legend ─────────────────────────────────────────────────────────── */}
       <View style={s.legend}>
@@ -795,10 +801,10 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
 
   // Header
-  header: { backgroundColor: Colors.primary, paddingBottom: Spacing.sm },
+  header: { paddingBottom: Spacing.sm },
   headerInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm, paddingBottom: 6 },
   headerLeft: { flex: 1 },
-  headerTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: '#fff' },
+  headerTitle: { fontSize: 28, fontWeight: FontWeight.black, color: '#fff' },
   headerSub: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.75)', marginTop: 1 },
   headerRight: { flexDirection: 'row', gap: Spacing.sm },
   hBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },

@@ -5,11 +5,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { supabase } from '@/services/supabase';
-import { Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { Palette, Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -263,24 +263,36 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     Linking.openURL(url).catch(() => Alert.alert('Error', 'Could not open link.'));
   };
 
+  const GradHeader = () => (
+    <LinearGradient
+      colors={[Palette.dark900, Palette.dark700]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.gradHeader}
+    >
+      <TouchableOpacity style={styles.gradBackBtn} onPress={() => navigation.goBack()}>
+        <Ionicons name="chevron-back" size={24} color="#fff" />
+      </TouchableOpacity>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.gradTitle}>Settings</Text>
+        <Text style={styles.gradSub}>App preferences</Text>
+      </View>
+      {saving && <ActivityIndicator size="small" color="#fff" />}
+    </LinearGradient>
+  );
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe} edges={['bottom']}>
-        <ScreenHeader title="Settings" subtitle="App preferences" navigation={navigation} showBack />
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <GradHeader />
         <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScreenHeader
-        title="Settings"
-        subtitle="App preferences"
-        navigation={navigation}
-        showBack
-        rightElement={saving ? <ActivityIndicator size="small" color="#fff" /> : undefined}
-      />
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <GradHeader />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
 
@@ -666,6 +678,10 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
+  gradHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.lg, gap: Spacing.md },
+  gradBackBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  gradTitle: { fontSize: 22, fontWeight: FontWeight.black, color: '#fff' },
+  gradSub: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
   content: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: 48 },
 
   section: {
