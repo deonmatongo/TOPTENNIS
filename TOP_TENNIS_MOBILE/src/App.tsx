@@ -17,7 +17,6 @@ import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 
 import { AuthScreen } from '@/screens/AuthScreen';
 import { OnboardingScreen } from '@/screens/OnboardingScreen';
-import { HomeScreen } from '@/screens/HomeScreen';
 import { ScheduleScreen } from '@/screens/ScheduleScreen';
 import { MatchesScreen } from '@/screens/MatchesScreen';
 import { MessagesScreen } from '@/screens/MessagesScreen';
@@ -85,7 +84,7 @@ function TabNavigator() {
         },
       })}
     >
-      <Tab.Screen name="Home"     component={HomeScreen}    />
+      <Tab.Screen name="Home"     component={DashboardScreen}    />
       <Tab.Screen name="Schedule" component={ScheduleScreen}/>
       <Tab.Screen name="Matches"  component={MatchesScreen} />
       <Tab.Screen name="Messages" component={MessagesScreen}/>
@@ -108,7 +107,6 @@ function MoreNavigator() {
       <MoreStack.Screen name="Social" component={SocialScreen} options={{ animation: 'slide_from_right' }} />
       <MoreStack.Screen name="Messages" component={MessagesScreen} options={{ animation: 'slide_from_right' }} />
       <MoreStack.Screen name="Notifications" component={NotificationsScreen} options={{ animation: 'slide_from_right' }} />
-      <MoreStack.Screen name="Dashboard" component={DashboardScreen} options={{ animation: 'slide_from_right' }} />
       <MoreStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ animation: 'slide_from_right' }} />
       <MoreStack.Screen name="ManageBookings" component={ManageBookingsScreen} options={{ animation: 'slide_from_right' }} />
       <MoreStack.Screen name="Competition" component={CompetitionScreen} options={{ animation: 'slide_from_right' }} />
@@ -138,7 +136,6 @@ function MoreMenuScreen({ navigation }: { navigation: any }) {
       items: [
         { label: 'My Profile',    sub: 'Edit personal info',          icon: 'person-circle-outline',  screen: 'Profile',              badge: 0,                    color: Palette.purple500, bg: Palette.purpleBg  },
         { label: 'Performance',   sub: 'Match stats & analytics',     icon: 'bar-chart-outline',      screen: 'Performance',          badge: 0,                    color: Palette.blue500,   bg: Palette.blueBg    },
-        { label: 'Dashboard',     sub: 'Activity overview',           icon: 'grid-outline',           screen: 'Dashboard',            badge: 0,                    color: Palette.orange500, bg: Palette.orange50  },
       ],
     },
     {
@@ -314,11 +311,6 @@ function AppNavigator() {
           <Stack.Screen
             name="Social"
             component={SocialScreen}
-            options={{ animation: 'slide_from_right' }}
-          />
-          <Stack.Screen
-            name="Dashboard"
-            component={DashboardScreen}
             options={{ animation: 'slide_from_right' }}
           />
           <Stack.Screen
