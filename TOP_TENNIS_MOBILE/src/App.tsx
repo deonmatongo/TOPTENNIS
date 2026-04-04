@@ -166,7 +166,7 @@ function MoreMenuScreen({ navigation }: { navigation: any }) {
   ];
 
   return (
-    <SafeAreaView style={ms.safe} edges={['bottom']}>
+    <SafeAreaView style={ms.safe} edges={[]}>
       <StatusBar style="light" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
 

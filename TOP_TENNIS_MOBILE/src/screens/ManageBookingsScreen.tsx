@@ -239,7 +239,7 @@ export const ManageBookingsScreen: React.FC<{ navigation: any }> = ({ navigation
   const currentData = tabData[activeTab];
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={[]}>
       <StatusBar style="light" />
       <LinearGradient colors={[Palette.dark900, Palette.dark700]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.gradHeader, { paddingTop: insets.top + Spacing.lg }]}>
         <TouchableOpacity style={styles.gradBackBtn} onPress={() => navigation.goBack()}>

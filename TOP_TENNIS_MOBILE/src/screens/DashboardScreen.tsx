@@ -112,7 +112,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const loading = profileLoading || matchesLoading;
 
   return (
-    <SafeAreaView style={s.safe} edges={['bottom']}>
+    <SafeAreaView style={s.safe} edges={[]}>
       <StatusBar style="light" />
       <ScrollView
         showsVerticalScrollIndicator={false}

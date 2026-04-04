@@ -141,7 +141,7 @@ export const NotificationSettingsScreen: React.FC<{ navigation: any }> = ({ navi
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={[]}>
       <ScreenHeader title="Notification Settings" subtitle="Manage your alerts" navigation={navigation} showBack />
 
       {loading ? (

@@ -285,7 +285,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <SafeAreaView style={styles.safe} edges={[]}>
         <StatusBar style="light" />
         <GradHeader />
         <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />
@@ -294,7 +294,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={[]}>
       <StatusBar style="light" />
       <GradHeader />
 

@@ -105,7 +105,7 @@ export const CasualMatchScreen: React.FC<{ navigation: any }> = ({ navigation })
   };
 
   return (
-    <SafeAreaView style={s.safe} edges={['bottom']}>
+    <SafeAreaView style={s.safe} edges={[]}>
       <StatusBar style="light" />
       {/* ── Header ── */}
       <LinearGradient

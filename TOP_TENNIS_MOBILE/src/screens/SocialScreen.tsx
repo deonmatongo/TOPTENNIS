@@ -119,7 +119,7 @@ export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     pendingReceived.some(r => r.sender_id === userId);
 
   return (
-    <SafeAreaView style={s.safe} edges={['bottom']}>
+    <SafeAreaView style={s.safe} edges={[]}>
       <StatusBar style="light" />
       {/* ── Header ── */}
       <LinearGradient

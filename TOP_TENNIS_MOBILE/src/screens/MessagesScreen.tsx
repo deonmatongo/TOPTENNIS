@@ -801,7 +801,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
   // ── List view ────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={ls.safe} edges={['bottom']}>
+    <SafeAreaView style={ls.safe} edges={[]}>
       <StatusBar style="light" />
       {/* Header */}
       <LinearGradient

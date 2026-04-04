@@ -735,7 +735,7 @@ export const MyLeaguesScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
   if (selectedReg) {
     return (
-      <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <SafeAreaView style={styles.safe} edges={[]}>
         <LeagueDetailView
           registration={selectedReg}
           onBack={() => setSelectedReg(null)}
@@ -746,7 +746,7 @@ export const MyLeaguesScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={[]}>
       <StatusBar style="light" />
       {/* Dark gradient header */}
       <LinearGradient

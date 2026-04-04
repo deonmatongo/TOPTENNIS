@@ -58,7 +58,7 @@ export const CompetitionScreen: React.FC<{ navigation: any }> = ({ navigation })
   const loading = regsLoading || lbLoading;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={[]}>
       <StatusBar style="light" />
       <LinearGradient
         colors={[Palette.dark900, Palette.dark700]}
