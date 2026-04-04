@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -97,8 +98,8 @@ export const useNotifications = () => {
     pendingQueueRef.current = [];
     fetchNotifications();
 
-    const channel = supabase
-      .channel(`notifications-mobile-${user.id}`)
+    const buildChannel = () => supabase
+      .channel(`notifications-mobile-${user.id}-${Date.now()}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -136,10 +137,39 @@ export const useNotifications = () => {
           updateUnreadCount(filtered);
           return filtered;
         });
-      })
-      .subscribe();
+      });
 
-    return () => { supabase.removeChannel(channel); };
+    let channel = buildChannel();
+    let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const subscribe = () => {
+      channel.subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          // Rebuild and retry after 3s on failure
+          supabase.removeChannel(channel);
+          retryTimeout = setTimeout(() => {
+            channel = buildChannel();
+            subscribe();
+          }, 3000);
+        }
+      });
+    };
+    subscribe();
+
+    // When the app returns to foreground, refetch to catch any missed
+    // notifications (WebSocket may have dropped while backgrounded)
+    const handleAppState = (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        fetchNotifications();
+      }
+    };
+    const appStateSub = AppState.addEventListener('change', handleAppState);
+
+    return () => {
+      if (retryTimeout) clearTimeout(retryTimeout);
+      supabase.removeChannel(channel);
+      appStateSub.remove();
+    };
   }, [user, fetchNotifications, injectRow, updateUnreadCount]);
 
   const markAsRead = useCallback(async (id: string) => {

@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { useLeagueRegistrations } from '@/hooks/useLeagueRegistrations';
 import { useDivisionAssignments } from '@/hooks/useDivisionAssignments';
 import { useLeagueMatches } from '@/hooks/useLeagueMatches';
@@ -51,7 +50,9 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
 ];
 
 const getLeagueStatus = (reg: any) => {
-  const months = (Date.now() - new Date(reg.created_at).getTime()) / (1000 * 60 * 60 * 24 * 30);
+  const dateStr = reg.created_at || reg.registration_date;
+  if (!dateStr) return 'In Progress';
+  const months = (Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24 * 30);
   return months < 3 ? 'In Progress' : 'Completed';
 };
 
@@ -79,6 +80,10 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
   }, [divisionId]);
 
   const status = getLeagueStatus(registration);
+
+  const handleMatchRequest = (opponentId: string, opponentName: string) => {
+    navigation.navigate('Schedule', { opponentId, opponentName });
+  };
 
   const renderMatches = () => {
     const isLoading = isDemoLeague ? false : (matchesLoading || divMatchesLoading);
@@ -290,65 +295,145 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
 
   const renderDivision = () => {
     if (leaderboardLoading) return <ActivityIndicator color={Colors.primary} style={{ marginTop: 32 }} />;
-    if (leaderboard.length === 0) return (
-      <View style={styles.tabEmpty}>
-        <Ionicons name="bar-chart-outline" size={40} color={Colors.textMuted} />
-        <Text style={styles.tabEmptyTitle}>No standings yet</Text>
-        <Text style={styles.tabEmptySub}>Division standings will appear once matches are played.</Text>
-      </View>
-    );
+
+    const meStats = leaderboard.find(p => p.isCurrentUser);
+    const myRank  = leaderboard.findIndex(p => p.isCurrentUser) + 1;
+    const currentAssignment = assignments.find(a => a.league_registration_id === registration.id);
+    const completed  = currentAssignment?.matches_completed ?? 0;
+    const required   = currentAssignment?.matches_required  ?? 5;
+    const eligible   = currentAssignment?.playoff_eligible  ?? false;
+    const pct = Math.min(100, Math.round((completed / required) * 100));
+
     return (
       <View style={styles.tabContent}>
-        <View style={styles.standingsHeader}>
-          <Text style={styles.standingsTitle}>{divisionInfo?.division_name || 'Division'} Standings</Text>
-          <Text style={styles.standingsSub}>Rankings and playoff status</Text>
-        </View>
-        {leaderboard.map((player, index) => {
-          const winRate = player.total_matches > 0 ? Math.round((player.wins / player.total_matches) * 100) : 0;
-          const isTop3 = index < 3;
-          return (
-            <TouchableOpacity
-              key={player.user_id}
-              style={[styles.standingRow, player.isCurrentUser && styles.standingRowSelf]}
-              onPress={() => {
-                if (!player.isCurrentUser) {
-                  setSelectedLeaderboardPlayer({
-                    id: player.user_id,
-                    first_name: player.name.split(' ')[0] || player.name,
-                    last_name: player.name.split(' ').slice(1).join(' ') || '',
-                    wins: player.wins,
-                    losses: player.losses,
-                  });
-                }
-              }}
-              activeOpacity={player.isCurrentUser ? 1 : 0.7}
-            >
-              <View style={[styles.rankCircle, player.isCurrentUser ? styles.rankCircleSelf : isTop3 ? styles.rankCircleTop : styles.rankCircleDefault]}>
-                {isTop3 && !player.isCurrentUser
-                  ? <Text style={{ fontSize: 14 }}>🏆</Text>
-                  : <Text style={[styles.rankText, player.isCurrentUser && { color: '#fff' }]}>{index + 1}</Text>}
+
+        {/* My status card */}
+        {meStats && (
+          <View style={styles.myStatusCard}>
+            <View style={styles.myStatusTop}>
+              <View style={styles.myStatusAvatar}>
+                <Text style={styles.myStatusAvatarText}>{meStats.name.slice(0, 2).toUpperCase()}</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <View style={styles.standingNameRow}>
-                  <Text style={[styles.standingName, player.isCurrentUser && { color: Colors.primary }]}>{player.name}</Text>
-                  {player.isCurrentUser && <View style={styles.youBadge}><Text style={styles.youBadgeText}>You</Text></View>}
+              <View style={{ flex: 1, gap: 4 }}>
+                <View style={styles.myStatusNameRow}>
+                  <Text style={styles.myStatusName}>{meStats.name}</Text>
+                  {eligible && (
+                    <View style={styles.playoffReadyBadge}>
+                      <Ionicons name="shield-checkmark-outline" size={11} color="#fff" />
+                      <Text style={styles.playoffReadyText}>Playoff Ready</Text>
+                    </View>
+                  )}
+                  {myRank > 0 && (
+                    <View style={styles.rankPill}><Text style={styles.rankPillText}>#{myRank}</Text></View>
+                  )}
                 </View>
-                <Text style={styles.standingStats}>{player.wins}W – {player.losses}L  •  {winRate}%  •  {player.points} pts</Text>
+                <View style={styles.myStatusStatsRow}>
+                  <Text style={styles.myStatusWins}>{meStats.wins}W</Text>
+                  <Text style={styles.myStatusLosses}>{meStats.losses}L</Text>
+                  <Text style={styles.myStatusPts}>{meStats.points} pts</Text>
+                  <Text style={styles.myStatusWr}>
+                    {meStats.total_matches > 0 ? Math.round((meStats.wins / meStats.total_matches) * 100) : 0}% WR
+                  </Text>
+                </View>
               </View>
-              <View style={styles.standingRight}>
-                {player.playoff_eligible
-                  ? <View style={styles.playoffBadge}><Ionicons name="medal-outline" size={11} color="#fff" /><Text style={styles.playoffBadgeText}>Playoff</Text></View>
-                  : <Text style={styles.matchesNeeded}>{player.matches_required - player.matches_completed} more needed</Text>}
-                {!player.isCurrentUser && (
-                  <TouchableOpacity style={styles.scheduleSmallBtn} onPress={() => navigation.navigate('Schedule')}>
-                    <Ionicons name="calendar-outline" size={13} color={Colors.primary} />
-                    <Text style={styles.scheduleSmallBtnText}>Schedule</Text>
-                  </TouchableOpacity>
-                )}
+            </View>
+            {/* Progress toward playoff eligibility */}
+            <View style={styles.myStatusProgress}>
+              <View style={styles.progressLabelRow}>
+                <Text style={styles.progressLabel}>Matches toward playoff eligibility</Text>
+                <Text style={styles.progressCount}>{completed}/{required}</Text>
               </View>
-            </TouchableOpacity>
-          );
-        })}
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${pct}%` as any }, eligible && styles.progressFillGreen]} />
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Division context badges */}
+        {divisionInfo && (
+          <View style={styles.divBadgeRow}>
+            <View style={styles.divBadge}><Text style={styles.divBadgeText}>{divisionInfo.division_name}</Text></View>
+            {(divisionInfo as any).skill_level_range && (
+              <View style={styles.divBadge}><Text style={styles.divBadgeText}>Level {(divisionInfo as any).skill_level_range}</Text></View>
+            )}
+            {(divisionInfo as any).competitiveness && (
+              <View style={styles.divBadge}><Text style={styles.divBadgeText}>{(divisionInfo as any).competitiveness}</Text></View>
+            )}
+          </View>
+        )}
+
+        {leaderboard.length === 0 ? (
+          <View style={styles.tabEmpty}>
+            <Ionicons name="bar-chart-outline" size={40} color={Colors.textMuted} />
+            <Text style={styles.tabEmptyTitle}>No standings yet</Text>
+            <Text style={styles.tabEmptySub}>Rankings appear once matches are played.</Text>
+          </View>
+        ) : (
+          leaderboard.map((p, index) => {
+            const winRate = p.total_matches > 0 ? Math.round((p.wins / p.total_matches) * 100) : 0;
+            const medals = ['🥇', '🥈', '🥉'];
+            const isTop3 = index < 3;
+            return (
+              <TouchableOpacity
+                key={p.user_id}
+                style={[styles.standingRow, p.isCurrentUser && styles.standingRowSelf]}
+                onPress={() => {
+                  if (!p.isCurrentUser) {
+                    setSelectedLeaderboardPlayer({
+                      id: p.user_id,
+                      first_name: p.name.split(' ')[0] || p.name,
+                      last_name: p.name.split(' ').slice(1).join(' ') || '',
+                      wins: p.wins,
+                      losses: p.losses,
+                    });
+                  }
+                }}
+                activeOpacity={p.isCurrentUser ? 1 : 0.7}
+              >
+                <View style={[styles.rankCircle, p.isCurrentUser ? styles.rankCircleSelf : isTop3 ? styles.rankCircleTop : styles.rankCircleDefault]}>
+                  {isTop3 && !p.isCurrentUser
+                    ? <Text style={{ fontSize: 14 }}>{medals[index]}</Text>
+                    : <Text style={[styles.rankText, p.isCurrentUser && { color: '#fff' }]}>{index + 1}</Text>}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.standingNameRow}>
+                    <Text style={[styles.standingName, p.isCurrentUser && { color: Colors.primary }]} numberOfLines={1}>{p.name}</Text>
+                    {p.isCurrentUser && <View style={styles.youBadge}><Text style={styles.youBadgeText}>You</Text></View>}
+                    {p.playoff_eligible && (
+                      <View style={[styles.playoffBadge, { marginLeft: 2 }]}>
+                        <Ionicons name="shield-checkmark-outline" size={10} color="#fff" />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.standingStats}>{p.wins}W – {p.losses}L  •  {winRate}%  •  {p.points} pts</Text>
+                </View>
+                <View style={styles.standingRight}>
+                  {p.playoff_eligible
+                    ? <View style={styles.playoffBadge}><Ionicons name="medal-outline" size={11} color="#fff" /><Text style={styles.playoffBadgeText}>Playoff</Text></View>
+                    : <Text style={styles.matchesNeeded}>{Math.max(0, p.matches_required - p.matches_completed)} needed</Text>}
+                  {!p.isCurrentUser && (
+                    <TouchableOpacity
+                      style={styles.scheduleSmallBtn}
+                      onPress={() => handleMatchRequest(p.user_id, p.name)}
+                    >
+                      <Ionicons name="tennisball-outline" size={13} color={Colors.primary} />
+                      <Text style={styles.scheduleSmallBtnText}>Request</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })
+        )}
+
+        {/* Footer note */}
+        <View style={styles.divFooter}>
+          <Ionicons name="shield-checkmark-outline" size={14} color={Colors.success} />
+          <Text style={styles.divFooterText}>
+            Playoff eligibility requires {required} matches. Top seeds from each group advance.
+          </Text>
+        </View>
       </View>
     );
   };
@@ -614,10 +699,12 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
 };
 
 export const MyLeaguesScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const { registrations, loading, refetch } = useLeagueRegistrations();
+  const { player } = usePlayerProfile();
+  const { assignments } = useDivisionAssignments();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedReg, setSelectedReg] = useState<any>(null);
-  const [showHistory, setShowHistory] = useState(false);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -625,13 +712,25 @@ export const MyLeaguesScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     setRefreshing(false);
   };
 
-  const activeRegs = registrations.filter(r => getLeagueStatus(r) === 'In Progress');
-  const completedRegs = registrations.filter(r => getLeagueStatus(r) === 'Completed');
   const isDisplayingDemo = registrations.length === 0;
   const sourceRegs = isDisplayingDemo ? DUMMY_REGISTRATIONS : registrations;
-  const sourceActive = sourceRegs.filter(r => getLeagueStatus(r) === 'In Progress');
+  const sourceActive    = sourceRegs.filter(r => getLeagueStatus(r) === 'In Progress');
   const sourceCompleted = sourceRegs.filter(r => getLeagueStatus(r) === 'Completed');
-  const displayRegs = showHistory ? sourceCompleted : sourceActive;
+
+  // Stats for the strip
+  const totalWins   = isDisplayingDemo ? 4 : (player?.wins   ?? 0);
+  const totalLosses = isDisplayingDemo ? 1 : (player?.losses ?? 0);
+  const totalMatches = totalWins + totalLosses;
+  const winRate = totalMatches > 0 ? Math.round((totalWins / totalMatches) * 100) : 0;
+  const streak  = isDisplayingDemo ? 2 : (player?.current_streak ?? 0);
+  const rating  = player?.usta_rating ?? (player?.skill_level ? String(player.skill_level) : (isDisplayingDemo ? '3.5' : '—'));
+
+  const STATS = [
+    { label: 'Record', value: `${totalWins}W–${totalLosses}L`, sub: `${winRate}% win rate`,      icon: 'tennisball-outline' as const, color: Colors.primary },
+    { label: 'Active',  value: String(sourceActive.length),    sub: `${sourceCompleted.length} completed`, icon: 'flame-outline' as const,     color: Palette.orange500 },
+    { label: 'Streak',  value: streak > 0 ? `${streak}W` : '—', sub: 'win streak',               icon: 'flash-outline' as const,    color: '#eab308' },
+    { label: 'Rating',  value: rating,                          sub: player?.usta_rating ? 'USTA' : 'skill level', icon: 'star-outline' as const, color: Colors.primary },
+  ];
 
   if (selectedReg) {
     return (
@@ -647,12 +746,21 @@ export const MyLeaguesScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScreenHeader
-        title={showHistory ? 'League History' : 'My Leagues'}
-        subtitle={showHistory ? 'Past league performances' : 'Manage your active leagues'}
-        navigation={navigation}
-        showBack
-      />
+      {/* Dark gradient header */}
+      <LinearGradient
+        colors={[Palette.dark900, Palette.dark700]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={[styles.gradHeader, { paddingTop: insets.top + Spacing.md }]}
+      >
+        <TouchableOpacity style={styles.gradBackBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={24} color="#fff" />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.gradTitle}>My Leagues</Text>
+          <Text style={styles.gradSub}>Track divisions, standings &amp; playoffs</Text>
+        </View>
+      </LinearGradient>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
@@ -662,53 +770,47 @@ export const MyLeaguesScreen: React.FC<{ navigation: any }> = ({ navigation }) =
             <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />
           ) : (
             <>
-              {/* History toggle */}
-              <TouchableOpacity style={styles.historyToggle} onPress={() => setShowHistory(!showHistory)}>
-                <Ionicons name={showHistory ? 'trophy-outline' : 'time-outline'} size={16} color={Colors.primary} />
-                <Text style={styles.historyToggleText}>{showHistory ? 'View Active Leagues' : 'View History'}</Text>
-              </TouchableOpacity>
+              {/* 4-stat strip */}
+              <View style={styles.statsGrid}>
+                {STATS.map(s => (
+                  <View key={s.label} style={styles.statCard}>
+                    <View style={styles.statIconRow}>
+                      <Ionicons name={s.icon} size={14} color={s.color} />
+                      <Text style={styles.statLabel}>{s.label}</Text>
+                    </View>
+                    <Text style={styles.statValue}>{s.value}</Text>
+                    <Text style={styles.statSub}>{s.sub}</Text>
+                  </View>
+                ))}
+              </View>
 
               {/* Demo notice */}
               {isDisplayingDemo && (
                 <View style={styles.demoBanner}>
                   <Ionicons name="information-circle-outline" size={15} color={Colors.textMuted} />
-                  <Text style={styles.demoBannerText}>Showing example leagues. Join a real league to see your data.</Text>
+                  <Text style={styles.demoBannerText}>Showing example data — join a real league to see your stats.</Text>
                 </View>
               )}
 
-              {/* Summary stats */}
-              <View style={styles.summaryRow}>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryNum}>{sourceRegs.length}</Text>
-                  <Text style={styles.summaryLabel}>Registered</Text>
-                </View>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryNum}>{sourceActive.length}</Text>
-                  <Text style={styles.summaryLabel}>Active</Text>
-                </View>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryNum}>{sourceCompleted.length}</Text>
-                  <Text style={styles.summaryLabel}>Completed</Text>
-                </View>
-              </View>
-
-              {displayRegs.length === 0 && !isDisplayingDemo ? (
-                <View style={styles.emptyCard}>
-                  <Ionicons name="trophy-outline" size={48} color={Colors.textMuted} />
-                  <Text style={styles.emptyTitle}>{showHistory ? 'No past leagues' : 'No active leagues'}</Text>
-                  <Text style={styles.emptySub}>
-                    {showHistory ? 'Your completed leagues will appear here.' : 'Join a league to compete with players at your skill level.'}
-                  </Text>
-                  {!showHistory && (
-                    <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate('JoinLeague')}>
-                      <Text style={styles.emptyBtnText}>Browse Leagues</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ) : (
-                <>
-                  {displayRegs.map(reg => {
-                    const status = getLeagueStatus(reg);
+              {/* Active leagues */}
+              {sourceActive.length > 0 && (
+                <View style={styles.sectionBlock}>
+                  <View style={styles.sectionHead}>
+                    <Text style={styles.sectionTitle}>Active</Text>
+                    {isDisplayingDemo && (
+                      <View style={styles.demoPill}><Text style={styles.demoPillText}>demo</Text></View>
+                    )}
+                  </View>
+                  {sourceActive.map(reg => {
+                    const r = reg as any;
+                    const asgn = assignments.find(a => a.league_registration_id === reg.id);
+                    const completed = r.is_demo ? 3 : (asgn?.matches_completed ?? 0);
+                    const required  = r.is_demo ? 5 : (asgn?.matches_required  ?? 5);
+                    const eligible  = r.is_demo ? false : (asgn?.playoff_eligible ?? false);
+                    const pct = Math.min(100, Math.round((completed / required) * 100));
+                    const divLabel = r.is_demo
+                      ? 'Division A · Level 3.5'
+                      : (asgn?.division ? `${asgn.division.division_name} · Level ${asgn.division.skill_level_range}` : null);
                     return (
                       <TouchableOpacity
                         key={reg.id}
@@ -718,21 +820,26 @@ export const MyLeaguesScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                       >
                         <View style={styles.leagueCardHeader}>
                           <View style={styles.leagueTitleRow}>
-                            <View style={[styles.statusDot, { backgroundColor: status === 'In Progress' ? Colors.success : Colors.textMuted }]} />
                             <Text style={styles.leagueName} numberOfLines={1}>{reg.league_name || 'League'}</Text>
                           </View>
-                          <View style={[styles.statusBadge, { backgroundColor: status === 'In Progress' ? Colors.successLight : Colors.borderLight }]}>
-                            <Text style={[styles.statusText, { color: status === 'In Progress' ? Colors.success : Colors.textMuted }]}>{status}</Text>
+                          <View style={styles.leagueBadgeRow}>
+                            {eligible
+                              ? <View style={styles.playoffReadyBadge}><Ionicons name="shield-checkmark-outline" size={11} color="#fff" /><Text style={styles.playoffReadyText}>Playoff Ready</Text></View>
+                              : <View style={styles.inProgressBadge2}><Text style={styles.inProgressText2}>In Progress</Text></View>
+                            }
                           </View>
                         </View>
-                        <View style={styles.leagueCardMeta}>
-                          <View style={styles.metaItem}>
-                            <Ionicons name="calendar-outline" size={13} color={Colors.textMuted} />
-                            <Text style={styles.metaText}>Season {new Date(reg.created_at).getFullYear()}</Text>
+                        {divLabel && (
+                          <Text style={styles.divLabel}>{divLabel}</Text>
+                        )}
+                        {/* Progress bar */}
+                        <View style={styles.progressSection}>
+                          <View style={styles.progressLabelRow}>
+                            <Text style={styles.progressLabel}>Match progress</Text>
+                            <Text style={styles.progressCount}>{completed}/{required}</Text>
                           </View>
-                          <View style={styles.metaItem}>
-                            <Ionicons name="people-outline" size={13} color={Colors.textMuted} />
-                            <Text style={styles.metaText}>Division Play</Text>
+                          <View style={styles.progressTrack}>
+                            <View style={[styles.progressFill, { width: `${pct}%` as any }]} />
                           </View>
                         </View>
                         <View style={styles.viewLeagueRow}>
@@ -742,13 +849,57 @@ export const MyLeaguesScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                       </TouchableOpacity>
                     );
                   })}
-
-                  <TouchableOpacity style={styles.joinMoreBtn} onPress={() => navigation.navigate('JoinLeague')}>
-                    <Ionicons name="add-circle-outline" size={20} color={Colors.primary} />
-                    <Text style={styles.joinMoreText}>Join Another League</Text>
-                  </TouchableOpacity>
-                </>
+                </View>
               )}
+
+              {/* Completed leagues */}
+              {sourceCompleted.length > 0 && (
+                <View style={styles.sectionBlock}>
+                  <Text style={styles.sectionTitle}>Completed</Text>
+                  {sourceCompleted.map(reg => (
+                    <TouchableOpacity
+                      key={reg.id}
+                      style={[styles.leagueCard, styles.leagueCardCompleted]}
+                      onPress={() => setSelectedReg(reg)}
+                      activeOpacity={0.8}
+                    >
+                      <View style={styles.leagueCardHeader}>
+                        <Text style={styles.leagueName} numberOfLines={1}>{reg.league_name || 'League'}</Text>
+                        <View style={styles.completedBadge}><Text style={styles.completedBadgeText}>Completed</Text></View>
+                      </View>
+                      <Text style={styles.divLabel}>
+                        Season {reg.created_at ? new Date(reg.created_at).getFullYear() : '—'}
+                      </Text>
+                      <View style={styles.viewLeagueRow}>
+                        <Text style={styles.viewLeagueText}>View Details</Text>
+                        <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {/* Empty state */}
+              {sourceActive.length === 0 && sourceCompleted.length === 0 && !isDisplayingDemo && (
+                <View style={styles.emptyCard}>
+                  <Ionicons name="trophy-outline" size={48} color={Colors.textMuted} />
+                  <Text style={styles.emptyTitle}>No leagues yet</Text>
+                  <Text style={styles.emptySub}>Join a league to compete with players at your skill level.</Text>
+                  <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate('JoinLeague')}>
+                    <Text style={styles.emptyBtnText}>Browse Leagues</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Browse / Join CTA */}
+              <TouchableOpacity style={styles.ctaCard} onPress={() => navigation.navigate('JoinLeague')}>
+                <View style={styles.ctaIcon}><Ionicons name="trophy-outline" size={18} color={Colors.primary} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.ctaTitle}>{isDisplayingDemo ? 'Ready to compete for real?' : 'Looking for more competition?'}</Text>
+                  <Text style={styles.ctaSub}>{isDisplayingDemo ? 'Join a league to start playing' : 'Browse open leagues to join'}</Text>
+                </View>
+                <View style={styles.ctaBtn}><Text style={styles.ctaBtnText}>Browse</Text></View>
+              </TouchableOpacity>
             </>
           )}
         </View>
@@ -761,27 +912,61 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.lg, gap: Spacing.md },
 
-  // Overview
-  historyToggle: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, alignSelf: 'flex-end', paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.primary },
-  historyToggleText: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.medium },
-  summaryRow: { flexDirection: 'row', gap: Spacing.sm },
-  summaryCard: { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
-  summaryNum: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.primary },
-  summaryLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
-  leagueCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: Colors.border, borderLeftWidth: 4, borderLeftColor: Colors.primary, gap: Spacing.sm },
-  leagueCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  leagueTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  leagueName: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text, flex: 1 },
-  statusBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.full },
-  statusText: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold },
-  leagueCardMeta: { flexDirection: 'row', gap: Spacing.md },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metaText: { fontSize: FontSize.xs, color: Colors.textSecondary },
+  // Gradient header
+  gradHeader: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xl, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  gradBackBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  gradTitle: { fontSize: 26, fontWeight: FontWeight.black, color: '#fff', letterSpacing: -0.5 },
+  gradSub: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
+
+  // Stat strip
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  statCard: { width: '47.5%', backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border, gap: 3, ...Shadow.xs },
+  statIconRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  statLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+  statValue: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.text, letterSpacing: -0.5 },
+  statSub: { fontSize: FontSize.xs, color: Colors.textMuted },
+
+  // Overview sections
+  sectionBlock: { gap: Spacing.sm },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  sectionTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  demoPill: { backgroundColor: Colors.borderLight, paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border },
+  demoPillText: { fontSize: 10, color: Colors.textMuted },
+
+  // League cards
+  leagueCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: Colors.border, borderLeftWidth: 4, borderLeftColor: Colors.primary, gap: Spacing.sm, ...Shadow.sm },
+  leagueCardCompleted: { opacity: 0.75, borderLeftColor: Colors.textMuted },
+  leagueCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: Spacing.sm },
+  leagueTitleRow: { flex: 1 },
+  leagueName: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
+  leagueBadgeRow: { flexShrink: 0 },
+  playoffReadyBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#16a34a', paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.full },
+  playoffReadyText: { fontSize: 10, color: '#fff', fontWeight: FontWeight.semibold },
+  inProgressBadge2: { backgroundColor: Colors.borderLight, paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.full },
+  inProgressText2: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+  completedBadge: { backgroundColor: Colors.borderLight, paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.full },
+  completedBadgeText: { fontSize: FontSize.xs, color: Colors.textMuted, fontWeight: FontWeight.medium },
+  divLabel: { fontSize: FontSize.sm, color: Colors.textSecondary },
+
+  // Progress bar on league card
+  progressSection: { gap: 5 },
+  progressLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  progressLabel: { fontSize: FontSize.xs, color: Colors.textMuted },
+  progressCount: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: Colors.text },
+  progressTrack: { height: 6, backgroundColor: Colors.borderLight, borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: 6, backgroundColor: Colors.primary, borderRadius: 3 },
+
   viewLeagueRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, paddingTop: Spacing.xs, borderTopWidth: 1, borderTopColor: Colors.borderLight },
   viewLeagueText: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
-  joinMoreBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, paddingVertical: Spacing.lg, borderRadius: Radius.lg, borderWidth: 1.5, borderColor: Colors.primary, borderStyle: 'dashed' },
-  joinMoreText: { fontSize: FontSize.md, color: Colors.primary, fontWeight: FontWeight.semibold },
+
+  // Browse CTA card
+  ctaCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: Colors.primaryLight },
+  ctaIcon: { width: 36, height: 36, borderRadius: Radius.md, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  ctaTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
+  ctaSub: { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 1 },
+  ctaBtn: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border },
+  ctaBtnText: { fontSize: FontSize.sm, color: Colors.text, fontWeight: FontWeight.medium },
+
   emptyCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.xxl, alignItems: 'center', gap: Spacing.md, borderWidth: 1, borderColor: Colors.border, marginTop: Spacing.lg },
   emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
   emptySub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
@@ -789,6 +974,7 @@ const styles = StyleSheet.create({
   emptyBtnText: { color: '#fff', fontWeight: FontWeight.semibold, fontSize: FontSize.md },
 
   // Detail header
+  statusBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.full },
   detailHeader: { backgroundColor: Colors.surface, padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: Spacing.md },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, alignSelf: 'flex-start', paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border },
   backBtnText: { fontSize: FontSize.sm, color: Colors.text, fontWeight: FontWeight.medium },
@@ -898,6 +1084,32 @@ const styles = StyleSheet.create({
   playoffVs: { fontSize: FontSize.xs, color: Colors.textMuted, fontWeight: FontWeight.bold, textAlign: 'center', paddingVertical: 2 },
   playoffScore: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.text, textAlign: 'center' },
   playoffMatchMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+
+  // My status card (Division tab)
+  myStatusCard: { backgroundColor: Colors.primaryLight, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1.5, borderColor: Colors.primary, gap: Spacing.sm },
+  myStatusTop: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  myStatusAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
+  myStatusAvatarText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: '#fff' },
+  myStatusNameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, flexWrap: 'wrap' },
+  myStatusName: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
+  rankPill: { backgroundColor: Colors.surface, paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border },
+  rankPillText: { fontSize: 10, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
+  myStatusStatsRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' },
+  myStatusWins: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.success },
+  myStatusLosses: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.error },
+  myStatusPts: { fontSize: FontSize.sm, color: Colors.textSecondary },
+  myStatusWr: { fontSize: FontSize.sm, color: Colors.textSecondary },
+  myStatusProgress: { gap: 5 },
+  progressFillGreen: { backgroundColor: Colors.success },
+
+  // Division context badges
+  divBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
+  divBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
+  divBadgeText: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+
+  // Footer note
+  divFooter: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xs, backgroundColor: Colors.borderLight, borderRadius: Radius.md, padding: Spacing.sm, marginTop: Spacing.xs },
+  divFooterText: { fontSize: FontSize.xs, color: Colors.textSecondary, flex: 1, lineHeight: 18 },
 
   // Division standings
   standingsHeader: { gap: 2, marginBottom: Spacing.xs },
