@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from '@/components/ui/Avatar';
@@ -16,6 +16,7 @@ import { Palette, Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/
 const MEDALS = ['🥇', '🥈', '🥉'];
 
 export const CompetitionScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const { registrations, loading: regsLoading, refetch: refetchRegs } = useLeagueRegistrations();
   const { player } = usePlayerProfile();
   const [selectedLeagueIdx, setSelectedLeagueIdx] = useState(0);
@@ -56,12 +57,12 @@ export const CompetitionScreen: React.FC<{ navigation: any }> = ({ navigation })
   const loading = regsLoading || lbLoading;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
       <LinearGradient
         colors={[Palette.dark900, Palette.dark700]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.gradHeader}
+        style={[styles.gradHeader, { paddingTop: insets.top + Spacing.lg }]}
       >
         <TouchableOpacity style={styles.gradBackBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={24} color="#fff" />

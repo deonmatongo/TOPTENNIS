@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Switch, Alert, ActivityIndicator, Linking, Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
@@ -187,6 +187,7 @@ const lr = StyleSheet.create({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const { user, signOut } = useAuth();
   const { player } = usePlayerProfile();
   const [settings, setSettings] = useState<AppSettings>(DEFAULTS);
@@ -268,7 +269,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
       colors={[Palette.dark900, Palette.dark700]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={styles.gradHeader}
+      style={[styles.gradHeader, { paddingTop: insets.top + Spacing.lg }]}
     >
       <TouchableOpacity style={styles.gradBackBtn} onPress={() => navigation.goBack()}>
         <Ionicons name="chevron-back" size={24} color="#fff" />
@@ -283,7 +284,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <SafeAreaView style={styles.safe} edges={['bottom']}>
         <GradHeader />
         <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />
       </SafeAreaView>
@@ -291,7 +292,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
       <GradHeader />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>

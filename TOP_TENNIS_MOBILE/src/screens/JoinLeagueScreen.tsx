@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLeagueRegistrations } from '@/hooks/useLeagueRegistrations';
@@ -53,13 +53,14 @@ export const JoinLeagueScreen: React.FC<{ navigation: any }> = ({ navigation }) 
     }
   };
 
+  const insets = useSafeAreaInsets();
   const activeRegistrations = registrations.filter(r => r.status === 'active');
   const openLeagues = allLeagues.filter(l => l.status === 'Open' || l.status === 'Waitlist' || l.status === 'Registration Open' || l.status === 'Registration Closing Soon');
   const closedLeagues = allLeagues.filter(l => l.status === 'Closed' || l.status === 'Completed');
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <LinearGradient colors={[Palette.dark900, Palette.dark700]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gradHeader}>
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <LinearGradient colors={[Palette.dark900, Palette.dark700]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.gradHeader, { paddingTop: insets.top + Spacing.lg }]}>
         <TouchableOpacity style={styles.gradBackBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
