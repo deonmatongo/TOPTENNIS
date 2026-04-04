@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, ActivityIndicator, TextInput, Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useMatchSuggestions } from '@/hooks/useMatchSuggestions';
@@ -12,6 +12,7 @@ import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { Avatar } from '@/components/ui/Avatar';
 import { PlayerProfileSheet, PlayerSearchResult } from '@/components/ui/PlayerProfileSheet';
 import { Palette, Colors, Shadow, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/services/supabase';
 
 type Mode = 'selection' | 'ai' | 'search';
@@ -22,6 +23,7 @@ const winRate = (p: any) => {
 };
 
 export const CasualMatchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const { suggestions, loading } = useMatchSuggestions();
   const { player } = usePlayerProfile();
   const { friends, pendingSent, pendingReceived } = useFriendRequests();
@@ -103,13 +105,14 @@ export const CasualMatchScreen: React.FC<{ navigation: any }> = ({ navigation })
   };
 
   return (
-    <SafeAreaView style={s.safe} edges={['top']}>
+    <SafeAreaView style={s.safe} edges={['bottom']}>
+      <StatusBar style="light" />
       {/* ── Header ── */}
       <LinearGradient
         colors={[Palette.dark900, Palette.dark700]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={s.header}
+        style={[s.header, { paddingTop: insets.top + Spacing.lg }]}
       >
         <TouchableOpacity style={s.backBtn} onPress={() => mode !== 'selection' ? setMode('selection') : navigation.goBack()}>
           <Ionicons name="chevron-back" size={24} color="#fff" />

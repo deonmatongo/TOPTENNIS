@@ -3,10 +3,12 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   RefreshControl, ActivityIndicator, TextInput, Alert, Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNotifications, Notification, NotificationType } from '@/hooks/useNotifications';
 import { Colors, FontSize, FontWeight, Spacing, Radius, Shadow, Palette } from '@/theme/colors';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import * as ExpoNotifications from 'expo-notifications';
 
 ExpoNotifications.setNotificationHandler({
@@ -123,6 +125,7 @@ const fmtAgo = (date: Date): string => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const { notifications, unreadCount, loading, markAsRead, markAllAsRead,
           deleteNotification, markVisibleAsRead, refetch } = useNotifications();
   const [refreshing, setRefreshing]   = useState(false);
@@ -216,12 +219,16 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
   };
 
   return (
-    <SafeAreaView style={s.safe} edges={['top']}>
-
+    <SafeAreaView style={s.safe} edges={['bottom']}>
+      <StatusBar style="light" />
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <View style={s.header}>
+      <LinearGradient
+        colors={[Palette.dark900, Palette.dark700]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={[s.header, { paddingTop: insets.top + Spacing.md }]}
+      >
         <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={20} color={Colors.text} />
+          <Ionicons name="chevron-back" size={20} color="#fff" />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={s.headerTitle}>Notifications</Text>
@@ -232,7 +239,7 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
             <Text style={s.markAllTxt}>Mark all read</Text>
           </TouchableOpacity>
         )}
-      </View>
+      </LinearGradient>
 
       {/* ── Search ──────────────────────────────────────────────────────── */}
       <View style={s.searchWrap}>
@@ -339,25 +346,22 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
     paddingBottom: Spacing.sm,
     gap: Spacing.sm,
-    backgroundColor: Colors.background,
   },
   backBtn: {
     width: 38, height: 38, borderRadius: 19,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center', justifyContent: 'center',
-    ...Shadow.xs,
   },
-  headerTitle: { fontSize: FontSize.xxxl, fontWeight: FontWeight.black, color: Colors.text, letterSpacing: -1 },
-  headerSub:   { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.semibold, marginTop: 1 },
+  headerTitle: { fontSize: FontSize.xxxl, fontWeight: FontWeight.black, color: '#fff', letterSpacing: -1 },
+  headerSub:   { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)', fontWeight: FontWeight.semibold, marginTop: 1 },
   markAllBtn:  {
     paddingHorizontal: Spacing.md, paddingVertical: 7,
     borderRadius: Radius.full,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
-  markAllTxt:  { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.bold },
+  markAllTxt:  { fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.bold },
 
   // Search
   searchWrap: {

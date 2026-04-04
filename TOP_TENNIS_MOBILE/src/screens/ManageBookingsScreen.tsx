@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, ActivityIndicator, Alert, TextInput,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMatches } from '@/hooks/useMatches';
@@ -12,6 +12,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { MatchInviteResponseModal } from '@/components/ui/MatchInviteResponseModal';
 import { supabase } from '@/services/supabase';
 import { Palette, Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { StatusBar } from 'expo-status-bar';
 import { format, differenceInHours } from 'date-fns';
 
 type StatusFilter = 'all' | 'pending' | 'accepted' | 'declined' | 'cancelled';
@@ -25,6 +26,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }
 };
 
 export const ManageBookingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { invites, pendingReceived, upcoming, history, loading, respondToInvite, refetch } = useMatches();
   const [activeTab, setActiveTab] = useState<Tab>('received');
@@ -237,8 +239,9 @@ export const ManageBookingsScreen: React.FC<{ navigation: any }> = ({ navigation
   const currentData = tabData[activeTab];
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <LinearGradient colors={[Palette.dark900, Palette.dark700]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gradHeader}>
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <StatusBar style="light" />
+      <LinearGradient colors={[Palette.dark900, Palette.dark700]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.gradHeader, { paddingTop: insets.top + Spacing.lg }]}>
         <TouchableOpacity style={styles.gradBackBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>

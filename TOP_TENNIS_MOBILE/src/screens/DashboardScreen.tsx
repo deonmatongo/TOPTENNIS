@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,6 +14,7 @@ import { useLeagueRegistrations } from '@/hooks/useLeagueRegistrations';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Avatar } from '@/components/ui/Avatar';
 import { Palette, Colors, Shadow, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { StatusBar } from 'expo-status-bar';
 
 const ACHIEVEMENTS = [
   { id: 'first_win', icon: 'trophy' as const, label: 'First Win', desc: 'Win your first match', color: '#f59e0b', condition: (w: number) => w >= 1 },
@@ -49,6 +50,7 @@ const SectionLabel: React.FC<{ text: string; onAction?: () => void; actionText?:
 );
 
 export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { profile, loading: profileLoading, refetch: refetchProfile } = useProfile();
   const { player, refetch: refetchPlayer } = usePlayerProfile();
@@ -86,7 +88,8 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const loading = profileLoading || matchesLoading;
 
   return (
-    <SafeAreaView style={s.safe} edges={['top']}>
+    <SafeAreaView style={s.safe} edges={['bottom']}>
+      <StatusBar style="light" />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}
@@ -97,7 +100,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           colors={[Palette.dark900, Palette.dark700]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={s.hero}
+          style={[s.hero, { paddingTop: insets.top + Spacing.lg }]}
         >
           {/* Top row */}
           <View style={s.heroTop}>

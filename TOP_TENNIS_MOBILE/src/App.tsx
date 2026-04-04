@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet, Text, TouchableOpacity, ScrollView, Platform, Linking } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -117,6 +117,7 @@ function MoreNavigator() {
 
 // ─── More Menu Screen ─────────────────────────────────────────────────────────
 function MoreMenuScreen({ navigation }: { navigation: any }) {
+  const insets = useSafeAreaInsets();
   const { unreadCount: notifCount } = useNotifications();
   const { pendingReceived: friendRequests } = useFriendRequests();
   const { player } = usePlayerProfile();
@@ -165,14 +166,15 @@ function MoreMenuScreen({ navigation }: { navigation: any }) {
   ];
 
   return (
-    <SafeAreaView style={ms.safe} edges={['top']}>
+    <SafeAreaView style={ms.safe} edges={['bottom']}>
+      <StatusBar style="light" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
 
         {/* ── Profile hero ──────────────────────────────────────────────── */}
         <LinearGradient
           colors={[Palette.dark900, Palette.dark700, Palette.dark600]}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={ms.hero}
+          style={[ms.hero, { paddingTop: insets.top + Spacing.md }]}
         >
           <View style={ms.heroInner}>
             <View style={ms.avatarWrap}>

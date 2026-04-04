@@ -3,12 +3,14 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, ActivityIndicator, TextInput, Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { Avatar } from '@/components/ui/Avatar';
 import { PlayerProfileSheet, PlayerSearchResult } from '@/components/ui/PlayerProfileSheet';
 import { Palette, Colors, Shadow, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -42,6 +44,7 @@ const EmptyState: React.FC<{ icon: string; title: string; sub: string; btnLabel?
 );
 
 export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const {
     pendingReceived, pendingSent, friends, loading,
@@ -116,9 +119,14 @@ export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     pendingReceived.some(r => r.sender_id === userId);
 
   return (
-    <SafeAreaView style={s.safe} edges={['top']}>
+    <SafeAreaView style={s.safe} edges={['bottom']}>
+      <StatusBar style="light" />
       {/* ── Header ── */}
-      <View style={s.header}>
+      <LinearGradient
+        colors={[Palette.dark900, Palette.dark700]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={[s.header, { paddingTop: insets.top + Spacing.lg }]}
+      >
         <View>
           <Text style={s.headerTitle}>Network</Text>
           <Text style={s.headerSub}>Friends & players</Text>
@@ -129,13 +137,13 @@ export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             <Text style={s.headerCountLabel}>Friends</Text>
           </View>
           {pendingReceived.length > 0 && (
-            <View style={[s.headerCountItem, { backgroundColor: Colors.primaryLight }]}>
-              <Text style={[s.headerCountVal, { color: Colors.primary }]}>{pendingReceived.length}</Text>
-              <Text style={[s.headerCountLabel, { color: Colors.primary }]}>Pending</Text>
+            <View style={[s.headerCountItem, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+              <Text style={[s.headerCountVal, { color: '#fff' }]}>{pendingReceived.length}</Text>
+              <Text style={[s.headerCountLabel, { color: 'rgba(255,255,255,0.8)' }]}>Pending</Text>
             </View>
           )}
         </View>
-      </View>
+      </LinearGradient>
 
       {/* ── Search bar ── */}
       <View style={s.searchWrap}>
@@ -347,13 +355,13 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
 
   // ── Header ──
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.md },
-  headerTitle: { fontSize: 28, fontWeight: FontWeight.black, color: Colors.text },
-  headerSub: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md },
+  headerTitle: { fontSize: 28, fontWeight: FontWeight.black, color: '#fff' },
+  headerSub: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
   headerCounts: { flexDirection: 'row', gap: Spacing.sm },
-  headerCountItem: { backgroundColor: Colors.surfaceWarm, borderRadius: Radius.lg, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, alignItems: 'center', minWidth: 52 },
-  headerCountVal: { fontSize: FontSize.lg, fontWeight: FontWeight.black, color: Colors.text },
-  headerCountLabel: { fontSize: 10, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+  headerCountItem: { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: Radius.lg, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, alignItems: 'center', minWidth: 52 },
+  headerCountVal: { fontSize: FontSize.lg, fontWeight: FontWeight.black, color: '#fff' },
+  headerCountLabel: { fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: FontWeight.medium },
 
   // ── Search ──
   searchWrap: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },

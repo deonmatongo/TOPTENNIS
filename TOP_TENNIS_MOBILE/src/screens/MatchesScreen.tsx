@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, Alert, ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useMatches } from '@/hooks/useMatches';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,6 +14,8 @@ import { ProposeNewTimeModal } from '@/components/ui/ProposeNewTimeModal';
 import { useCalendarExport } from '@/hooks/useCalendarExport';
 import { supabase } from '@/services/supabase';
 import { Colors, FontSize, FontWeight, Spacing, Radius, Shadow, Palette } from '@/theme/colors';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import { format } from 'date-fns';
 
 type Tab = 'pending' | 'upcoming' | 'history';
@@ -21,6 +23,7 @@ type Tab = 'pending' | 'upcoming' | 'history';
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const MatchesScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { pendingReceived, upcoming, history, loading, respondToInvite, refetch } = useMatches();
   const [tab, setTab] = useState<Tab>('pending');
@@ -73,15 +76,19 @@ export const MatchesScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
   };
 
   return (
-    <SafeAreaView style={s.safe} edges={['top']}>
-
+    <SafeAreaView style={s.safe} edges={['bottom']}>
+      <StatusBar style="light" />
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <View style={s.header}>
+      <LinearGradient
+        colors={[Palette.dark900, Palette.dark700]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={[s.header, { paddingTop: insets.top + Spacing.md }]}
+      >
         <View style={{ flex: 1 }}>
           <Text style={s.headerTitle}>Matches</Text>
           <Text style={s.headerSub}>{pendingReceived.length > 0 ? `${pendingReceived.length} invitation${pendingReceived.length > 1 ? 's' : ''} waiting` : 'Your match activity'}</Text>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* ── Segmented tabs ──────────────────────────────────────────────── */}
       <View style={s.tabsWrap}>
@@ -280,12 +287,10 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
-    backgroundColor: Colors.background,
+    paddingBottom: Spacing.md,
   },
-  headerTitle: { fontSize: FontSize.xxxl, fontWeight: FontWeight.black, color: Colors.text, letterSpacing: -1 },
-  headerSub: { fontSize: FontSize.sm, color: Colors.textMuted, marginTop: 2, fontWeight: FontWeight.medium },
+  headerTitle: { fontSize: FontSize.xxxl, fontWeight: FontWeight.black, color: '#fff', letterSpacing: -1 },
+  headerSub: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.65)', marginTop: 2, fontWeight: FontWeight.medium },
 
   // Tabs
   tabsWrap: {
