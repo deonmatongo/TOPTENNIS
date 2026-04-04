@@ -11,6 +11,7 @@ import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { Palette, Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { LeagueRegistrationModal } from '@/components/ui/LeagueRegistrationModal';
 import type { League } from '@/hooks/useLeagueRegistrations';
+import { StatusBar } from 'expo-status-bar';
 
 export const JoinLeagueScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { allLeagues, registrations, loading, registerForLeague, isRegistered, refetch } = useLeagueRegistrations();
@@ -60,6 +61,7 @@ export const JoinLeagueScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <StatusBar style="light" />
       <LinearGradient colors={[Palette.dark900, Palette.dark700]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.gradHeader, { paddingTop: insets.top + Spacing.lg }]}>
         <TouchableOpacity style={styles.gradBackBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={24} color="#fff" />

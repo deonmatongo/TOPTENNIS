@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { supabase } from '@/services/supabase';
 import { Palette, Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { StatusBar } from 'expo-status-bar';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -285,6 +286,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   if (loading) {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
+        <StatusBar style="light" />
         <GradHeader />
         <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />
       </SafeAreaView>
@@ -293,6 +295,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <StatusBar style="light" />
       <GradHeader />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>

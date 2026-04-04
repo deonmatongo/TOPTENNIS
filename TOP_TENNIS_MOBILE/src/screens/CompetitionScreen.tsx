@@ -12,6 +12,7 @@ import { useLeagueLeaderboard } from '@/hooks/useLeagueLeaderboard';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { PlayerProfileModal, PlayerSearchResult } from '@/components/ui/PlayerProfileModal';
 import { Palette, Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { StatusBar } from 'expo-status-bar';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
@@ -58,6 +59,7 @@ export const CompetitionScreen: React.FC<{ navigation: any }> = ({ navigation })
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <StatusBar style="light" />
       <LinearGradient
         colors={[Palette.dark900, Palette.dark700]}
         start={{ x: 0, y: 0 }}

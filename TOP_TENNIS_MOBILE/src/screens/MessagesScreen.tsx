@@ -16,6 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Avatar } from '@/components/ui/Avatar';
 import { Palette, Colors, Shadow, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
+import { StatusBar } from 'expo-status-bar';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -801,6 +802,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
 
   return (
     <SafeAreaView style={ls.safe} edges={['bottom']}>
+      <StatusBar style="light" />
       {/* Header */}
       <LinearGradient
         colors={[Palette.dark900, Palette.dark700]}

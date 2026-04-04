@@ -13,6 +13,7 @@ import { useLeagueMatches } from '@/hooks/useLeagueMatches';
 import { useCalendarExport } from '@/hooks/useCalendarExport';
 import { Palette, Colors, Shadow, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import {
   format, addDays, subDays, addWeeks, subWeeks,
   startOfWeek, endOfWeek, eachDayOfInterval,
@@ -292,6 +293,7 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
 
   return (
     <SafeAreaView style={s.safe} edges={['bottom']}>
+      <StatusBar style="light" />
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <LinearGradient
         colors={[Palette.dark900, Palette.dark700]}

@@ -20,6 +20,7 @@ import { useLeagueLeaderboard } from '@/hooks/useLeagueLeaderboard';
 import { supabase } from '@/services/supabase';
 import { Palette, Colors, Shadow, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 
 // ── Dummy data (shown when user has no real registrations) ────────────────────
 
@@ -746,6 +747,7 @@ export const MyLeaguesScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <StatusBar style="light" />
       {/* Dark gradient header */}
       <LinearGradient
         colors={[Palette.dark900, Palette.dark700]}
