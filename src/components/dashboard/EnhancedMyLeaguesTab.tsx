@@ -56,8 +56,9 @@ interface DivisionInfo {
 // ── Small helpers ─────────────────────────────────────────────────────────────
 
 const getLeagueStatus = (league: any): 'In Progress' | 'Completed' => {
-  const months =
-    (Date.now() - new Date(league.created_at).getTime()) / (1000 * 60 * 60 * 24 * 30);
+  const dateStr = league.created_at || league.registration_date;
+  if (!dateStr) return 'In Progress'; // treat unknown-date registrations as active
+  const months = (Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24 * 30);
   return months < 3 ? 'In Progress' : 'Completed';
 };
 
@@ -1112,7 +1113,7 @@ const EnhancedMyLeaguesTab: React.FC<EnhancedMyLeaguesTabProps> = ({
         </div>
 
         {/* 5-tab layout */}
-        <Tabs defaultValue={league.is_demo ? 'matches' : 'my-group'} className="space-y-4">
+        <Tabs defaultValue="matches" className="space-y-4">
           <TabsList className="grid w-full grid-cols-5 h-auto">
             <TabsTrigger value="matches"    className="flex items-center gap-1 py-2.5"><Calendar  className="w-4 h-4 shrink-0" /><span className="hidden sm:inline text-xs">Matches</span></TabsTrigger>
             <TabsTrigger value="my-group"   className="flex items-center gap-1 py-2.5"><BarChart3 className="w-4 h-4 shrink-0" /><span className="hidden sm:inline text-xs">My Group</span></TabsTrigger>
