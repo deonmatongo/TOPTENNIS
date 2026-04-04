@@ -800,13 +800,13 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
   // ── List view ────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={ls.safe} edges={['top']}>
+    <SafeAreaView style={ls.safe} edges={['bottom']}>
       {/* Header */}
       <LinearGradient
         colors={[Palette.dark900, Palette.dark700]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={ls.header}
+        style={[ls.header, { paddingTop: insets.top + Spacing.md }]}
       >
         <View style={ls.headerRow}>
           <View style={{ flex: 1 }}>
