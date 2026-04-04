@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, ActivityIndicator,
+  RefreshControl, ActivityIndicator, TextInput,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,6 +15,8 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { Avatar } from '@/components/ui/Avatar';
 import { Palette, Colors, Shadow, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { StatusBar } from 'expo-status-bar';
+import { supabase } from '@/services/supabase';
+import { PlayerProfileSheet, PlayerSearchResult } from '@/components/ui/PlayerProfileSheet';
 
 const ACHIEVEMENTS = [
   { id: 'first_win', icon: 'trophy' as const, label: 'First Win', desc: 'Win your first match', color: '#f59e0b', condition: (w: number) => w >= 1 },
@@ -51,6 +53,11 @@ const SectionLabel: React.FC<{ text: string; onAction?: () => void; actionText?:
 
 export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState<PlayerSearchResult | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { user } = useAuth();
   const { profile, loading: profileLoading, refetch: refetchProfile } = useProfile();
   const { player, refetch: refetchPlayer } = usePlayerProfile();
@@ -64,6 +71,23 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     await Promise.all([refetchProfile(), refetchPlayer(), refetchMatches()]);
     setRefreshing(false);
   };
+
+  const handleSearch = useCallback((q: string) => {
+    setSearchQuery(q);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (q.trim().length < 1) { setSearchResults([]); setSearching(false); return; }
+    setSearching(true);
+    debounceRef.current = setTimeout(async () => {
+      const { data } = await supabase
+        .from('players')
+        .select('id, name, skill_level, usta_rating, city, profile_picture_url, user_id')
+        .ilike('name', `%${q}%`)
+        .neq('user_id', user?.id || '')
+        .limit(15);
+      setSearchResults(data || []);
+      setSearching(false);
+    }, 350);
+  }, [user?.id]);
 
   const fullName = profile
     ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
@@ -145,7 +169,56 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
               </React.Fragment>
             ))}
           </View>
+
+          {/* Search bar */}
+          <View style={s.searchWrap}>
+            <Ionicons name="search-outline" size={17} color="rgba(255,255,255,0.55)" />
+            <TextInput
+              style={s.searchInput}
+              placeholder="Find a player..."
+              placeholderTextColor="rgba(255,255,255,0.45)"
+              value={searchQuery}
+              onChangeText={handleSearch}
+              returnKeyType="search"
+              autoCorrect={false}
+            />
+            {searching && <ActivityIndicator size="small" color="rgba(255,255,255,0.6)" />}
+            {searchQuery.length > 0 && !searching && (
+              <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults([]); }}>
+                <Ionicons name="close-circle" size={17} color="rgba(255,255,255,0.5)" />
+              </TouchableOpacity>
+            )}
+          </View>
         </LinearGradient>
+
+        {/* Search results */}
+        {(searchResults.length > 0 || (searchQuery.length > 0 && !searching)) && (
+          <View style={s.searchResults}>
+            {searchResults.length === 0 ? (
+              <Text style={s.searchEmpty}>No players found for "{searchQuery}"</Text>
+            ) : (
+              searchResults.map(p => (
+                <TouchableOpacity
+                  key={p.id}
+                  style={s.searchRow}
+                  onPress={() => setSelectedPlayer(p)}
+                  activeOpacity={0.8}
+                >
+                  <Avatar name={p.name || 'P'} size={40} imageUrl={p.profile_picture_url} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.searchName}>{p.name}</Text>
+                    <View style={s.searchChips}>
+                      {p.skill_level && <View style={s.searchChip}><Text style={s.searchChipTxt}>Level {p.skill_level}</Text></View>}
+                      {p.city && <View style={s.searchChip}><Text style={s.searchChipTxt}>{p.city}</Text></View>}
+                      {p.usta_rating && <View style={s.searchChip}><Text style={s.searchChipTxt}>USTA {p.usta_rating}</Text></View>}
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        )}
 
         <View style={s.body}>
           {/* Pending invites alert */}
@@ -314,6 +387,12 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           </View>
         </View>
       </ScrollView>
+
+      <PlayerProfileSheet
+        player={selectedPlayer}
+        visible={!!selectedPlayer}
+        onClose={() => setSelectedPlayer(null)}
+      />
     </SafeAreaView>
   );
 };
@@ -399,4 +478,15 @@ const s = StyleSheet.create({
   shortcutDiv: { height: 1, backgroundColor: Colors.borderLight, marginHorizontal: Spacing.md },
   shortcutIcon: { width: 36, height: 36, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
   shortcutTxt: { flex: 1, fontSize: FontSize.sm, color: Colors.text, fontWeight: FontWeight.medium },
+
+  // ── Search ──
+  searchWrap: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: Radius.full, paddingHorizontal: Spacing.md, height: 44, marginTop: Spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
+  searchInput: { flex: 1, fontSize: FontSize.sm, color: '#fff', paddingVertical: 0 },
+  searchResults: { backgroundColor: Colors.surface, marginHorizontal: Spacing.md, marginTop: -2, borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.border, ...Shadow.md, overflow: 'hidden' },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
+  searchName: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
+  searchChips: { flexDirection: 'row', gap: 4, marginTop: 3, flexWrap: 'wrap' },
+  searchChip: { backgroundColor: Colors.backgroundAlt, borderRadius: Radius.sm, paddingHorizontal: 7, paddingVertical: 2 },
+  searchChipTxt: { fontSize: 10, color: Colors.textSecondary },
+  searchEmpty: { padding: Spacing.md, textAlign: 'center', color: Colors.textMuted, fontSize: FontSize.sm },
 });

@@ -395,8 +395,7 @@ const styles = StyleSheet.create({
 const tabStyles = StyleSheet.create({
   bar: {
     backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: Palette.gray150,
+    borderTopWidth: 0,
     height: Platform.OS === 'ios' ? 82 : 66,
     paddingBottom: Platform.OS === 'ios' ? 22 : 8,
     paddingTop: 8,
