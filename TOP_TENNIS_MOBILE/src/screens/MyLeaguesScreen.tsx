@@ -27,6 +27,8 @@ import { StatusBar } from 'expo-status-bar';
 const _d = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
 const _p = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
 
+const LEAGUE_ACTIVITIES_AVAILABLE = true;
+
 const DUMMY_REGISTRATIONS = [
   { id: '__demo_1', league_id: '__demo_l1', league_name: 'Spring Open Singles 2026', status: 'active',    created_at: _p(28),  is_demo: true },
   { id: '__demo_2', league_id: '__demo_l2', league_name: 'City Doubles Championship', status: 'active',   created_at: _p(14),  is_demo: true },
@@ -51,6 +53,9 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
 ];
 
 const getLeagueStatus = (reg: any) => {
+  if (reg.status === 'completed' || reg.status === 'expired') return 'Completed';
+  if (reg.status === 'active') return 'In Progress';
+  // Fallback: date-based heuristic for legacy records
   const dateStr = reg.created_at || reg.registration_date;
   if (!dateStr) return 'In Progress';
   const months = (Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24 * 30);
@@ -706,6 +711,7 @@ export const MyLeaguesScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const { assignments } = useDivisionAssignments();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedReg, setSelectedReg] = useState<any>(null);
+  const [completedPage, setCompletedPage] = useState(3);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -768,7 +774,13 @@ export const MyLeaguesScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
       >
         <View style={styles.content}>
-          {loading && !refreshing ? (
+          {!LEAGUE_ACTIVITIES_AVAILABLE ? (
+            <View style={styles.unavailableCard}>
+              <Ionicons name="time-outline" size={48} color={Colors.textMuted} />
+              <Text style={styles.unavailableTitle}>League activities are not available at this time.</Text>
+              <Text style={styles.unavailableSub}>Check back soon — new league registrations will open shortly.</Text>
+            </View>
+          ) : loading && !refreshing ? (
             <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />
           ) : (
             <>
@@ -855,31 +867,46 @@ export const MyLeaguesScreen: React.FC<{ navigation: any }> = ({ navigation }) =
               )}
 
               {/* Completed leagues */}
-              {sourceCompleted.length > 0 && (
-                <View style={styles.sectionBlock}>
-                  <Text style={styles.sectionTitle}>Completed</Text>
-                  {sourceCompleted.map(reg => (
-                    <TouchableOpacity
-                      key={reg.id}
-                      style={[styles.leagueCard, styles.leagueCardCompleted]}
-                      onPress={() => setSelectedReg(reg)}
-                      activeOpacity={0.8}
-                    >
-                      <View style={styles.leagueCardHeader}>
-                        <Text style={styles.leagueName} numberOfLines={1}>{reg.league_name || 'League'}</Text>
-                        <View style={styles.completedBadge}><Text style={styles.completedBadgeText}>Completed</Text></View>
-                      </View>
-                      <Text style={styles.divLabel}>
-                        Season {reg.created_at ? new Date(reg.created_at).getFullYear() : '—'}
-                      </Text>
-                      <View style={styles.viewLeagueRow}>
-                        <Text style={styles.viewLeagueText}>View Details</Text>
-                        <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+              {sourceCompleted.length > 0 && (() => {
+                const sorted = [...sourceCompleted].sort((a, b) =>
+                  new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
+                );
+                const visible = sorted.slice(0, completedPage);
+                return (
+                  <View style={styles.sectionBlock}>
+                    <View style={styles.sectionHead}>
+                      <Text style={styles.sectionTitle}>Completed</Text>
+                      <Text style={styles.sectionCount}>{sourceCompleted.length} total</Text>
+                    </View>
+                    {visible.map(reg => (
+                      <TouchableOpacity
+                        key={reg.id}
+                        style={[styles.leagueCard, styles.leagueCardCompleted]}
+                        onPress={() => setSelectedReg(reg)}
+                        activeOpacity={0.8}
+                      >
+                        <View style={styles.leagueCardHeader}>
+                          <Text style={styles.leagueName} numberOfLines={1}>{reg.league_name || 'League'}</Text>
+                          <View style={styles.completedBadge}><Text style={styles.completedBadgeText}>Completed</Text></View>
+                        </View>
+                        <Text style={styles.divLabel}>
+                          Season {reg.created_at ? new Date(reg.created_at).getFullYear() : '—'}
+                        </Text>
+                        <View style={styles.viewLeagueRow}>
+                          <Text style={styles.viewLeagueText}>View Details</Text>
+                          <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                    {sorted.length > completedPage && (
+                      <TouchableOpacity style={styles.loadMoreBtn} onPress={() => setCompletedPage(p => p + 3)}>
+                        <Text style={styles.loadMoreText}>Load more ({sorted.length - completedPage} remaining)</Text>
+                        <Ionicons name="chevron-down" size={14} color={Colors.primary} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })()}
 
               {/* Empty state */}
               {sourceActive.length === 0 && sourceCompleted.length === 0 && !isDisplayingDemo && (
@@ -914,6 +941,11 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.lg, gap: Spacing.md },
 
+  // Unavailable state
+  unavailableCard: { alignItems: 'center', justifyContent: 'center', paddingVertical: 64, gap: Spacing.sm },
+  unavailableTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.textMuted, textAlign: 'center', maxWidth: 280 },
+  unavailableSub: { fontSize: FontSize.sm, color: Colors.textMuted, textAlign: 'center', maxWidth: 260, opacity: 0.7 },
+
   // Gradient header
   gradHeader: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xl, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   gradBackBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
@@ -932,6 +964,9 @@ const styles = StyleSheet.create({
   sectionBlock: { gap: Spacing.sm },
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   sectionTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionCount: { fontSize: FontSize.xs, color: Colors.textMuted, fontWeight: FontWeight.medium },
+  loadMoreBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.separator, marginTop: 4 },
+  loadMoreText: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
   demoPill: { backgroundColor: Colors.borderLight, paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border },
   demoPillText: { fontSize: 10, color: Colors.textMuted },
 

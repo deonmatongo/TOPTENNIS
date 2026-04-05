@@ -13,6 +13,9 @@ import { LeagueRegistrationModal } from '@/components/ui/LeagueRegistrationModal
 import type { League } from '@/hooks/useLeagueRegistrations';
 import { StatusBar } from 'expo-status-bar';
 
+// ── Feature flag — set to false to show the unavailable state ─────────────────
+const LEAGUE_ACTIVITIES_AVAILABLE = true;
+
 export const JoinLeagueScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { allLeagues, registrations, loading, registerForLeague, isRegistered, refetch } = useLeagueRegistrations();
   const { player } = usePlayerProfile();
@@ -76,7 +79,13 @@ export const JoinLeagueScreen: React.FC<{ navigation: any }> = ({ navigation }) 
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
       >
         <View style={styles.content}>
-          {loading && !refreshing ? (
+          {!LEAGUE_ACTIVITIES_AVAILABLE ? (
+            <View style={styles.unavailableCard}>
+              <Ionicons name="time-outline" size={48} color={Colors.textMuted} />
+              <Text style={styles.unavailableTitle}>League activities are not available at this time.</Text>
+              <Text style={styles.unavailableSub}>Check back soon — new league registrations will open shortly.</Text>
+            </View>
+          ) : loading && !refreshing ? (
             <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />
           ) : (
             <>
@@ -136,7 +145,17 @@ export const JoinLeagueScreen: React.FC<{ navigation: any }> = ({ navigation }) 
                       <View key={league.id} style={styles.leagueCard}>
                         <View style={styles.leagueCardTop}>
                           <View style={styles.leagueInfo}>
-                            <Text style={styles.leagueName}>{league.name}</Text>
+                            <View style={styles.leagueNameRow}>
+                              <Text style={styles.leagueName}>{league.name}</Text>
+                              {league.privacy === 'public' ? null : (
+                                <View style={styles.privacyBadge}>
+                                  <Ionicons name="lock-closed-outline" size={10} color="#6d28d9" />
+                                  <Text style={styles.privacyBadgeText}>
+                                    {league.privacy === 'friends_only' || !league.privacy ? 'Private · Friends Only' : 'Private'}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
                             {league.prize && (
                               <View style={styles.detailRow}>
                                 <Ionicons name="cash-outline" size={13} color={Colors.success} />
@@ -299,7 +318,12 @@ const styles = StyleSheet.create({
   leagueCardCompleted: { opacity: 0.6 },
   leagueCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   leagueInfo: { flex: 1, gap: 4 },
+  leagueNameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, flexWrap: 'wrap' },
   leagueName: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
+  privacyBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#ede9fe', paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full },
+  privacyBadgeText: { fontSize: 10, color: '#6d28d9', fontWeight: FontWeight.semibold },
+  privacyBadgePrivate: { backgroundColor: Colors.backgroundAlt },
+  privacyBadgePrivateText: { color: '#374151' },
   detailRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   detailText: { fontSize: FontSize.sm, color: Colors.textSecondary },
   leagueDesc: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 20 },
@@ -319,6 +343,11 @@ const styles = StyleSheet.create({
   registerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, backgroundColor: Colors.primary, paddingVertical: Spacing.md, borderRadius: Radius.md },
   registerBtnDisabled: { backgroundColor: Colors.textMuted },
   registerBtnText: { color: '#fff', fontWeight: FontWeight.semibold, fontSize: FontSize.md },
+
+  // Unavailable state
+  unavailableCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.xxl + 8, alignItems: 'center', gap: Spacing.md, borderWidth: 1, borderColor: Colors.border, marginTop: Spacing.xl },
+  unavailableTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text, textAlign: 'center' },
+  unavailableSub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
 
   // Empty state
   emptyCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.xxl, alignItems: 'center', gap: Spacing.md, borderWidth: 1, borderColor: Colors.border, marginTop: Spacing.lg },

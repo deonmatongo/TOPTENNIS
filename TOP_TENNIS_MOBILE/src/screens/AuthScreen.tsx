@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/services/supabase';
 import { Palette, Colors, FontSize, FontWeight, Radius, Spacing } from '@/theme/colors';
+import { useBiometrics } from '@/hooks/useBiometrics';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -59,7 +60,9 @@ export const AuthScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [biometricLoading, setBiometricLoading] = useState(false);
   const { signIn, signUp, signInWithGoogle } = useAuth();
+  const { available, biometricType, biometricLabel, credentialsStored, authenticate, saveCredentials } = useBiometrics();
 
   const handleGoogleAuth = async () => {
     setGoogleLoading(true);
@@ -71,6 +74,27 @@ export const AuthScreen: React.FC = () => {
       setGoogleLoading(false);
     }
   };
+
+  const handleBiometricSignIn = useCallback(async () => {
+    setBiometricLoading(true);
+    try {
+      const creds = await authenticate();
+      if (!creds) return; // user cancelled or failed
+      await signIn(creds.email, creds.password);
+    } catch (e: any) {
+      Alert.alert('Sign In Failed', e?.message || 'Could not sign in. Please use your password.');
+    } finally {
+      setBiometricLoading(false);
+    }
+  }, [authenticate, signIn]);
+
+  // Auto-prompt biometrics on mount when credentials are stored
+  useEffect(() => {
+    if (available && credentialsStored && mode === 'signin') {
+      const timer = setTimeout(() => handleBiometricSignIn(), 400);
+      return () => clearTimeout(timer);
+    }
+  }, [available, credentialsStored]);
 
   const pwStrength = mode === 'signup' ? getPasswordStrength(password) : null;
 
@@ -134,6 +158,20 @@ export const AuthScreen: React.FC = () => {
       setLoading(true);
       try {
         await signIn(email.trim(), password);
+        // Offer biometrics setup after first successful password login
+        if (available && !credentialsStored) {
+          Alert.alert(
+            `Enable ${biometricLabel}`,
+            `Sign in faster next time using ${biometricLabel}.`,
+            [
+              { text: 'Not Now', style: 'cancel' },
+              {
+                text: `Enable ${biometricLabel}`,
+                onPress: () => saveCredentials(email.trim(), password),
+              },
+            ],
+          );
+        }
       } catch (e: any) {
         Alert.alert('Sign In Failed', e?.message || 'Incorrect email or password.');
       } finally {
@@ -420,6 +458,29 @@ export const AuthScreen: React.FC = () => {
               }
             </TouchableOpacity>
 
+            {/* Biometric sign-in (only on sign-in mode when available + creds stored) */}
+            {mode === 'signin' && available && credentialsStored && (
+              <TouchableOpacity
+                style={[s.biometricBtn, (loading || googleLoading || biometricLoading) && s.submitBtnDisabled]}
+                onPress={handleBiometricSignIn}
+                disabled={loading || googleLoading || biometricLoading}
+                activeOpacity={0.85}
+              >
+                {biometricLoading ? (
+                  <ActivityIndicator color={Colors.primary} />
+                ) : (
+                  <>
+                    <Ionicons
+                      name={biometricType === 'faceid' ? 'scan-outline' : 'finger-print-outline'}
+                      size={22}
+                      color={Colors.primary}
+                    />
+                    <Text style={s.biometricTxt}>Sign in with {biometricLabel}</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+
             {/* Switch mode */}
             <Text style={s.switchTxt}>
               {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
@@ -501,6 +562,10 @@ const s = StyleSheet.create({
   googleIcon: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e5e7eb' },
   googleIconTxt: { fontSize: 13, fontWeight: FontWeight.bold, color: '#4285F4', lineHeight: 17 },
   googleTxt: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text },
+
+  // ── Biometric ──
+  biometricBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: Colors.primaryLight, borderWidth: 1.5, borderColor: Colors.primaryMuted, borderRadius: Radius.full, height: 52 },
+  biometricTxt: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.primary },
 
   // ── Switch mode ──
   switchTxt: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center' },

@@ -36,12 +36,62 @@ export const useMatches = () => {
       }
 
       console.log('Matches data:', data);
-      setMatches(data as Match[]);
+      const matchList = data as Match[];
+      setMatches(matchList);
+      checkPastDueMatches(matchList).catch(() => {});
     } catch (err) {
       console.error('Unexpected error:', err);
       setError('Failed to fetch matches');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkPastDueMatches = async (allMatches: Match[]) => {
+    const now = new Date();
+    const pastDue = allMatches.filter(m =>
+      m.status === 'scheduled' &&
+      !m.winner_id &&
+      new Date(m.match_date) < now
+    );
+    if (pastDue.length === 0) return;
+
+    const matchIds = pastDue.map(m => m.id);
+    const { data: existing } = await supabase
+      .from('notifications')
+      .select('metadata')
+      .eq('type', 'score_reminder')
+      .in('metadata->>match_id', matchIds);
+
+    const alreadyNotified = new Set((existing || []).map((n: any) => n.metadata?.match_id));
+    const toNotify = pastDue.filter(m => !alreadyNotified.has(m.id));
+    if (toNotify.length === 0) return;
+
+    // Resolve user_ids from the players table
+    const playerIds = [...new Set(toNotify.flatMap(m => [m.player1_id, m.player2_id]))];
+    const { data: playerRows } = await supabase
+      .from('players')
+      .select('id, user_id')
+      .in('id', playerIds);
+
+    const playerUserMap = new Map((playerRows || []).map((p: any) => [p.id, p.user_id]));
+
+    const rows = toNotify.flatMap(m => {
+      const uid1 = playerUserMap.get(m.player1_id);
+      const uid2 = playerUserMap.get(m.player2_id);
+      return [uid1, uid2].filter(Boolean).map(uid => ({
+        user_id: uid,
+        type: 'score_reminder',
+        title: 'Record Match Score',
+        message: 'Your match has ended. Please record the score so the leaderboard stays up to date.',
+        read: false,
+        action_url: '/dashboard?tab=schedule',
+        metadata: { match_id: m.id },
+      }));
+    });
+
+    if (rows.length > 0) {
+      await supabase.from('notifications').insert(rows);
     }
   };
 

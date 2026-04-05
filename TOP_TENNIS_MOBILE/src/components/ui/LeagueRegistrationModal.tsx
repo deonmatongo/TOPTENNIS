@@ -16,6 +16,7 @@ interface League {
   name: string;
   description?: string;
   prize?: string;
+  privacy?: 'private' | 'friends_only' | 'public';
 }
 
 interface Props {
@@ -146,6 +147,18 @@ export const LeagueRegistrationModal: React.FC<Props> = ({
                 <Ionicons name="people" size={32} color={Colors.primary} />
               </View>
               <Text style={styles.stepTitle}>Register for {league.name}</Text>
+              {(league.privacy === 'private' || !league.privacy) && (
+                <View style={styles.privacyRow}>
+                  <Ionicons name="lock-closed-outline" size={12} color="#6b7280" />
+                  <Text style={styles.privacyText}>Private league</Text>
+                </View>
+              )}
+              {league.privacy === 'friends_only' && (
+                <View style={[styles.privacyRow, styles.privacyRowFriends]}>
+                  <Ionicons name="people-outline" size={12} color="#6d28d9" />
+                  <Text style={[styles.privacyText, { color: '#6d28d9' }]}>Friends Only</Text>
+                </View>
+              )}
               {league.prize && (
                 <Text style={styles.feeText}>
                   Registration fee: <Text style={styles.feeAmount}>{league.prize}</Text>
@@ -407,6 +420,9 @@ const styles = StyleSheet.create({
   iconCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
   stepTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.text, textAlign: 'center' },
   stepSub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  privacyRow: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.backgroundAlt, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full },
+  privacyRowFriends: { backgroundColor: '#ede9fe' },
+  privacyText: { fontSize: FontSize.xs, color: '#6b7280', fontWeight: FontWeight.semibold },
   feeText: { fontSize: FontSize.md, color: Colors.textSecondary, textAlign: 'center' },
   feeAmount: { color: Colors.success, fontWeight: FontWeight.bold },
 

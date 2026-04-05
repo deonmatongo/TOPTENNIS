@@ -186,12 +186,10 @@ export const MatchInviteResponseModal: React.FC<Props> = ({
               <Ionicons name="time-outline" size={16} color={Colors.textMuted} />
               <Text style={styles.detailText}>{invite.start_time} – {invite.end_time}</Text>
             </View>
-            {invite.court_location && (
-              <View style={styles.detailRow}>
-                <Ionicons name="location-outline" size={16} color={Colors.textMuted} />
-                <Text style={styles.detailText}>{invite.court_location}</Text>
-              </View>
-            )}
+            <View style={styles.detailRow}>
+              <Ionicons name="location-outline" size={16} color={Colors.textMuted} />
+              <Text style={styles.detailText}>{invite.court_location || 'No location set'}</Text>
+            </View>
             {invite.message && (
               <View style={styles.messageBox}>
                 <Text style={styles.messageText}>"{invite.message}"</Text>

@@ -175,6 +175,38 @@ const PerformanceTab = ({ player }: PerformanceTabProps) => {
         </div>
       </div>
 
+      {/* Casual Match Dashboard */}
+      {(() => {
+        const casualMatches = (stats?.matches ?? []).filter(m => !m.leagueId);
+        const casualWins = casualMatches.filter(m => m.isWin).length;
+        const casualLosses = casualMatches.length - casualWins;
+        const casualWinRate = casualMatches.length > 0 ? Math.round((casualWins / casualMatches.length) * 100) : 0;
+        const casualCards = [
+          { label: 'Played', value: casualMatches.length, bg: 'bg-blue-50 dark:bg-blue-950/40', color: 'text-blue-700 dark:text-blue-300' },
+          { label: 'Wins', value: casualWins, bg: 'bg-emerald-50 dark:bg-emerald-950/40', color: 'text-emerald-700 dark:text-emerald-300' },
+          { label: 'Losses', value: casualLosses, bg: 'bg-red-50 dark:bg-red-950/40', color: 'text-red-700 dark:text-red-300' },
+          { label: 'Win Rate', value: `${casualWinRate}%`, bg: 'bg-orange-50 dark:bg-orange-950/40', color: 'text-orange-700 dark:text-orange-300' },
+        ];
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2 border-b pb-3">
+              <Zap className="w-5 h-5 text-primary" />
+              <h2 className="text-xl font-bold text-foreground">Casual Match Dashboard</h2>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {casualCards.map(c => (
+                <Card key={c.label} className={`${c.bg} border-0`}>
+                  <CardContent className="pt-5 pb-4 flex flex-col items-center gap-1">
+                    <span className={`text-3xl font-extrabold ${c.color}`}>{c.value}</span>
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{c.label}</span>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Performance Charts — all-time data */}
       <PerformanceChart matches={stats?.matches ?? []} />
 

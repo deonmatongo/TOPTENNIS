@@ -34,6 +34,9 @@ export const PerformanceScreen: React.FC<{ navigation: any }> = ({ navigation })
   const streak    = player?.current_streak ?? 0;
   const bestStr   = player?.best_streak   ?? 0;
 
+  const casualHistory    = history.filter(m => !m.is_league_match);
+  const casualWins       = casualHistory.filter(m => m.result === 'win').length;
+  const casualLosses     = casualHistory.filter(m => m.result === 'loss').length;
   const displayedHistory = showAll ? history : history.slice(0, 5);
 
   const METRICS = [
@@ -123,6 +126,47 @@ export const PerformanceScreen: React.FC<{ navigation: any }> = ({ navigation })
             <Text style={s.leagueSummary}>Registered in {registrations.length} league{registrations.length !== 1 ? 's' : ''}</Text>
           </View>
         )}
+
+        {/* ── Casual Match Dashboard ─────────────────────────────────────── */}
+        <View style={s.card}>
+          <View style={s.cardHead}>
+            <View>
+              <Text style={s.cardTitle}>Casual Matches</Text>
+              <Text style={s.cardSub}>Non-league match performance</Text>
+            </View>
+            <TouchableOpacity onPress={() => navigation.navigate('CasualMatch')}>
+              <Text style={s.cardLink}>Find Players →</Text>
+            </TouchableOpacity>
+          </View>
+
+          {casualHistory.length === 0 ? (
+            <View style={s.histEmpty}>
+              <Ionicons name="tennisball-outline" size={28} color={Colors.textMuted} />
+              <Text style={s.histEmptyTxt}>No casual matches yet</Text>
+            </View>
+          ) : (
+            <View style={s.casualGrid}>
+              {[
+                { label: 'Played', value: casualHistory.length, color: Palette.blue500, bg: Palette.blueBg, icon: 'tennisball-outline' as const },
+                { label: 'Wins',   value: casualWins,           color: Palette.green500, bg: Palette.greenBg, icon: 'trophy-outline' as const },
+                { label: 'Losses', value: casualLosses,         color: Palette.red500,  bg: Palette.redBg,  icon: 'close-circle-outline' as const },
+                {
+                  label: 'Win Rate',
+                  value: `${casualHistory.length > 0 ? Math.round((casualWins / casualHistory.length) * 100) : 0}%`,
+                  color: Palette.orange500, bg: Palette.orange50, icon: 'flame-outline' as const,
+                },
+              ].map(m => (
+                <View key={m.label} style={[s.casualCard, { backgroundColor: m.bg }]}>
+                  <View style={[s.metricIcon, { backgroundColor: m.color + '22' }]}>
+                    <Ionicons name={m.icon} size={18} color={m.color} />
+                  </View>
+                  <Text style={[s.metricValue, { color: m.color, fontSize: FontSize.lg }]}>{m.value}</Text>
+                  <Text style={s.metricLabel}>{m.label}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
 
         {/* ── Achievements ───────────────────────────────────────────────── */}
         <View style={s.card}>
@@ -369,6 +413,16 @@ const s = StyleSheet.create({
   scoreText:    { fontSize: FontSize.xxs, color: Colors.textMuted, fontFamily: 'monospace' },
   showMore:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.separator },
   showMoreTxt:  { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
+
+  // Casual match summary
+  casualSummaryRow: { flexDirection: 'row', gap: Spacing.sm },
+  casualStatBox:    { flex: 1, borderRadius: Radius.md, padding: Spacing.md, alignItems: 'center', gap: 2 },
+  casualStatNum:    { fontSize: FontSize.xxl, fontWeight: FontWeight.black, letterSpacing: -0.5 },
+  casualStatLbl:    { fontSize: FontSize.xs, fontWeight: FontWeight.semibold },
+
+  // Casual match dashboard grid
+  casualGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  casualCard: { flex: 1, minWidth: '45%', borderRadius: Radius.lg, padding: Spacing.md, alignItems: 'center', gap: 4 },
 
   // Empty card
   emptyCard: {

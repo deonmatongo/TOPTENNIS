@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useMatches } from "@/hooks/useMatches";
 import { useLeaderboard } from "@/hooks/useLeaderboard";
 import { useAuth } from "@/contexts/AuthContext";
+import { MapPin, Loader2 } from "lucide-react";
 
 interface ScheduleMatchModalProps {
   open: boolean;
@@ -20,6 +21,7 @@ const ScheduleMatchModal = ({ open, onOpenChange }: ScheduleMatchModalProps) => 
   const { createMatch } = useMatches();
   const { players } = useLeaderboard();
   const [loading, setLoading] = useState(false);
+  const [geoLoading, setGeoLoading] = useState(false);
   const [formData, setFormData] = useState({
     opponent_id: '',
     match_date: '',
@@ -29,6 +31,35 @@ const ScheduleMatchModal = ({ open, onOpenChange }: ScheduleMatchModalProps) => 
 
   // Filter out current user from opponent list
   const availableOpponents = players.filter(player => player.user_id !== user?.id);
+
+  const handleUseMyLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser');
+      return;
+    }
+    setGeoLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+          );
+          const data = await res.json();
+          const address = data.display_name ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+          setFormData(prev => ({ ...prev, court_location: address }));
+        } catch {
+          toast.error('Could not resolve location name');
+        } finally {
+          setGeoLoading(false);
+        }
+      },
+      () => {
+        toast.error('Location access denied');
+        setGeoLoading(false);
+      }
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,12 +141,25 @@ const ScheduleMatchModal = ({ open, onOpenChange }: ScheduleMatchModalProps) => 
 
           <div>
             <Label htmlFor="court_location">Court Location</Label>
-            <Input
-              id="court_location"
-              value={formData.court_location}
-              onChange={(e) => setFormData(prev => ({ ...prev, court_location: e.target.value }))}
-              placeholder="e.g., Central Tennis Club - Court 1"
-            />
+            <div className="flex gap-2 mt-1">
+              <Input
+                id="court_location"
+                value={formData.court_location}
+                onChange={(e) => setFormData(prev => ({ ...prev, court_location: e.target.value }))}
+                placeholder="e.g., Central Tennis Club - Court 1"
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={handleUseMyLocation}
+                disabled={geoLoading}
+                title="Use my current location"
+              >
+                {geoLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+              </Button>
+            </div>
           </div>
 
           <DialogFooter>

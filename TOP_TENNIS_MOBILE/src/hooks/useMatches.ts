@@ -19,6 +19,7 @@ export interface MatchInvite {
   proposed_date?: string;
   proposed_start_time?: string;
   proposed_end_time?: string;
+  winner_id?: string | null;
   sender?: { first_name: string; last_name: string; skill_level?: number; profile_picture_url?: string; wins?: number; losses?: number; usta_rating?: string; competitiveness?: string; city?: string };
   receiver?: { first_name: string; last_name: string; skill_level?: number; profile_picture_url?: string };
 }
@@ -27,6 +28,50 @@ export const useMatches = () => {
   const { user } = useAuth();
   const [invites, setInvites] = useState<MatchInvite[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const checkPastDueMatches = useCallback(async (allInvites: MatchInvite[]) => {
+    const now = new Date();
+    const pastDue = allInvites.filter(i =>
+      i.status === 'accepted' &&
+      !i.winner_id &&
+      new Date(`${i.date}T${i.start_time}`) < now
+    );
+    if (pastDue.length === 0) return;
+
+    const matchIds = pastDue.map(i => i.id);
+    const { data: existing } = await supabase
+      .from('notifications')
+      .select('metadata')
+      .eq('type', 'score_reminder')
+      .in('metadata->>match_id', matchIds);
+
+    const alreadyNotified = new Set((existing || []).map((n: any) => n.metadata?.match_id));
+    const toNotify = pastDue.filter(i => !alreadyNotified.has(i.id));
+    if (toNotify.length === 0) return;
+
+    const rows = toNotify.flatMap(i => [
+      {
+        user_id: i.sender_id,
+        type: 'score_reminder',
+        title: 'Record Match Score',
+        message: 'Your match has ended. Please record the score so the leaderboard stays up to date.',
+        read: false,
+        action_url: '/dashboard?tab=schedule',
+        metadata: { match_id: i.id },
+      },
+      {
+        user_id: i.receiver_id,
+        type: 'score_reminder',
+        title: 'Record Match Score',
+        message: 'Your match has ended. Please record the score so the leaderboard stays up to date.',
+        read: false,
+        action_url: '/dashboard?tab=schedule',
+        metadata: { match_id: i.id },
+      },
+    ]);
+
+    await supabase.from('notifications').insert(rows);
+  }, []);
 
   const fetchInvites = useCallback(async () => {
     if (!user) { setLoading(false); return; }
@@ -56,12 +101,13 @@ export const useMatches = () => {
       }));
 
       setInvites(enriched);
+      checkPastDueMatches(enriched).catch(() => {});
     } catch (e) {
       console.error('Error fetching matches:', e);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, checkPastDueMatches]);
 
   const respondToInvite = useCallback(async (inviteId: string, status: 'accepted' | 'declined') => {
     const { error } = await supabase

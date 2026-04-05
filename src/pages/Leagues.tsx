@@ -20,6 +20,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+const LEAGUE_ACTIVITIES_AVAILABLE = false;
+
 const Leagues = () => {
   const [selectedLeague, setSelectedLeague] = useState<any>(null);
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
@@ -184,6 +186,19 @@ const Leagues = () => {
       console.error("Registration error:", error);
     }
   };
+
+  if (!LEAGUE_ACTIVITIES_AVAILABLE) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-white overflow-x-hidden">
+        <Header />
+        <div className="container mx-auto px-4 py-24 flex flex-col items-center justify-center text-center gap-4">
+          <Trophy className="w-16 h-16 text-orange-300" />
+          <h2 className="text-2xl font-bold text-gray-800">League Activities Unavailable</h2>
+          <p className="text-gray-500 max-w-md">League activities are not available at this time.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-white overflow-x-hidden">

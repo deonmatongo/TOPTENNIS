@@ -473,7 +473,7 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                       <View style={s.matchInfo}>
                         <Text style={s.matchName}>vs {name}</Text>
                         <Text style={s.matchTime}>{format(parseISO(inv.date), 'EEE, MMM d')} · {fmtTime(inv.start_time)}–{fmtTime(inv.end_time)}</Text>
-                        {inv.court_location && <Text style={s.matchLoc}><Ionicons name="location-outline" size={10} color={Colors.textMuted} /> {inv.court_location}</Text>}
+                        <Text style={s.matchLoc}><Ionicons name="location-outline" size={10} color={Colors.textMuted} /> {inv.court_location || 'No location set'}</Text>
                       </View>
                       <View style={s.confirmedBadge}>
                         <Ionicons name="checkmark-circle" size={12} color={Colors.success} />

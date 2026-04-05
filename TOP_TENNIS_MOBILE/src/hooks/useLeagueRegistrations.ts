@@ -13,6 +13,7 @@ export interface League {
   season?: string;
   players?: number;
   prize?: string;
+  privacy?: 'private' | 'friends_only' | 'public';
 }
 
 export interface LeagueRegistration {
@@ -35,6 +36,7 @@ export const STATIC_LEAGUES: League[] = [
     description: "Men's singles league for competitive adult players. Evening and weekend matches available. Registration Deadline: July 3rd",
     prize: '$35.00',
     status: 'Open',
+    privacy: 'private',
   },
   {
     id: 'mens-doubles-fall-2025',
@@ -44,6 +46,7 @@ export const STATIC_LEAGUES: League[] = [
     description: "Men's doubles league for players who enjoy team competition. Flexible scheduling for working professionals. Registration Deadline: August 28th",
     prize: '$40.00',
     status: 'Open',
+    privacy: 'private',
   },
   {
     id: 'ladies-singles-summer-2025',
@@ -53,6 +56,7 @@ export const STATIC_LEAGUES: League[] = [
     description: "Women's singles league with competitive matches. Perfect for improving individual skills. Registration Deadline: July 3rd",
     prize: '$35.00',
     status: 'Open',
+    privacy: 'private',
   },
   {
     id: 'ladies-doubles-fall-2025',
@@ -62,6 +66,7 @@ export const STATIC_LEAGUES: League[] = [
     description: "Women's doubles league focusing on strategy and teamwork. Social and competitive atmosphere. Registration Deadline: August 28th",
     prize: '$40.00',
     status: 'Open',
+    privacy: 'private',
   },
   {
     id: 'mixed-doubles-fall-2025',
@@ -71,6 +76,7 @@ export const STATIC_LEAGUES: League[] = [
     description: 'Mixed doubles league for men and women. Great way to meet new players and enjoy competitive tennis. Registration Deadline: August 28th',
     prize: '$45.00',
     status: 'Open',
+    privacy: 'private',
   },
 ];
 

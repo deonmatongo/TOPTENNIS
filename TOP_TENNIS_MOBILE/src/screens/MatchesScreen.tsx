@@ -144,7 +144,7 @@ export const MatchesScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
       <MatchInviteResponseModal
         visible={!!selectedInvite} invite={selectedInvite}
         onClose={() => setSelectedInvite(null)}
-        onAccept={async (id) => { await handleRespond(id, 'accepted'); setSelectedInvite(null); }}
+        onAccept={async (id) => { await handleRespond(id, 'accepted'); setSelectedInvite(null); navigation?.navigate('Schedule'); }}
         onDecline={async (id) => { await handleRespond(id, 'declined'); setSelectedInvite(null); }}
         onProposeNewTime={async (id, date, start, end) => { await handleProposeNewTime(id, date, start, end); setSelectedInvite(null); }}
       />
@@ -187,12 +187,10 @@ function InviteCard({ invite, onPress, isResponding, getOpponent }: any) {
           </View>
         </View>
 
-        {invite.court_location && (
-          <View style={s.metaRow}>
-            <Ionicons name="location-outline" size={13} color={Colors.textMuted} />
-            <Text style={s.metaText}>{invite.court_location}</Text>
-          </View>
-        )}
+        <View style={s.metaRow}>
+          <Ionicons name="location-outline" size={13} color={Colors.textMuted} />
+          <Text style={s.metaText}>{invite.court_location || 'No location set'}</Text>
+        </View>
         {invite.message && (
           <View style={s.messageBox}>
             <Ionicons name="chatbubble-outline" size={12} color={Colors.textMuted} />
@@ -248,12 +246,10 @@ function MatchCard({ invite, userId, getOpponent, onReschedule, onExport }: any)
           </View>
         </View>
 
-        {invite.court_location && (
-          <View style={s.metaRow}>
-            <Ionicons name="location-outline" size={13} color={Colors.textMuted} />
-            <Text style={s.metaText}>{invite.court_location}</Text>
-          </View>
-        )}
+        <View style={s.metaRow}>
+          <Ionicons name="location-outline" size={13} color={Colors.textMuted} />
+          <Text style={s.metaText}>{invite.court_location || 'No location set'}</Text>
+        </View>
 
         <View style={s.statusRow}>
           <View style={[s.statusDot, { backgroundColor: isHistory ? Colors.textMuted : Colors.success }]} />

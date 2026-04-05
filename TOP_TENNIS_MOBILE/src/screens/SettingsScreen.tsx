@@ -11,6 +11,7 @@ import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { supabase } from '@/services/supabase';
 import { Palette, Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { StatusBar } from 'expo-status-bar';
+import { useBiometrics } from '@/hooks/useBiometrics';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -185,6 +186,10 @@ const lr = StyleSheet.create({
   desc: { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 2 },
 });
 
+// ─── Admin config ─────────────────────────────────────────────────────────────
+
+const ADMIN_EMAILS = ['admin@toptennis.app', 'deon@toptennis.app'];
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
@@ -231,6 +236,51 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     }
   }, [settings, user]);
 
+  const handleAdminResetAllData = () => {
+    Alert.alert(
+      '⚠️ Reset All User Data',
+      'This will permanently clear stats (wins/losses/streaks), match history, and notifications for ALL accounts. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, I Understand',
+          style: 'destructive',
+          onPress: () =>
+            Alert.alert(
+              'Final Confirmation',
+              'Type "RESET" to confirm this destructive operation.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'RESET ALL DATA',
+                  style: 'destructive',
+                  onPress: async () => {
+                    setSaving(true);
+                    try {
+                      await Promise.all([
+                        supabase.from('players').update({
+                          wins: 0, losses: 0, current_streak: 0, best_streak: 0,
+                        }).neq('id', '00000000-0000-0000-0000-000000000000'),
+                        supabase.from('match_invites').delete()
+                          .neq('id', '00000000-0000-0000-0000-000000000000'),
+                        supabase.from('notifications').delete()
+                          .neq('id', '00000000-0000-0000-0000-000000000000'),
+                      ]);
+                      Alert.alert('Done', 'All user data has been reset successfully.');
+                    } catch {
+                      Alert.alert('Error', 'Reset failed. Check admin permissions.');
+                    } finally {
+                      setSaving(false);
+                    }
+                  },
+                },
+              ]
+            ),
+        },
+      ]
+    );
+  };
+
   const handleDeleteAccount = () => {
     Alert.alert(
       'Delete Account',
@@ -251,6 +301,44 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign Out', style: 'destructive', onPress: signOut },
     ]);
+  };
+
+  const { available: biometricAvailable, biometricLabel, credentialsStored, saveCredentials, clearCredentials, authenticate } = useBiometrics();
+
+  const handleToggleBiometrics = () => {
+    if (credentialsStored) {
+      Alert.alert(
+        `Disable ${biometricLabel}`,
+        `You will no longer be able to sign in with ${biometricLabel}.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Disable', style: 'destructive', onPress: clearCredentials },
+        ],
+      );
+    } else {
+      Alert.alert(
+        `Enable ${biometricLabel}`,
+        `To enable ${biometricLabel} sign-in, please confirm your identity.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Continue',
+            onPress: async () => {
+              const result = await authenticate();
+              if (result) {
+                // credentials returned means they were already stored — shouldn't happen here
+                // but if biometrics passed, prompt for password
+                Alert.alert(
+                  'Enter Password',
+                  'Sign out and sign back in to enable biometric login, or enable it from the login screen after your next sign-in.',
+                  [{ text: 'OK' }],
+                );
+              }
+            },
+          },
+        ],
+      );
+    }
   };
 
   const handleClearCache = () => {
@@ -324,6 +412,23 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             color="#8b5cf6"
             onPress={() => Alert.alert('Account Security', 'Password changes and security settings are managed via email. Check your inbox for a reset link.', [{ text: 'OK' }])}
           />
+          {biometricAvailable && (
+            <View style={nr.row}>
+              <View style={[nr.icon, { backgroundColor: '#EFF6FF' }]}>
+                <Ionicons name={biometricLabel === 'Face ID' ? 'scan-outline' : 'finger-print-outline'} size={18} color="#3b82f6" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={nr.label}>{biometricLabel} Sign-In</Text>
+                <Text style={nr.desc}>{credentialsStored ? `${biometricLabel} is enabled` : `Sign in faster with ${biometricLabel}`}</Text>
+              </View>
+              <Switch
+                value={credentialsStored}
+                onValueChange={handleToggleBiometrics}
+                trackColor={{ false: Colors.borderLight, true: '#93c5fd' }}
+                thumbColor={credentialsStored ? '#3b82f6' : Colors.textMuted}
+              />
+            </View>
+          )}
           <NavRow
             icon="mail-outline"
             label="Email Address"
@@ -670,6 +775,20 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* ── Admin Panel ──────────────────────────────────────────────── */}
+        {ADMIN_EMAILS.includes(user?.email || '') && (
+          <View style={styles.section}>
+            <SectionHeader icon="shield-outline" label="Admin Panel" color="#7c3aed" />
+            <NavRow
+              icon="refresh-circle-outline"
+              label="Reset All User Data"
+              desc="Clear all player stats, match history & preferences for all accounts"
+              color="#7c3aed"
+              onPress={handleAdminResetAllData}
+            />
+          </View>
+        )}
 
         <Text style={styles.footer}>
           Top Tennis · All settings are saved automatically.{'\n'}

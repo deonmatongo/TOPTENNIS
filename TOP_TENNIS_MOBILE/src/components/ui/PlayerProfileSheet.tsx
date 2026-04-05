@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, Modal, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
+import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,6 +12,7 @@ import { Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { usePlayerAvailability } from '@/hooks/usePlayerAvailability';
 import { useSendMatchInvite } from '@/hooks/useSendMatchInvite';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
+import { useBlockedUsers } from '@/hooks/useBlockedUsers';
 import { useAuth } from '@/contexts/AuthContext';
 
 export interface PlayerSearchResult {
@@ -32,6 +34,7 @@ interface Props {
   player: PlayerSearchResult | null;
   visible: boolean;
   onClose: () => void;
+  onMessage?: (userId: string) => void;
 }
 
 type SheetTab = 'profile' | 'availability';
@@ -60,7 +63,7 @@ const competitivenessLabel = (c?: string) => {
   }
 };
 
-export const PlayerProfileSheet: React.FC<Props> = ({ player, visible, onClose }) => {
+export const PlayerProfileSheet: React.FC<Props> = ({ player, visible, onClose, onMessage }) => {
   const { user } = useAuth();
   const [tab, setTab] = useState<SheetTab>('profile');
   const [selectedSlot, setSelectedSlot] = useState<{
@@ -70,13 +73,16 @@ export const PlayerProfileSheet: React.FC<Props> = ({ player, visible, onClose }
   const [message, setMessage] = useState('');
   const [showBooking, setShowBooking] = useState(false);
   const [sent, setSent] = useState(false);
+  const [fetchingLocation, setFetchingLocation] = useState(false);
 
   const { availability, loading: availLoading } = usePlayerAvailability(
     visible && player ? player.user_id : undefined
   );
   const { sendInvite, sending } = useSendMatchInvite();
-  const { sendFriendRequest, friends, pendingSent, pendingReceived } = useFriendRequests();
+  const { sendFriendRequest, friends, pendingSent, pendingReceived, updateRequestStatus } = useFriendRequests();
+  const { blockUser } = useBlockedUsers();
   const [addingFriend, setAddingFriend] = useState(false);
+  const [blocking, setBlocking] = useState(false);
 
   if (!player) return null;
 
@@ -101,12 +107,63 @@ export const PlayerProfileSheet: React.FC<Props> = ({ player, visible, onClose }
     }
   };
 
+  const handleAcceptFriend = async () => {
+    const req = pendingReceived.find(r => r.sender_id === player?.user_id);
+    if (!req) return;
+    try {
+      await updateRequestStatus(req.id, 'accepted');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to accept request');
+    }
+  };
+
+  const handleBlock = () => {
+    Alert.alert(
+      `Block ${player?.name}?`,
+      'They won\'t be able to see your profile or contact you.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block', style: 'destructive',
+          onPress: async () => {
+            if (!player) return;
+            setBlocking(true);
+            const ok = await blockUser(player.user_id);
+            setBlocking(false);
+            if (ok) { Alert.alert('Blocked', `${player.name} has been blocked.`); onClose(); }
+          },
+        },
+      ]
+    );
+  };
+
   const handleSelectSlot = (slot: { id: string; date: string; start_time: string; end_time: string }) => {
     setSelectedSlot(slot);
     setCourtLocation('');
     setMessage('');
     setSent(false);
     setShowBooking(true);
+  };
+
+  const handleUseMyLocation = async () => {
+    setFetchingLocation(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Location access is required to use this feature. You can enter the court location manually.');
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const [place] = await Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+      if (place) {
+        const parts = [place.name, place.street, place.city, place.region].filter(Boolean);
+        setCourtLocation(parts.join(', '));
+      }
+    } catch {
+      Alert.alert('Location Unavailable', 'Could not get your current location. Please enter it manually.');
+    } finally {
+      setFetchingLocation(false);
+    }
   };
 
   const handleSendRequest = async () => {
@@ -151,9 +208,10 @@ export const PlayerProfileSheet: React.FC<Props> = ({ player, visible, onClose }
       </View>
     );
     if (isPendingReceived) return (
-      <View style={[styles.friendBadge, { backgroundColor: Colors.primaryLight }]}>
-        <Text style={[styles.friendBadgeText, { color: Colors.primaryDark }]}>Respond</Text>
-      </View>
+      <TouchableOpacity style={[styles.addFriendBtn, { backgroundColor: Colors.primary }]} onPress={handleAcceptFriend}>
+        <Ionicons name="checkmark-outline" size={14} color="#fff" />
+        <Text style={styles.addFriendText}>Accept</Text>
+      </TouchableOpacity>
     );
     return (
       <TouchableOpacity style={styles.addFriendBtn} onPress={handleAddFriend} disabled={addingFriend}>
@@ -331,6 +389,29 @@ export const PlayerProfileSheet: React.FC<Props> = ({ player, visible, onClose }
                   <Text style={[styles.pendingBannerText, { color: Colors.success }]}>You are already friends</Text>
                 </View>
               )}
+
+              {/* Message button */}
+              {onMessage && (
+                <TouchableOpacity
+                  style={styles.messageBtn}
+                  onPress={() => { onClose(); onMessage(player.user_id); }}
+                >
+                  <Ionicons name="chatbubble-outline" size={18} color={Colors.primary} />
+                  <Text style={styles.messageBtnText}>Send Message</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Block button */}
+              <TouchableOpacity
+                style={styles.blockBtn}
+                onPress={handleBlock}
+                disabled={blocking}
+              >
+                {blocking
+                  ? <ActivityIndicator size="small" color={Colors.error} />
+                  : <><Ionicons name="ban-outline" size={16} color={Colors.error} /><Text style={styles.blockBtnText}>Block Player</Text></>
+                }
+              </TouchableOpacity>
             </View>
           )}
 
@@ -414,7 +495,19 @@ export const PlayerProfileSheet: React.FC<Props> = ({ player, visible, onClose }
 
                 {/* Court location */}
                 <View>
-                  <Text style={styles.fieldLabel}>Court Location (optional)</Text>
+                  <View style={styles.fieldLabelRow}>
+                    <Text style={styles.fieldLabel}>Court Location (optional)</Text>
+                    <TouchableOpacity
+                      style={styles.geoBtn}
+                      onPress={handleUseMyLocation}
+                      disabled={fetchingLocation}
+                    >
+                      {fetchingLocation
+                        ? <ActivityIndicator size="small" color={Colors.primary} />
+                        : <><Ionicons name="locate-outline" size={13} color={Colors.primary} /><Text style={styles.geoBtnText}>Use My Location</Text></>
+                      }
+                    </TouchableOpacity>
+                  </View>
                   <TextInput
                     style={styles.fieldInput}
                     placeholder="e.g. Downtown Tennis Center, Court 3"
@@ -537,10 +630,18 @@ const styles = StyleSheet.create({
   slotSummaryName: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: '#fff' },
   slotSummaryDate: { fontSize: FontSize.md, color: 'rgba(255,255,255,0.9)' },
   slotSummaryTime: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: '#fff' },
-  fieldLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.textSecondary, marginBottom: 6 },
+  fieldLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  fieldLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.textSecondary },
+  geoBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: Colors.primaryLight, borderRadius: Radius.full },
+  geoBtnText: { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.semibold },
   fieldInput: { backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1.5, borderColor: Colors.border, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, fontSize: FontSize.md, color: Colors.text },
   fieldInputMulti: { height: 90, paddingTop: Spacing.sm },
   sendBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: Spacing.md + 2 },
   sendBtnDisabled: { opacity: 0.6 },
   sendBtnText: { color: '#fff', fontSize: FontSize.md, fontWeight: FontWeight.semibold },
+
+  messageBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: Radius.md, paddingVertical: Spacing.md },
+  messageBtnText: { color: Colors.primary, fontSize: FontSize.md, fontWeight: FontWeight.semibold },
+  blockBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, paddingVertical: Spacing.sm, marginTop: Spacing.xs },
+  blockBtnText: { color: Colors.error, fontSize: FontSize.sm, fontWeight: FontWeight.medium },
 });
