@@ -10,33 +10,31 @@ import { useNotifications, Notification, NotificationType } from '@/hooks/useNot
 import { Colors, FontSize, Font, FontWeight, Spacing, Radius, Shadow, Palette } from '@/theme/colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-import * as ExpoNotifications from 'expo-notifications';
 
-ExpoNotifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: true,
-    shouldShowBanner: true, shouldShowList: true,
-  }),
-});
+function getExpoNotifications() {
+  try { return require('expo-notifications') as typeof import('expo-notifications'); } catch { return null; }
+}
 
 async function registerForPush(): Promise<string | null> {
   if (__DEV__ && Platform.OS === 'web') return null;
-  const { status: existing } = await ExpoNotifications.getPermissionsAsync();
+  const Notifs = getExpoNotifications();
+  if (!Notifs) return null;
+  const { status: existing } = await Notifs.getPermissionsAsync();
   let finalStatus = existing;
   if (existing !== 'granted') {
-    const { status } = await ExpoNotifications.requestPermissionsAsync();
+    const { status } = await Notifs.requestPermissionsAsync();
     finalStatus = status;
   }
   if (finalStatus !== 'granted') return null;
   if (Platform.OS === 'android') {
-    await ExpoNotifications.setNotificationChannelAsync('default', {
+    await Notifs.setNotificationChannelAsync('default', {
       name: 'default',
-      importance: ExpoNotifications.AndroidImportance.MAX,
+      importance: Notifs.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#FF231F7C',
     });
   }
-  return (await ExpoNotifications.getExpoPushTokenAsync()).data;
+  return (await Notifs.getExpoPushTokenAsync()).data;
 }
 
 type ReadFilter = 'all' | 'unread' | 'read';
@@ -139,7 +137,18 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
   const [responding, setResponding]   = useState<string | null>(null);
   const autoMarkedRef = useRef(false);
 
-  useEffect(() => { registerForPush().catch(() => {}); }, []);
+  useEffect(() => {
+    const Notifs = getExpoNotifications();
+    if (Notifs) {
+      Notifs.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: true,
+          shouldShowBanner: true, shouldShowList: true,
+        }),
+      });
+    }
+    registerForPush().catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (loading || autoMarkedRef.current || notifications.length === 0) return;

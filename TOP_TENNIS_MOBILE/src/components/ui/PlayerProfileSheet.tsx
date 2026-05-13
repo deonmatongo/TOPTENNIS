@@ -3,7 +3,6 @@ import {
   View, Text, StyleSheet, Modal, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
-import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,6 +13,10 @@ import { useSendMatchInvite } from '@/hooks/useSendMatchInvite';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { useBlockedUsers } from '@/hooks/useBlockedUsers';
 import { useAuth } from '@/contexts/AuthContext';
+
+function getLocation() {
+  try { return require('expo-location') as typeof import('expo-location'); } catch { return null; }
+}
 
 export interface PlayerSearchResult {
   id: string;
@@ -146,6 +149,11 @@ export const PlayerProfileSheet: React.FC<Props> = ({ player, visible, onClose, 
   };
 
   const handleUseMyLocation = async () => {
+    const Location = getLocation();
+    if (!Location) {
+      Alert.alert('Unavailable', 'Location is not available. Please enter the court location manually.');
+      return;
+    }
     setFetchingLocation(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();

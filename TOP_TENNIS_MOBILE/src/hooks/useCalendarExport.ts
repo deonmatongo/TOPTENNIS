@@ -1,6 +1,9 @@
 import { useState } from 'react';
-import * as Calendar from 'expo-calendar';
 import { Alert, Platform } from 'react-native';
+
+function getCalendar() {
+  try { return require('expo-calendar') as typeof import('expo-calendar'); } catch { return null; }
+}
 
 export interface CalendarExportEvent {
   title: string;
@@ -12,6 +15,8 @@ export interface CalendarExportEvent {
 }
 
 const getDefaultCalendarId = async (): Promise<string | null> => {
+  const Calendar = getCalendar();
+  if (!Calendar) return null;
   const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
   if (Platform.OS === 'ios') {
     const def = await Calendar.getDefaultCalendarAsync();
@@ -31,6 +36,8 @@ export const useCalendarExport = () => {
   const [exporting, setExporting] = useState(false);
 
   const requestPermission = async (): Promise<boolean> => {
+    const Calendar = getCalendar();
+    if (!Calendar) return false;
     const { status } = await Calendar.requestCalendarPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert(
@@ -58,6 +65,8 @@ export const useCalendarExport = () => {
       const startDate = buildDate(event.date, event.startTime);
       const endDate = buildDate(event.date, event.endTime);
 
+      const Calendar = getCalendar();
+      if (!Calendar) { return false; }
       await Calendar.createEventAsync(calendarId, {
         title: event.title,
         startDate,
@@ -65,8 +74,8 @@ export const useCalendarExport = () => {
         location: event.location,
         notes: event.notes,
         alarms: [
-          { relativeOffset: -60 },   // 1 hour before
-          { relativeOffset: -1440 },  // 1 day before
+          { relativeOffset: -60 },
+          { relativeOffset: -1440 },
         ],
       });
 
@@ -93,6 +102,8 @@ export const useCalendarExport = () => {
         return 0;
       }
 
+      const Calendar = getCalendar();
+      if (!Calendar) return 0;
       for (const event of events) {
         try {
           const startDate = buildDate(event.date, event.startTime);
