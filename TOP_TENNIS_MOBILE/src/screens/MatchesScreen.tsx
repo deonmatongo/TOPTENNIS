@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, Alert, ActivityIndicator,
+  RefreshControl, Alert, ActivityIndicator, TextInput,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,7 +13,7 @@ import { ScoreConfirmationModal } from '@/components/ui/ScoreConfirmationModal';
 import { ProposeNewTimeModal } from '@/components/ui/ProposeNewTimeModal';
 import { useCalendarExport } from '@/hooks/useCalendarExport';
 import { supabase } from '@/services/supabase';
-import { Colors, FontSize, FontWeight, Spacing, Radius, Shadow, Palette } from '@/theme/colors';
+import { Colors, FontSize, Font, FontWeight, Spacing, Radius, Shadow, Palette } from '@/theme/colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { format } from 'date-fns';
@@ -27,6 +27,7 @@ export const MatchesScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
   const { user } = useAuth();
   const { pendingReceived, upcoming, history, loading, respondToInvite, refetch } = useMatches();
   const [tab, setTab] = useState<Tab>('pending');
+  const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [responding, setResponding] = useState<string | null>(null);
   const [selectedInvite, setSelectedInvite] = useState<any>(null);
@@ -57,6 +58,7 @@ export const MatchesScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
     return {
       name: opp ? `${opp.first_name} ${opp.last_name}`.trim() : 'Unknown',
       imageUrl: opp?.profile_picture_url,
+      profile: opp,
     };
   };
 
@@ -66,7 +68,15 @@ export const MatchesScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
     { key: 'history',  label: 'History',     count: history.length        },
   ];
 
-  const data = tab === 'pending' ? pendingReceived : tab === 'upcoming' ? upcoming : history;
+  const rawData = tab === 'pending' ? pendingReceived : tab === 'upcoming' ? upcoming : history;
+  const data = searchQuery.trim()
+    ? rawData.filter(invite => {
+        const { name } = getOpponent(invite as any);
+        const court = (invite as any).court_location || '';
+        const q = searchQuery.toLowerCase();
+        return name.toLowerCase().includes(q) || court.toLowerCase().includes(q);
+      })
+    : rawData;
 
   // ── Empty states ──────────────────────────────────────────────────────────
   const EMPTY = {
@@ -84,29 +94,47 @@ export const MatchesScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={[s.header, { paddingTop: insets.top + Spacing.md }]}
       >
-        <View style={{ flex: 1 }}>
+        <View style={s.headerInner}>
           <Text style={s.headerTitle}>Matches</Text>
           <Text style={s.headerSub}>{pendingReceived.length > 0 ? `${pendingReceived.length} invitation${pendingReceived.length > 1 ? 's' : ''} waiting` : 'Your match activity'}</Text>
         </View>
+
+        {/* ── Segmented tabs ────────────────────────────────────────────── */}
+        <View style={s.tabsWrap}>
+          {TABS.map(t => (
+            <TouchableOpacity
+              key={t.key}
+              style={[s.tabBtn, tab === t.key && s.tabBtnActive]}
+              onPress={() => setTab(t.key)}
+              activeOpacity={0.8}
+            >
+              <Text style={[s.tabLabel, tab === t.key && s.tabLabelActive]}>{t.label}</Text>
+              {t.count > 0 && (
+                <View style={[s.tabCount, tab === t.key && s.tabCountActive]}>
+                  <Text style={[s.tabCountText, tab === t.key && s.tabCountTextActive]}>{t.count}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
       </LinearGradient>
 
-      {/* ── Segmented tabs ──────────────────────────────────────────────── */}
-      <View style={s.tabsWrap}>
-        {TABS.map(t => (
-          <TouchableOpacity
-            key={t.key}
-            style={[s.tabBtn, tab === t.key && s.tabBtnActive]}
-            onPress={() => setTab(t.key)}
-            activeOpacity={0.8}
-          >
-            <Text style={[s.tabLabel, tab === t.key && s.tabLabelActive]}>{t.label}</Text>
-            {t.count > 0 && (
-              <View style={[s.tabCount, tab === t.key && s.tabCountActive]}>
-                <Text style={[s.tabCountText, tab === t.key && s.tabCountTextActive]}>{t.count}</Text>
-              </View>
-            )}
+      {/* ── Search ──────────────────────────────────────────────────────── */}
+      <View style={s.searchWrap}>
+        <Ionicons name="search-outline" size={16} color={Colors.textMuted} />
+        <TextInput
+          style={s.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search by name or court..."
+          placeholderTextColor={Colors.textMuted}
+          returnKeyType="search"
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
           </TouchableOpacity>
-        ))}
+        )}
       </View>
 
       {/* ── Content ─────────────────────────────────────────────────────── */}
@@ -122,15 +150,17 @@ export const MatchesScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
         ) : data.length === 0 ? (
           <View style={s.empty}>
             <View style={s.emptyIcon}>
-              <Ionicons name={EMPTY[tab].icon} size={32} color={Colors.textMuted} />
+              <Ionicons name={EMPTY[tab].icon} size={32} color={Colors.primary} />
             </View>
             <Text style={s.emptyTitle}>{EMPTY[tab].title}</Text>
             <Text style={s.emptyText}>{EMPTY[tab].sub}</Text>
           </View>
         ) : (
           data.map(invite => tab === 'pending'
-            ? <InviteCard key={invite.id} invite={invite as any} onPress={() => setSelectedInvite(invite)} isResponding={responding === invite.id} getOpponent={getOpponent} />
-            : <MatchCard  key={invite.id} invite={invite as any} userId={user?.id} getOpponent={getOpponent} onReschedule={() => setRescheduleInvite(invite)}
+            ? <InviteCard key={invite.id} invite={invite as any} userId={user?.id} onPress={() => setSelectedInvite(invite)} isResponding={responding === invite.id} getOpponent={getOpponent} />
+            : <MatchCard  key={invite.id} invite={invite as any} userId={user?.id} getOpponent={getOpponent}
+                onReschedule={() => setRescheduleInvite(invite)}
+                onRecordResult={() => setScoreMatch(invite)}
                 onExport={() => {
                   const { name } = getOpponent(invite as any);
                   exportEvent({ title: `Tennis vs ${name}`, date: (invite as any).date, startTime: (invite as any).start_time, endTime: (invite as any).end_time, location: (invite as any).court_location });
@@ -160,115 +190,190 @@ export const MatchesScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
   );
 };
 
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+function skillBadgeColor(level?: number) {
+  if (!level) return Colors.textMuted;
+  if (level >= 8) return Palette.red500;
+  if (level >= 6) return Colors.primary;
+  if (level >= 4) return Palette.yellow500;
+  return Palette.green500;
+}
+
 // ─── InviteCard ───────────────────────────────────────────────────────────────
 
-function InviteCard({ invite, onPress, isResponding, getOpponent }: any) {
-  const { name, imageUrl } = getOpponent(invite);
+function InviteCard({ invite, onPress, isResponding, getOpponent, userId }: any) {
+  const { name, imageUrl, profile: opp } = getOpponent(invite);
+  const totalGames = (opp?.wins || 0) + (opp?.losses || 0);
+  const winRate = totalGames > 0 ? Math.round(((opp?.wins || 0) / totalGames) * 100) : null;
+  const levelColor = skillBadgeColor(opp?.skill_level);
+
   return (
-    <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.85} disabled={isResponding}>
-      {/* Accent stripe */}
-      <View style={s.cardStripe} />
-
-      <View style={s.cardBody}>
-        {/* Avatar + name/time */}
-        <View style={s.cardRow}>
-          <Avatar name={name} size={52} imageUrl={imageUrl} />
-          <View style={{ flex: 1 }}>
-            <View style={s.cardNameRow}>
-              <Text style={s.cardName}>{name}</Text>
-              <View style={[s.typePill, invite.is_league_match ? s.typePillLeague : s.typePillMatch]}>
-                <Text style={[s.typePillText, invite.is_league_match ? { color: Palette.purple500 } : { color: Colors.primary }]}>
-                  {invite.is_league_match ? 'League' : 'Match'}
-                </Text>
-              </View>
-            </View>
-            <Text style={s.cardDate}>{format(new Date(invite.date), 'EEEE, MMMM d')}</Text>
-            <Text style={s.cardTime}>{invite.start_time} – {invite.end_time}</Text>
-          </View>
+    <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.92} disabled={isResponding}>
+      {/* Top: avatar + name + type badge */}
+      <View style={s.cardTop}>
+        <Avatar name={name} size={48} imageUrl={imageUrl} />
+        <View style={s.cardIdentity}>
+          <Text style={s.cardName}>{name}</Text>
+          <Text style={s.cardSub}>{format(new Date(invite.date), 'EEEE, MMMM d')}</Text>
         </View>
-
-        <View style={s.metaRow}>
-          <Ionicons name="location-outline" size={13} color={Colors.textMuted} />
-          <Text style={s.metaText}>{invite.court_location || 'No location set'}</Text>
+        <View style={[s.typeBadge, invite.is_league_match ? s.typeBadgeLeague : s.typeBadgeMatch]}>
+          <Text style={[s.typeBadgeTxt, { color: invite.is_league_match ? Palette.purple500 : Colors.primary }]}>
+            {invite.is_league_match ? 'LEAGUE' : 'MATCH'}
+          </Text>
         </View>
-        {invite.message && (
-          <View style={s.messageBox}>
-            <Ionicons name="chatbubble-outline" size={12} color={Colors.textMuted} />
-            <Text style={s.messageText}>"{invite.message}"</Text>
-          </View>
-        )}
-        {invite.proposed_date && (
-          <View style={s.proposedBox}>
-            <Ionicons name="time-outline" size={13} color={Colors.warning} />
-            <Text style={s.proposedText}>New time proposed: {invite.proposed_date} at {invite.proposed_start_time}</Text>
-          </View>
-        )}
-
-        <TouchableOpacity style={s.respondBtn} onPress={onPress} disabled={isResponding} activeOpacity={0.85}>
-          {isResponding
-            ? <ActivityIndicator size="small" color="#fff" />
-            : <>
-                <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
-                <Text style={s.respondBtnText}>View & Respond</Text>
-              </>
-          }
-        </TouchableOpacity>
       </View>
+
+      {/* Opponent profile chips */}
+      {(opp?.skill_level || opp?.usta_rating || winRate !== null || opp?.city) && (
+        <View style={s.profileRow}>
+          {opp?.skill_level && (
+            <View style={[s.profileChip, { backgroundColor: levelColor + '20' }]}>
+              <View style={[s.profileChipDot, { backgroundColor: levelColor }]} />
+              <Text style={[s.profileChipTxt, { color: levelColor }]}>Level {opp.skill_level}</Text>
+            </View>
+          )}
+          {opp?.usta_rating && (
+            <View style={s.profileChip}>
+              <Text style={s.profileChipTxt}>USTA {opp.usta_rating}</Text>
+            </View>
+          )}
+          {winRate !== null && (
+            <View style={s.profileChip}>
+              <Text style={s.profileChipTxt}>{winRate}% wins</Text>
+            </View>
+          )}
+          {opp?.city && (
+            <View style={s.profileChip}>
+              <Ionicons name="location-outline" size={10} color={Colors.textMuted} />
+              <Text style={s.profileChipTxt}>{opp.city}</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Strava-style 3-up stats */}
+      <View style={s.statsRow}>
+        <View style={s.stat}>
+          <Text style={s.statLabel}>STARTS</Text>
+          <Text style={s.statValue}>{invite.start_time}</Text>
+        </View>
+        <View style={[s.stat, s.statMid]}>
+          <Text style={s.statLabel}>ENDS</Text>
+          <Text style={s.statValue}>{invite.end_time}</Text>
+        </View>
+        <View style={s.stat}>
+          <Text style={s.statLabel}>COURT</Text>
+          <Text style={s.statValue} numberOfLines={1}>{invite.court_location || '—'}</Text>
+        </View>
+      </View>
+
+      {/* Optional extras */}
+      {(invite.message || invite.proposed_date) && (
+        <View style={s.extras}>
+          {invite.message && (
+            <View style={s.msgBox}>
+              <Ionicons name="chatbubble-outline" size={12} color={Colors.textMuted} />
+              <Text style={s.msgTxt} numberOfLines={2}>"{invite.message}"</Text>
+            </View>
+          )}
+          {invite.proposed_date && (
+            <View style={s.proposedBox}>
+              <Ionicons name="time-outline" size={13} color={Colors.warning} />
+              <Text style={s.proposedTxt}>New time: {invite.proposed_date} at {invite.proposed_start_time}</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Full-width CTA */}
+      <TouchableOpacity style={s.ctaBtn} onPress={onPress} disabled={isResponding} activeOpacity={0.85}>
+        {isResponding
+          ? <ActivityIndicator size="small" color="#fff" />
+          : <Text style={s.ctaBtnTxt}>View & Respond</Text>
+        }
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 }
 
 // ─── MatchCard ────────────────────────────────────────────────────────────────
 
-function MatchCard({ invite, userId, getOpponent, onReschedule, onExport }: any) {
+function MatchCard({ invite, userId, getOpponent, onReschedule, onExport, onRecordResult }: any) {
   const { name, imageUrl } = getOpponent(invite);
   const isSender = invite.sender_id === userId;
-  const isHistory = invite.status === 'completed' || invite.status === 'declined';
+  const isPast = new Date(`${invite.date}T${invite.start_time}`) < new Date();
+  const hasWinner = !!invite.winner_id;
+  const iWon = hasWinner && invite.winner_id === userId;
+  const hasScore = invite.player1_score != null && invite.player2_score != null;
 
   return (
     <View style={s.card}>
-      <View style={[s.cardStripe, isHistory && s.cardStripeGray]} />
-      <View style={s.cardBody}>
-
-        <View style={s.cardRow}>
-          <Avatar name={name} size={52} imageUrl={imageUrl} />
-          <View style={{ flex: 1 }}>
-            <View style={s.cardNameRow}>
-              <Text style={s.cardName}>{name}</Text>
-              <View style={[s.typePill, isSender ? s.typePillSent : s.typePillReceived]}>
-                <Text style={[s.typePillText, { color: isSender ? Colors.accent : Colors.success }]}>
-                  {isSender ? 'You invited' : 'Invited you'}
-                </Text>
-              </View>
-            </View>
-            <Text style={s.cardDate}>{format(new Date(invite.date), 'EEEE, MMMM d')}</Text>
-            <Text style={s.cardTime}>{invite.start_time} – {invite.end_time}</Text>
+      {/* Top: avatar + name + status */}
+      <View style={s.cardTop}>
+        <Avatar name={name} size={48} imageUrl={imageUrl} />
+        <View style={s.cardIdentity}>
+          <Text style={s.cardName}>{name}</Text>
+          <Text style={s.cardSub}>{isSender ? 'You invited' : 'Invited you'}</Text>
+        </View>
+        {isPast && hasWinner ? (
+          <View style={[s.resultBadge, iWon ? s.resultBadgeWon : s.resultBadgeLost]}>
+            <Text style={[s.resultBadgeTxt, { color: iWon ? Colors.success : Palette.red500 }]}>
+              {iWon ? 'WON' : 'LOST'}
+            </Text>
           </View>
+        ) : (
+          <View style={[s.statusBadge, isPast ? s.statusBadgeGray : s.statusBadgeGreen]}>
+            <View style={[s.statusDot, { backgroundColor: isPast ? Colors.textMuted : Colors.success }]} />
+            <Text style={[s.statusTxt, { color: isPast ? Colors.textMuted : Colors.success }]}>
+              {isPast ? 'Completed' : 'Confirmed'}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Strava-style 3-up stats */}
+      <View style={s.statsRow}>
+        <View style={s.stat}>
+          <Text style={s.statLabel}>DATE</Text>
+          <Text style={s.statValue}>{format(new Date(invite.date), 'MMM d')}</Text>
         </View>
-
-        <View style={s.metaRow}>
-          <Ionicons name="location-outline" size={13} color={Colors.textMuted} />
-          <Text style={s.metaText}>{invite.court_location || 'No location set'}</Text>
+        <View style={[s.stat, s.statMid]}>
+          <Text style={s.statLabel}>{isPast && hasScore ? 'SCORE' : 'TIME'}</Text>
+          <Text style={s.statValue} numberOfLines={1}>
+            {isPast && hasScore ? `${invite.player1_score}–${invite.player2_score}` : invite.start_time}
+          </Text>
         </View>
-
-        <View style={s.statusRow}>
-          <View style={[s.statusDot, { backgroundColor: isHistory ? Colors.textMuted : Colors.success }]} />
-          <Text style={s.statusText}>{isHistory ? 'Completed' : 'Confirmed'}</Text>
-
-          {!isHistory && (
-            <View style={s.actionBtns}>
-              <TouchableOpacity style={s.ghostBtn} onPress={onReschedule} activeOpacity={0.7}>
-                <Ionicons name="time-outline" size={13} color={Colors.primary} />
-                <Text style={s.ghostBtnText}>Reschedule</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.ghostBtn, s.ghostBtnGreen]} onPress={onExport} activeOpacity={0.7}>
-                <Ionicons name="calendar-outline" size={13} color={Colors.success} />
-                <Text style={[s.ghostBtnText, { color: Colors.success }]}>Export</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+        <View style={s.stat}>
+          <Text style={s.statLabel}>COURT</Text>
+          <Text style={s.statValue} numberOfLines={1}>{invite.court_location || '—'}</Text>
         </View>
       </View>
+
+      {/* Actions */}
+      {!isPast ? (
+        <View style={s.actionRow}>
+          <TouchableOpacity style={s.actionBtn} onPress={onReschedule} activeOpacity={0.75}>
+            <Ionicons name="time-outline" size={15} color={Colors.primary} />
+            <Text style={s.actionBtnTxt}>Reschedule</Text>
+          </TouchableOpacity>
+          <View style={s.actionDivider} />
+          <TouchableOpacity style={s.actionBtn} onPress={onExport} activeOpacity={0.75}>
+            <Ionicons name="calendar-outline" size={15} color={Colors.primary} />
+            <Text style={s.actionBtnTxt}>Calendar</Text>
+          </TouchableOpacity>
+          <View style={s.actionDivider} />
+          <TouchableOpacity style={s.actionBtn} onPress={onRecordResult} activeOpacity={0.75}>
+            <Ionicons name="trophy-outline" size={15} color={Colors.primary} />
+            <Text style={s.actionBtnTxt}>Record</Text>
+          </TouchableOpacity>
+        </View>
+      ) : !hasWinner && (
+        <TouchableOpacity style={s.recordResultBtn} onPress={onRecordResult} activeOpacity={0.85}>
+          <Ionicons name="trophy-outline" size={15} color={Colors.primary} />
+          <Text style={s.recordResultTxt}>Record Result</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -278,25 +383,19 @@ function MatchCard({ invite, userId, getOpponent, onReschedule, onExport }: any)
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
 
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
-  },
-  headerTitle: { fontSize: FontSize.xxxl, fontWeight: FontWeight.black, color: '#fff', letterSpacing: -1 },
-  headerSub: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.65)', marginTop: 2, fontWeight: FontWeight.medium },
+  // ── Header ────────────────────────────────────────────────────────────────
+  header: { paddingBottom: Spacing.sm },
+  headerInner: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xs },
+  headerTitle: { fontSize: FontSize.xxxl, fontFamily: Font.black, color: '#fff', letterSpacing: -1 },
+  headerSub: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.65)', marginTop: 2, fontFamily: Font.medium },
 
-  // Tabs
+  // ── Tabs ─────────────────────────────────────────────────────────────────
   tabsWrap: {
     flexDirection: 'row',
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.lg,
-    backgroundColor: Colors.backgroundAlt,
-    borderRadius: Radius.md,
-    padding: 3,
-    gap: 2,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.xs,
+    paddingBottom: Spacing.sm,
+    gap: 6,
   },
   tabBtn: {
     flex: 1,
@@ -304,105 +403,195 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    paddingVertical: 9,
-    borderRadius: Radius.sm,
+    paddingVertical: 8,
+    borderRadius: Radius.full,
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
-  tabBtnActive: {
-    backgroundColor: Colors.surface,
-    ...Shadow.xs,
-  },
-  tabLabel: { fontSize: FontSize.sm, color: Colors.textMuted, fontWeight: FontWeight.semibold },
-  tabLabelActive: { color: Colors.text },
+  tabBtnActive: { backgroundColor: '#fff' },
+  tabLabel: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.75)', fontFamily: Font.semibold },
+  tabLabelActive: { color: Palette.dark900 },
   tabCount: {
-    backgroundColor: Colors.border,
+    backgroundColor: 'rgba(255,255,255,0.25)',
     borderRadius: Radius.full,
     minWidth: 18, height: 18,
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 4,
   },
   tabCountActive: { backgroundColor: Colors.primaryLight },
-  tabCountText: { fontSize: FontSize.xxs, color: Colors.textSecondary, fontWeight: FontWeight.bold },
+  tabCountText: { fontSize: FontSize.xxs, color: '#fff', fontFamily: Font.bold },
   tabCountTextActive: { color: Colors.primary },
 
-  scroll: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: 40 },
+  // ── Scroll ───────────────────────────────────────────────────────────────
+  scroll: { paddingTop: Spacing.md, paddingBottom: 48 },
 
-  // Cards
+  // ── Card shell ────────────────────────────────────────────────────────────
   card: {
-    flexDirection: 'row',
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
     ...Shadow.sm,
   },
-  cardStripe: { width: 4, backgroundColor: Colors.primary },
-  cardStripeGray: { backgroundColor: Colors.textMuted },
-  cardBody: { flex: 1, padding: Spacing.lg, gap: Spacing.sm },
 
-  cardRow: { flexDirection: 'row', gap: Spacing.md, alignItems: 'flex-start' },
-  cardNameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, flexWrap: 'wrap', marginBottom: 2 },
-  cardName: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text, letterSpacing: -0.2 },
-  cardDate: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.medium },
-  cardTime: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold, marginTop: 1 },
-
-  typePill: {
-    paddingHorizontal: 7, paddingVertical: 3,
-    borderRadius: Radius.full,
+  // ── Card top row ─────────────────────────────────────────────────────────
+  cardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
+    gap: Spacing.md,
   },
-  typePillLeague:   { backgroundColor: Palette.purpleBg },
-  typePillMatch:    { backgroundColor: Colors.primaryLight },
-  typePillSent:     { backgroundColor: Colors.accentLight },
-  typePillReceived: { backgroundColor: Colors.successLight },
-  typePillText: { fontSize: FontSize.xxs, fontWeight: FontWeight.bold },
+  cardIdentity: { flex: 1 },
+  cardName: { fontSize: FontSize.lg, fontFamily: Font.bold, color: Colors.text, letterSpacing: -0.3 },
+  cardSub:  { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 2, fontFamily: Font.medium },
 
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  metaText: { fontSize: FontSize.sm, color: Colors.textMuted, flex: 1 },
+  // Type badge (LEAGUE / MATCH)
+  typeBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.xs },
+  typeBadgeLeague: { backgroundColor: Palette.purpleBg },
+  typeBadgeMatch:  { backgroundColor: Colors.primaryLight },
+  typeBadgeTxt: { fontSize: 10, fontFamily: Font.extrabold, letterSpacing: 0.6 },
 
-  messageBox: {
+  // Status badge (Confirmed / Completed)
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 5, borderRadius: Radius.xs },
+  statusBadgeGreen: { backgroundColor: Colors.successLight },
+  statusBadgeGray:  { backgroundColor: Colors.backgroundAlt },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusTxt: { fontSize: 11, fontFamily: Font.semibold },
+
+  // ── Strava stats row ──────────────────────────────────────────────────────
+  statsRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  stat: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: Spacing.md,
+    alignItems: 'flex-start',
+  },
+  statMid: {
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  statLabel: {
+    fontSize: 9,
+    fontFamily: Font.extrabold,
+    color: Colors.textMuted,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 5,
+  },
+  statValue: {
+    fontSize: FontSize.md,
+    fontFamily: Font.bold,
+    color: Colors.text,
+    letterSpacing: -0.2,
+  },
+
+  // ── Extras (message / proposed time) ────────────────────────────────────
+  extras: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm, gap: Spacing.xs },
+  msgBox: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 6,
     backgroundColor: Colors.backgroundAlt,
     borderRadius: Radius.sm, padding: Spacing.sm,
   },
-  messageText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontStyle: 'italic', flex: 1 },
-
+  msgTxt: { fontSize: FontSize.xs, color: Colors.textSecondary, fontStyle: 'italic', flex: 1 },
   proposedBox: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: Colors.warningLight,
     borderRadius: Radius.sm, padding: Spacing.sm,
   },
-  proposedText: { fontSize: FontSize.xs, color: Colors.warning, fontWeight: FontWeight.medium, flex: 1 },
+  proposedTxt: { fontSize: FontSize.xs, color: Colors.warning, fontFamily: Font.semibold, flex: 1 },
 
-  respondBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, backgroundColor: Colors.primary,
-    borderRadius: Radius.md, paddingVertical: 12,
+  // ── Full-width CTA ───────────────────────────────────────────────────────
+  ctaBtn: {
+    margin: Spacing.lg,
+    marginTop: Spacing.md,
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.md,
+    paddingVertical: 14,
+    alignItems: 'center',
     ...Shadow.orange,
   },
-  respondBtnText: { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.sm },
+  ctaBtnTxt: { color: '#fff', fontSize: FontSize.md, fontFamily: Font.bold, letterSpacing: 0.1 },
 
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, flexWrap: 'wrap' },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  statusText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.medium, marginRight: 4 },
-  actionBtns: { flexDirection: 'row', gap: Spacing.xs, marginLeft: 'auto' },
-  ghostBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    paddingHorizontal: Spacing.sm, paddingVertical: 5,
-    borderRadius: Radius.sm,
-    borderWidth: 1, borderColor: Colors.primary,
+  // ── Action row (reschedule / export) ─────────────────────────────────────
+  actionRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
   },
-  ghostBtnGreen: { borderColor: Colors.success },
-  ghostBtnText: { fontSize: FontSize.xxs, color: Colors.primary, fontWeight: FontWeight.semibold },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 13,
+  },
+  actionDivider: { width: 1, backgroundColor: Colors.borderLight },
+  actionBtnTxt: { fontSize: FontSize.sm, fontFamily: Font.bold, color: Colors.primary },
 
-  // Empty / loading
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-  empty:  { alignItems: 'center', paddingTop: 80, gap: Spacing.md },
-  emptyIcon: {
-    width: 72, height: 72, borderRadius: 36,
+  // ── Search bar ───────────────────────────────────────────────────────────
+  searchWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    marginHorizontal: Spacing.lg, marginBottom: Spacing.sm,
+    marginTop: Spacing.sm,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.md,
+    height: 44,
+    borderWidth: 1, borderColor: Colors.border,
+    ...Shadow.xs,
+  },
+  searchInput: { flex: 1, fontSize: FontSize.sm, color: Colors.text, paddingVertical: 0 },
+
+  // ── Opponent profile chips ────────────────────────────────────────────────
+  profileRow: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 6,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
+  },
+  profileChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: Colors.backgroundAlt,
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: Radius.full,
+  },
+  profileChipDot: { width: 6, height: 6, borderRadius: 3 },
+  profileChipTxt: { fontSize: FontSize.xxs, fontFamily: Font.semibold, color: Colors.textSecondary },
+
+  // ── Result badge (Won / Lost) ─────────────────────────────────────────────
+  resultBadge: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: Radius.xs },
+  resultBadgeWon:  { backgroundColor: Colors.successLight },
+  resultBadgeLost: { backgroundColor: '#FFEEEE' },
+  resultBadgeTxt:  { fontSize: 11, fontFamily: Font.extrabold, letterSpacing: 0.5 },
+
+  // ── Record result button (history, no winner) ────────────────────────────
+  recordResultBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    marginHorizontal: Spacing.lg, marginBottom: Spacing.md, marginTop: 4,
+    paddingVertical: 11,
+    borderRadius: Radius.md,
+    borderWidth: 1.5, borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+  },
+  recordResultTxt: { fontSize: FontSize.sm, fontFamily: Font.bold, color: Colors.primary },
+
+  // ── Empty / loading ──────────────────────────────────────────────────────
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
+  empty:  { alignItems: 'center', paddingTop: 80, gap: Spacing.md, paddingHorizontal: Spacing.xxxl },
+  emptyIcon: {
+    width: 76, height: 76, borderRadius: 38,
+    backgroundColor: Colors.primaryLight,
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 4,
   },
-  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
-  emptyText:  { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', paddingHorizontal: 32, lineHeight: 20 },
+  emptyTitle: { fontSize: FontSize.lg, fontFamily: Font.bold, color: Colors.text, letterSpacing: -0.3 },
+  emptyText:  { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
 });

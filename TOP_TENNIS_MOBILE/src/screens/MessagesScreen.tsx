@@ -3,7 +3,10 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, KeyboardAvoidingView, Platform, RefreshControl,
   ActivityIndicator, Alert, ScrollView, Clipboard, Modal,
+  Keyboard, Image, Dimensions, useWindowDimensions, Animated, PanResponder,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { supabase } from '@/services/supabase';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,10 +16,18 @@ import { useBlockedUsers } from '@/hooks/useBlockedUsers';
 import { useOnlinePresence } from '@/hooks/useOnlinePresence';
 import { useTypingIndicator, TypingUser } from '@/hooks/useTypingIndicator';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCallContext } from '@/contexts/CallContext';
 import { Avatar } from '@/components/ui/Avatar';
-import { Palette, Colors, Shadow, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { MatchInviteCard, MatchBookingSheet, BookingMember } from '@/components/chat/MatchBooking';
+import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { Palette, Colors, Shadow, FontSize, Font, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { StatusBar } from 'expo-status-bar';
+import { useFocusEffect } from '@react-navigation/native';
+
+function getAudio() {
+  try { return require('expo-av').Audio; } catch { return null; }
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -151,7 +162,7 @@ const ReplyPreview: React.FC<{ msg: ConversationMessage; onClear: () => void }> 
 const rp = StyleSheet.create({
   wrap: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.borderLight },
   bar: { width: 3, height: '100%', borderRadius: 2, backgroundColor: Colors.primary },
-  name: { fontSize: 12, fontWeight: FontWeight.bold, color: Colors.primary },
+  name: { fontSize: 12, fontFamily: Font.bold, color: Colors.primary },
   content: { fontSize: 12, color: Colors.textSecondary },
   close: { padding: 4 },
 });
@@ -170,10 +181,37 @@ const Bubble: React.FC<{
   onDelete: () => void;
   onCopy: () => void;
   onDismiss: () => void;
-}> = ({ item, replySource, isMine, isGroup, prevSameSender, isLongPressed, onLongPress, onReply, onDelete, onCopy, onDismiss }) => {
+  onSenderPress?: (senderId: string) => void;
+}> = ({ item, replySource, isMine, isGroup, prevSameSender, isLongPressed, onLongPress, onReply, onDelete, onCopy, onDismiss, onSenderPress }) => {
   const senderName = getSenderName(item);
   const showAvatar = isGroup && !isMine && !prevSameSender;
   const showName = isGroup && !isMine && !prevSameSender;
+
+  // Match invite card
+  if (item.content.startsWith('__match_invite__:')) {
+    const inviteId = item.content.replace('__match_invite__:', '');
+    return (
+      <View style={[bub.wrap, isMine ? bub.wrapR : bub.wrapL, prevSameSender && bub.tight]}>
+        {isGroup && !isMine && (
+          <View style={bub.avatarCol}>
+            {showAvatar
+              ? <TouchableOpacity onPress={() => onSenderPress?.(item.sender_id)} activeOpacity={0.8}>
+                  <Avatar name={senderName} size={28} imageUrl={item.sender?.profile_picture_url ?? undefined} />
+                </TouchableOpacity>
+              : <View style={{ width: 28 }} />
+            }
+          </View>
+        )}
+        <View style={bub.col}>
+          {showName && <Text style={bub.senderName}>{senderName}</Text>}
+          <MatchInviteCard inviteId={inviteId} isMine={isMine} />
+          <Text style={[bub.time, isMine ? bub.timeR : bub.timeL, { marginTop: 4 }]}>
+            {fmtMsgTime(item.created_at)}
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[bub.wrap, isMine ? bub.wrapR : bub.wrapL, prevSameSender && bub.tight]}>
@@ -187,7 +225,11 @@ const Bubble: React.FC<{
       )}
 
       <View style={bub.col}>
-        {showName && <Text style={bub.senderName}>{senderName}</Text>}
+        {showName && (
+          <TouchableOpacity onPress={() => onSenderPress?.(item.sender_id)} activeOpacity={0.7}>
+            <Text style={bub.senderName}>{senderName}</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity onLongPress={onLongPress} activeOpacity={0.88} delayLongPress={300}>
           <View style={[bub.bubble, isMine ? bub.bubR : bub.bubL]}>
@@ -247,13 +289,13 @@ const bub = StyleSheet.create({
   tight: { marginBottom: 1 },
   avatarCol: { width: 32, alignItems: 'flex-start', justifyContent: 'flex-end', marginRight: 4 },
   col: { maxWidth: '76%' },
-  senderName: { fontSize: 11, fontWeight: FontWeight.semibold, color: Colors.primary, marginBottom: 2, marginLeft: 10 },
+  senderName: { fontSize: 11, fontFamily: Font.semibold, color: Colors.primary, marginBottom: 2, marginLeft: 10 },
   bubble: { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, paddingBottom: 5 },
   bubR: { backgroundColor: CHAT.sentBg, borderTopRightRadius: 3, borderWidth: 1, borderColor: CHAT.sentBorder },
   bubL: { backgroundColor: CHAT.recvBg, borderTopLeftRadius: 3, borderWidth: 1, borderColor: CHAT.recvBorder, ...Shadow.xs },
   replyBox: { flexDirection: 'row', gap: 6, backgroundColor: 'rgba(0,0,0,0.06)', borderRadius: 8, padding: 6, marginBottom: 6 },
   replyBar: { width: 3, borderRadius: 2, backgroundColor: Colors.primary, alignSelf: 'stretch' },
-  replyName: { fontSize: 11, fontWeight: FontWeight.semibold, color: Colors.primary },
+  replyName: { fontSize: 11, fontFamily: Font.semibold, color: Colors.primary },
   replyContent: { fontSize: 11, color: Colors.textSecondary },
   text: { fontSize: FontSize.md, lineHeight: 21 },
   textR: { color: '#1A1A2E' },
@@ -266,7 +308,7 @@ const bub = StyleSheet.create({
   menuR: { alignSelf: 'flex-end' },
   menuL: { alignSelf: 'flex-start' },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 10 },
-  menuTxt: { fontSize: FontSize.xs, fontWeight: FontWeight.medium, color: Colors.text },
+  menuTxt: { fontSize: FontSize.xs, fontFamily: Font.medium, color: Colors.text },
   menuSep: { width: 1, height: 28, backgroundColor: Colors.borderLight },
 });
 
@@ -360,16 +402,16 @@ const gcm = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border },
   closeBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.backgroundAlt, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
+  title: { fontSize: FontSize.lg, fontFamily: Font.semibold, color: Colors.text },
   createBtn: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.md, paddingVertical: 8, borderRadius: Radius.full },
-  createBtnTxt: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: '#fff' },
+  createBtnTxt: { fontSize: FontSize.sm, fontFamily: Font.semibold, color: '#fff' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Colors.surface, paddingHorizontal: Spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
   nameIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
   nameInput: { flex: 1, fontSize: FontSize.lg, color: Colors.text },
-  selCount: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: Colors.primary, paddingHorizontal: Spacing.lg, paddingVertical: 8, backgroundColor: Colors.primaryLight },
-  sectionLbl: { fontSize: 10, fontWeight: FontWeight.bold, color: Colors.textMuted, letterSpacing: 0.8, paddingHorizontal: Spacing.lg, paddingVertical: 10, backgroundColor: Colors.backgroundAlt, textTransform: 'uppercase' },
+  selCount: { fontSize: FontSize.xs, fontFamily: Font.semibold, color: Colors.primary, paddingHorizontal: Spacing.lg, paddingVertical: 8, backgroundColor: Colors.primaryLight },
+  sectionLbl: { fontSize: 10, fontFamily: Font.bold, color: Colors.textMuted, letterSpacing: 0.8, paddingHorizontal: Spacing.lg, paddingVertical: 10, backgroundColor: Colors.backgroundAlt, textTransform: 'uppercase' },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingHorizontal: Spacing.lg, paddingVertical: 12, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
-  rowName: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.medium, color: Colors.text },
+  rowName: { flex: 1, fontSize: FontSize.md, fontFamily: Font.medium, color: Colors.text },
   chk: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
   chkOn: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   emptyWrap: { alignItems: 'center', paddingTop: 48, gap: 8 },
@@ -473,25 +515,25 @@ const GroupInfoModal: React.FC<{
 const gim = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  title: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
+  title: { fontSize: FontSize.lg, fontFamily: Font.semibold, color: Colors.text },
   doneBtn: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.md, paddingVertical: 8, borderRadius: Radius.full, minWidth: 64, alignItems: 'center' },
-  doneTxt: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: '#fff' },
+  doneTxt: { fontSize: FontSize.sm, fontFamily: Font.semibold, color: '#fff' },
   hero: { alignItems: 'center', paddingVertical: 24, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight, gap: 8 },
   heroAvt: { width: 76, height: 76, borderRadius: 38, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
   nameRow: { flexDirection: 'row', alignItems: 'center' },
-  heroName: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.text },
+  heroName: { fontSize: FontSize.xl, fontFamily: Font.bold, color: Colors.text },
   heroSub: { fontSize: FontSize.sm, color: Colors.textMuted },
   renameRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: Spacing.lg },
   renameInput: { flex: 1, fontSize: FontSize.lg, color: Colors.text, borderBottomWidth: 2, borderBottomColor: Colors.primary, paddingBottom: 4 },
-  sectionLbl: { fontSize: 10, fontWeight: FontWeight.bold, color: Colors.textMuted, letterSpacing: 0.8, paddingHorizontal: Spacing.lg, paddingVertical: 10, backgroundColor: Colors.backgroundAlt, textTransform: 'uppercase' },
+  sectionLbl: { fontSize: 10, fontFamily: Font.bold, color: Colors.textMuted, letterSpacing: 0.8, paddingHorizontal: Spacing.lg, paddingVertical: 10, backgroundColor: Colors.backgroundAlt, textTransform: 'uppercase' },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingHorizontal: Spacing.lg, paddingVertical: 12, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
-  rowName: { fontSize: FontSize.md, fontWeight: FontWeight.medium, color: Colors.text },
-  adminTag: { fontSize: 11, color: Colors.primary, fontWeight: FontWeight.semibold, marginTop: 2 },
+  rowName: { fontSize: FontSize.md, fontFamily: Font.medium, color: Colors.text },
+  adminTag: { fontSize: 11, color: Colors.primary, fontFamily: Font.semibold, marginTop: 2 },
   addRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingHorizontal: Spacing.lg, paddingVertical: 12, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
   addIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  addTxt: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.primary },
+  addTxt: { flex: 1, fontSize: FontSize.md, fontFamily: Font.semibold, color: Colors.primary },
   leaveBtn: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.lg, paddingVertical: 14, marginTop: Spacing.lg, backgroundColor: Colors.surface, borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.borderLight },
-  leaveTxt: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.error },
+  leaveTxt: { fontSize: FontSize.md, fontFamily: Font.semibold, color: Colors.error },
 });
 
 // ── Empty state ────────────────────────────────────────────────────────────────
@@ -514,10 +556,10 @@ const EmptyState: React.FC<{
 const em = StyleSheet.create({
   wrap: { alignItems: 'center', paddingTop: 80, gap: 10, paddingHorizontal: 32 },
   circle: { width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  title: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
+  title: { fontSize: FontSize.lg, fontFamily: Font.bold, color: Colors.text },
   sub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
   btn: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.sm, borderRadius: Radius.full, marginTop: Spacing.sm },
-  btnTxt: { color: '#fff', fontWeight: FontWeight.semibold, fontSize: FontSize.md },
+  btnTxt: { color: '#fff', fontFamily: Font.semibold, fontSize: FontSize.md },
 });
 
 // ── Main Screen ────────────────────────────────────────────────────────────────
@@ -533,6 +575,7 @@ const LIST_TABS: { key: ActiveTab; label: string }[] = [
 
 export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ navigation, route }) => {
   const { user } = useAuth();
+  const { startCall } = useCallContext();
   const insets = useSafeAreaInsets();
   const {
     conversations, loading, sendMessage, getOrCreateDM, createGroupChat,
@@ -545,6 +588,18 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('chats');
   const [selectedConvId, setSelectedConvId] = useState<string | null>(route?.params?.openConvId ?? null);
+
+  useFocusEffect(
+    useCallback(() => {
+      (navigation as any)?.setOptions?.({
+        tabBarStyle: selectedConvId ? { display: 'none' } : undefined,
+      });
+      return () => {
+        (navigation as any)?.setOptions?.({ tabBarStyle: undefined });
+      };
+    }, [selectedConvId, navigation]),
+  );
+
   const [searchQuery, setSearchQuery] = useState('');
   const [friendSearch, setFriendSearch] = useState('');
   const [msgInput, setMsgInput] = useState('');
@@ -556,6 +611,15 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [longPressMsg, setLongPressMsg] = useState<string | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [showBookingSheet, setShowBookingSheet] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingCancelled, setRecordingCancelled] = useState(false);
+  const [recordSecs, setRecordSecs] = useState(0);
+  const recordingRef = useRef<any>(null);
+  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordingPulse = useRef(new Animated.Value(1)).current;
   const flatListRef = useRef<FlatList>(null);
 
   const { typingUsers, broadcastTyping } = useTypingIndicator(selectedConvId);
@@ -579,18 +643,133 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
   };
 
   const handleSend = async () => {
-    if (!selectedConvId || !msgInput.trim()) return;
+    if (!selectedConvId || (!msgInput.trim() && !pendingImage)) return;
     const text = msgInput.trim();
     const replyId = replyTo?.id;
+    const imageUri = pendingImage;
     setMsgInput('');
     setReplyTo(null);
+    setPendingImage(null);
     setSending(true);
     try {
-      await sendMessage(selectedConvId, text, replyId);
+      if (imageUri) {
+        const ext = (imageUri.split('.').pop()?.split('?')[0] ?? 'jpg').toLowerCase();
+        const path = `messages/${user!.id}/${Date.now()}.${ext}`;
+        const res = await fetch(imageUri);
+        const blob = await res.blob();
+        const { error: upErr } = await supabase.storage.from('chat-media').upload(path, blob, { contentType: `image/${ext}`, upsert: false });
+        if (upErr) throw upErr;
+        const { data: urlData } = supabase.storage.from('chat-media').getPublicUrl(path);
+        await sendMessage(selectedConvId, urlData.publicUrl, replyId);
+      }
+      if (text) await sendMessage(selectedConvId, text, replyId);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
-    } catch { Alert.alert('Error', 'Failed to send.'); setMsgInput(text); }
-    finally { setSending(false); }
+    } catch {
+      Alert.alert('Error', 'Failed to send.');
+      if (text) setMsgInput(text);
+      if (imageUri) setPendingImage(imageUri);
+    } finally { setSending(false); }
   };
+
+  const handleBooked = async (inviteIds: string[]) => {
+    if (!selectedConvId) return;
+    for (const id of inviteIds) {
+      await sendMessage(selectedConvId, `__match_invite__:${id}`, undefined).catch(() => {});
+    }
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
+  };
+
+  const handleEmojiToggle = () => {
+    if (!showEmojiPicker) Keyboard.dismiss();
+    setShowEmojiPicker(v => !v);
+  };
+
+  const handlePickImage = () => {
+    Alert.alert('Attachment', 'Choose a source', [
+      {
+        text: 'Photo Library',
+        onPress: async () => {
+          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo library access to send images.'); return; }
+          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+          if (!result.canceled && result.assets[0]) { setPendingImage(result.assets[0].uri); setShowEmojiPicker(false); }
+        },
+      },
+      {
+        text: 'Camera',
+        onPress: async () => {
+          const perm = await ImagePicker.requestCameraPermissionsAsync();
+          if (!perm.granted) { Alert.alert('Permission needed', 'Allow camera access to take photos.'); return; }
+          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+          if (!result.canceled && result.assets[0]) { setPendingImage(result.assets[0].uri); setShowEmojiPicker(false); }
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const startRecording = async () => {
+    try {
+      const Audio = getAudio();
+      if (!Audio) { Alert.alert('Not supported', 'Voice messages require a dev build — run eas build --profile development.'); return; }
+      const perm = await Audio.requestPermissionsAsync();
+      if (!perm.granted) { Alert.alert('Permission needed', 'Allow microphone access to send voice messages.'); return; }
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      recordingRef.current = recording;
+      setIsRecording(true);
+      setRecordingCancelled(false);
+      setRecordSecs(0);
+      recordTimerRef.current = setInterval(() => setRecordSecs(s => s + 1), 1000);
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(recordingPulse, { toValue: 1.4, duration: 600, useNativeDriver: true }),
+          Animated.timing(recordingPulse, { toValue: 1, duration: 600, useNativeDriver: true }),
+        ]),
+      ).start();
+    } catch { Alert.alert('Error', 'Could not start recording.'); }
+  };
+
+  const stopRecording = async (cancel = false) => {
+    if (!recordingRef.current) return;
+    if (recordTimerRef.current) { clearInterval(recordTimerRef.current); recordTimerRef.current = null; }
+    recordingPulse.stopAnimation();
+    recordingPulse.setValue(1);
+    setIsRecording(false);
+    const rec = recordingRef.current;
+    recordingRef.current = null;
+    try {
+      await rec.stopAndUnloadAsync();
+      getAudio()?.setAudioModeAsync({ allowsRecordingIOS: false });
+      if (cancel || recordSecs < 1) return;
+      const uri = rec.getURI();
+      if (!uri || !selectedConvId) return;
+      setSending(true);
+      const path = `voice/${user!.id}/${Date.now()}.m4a`;
+      const res = await fetch(uri);
+      const blob = await res.blob();
+      const { error: upErr } = await supabase.storage.from('chat-media').upload(path, blob, { contentType: 'audio/m4a', upsert: false });
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from('chat-media').getPublicUrl(path);
+      await sendMessage(selectedConvId, `🎤 ${urlData.publicUrl}`, undefined);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
+    } catch { Alert.alert('Error', 'Failed to send voice message.'); }
+    finally { setSending(false); setRecordSecs(0); }
+  };
+
+  const micPanResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: () => { startRecording(); },
+    onPanResponderMove: (_, gs) => {
+      if (gs.dx < -60) setRecordingCancelled(true);
+      else setRecordingCancelled(false);
+    },
+    onPanResponderRelease: (_, gs) => { stopRecording(gs.dx < -60); },
+    onPanResponderTerminate: () => { stopRecording(true); },
+  });
+
+  const fmtRecordTime = (secs: number) => `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`;
 
   const handleTyping = useCallback((text: string) => {
     setMsgInput(text);
@@ -657,7 +836,14 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
           <TouchableOpacity style={th.backBtn} onPress={() => { setSelectedConvId(null); setReplyTo(null); }}>
             <Ionicons name="chevron-back" size={26} color="#fff" />
           </TouchableOpacity>
-          <TouchableOpacity style={th.identity} onPress={() => selectedConv.is_group && setShowGroupInfo(true)} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={th.identity}
+            onPress={() => {
+              if (selectedConv.is_group) setShowGroupInfo(true);
+              else if (otherId) (navigation as any)?.push?.('PlayerProfile', { userId: otherId });
+            }}
+            activeOpacity={0.8}
+          >
             <View style={{ position: 'relative' }}>
               {selectedConv.is_group
                 ? <View style={th.groupAvt}><Ionicons name="people" size={19} color={Colors.primary} /></View>
@@ -670,13 +856,39 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
               <Text style={th.sub} numberOfLines={1}>
                 {selectedConv.is_group
                   ? `${selectedConv.members.length} members`
-                  : otherIsOnline ? 'Online now' : 'tap for info'}
+                  : otherIsOnline ? 'Online now' : 'Tap to view profile'}
               </Text>
             </View>
           </TouchableOpacity>
           <View style={th.actions}>
-            <TouchableOpacity style={th.iconBtn}><Ionicons name="videocam-outline" size={22} color="rgba(255,255,255,0.8)" /></TouchableOpacity>
-            <TouchableOpacity style={th.iconBtn}><Ionicons name="call-outline" size={20} color="rgba(255,255,255,0.8)" /></TouchableOpacity>
+            {/* Book a match */}
+            <TouchableOpacity
+              style={th.iconBtn}
+              activeOpacity={0.7}
+              onPress={() => setShowBookingSheet(true)}
+            >
+              <Ionicons name="tennisball-outline" size={20} color="rgba(255,255,255,0.8)" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={th.iconBtn}
+              activeOpacity={0.7}
+              onPress={() => {
+                const targetId = selectedConv.is_group ? selectedConvId! : (otherId ?? '');
+                if (targetId) startCall(targetId, 'video', selectedConvId!, selectedConv.is_group).catch(() => {});
+              }}
+            >
+              <Ionicons name="videocam-outline" size={22} color="rgba(255,255,255,0.8)" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={th.iconBtn}
+              activeOpacity={0.7}
+              onPress={() => {
+                const targetId = selectedConv.is_group ? selectedConvId! : (otherId ?? '');
+                if (targetId) startCall(targetId, 'audio', selectedConvId!, selectedConv.is_group).catch(() => {});
+              }}
+            >
+              <Ionicons name="call-outline" size={20} color="rgba(255,255,255,0.8)" />
+            </TouchableOpacity>
             {selectedConv.is_group && (
               <TouchableOpacity style={th.iconBtn} onPress={() => setShowGroupInfo(true)}>
                 <Ionicons name="ellipsis-vertical" size={18} color="rgba(255,255,255,0.8)" />
@@ -684,6 +896,29 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
             )}
           </View>
         </LinearGradient>
+
+        {/* Match booking sheet */}
+        {(() => {
+          const bookingMembers: BookingMember[] = selectedConv.is_group
+            ? selectedConv.members
+                .filter(m => m.user_id !== user?.id)
+                .map(m => ({
+                  userId: m.user_id,
+                  name: [m.profile?.first_name, m.profile?.last_name].filter(Boolean).join(' ') || 'Player',
+                  avatarUrl: m.profile?.profile_picture_url ?? undefined,
+                }))
+            : otherId
+            ? [{ userId: otherId, name: convName, avatarUrl: convAvatar ?? undefined }]
+            : [];
+          return (
+            <MatchBookingSheet
+              visible={showBookingSheet}
+              onClose={() => setShowBookingSheet(false)}
+              members={bookingMembers}
+              onBooked={handleBooked}
+            />
+          );
+        })()}
 
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <FlatList
@@ -725,6 +960,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
                   ])}
                   onCopy={() => { Clipboard.setString(msg.content); setLongPressMsg(null); }}
                   onDismiss={() => setLongPressMsg(null)}
+                  onSenderPress={uid => (navigation as any)?.push?.('PlayerProfile', { userId: uid })}
                 />
               );
             }}
@@ -742,37 +978,73 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
           <TypingBar users={typingUsers} />
           {replyTo && <ReplyPreview msg={replyTo} onClear={() => setReplyTo(null)} />}
 
-          <View style={[th.inputBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-            <View style={th.inputWrap}>
-              <TouchableOpacity style={th.emojiBtn}>
-                <Ionicons name="happy-outline" size={22} color={CHAT.muted} />
-              </TouchableOpacity>
-              <TextInput
-                style={th.input}
-                value={msgInput}
-                onChangeText={handleTyping}
-                placeholder="Message"
-                placeholderTextColor={CHAT.muted}
-                multiline
-                maxLength={2000}
-                onFocus={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 300)}
-              />
-              <TouchableOpacity style={th.attachBtn}>
-                <Ionicons name="attach-outline" size={22} color={CHAT.muted} style={{ transform: [{ rotate: '45deg' }] }} />
+          {pendingImage && (
+            <View style={th.imgPreviewBar}>
+              <Image source={{ uri: pendingImage }} style={th.imgPreviewThumb} />
+              <TouchableOpacity style={th.imgRemoveBtn} onPress={() => setPendingImage(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close-circle" size={20} color={Colors.error} />
               </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={[th.sendBtn, msgInput.trim() && th.sendBtnActive]}
-              onPress={msgInput.trim() ? handleSend : undefined}
-              disabled={sending}
-            >
-              {sending
-                ? <ActivityIndicator size="small" color="#fff" />
-                : msgInput.trim()
-                  ? <Ionicons name="send" size={17} color="#fff" style={{ marginLeft: 2 }} />
-                  : <Ionicons name="mic-outline" size={20} color="#fff" />
-              }
-            </TouchableOpacity>
+          )}
+
+          {showEmojiPicker && (
+            <EmojiPanel onSelect={e => setMsgInput(v => v + e)} />
+          )}
+
+          {/* Recording overlay bar */}
+          {isRecording && (
+            <View style={th.recBar}>
+              <Animated.View style={[th.recDot, { transform: [{ scale: recordingPulse }] }]} />
+              <Text style={th.recTimer}>{fmtRecordTime(recordSecs)}</Text>
+              <Text style={[th.recHint, recordingCancelled && th.recHintCancel]}>
+                {recordingCancelled ? '← Release to cancel' : '← Slide to cancel'}
+              </Text>
+            </View>
+          )}
+
+          <View style={[th.inputBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+            {!isRecording && (
+              <View style={th.inputWrap}>
+                <TouchableOpacity style={th.emojiBtn} onPress={handleEmojiToggle}>
+                  <Ionicons name={showEmojiPicker ? 'happy' : 'happy-outline'} size={22} color={showEmojiPicker ? Colors.primary : CHAT.muted} />
+                </TouchableOpacity>
+                <TextInput
+                  style={th.input}
+                  value={msgInput}
+                  onChangeText={handleTyping}
+                  placeholder="Message"
+                  placeholderTextColor={CHAT.muted}
+                  multiline
+                  maxLength={2000}
+                  onFocus={() => { setShowEmojiPicker(false); setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 300); }}
+                />
+                <TouchableOpacity style={th.attachBtn} onPress={handlePickImage}>
+                  <Ionicons name="attach-outline" size={22} color={pendingImage ? Colors.primary : CHAT.muted} style={{ transform: [{ rotate: '45deg' }] }} />
+                </TouchableOpacity>
+              </View>
+            )}
+            {isRecording && <View style={{ flex: 1 }} />}
+
+            {/* Send / mic button */}
+            {(msgInput.trim() || pendingImage) ? (
+              <TouchableOpacity
+                style={[th.sendBtn, th.sendBtnActive]}
+                onPress={handleSend}
+                disabled={sending}
+              >
+                {sending
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Ionicons name="send" size={17} color="#fff" style={{ marginLeft: 2 }} />
+                }
+              </TouchableOpacity>
+            ) : (
+              <Animated.View
+                style={[th.sendBtn, th.sendBtnActive, isRecording && th.sendBtnRecording, { transform: [{ scale: isRecording ? recordingPulse : 1 }] }]}
+                {...micPanResponder.panHandlers}
+              >
+                <Ionicons name={isRecording ? 'mic' : 'mic-outline'} size={20} color="#fff" />
+              </Animated.View>
+            )}
           </View>
         </KeyboardAvoidingView>
 
@@ -1068,13 +1340,13 @@ const th = StyleSheet.create({
   identity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   groupAvt: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(249,115,22,0.2)', alignItems: 'center', justifyContent: 'center' },
   nameCol: { flex: 1 },
-  name: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: '#fff' },
+  name: { fontSize: FontSize.md, fontFamily: Font.bold, color: '#fff' },
   sub: { fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 1 },
   actions: { flexDirection: 'row', alignItems: 'center' },
   iconBtn: { padding: 8 },
   listContent: { paddingVertical: 10, paddingBottom: 12 },
   divider: { alignItems: 'center', marginVertical: 10 },
-  dividerTxt: { fontSize: 11, fontWeight: FontWeight.semibold, color: Colors.textSecondary, backgroundColor: CHAT.divBg, paddingHorizontal: 14, paddingVertical: 5, borderRadius: Radius.full, overflow: 'hidden' },
+  dividerTxt: { fontSize: 11, fontFamily: Font.semibold, color: Colors.textSecondary, backgroundColor: CHAT.divBg, paddingHorizontal: 14, paddingVertical: 5, borderRadius: Radius.full, overflow: 'hidden' },
   emptyWrap: { alignItems: 'center', paddingTop: 80, gap: 12 },
   emptyPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.07)', paddingHorizontal: 14, paddingVertical: 6, borderRadius: Radius.full },
   emptyPillTxt: { fontSize: 12, color: CHAT.muted },
@@ -1086,6 +1358,15 @@ const th = StyleSheet.create({
   attachBtn: { padding: 8 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: CHAT.muted, alignItems: 'center', justifyContent: 'center' },
   sendBtnActive: { backgroundColor: Colors.primary, ...Shadow.orange },
+  sendBtnRecording: { backgroundColor: Colors.error, shadowColor: Colors.error },
+  recBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#fff', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.borderLight, gap: 12 },
+  recDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: Colors.error },
+  recTimer: { fontSize: 16, fontFamily: Font.semibold, color: Colors.text, minWidth: 48 },
+  recHint: { flex: 1, fontSize: 13, color: Colors.textMuted, textAlign: 'right' },
+  recHintCancel: { color: Colors.error, fontFamily: Font.semibold },
+  imgPreviewBar: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: CHAT.inputBg, borderTopWidth: 1, borderTopColor: Colors.borderLight },
+  imgPreviewThumb: { width: 70, height: 70, borderRadius: 10, backgroundColor: Colors.surface },
+  imgRemoveBtn: { marginLeft: -10, marginTop: -6 },
 });
 
 // ── List styles ────────────────────────────────────────────────────────────────
@@ -1094,7 +1375,7 @@ const ls = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   header: { paddingBottom: 8 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: 8 },
-  title: { fontSize: 28, fontWeight: FontWeight.black, color: '#fff' },
+  title: { fontSize: 28, fontFamily: Font.black, color: '#fff' },
   headerSub: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
   headerActions: { flexDirection: 'row', gap: Spacing.sm },
   hBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
@@ -1102,10 +1383,10 @@ const ls = StyleSheet.create({
   tabRow: { flexDirection: 'row', paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm, gap: 6 },
   tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, borderRadius: Radius.full, gap: 4, backgroundColor: 'rgba(255,255,255,0.12)' },
   tabActive: { backgroundColor: '#fff' },
-  tabTxt: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: 'rgba(255,255,255,0.75)' },
+  tabTxt: { fontSize: FontSize.xs, fontFamily: Font.semibold, color: 'rgba(255,255,255,0.75)' },
   tabTxtActive: { color: Palette.dark900 },
   tabBadge: { backgroundColor: Colors.error, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
-  tabBadgeTxt: { color: '#fff', fontSize: 9, fontWeight: FontWeight.bold },
+  tabBadgeTxt: { color: '#fff', fontSize: 9, fontFamily: Font.bold },
 
   searchBar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, paddingHorizontal: Spacing.lg, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
   searchInput: { flex: 1, fontSize: FontSize.sm, color: Colors.text, paddingVertical: 0 },
@@ -1116,32 +1397,367 @@ const ls = StyleSheet.create({
   groupAvt: { width: 52, height: 52, borderRadius: 26, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
   convBody: { flex: 1, minWidth: 0 },
   convTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 },
-  convName: { fontSize: FontSize.md, fontWeight: FontWeight.medium, color: Colors.text, flex: 1, marginRight: 4 },
-  convNameBold: { fontWeight: FontWeight.bold },
+  convName: { fontSize: FontSize.md, fontFamily: Font.medium, color: Colors.text, flex: 1, marginRight: 4 },
+  convNameBold: { fontFamily: Font.bold },
   convTime: { fontSize: 11, color: Colors.textMuted },
-  convTimeUnread: { color: Colors.primary, fontWeight: FontWeight.semibold },
+  convTimeUnread: { color: Colors.primary, fontFamily: Font.semibold },
   convBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   convPrev: { fontSize: FontSize.sm, color: Colors.textSecondary, flex: 1, marginRight: 4 },
-  convPrevBold: { fontWeight: FontWeight.semibold, color: Colors.text },
+  convPrevBold: { fontFamily: Font.semibold, color: Colors.text },
   unreadBadge: { backgroundColor: Colors.primary, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
-  unreadTxt: { color: '#fff', fontSize: 11, fontWeight: FontWeight.bold },
+  unreadTxt: { color: '#fff', fontSize: 11, fontFamily: Font.bold },
 
   statusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full },
   statusOnline: { backgroundColor: Colors.successLight },
   statusOffline: { backgroundColor: Colors.backgroundAlt },
-  statusTxt: { fontSize: 10, fontWeight: FontWeight.semibold },
+  statusTxt: { fontSize: 10, fontFamily: Font.semibold },
   statusOnlineTxt: { color: Colors.success },
   statusOfflineTxt: { color: Colors.textMuted },
   msgBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
 
-  sectionLbl: { fontSize: 10, fontWeight: FontWeight.bold, color: Colors.textMuted, letterSpacing: 0.8, paddingHorizontal: Spacing.lg, paddingVertical: 8, backgroundColor: Colors.backgroundAlt, textTransform: 'uppercase' },
+  sectionLbl: { fontSize: 10, fontFamily: Font.bold, color: Colors.textMuted, letterSpacing: 0.8, paddingHorizontal: Spacing.lg, paddingVertical: 8, backgroundColor: Colors.backgroundAlt, textTransform: 'uppercase' },
 
   reqBtns: { flexDirection: 'row', gap: 8 },
   acceptBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.success, alignItems: 'center', justifyContent: 'center' },
   declineBtn: { width: 38, height: 38, borderRadius: 19, borderWidth: 1.5, borderColor: Colors.error, alignItems: 'center', justifyContent: 'center' },
   cancelBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.warningLight, paddingHorizontal: Spacing.sm, paddingVertical: 5, borderRadius: Radius.full },
-  cancelBtnTxt: { fontSize: 11, color: Colors.warning, fontWeight: FontWeight.semibold },
+  cancelBtnTxt: { fontSize: 11, color: Colors.warning, fontFamily: Font.semibold },
 
   unblockBtn: { backgroundColor: Colors.backgroundAlt, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: Spacing.sm, paddingVertical: 6, borderRadius: Radius.full },
-  unblockTxt: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: Colors.text },
+  unblockTxt: { fontSize: FontSize.xs, fontFamily: Font.semibold, color: Colors.text },
+});
+
+// ── Emoji picker ───────────────────────────────────────────────────────────────
+
+interface EmojiCat { key: string; icon: string; label: string; emojis: string[] }
+
+const EMOJI_DATA: EmojiCat[] = [
+  {
+    key: 'smileys', icon: '😊', label: 'Smileys & Emotion',
+    emojis: [
+      '😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇',
+      '🥰','😍','🤩','😘','😗','☺️','😚','😙','🥲','😋','😛','😜','🤪','😝',
+      '🤑','🤗','🤭','🫢','🤫','🤔','🫡','🤐','🥴','😑','😐','😶','😏','😒',
+      '🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🤧',
+      '🥵','🥶','😵','💫','🤯','🤠','🥳','🥸','😎','🤓','🧐','😕','😟','🙁',
+      '☹️','😮','😯','😲','😳','🥺','🥹','😦','😧','😨','😰','😥','😢','😭',
+      '😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿',
+      '💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖',
+      '😺','😸','😹','😻','😼','😽','🙀','😿','😾','🙈','🙉','🙊',
+      '❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❤️‍🔥','❣️',
+      '💕','💞','💓','💗','💖','💘','💝','💟',
+      '💋','💌','💤','💢','💥','✨','💫','💦','💨','💬','💭','🗯️',
+    ],
+  },
+  {
+    key: 'people', icon: '👋', label: 'People & Body',
+    emojis: [
+      '👋','🤚','🖐️','✋','🤙','👌','🤌','🤏','✌️','🤞','🤟','🤘',
+      '👈','👉','👆','🖕','👇','☝️','🫵','👍','👎','✊','👊','🤛','🤜',
+      '👏','🙌','🫶','🤲','🤝','🙏','✍️','💅','🤳',
+      '💪','🦾','🦵','🦶','👂','🦻','👃','👀','👁️','👅','👄','🫂',
+      '👶','🧒','👦','👧','🧑','👱','👨','🧔','👩','🧓','👴','👵',
+      '🙍','🙎','🙅','🙆','💁','🙋','🧏','🙇','🤦','🤷',
+      '👮','🕵️','💂','👷','💆','💇','🚶','🧍','🧎','🏃','💃','🕺',
+      '🧗','🏋️','🤸','⛹️','🏄','🚣','🧘','🛀','🛌',
+      '👫','👬','👭','💑','💏','👨‍👩‍👦','👪',
+      '🧙','🧛','🧟','🧞','🧜','🧚','👼','🎅','🤶','🦸','🦹',
+    ],
+  },
+  {
+    key: 'animals', icon: '🐶', label: 'Animals & Nature',
+    emojis: [
+      '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷',
+      '🐸','🐵','🙈','🙉','🙊','🐔','🐧','🐦','🦆','🦅','🦉','🦇','🐺',
+      '🐗','🐴','🦄','🐝','🦋','🐌','🐞','🐜','🦟','🦗','🕷️','🦂',
+      '🐢','🐍','🦎','🦖','🦕','🐊','🦭','🐳','🐋','🐬','🦈','🐙',
+      '🦑','🦐','🦀','🐡','🐠','🐟','🐆','🐅','🦓','🦍','🦧','🐘',
+      '🦛','🦏','🐪','🐫','🦒','🦘','🦬','🐃','🐂','🐄','🐎','🐖',
+      '🐏','🐑','🦙','🐐','🦌','🐕','🦮','🐈','🦔','🐾',
+      '🌸','💐','🌺','🌻','🌹','🌷','🌼','🌱','🌿','☘️','🍀','🎋',
+      '🌾','🌵','🎄','🌲','🌳','🌴','🍃','🍂','🍁','🍄','🌰',
+      '⭐','🌟','🌠','☀️','🌤️','⛅','🌥️','☁️','🌧️','⛈️','🌩️','🌨️',
+      '❄️','☃️','⛄','🌬️','💨','💧','💦','🌊','🌈','🌀','🌫️','🌪️',
+      '🌙','🌛','🌜','🌝','🌞','🪐','🔥','⚡','🌡️',
+    ],
+  },
+  {
+    key: 'food', icon: '🍔', label: 'Food & Drink',
+    emojis: [
+      '🍇','🍈','🍉','🍊','🍋','🍌','🍍','🥭','🍎','🍏','🍐','🍑','🍒',
+      '🍓','🫐','🥝','🍅','🫒','🥥','🥑','🍆','🥔','🥕','🌽','🌶️','🫑',
+      '🥒','🥬','🥦','🧄','🧅','🍄','🥜','🫘','🌰',
+      '🍞','🥐','🥖','🫓','🥨','🥯','🧀','🍖','🍗','🥩','🥓',
+      '🌭','🍔','🍟','🍕','🫔','🌮','🌯','🥙','🧆','🥚','🍳','🥘',
+      '🍲','🫕','🥣','🥗','🍱','🍘','🍙','🍚','🍛','🍜','🍝','🍠',
+      '🍢','🍣','🍤','🍥','🥮','🍡','🥟','🥠','🥡',
+      '🍦','🍧','🍨','🍩','🍪','🎂','🍰','🧁','🥧','🍫','🍬','🍭','🍯',
+      '☕','🫖','🍵','🧃','🥤','🧋','🍶','🍺','🍻','🥂','🍷',
+      '🥃','🍸','🍹','🧉','🍾','🧊','🥛','🍼','🍽️','🍴','🥄','🔪',
+    ],
+  },
+  {
+    key: 'activity', icon: '⚽', label: 'Activities',
+    emojis: [
+      '⚽','🏀','🏈','⚾','🥎','🎾','🏐','🏉','🥏','🎱','🏓','🏸',
+      '🏒','🥍','🏑','🏏','⛳','🎣','🤿','🥊','🥋','🎽',
+      '🛹','🛼','🛷','⛸️','🤺','🏇','⛷️','🏂','🪂',
+      '🏋️','🤸','⛹️','🤾','🏌️','🏄','🚣','🧘','🤼',
+      '🏆','🥇','🥈','🥉','🏅','🎖️','🎯','🎳','🎰','🎲','🧩',
+      '♟️','🃏','🎴','🀄','🎭','🎨','🖼️','🎪','🎬',
+      '🎤','🎧','🎼','🎵','🎶','🎷','🪗','🎸','🎹','🎺','🎻','🪕','🥁','🪘',
+      '🎊','🎉','🎈','🎀','🎁','🎗️','🎟️','🎫','🎠','🎡','🎢',
+    ],
+  },
+  {
+    key: 'travel', icon: '✈️', label: 'Travel & Places',
+    emojis: [
+      '🌍','🌎','🌏','🗺️','🧭','🌐',
+      '🏔️','⛰️','🌋','🗻','🏕️','🏖️','🏜️','🏝️','🏞️',
+      '🏟️','🏛️','🏗️','🏠','🏡','🏢','🏣','🏤','🏥','🏦','🏨',
+      '🏩','🏪','🏫','🏬','🏭','🏯','🏰','💒','🗼','🗽','⛪','🕌','🛕','⛩️','🕋',
+      '🚂','🚃','🚄','🚅','🚇','🚌','🚑','🚒','🚓','🚗','🚙','🛻',
+      '🚚','🚛','🚜','🏎️','🏍️','🛵','🚲','🛴','🛹',
+      '✈️','🛩️','🛫','🛬','💺','🚁','🛸','🚀','🛷',
+      '⛵','🚤','🛥️','🛳️','🚢','⛽','🚦','🚧','⚓',
+      '🌅','🌄','🌆','🌇','🌃','🌉','🌌','🎇','🎆',
+    ],
+  },
+  {
+    key: 'objects', icon: '💡', label: 'Objects',
+    emojis: [
+      '👓','🕶️','🥽','👔','👕','👖','🧣','🧤','🧥','🧦','👗','👘',
+      '👙','👚','👛','👜','👝','🎒','🩴','👞','👟','🥾','👠','👡','🩰','👢',
+      '👑','👒','🎩','🧢','⛑️','💄','💍','💎',
+      '📱','📲','💻','🖥️','⌨️','🖱️','📷','📸','📹','📺','📻','🎧','🎙️',
+      '📚','📖','📕','📗','📘','📙','📔','📃','📄','📑','📊','📈','📉',
+      '✏️','🖊️','📝','📌','📍','📎','🖇️','📏','📐','✂️','🗃️','🗂️',
+      '🔑','🗝️','🔒','🔓','🔨','🪓','⛏️','🛠️','🔧','🪛','🔩','⚙️',
+      '🧲','💡','🔦','🕯️','🧯','💰','💳','💎','🔮','🧪','🧬','🩺',
+      '🪄','🎁','📦','🛒','🚪','🪞','🪟','🛋️','🪑','🚿','🛁','🧸','🪆',
+    ],
+  },
+  {
+    key: 'symbols', icon: '💟', label: 'Symbols',
+    emojis: [
+      '❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞',
+      '💓','💗','💖','💘','💝','💯','✅','☑️','✔️','❌','❎','➕','➖',
+      '➗','✖️','🟰','♾️','❓','❔','❗','❕','🔥','⚡','⭐','🌟','✨','💫',
+      '🎉','🎊','🎈','🎀','🏆','👑','⚜️','🔱','📛','🔰','⭕','🚫','⛔',
+      '🔴','🟠','🟡','🟢','🔵','🟣','🟤','⚫','⚪',
+      '🟥','🟧','🟨','🟩','🟦','🟪','🟫','⬛','⬜','◼️','◻️','◾','◽','▪️','▫️',
+      '🔶','🔷','🔸','🔹','🔺','🔻','💠','🔘','🔲','🔳',
+      '♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓','⛎',
+      '☮️','✝️','☪️','🕉️','✡️','☯️','♻️','🆕','🆓','🆙','🆒','🆗','🆖',
+      '🅰️','🅱️','🆎','🅾️','🆑','🆘','🔞','🚳','🚭','🚯','🚱','🚷','📵',
+    ],
+  },
+];
+
+const EMOJI_KEYWORDS: Record<string, string[]> = {
+  smile:['😀','😃','😄','😁','😊','☺️','😺'], laugh:['😆','😅','🤣','😂','😸','😹'],
+  love:['❤️','🥰','😍','😘','💕','💞','💓','💖','💘','💝','😻'], heart:['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘','💝'],
+  cry:['😢','😭','😿','🥺'], angry:['😡','😠','🤬','😤','😈','👿','😾'],
+  happy:['😀','😃','😄','😁','😆','🥳','😊','🥰','😸'], sad:['😢','😭','😔','😞','😓','☹️','🙁','😿'],
+  fire:['🔥'], star:['⭐','🌟','✨','💫','🌠'], sun:['☀️','🌞','🌅','🌄'],
+  moon:['🌙','🌛','🌜','🌝'], snow:['❄️','☃️','⛄','🌨️'], rain:['🌧️','💧'],
+  rainbow:['🌈'], pizza:['🍕'], burger:['🍔'], taco:['🌮'],
+  coffee:['☕','🫖','🍵'], beer:['🍺','🍻'], wine:['🍷','🥂','🍾'],
+  cake:['🎂','🍰','🧁'], sushi:['🍣'], ramen:['🍜'], fruit:['🍎','🍊','🍋','🍇','🍓','🍒'],
+  dog:['🐶','🐕','🦮'], cat:['🐱','🐈','😺','😸','😹','😻','😼','😽','🙀','😿','😾'],
+  bear:['🐻','🐼','🐨'], lion:['🦁'], tiger:['🐯'], monkey:['🐵','🙈','🙉','🙊'],
+  bird:['🐦','🦆','🦅','🦉','🐧'], fish:['🐟','🐠','🐡'], shark:['🦈'],
+  flower:['🌸','💐','🌺','🌻','🌹','🌷','🌼'], tree:['🌲','🌳','🌴','🎄'],
+  soccer:['⚽'], basketball:['🏀'], tennis:['🎾'], trophy:['🏆','🥇','🏅'],
+  party:['🎉','🎊','🎈','🎀','🥳'], gift:['🎁','🎀'], music:['🎵','🎶','🎸','🎹','🎤','🎧'],
+  car:['🚗','🚙','🏎️','🚕'], plane:['✈️','🛩️','🛫','🛬'], rocket:['🚀'],
+  house:['🏠','🏡'], phone:['📱','☎️','📞'], computer:['💻','🖥️'],
+  camera:['📷','📸','🎥'], book:['📚','📖','📕'], money:['💰','💵','💳','💸'],
+  key:['🔑','🗝️'], lock:['🔒','🔓'], ok:['👌','✅','👍'], yes:['✅','👍','☑️'],
+  no:['❌','👎','🚫'], clap:['👏','🙌'], pray:['🙏'], muscle:['💪'],
+  eyes:['👀','👁️'], skull:['💀','☠️'], poop:['💩'], ghost:['👻'],
+  alien:['👽','👾'], robot:['🤖'], clown:['🤡'], santa:['🎅'],
+  kiss:['😘','💋','💏'], hug:['🤗','🫂'], think:['🤔','💭'],
+  cool:['😎'], nerd:['🤓','🧐'], sick:['🤒','🤕','🤢','🤮','🤧','😷'],
+  sleep:['😴','💤','🛌'], run:['🏃'], dance:['💃','🕺'],
+  water:['💧','💦','🌊','🏊'], earth:['🌍','🌎','🌏'],
+  check:['✅','✔️','☑️'], cross:['❌'], question:['❓'], warning:['⚠️'],
+  thumbup:['👍'], thumbdown:['👎'], wave:['👋','🌊'],
+};
+
+const ALL_EMOJIS = EMOJI_DATA.flatMap(c => c.emojis);
+
+function searchEmojis(q: string): string[] {
+  const lower = q.toLowerCase().trim();
+  if (!lower) return [];
+  const results = new Set<string>();
+  Object.entries(EMOJI_KEYWORDS).forEach(([kw, emojis]) => {
+    if (kw.includes(lower)) emojis.forEach(e => results.add(e));
+  });
+  // also surface emojis whose category label matches
+  EMOJI_DATA.forEach(cat => {
+    if (cat.label.toLowerCase().includes(lower)) cat.emojis.forEach(e => results.add(e));
+  });
+  return [...results];
+}
+
+const PAGES = [
+  { key: 'recents', icon: '🕐', label: 'Recently Used', emojis: [] as string[] },
+  ...EMOJI_DATA,
+];
+
+const EmojiPanel: React.FC<{ onSelect: (e: string) => void }> = ({ onSelect }) => {
+  const { width: screenWidth } = useWindowDimensions();
+  const [search, setSearch] = useState('');
+  const [recents, setRecents] = useState<string[]>([]);
+  const [activePage, setActivePage] = useState(0);
+  const pagerRef = useRef<FlatList>(null);
+  const tabStripRef = useRef<ScrollView>(null);
+
+  const handleSelect = (e: string) => {
+    onSelect(e);
+    setRecents(prev => [e, ...prev.filter(r => r !== e)].slice(0, 32));
+  };
+
+  const goToPage = (idx: number) => {
+    setSearch('');
+    setActivePage(idx);
+    pagerRef.current?.scrollToIndex({ index: idx, animated: true });
+    // keep active tab visible in the strip
+    tabStripRef.current?.scrollTo({ x: Math.max(0, idx * 44 - screenWidth / 2 + 22), animated: true });
+  };
+
+  const onPageChange = (e: any) => {
+    const page = Math.round(e.nativeEvent.contentOffset.x / screenWidth);
+    setActivePage(page);
+    tabStripRef.current?.scrollTo({ x: Math.max(0, page * 44 - screenWidth / 2 + 22), animated: true });
+  };
+
+  const searchResults = search.trim() ? searchEmojis(search) : null;
+
+  const renderGrid = (emojis: string[], emptyMsg: string) => (
+    emojis.length > 0 ? (
+      <View style={ep.grid}>
+        {emojis.map(e => (
+          <TouchableOpacity key={e} style={ep.cell} onPress={() => handleSelect(e)} activeOpacity={0.6}>
+            <Text style={ep.emojiTxt}>{e}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    ) : (
+      <Text style={ep.noResults}>{emptyMsg}</Text>
+    )
+  );
+
+  const renderPage = ({ item, index }: { item: typeof PAGES[0]; index: number }) => {
+    const emojis = index === 0 ? recents : item.emojis;
+    const emptyMsg = index === 0 ? 'Tap any emoji to save it here' : 'No emojis';
+    return (
+      <ScrollView
+        style={{ width: screenWidth }}
+        contentContainerStyle={ep.pageContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="always"
+        nestedScrollEnabled
+      >
+        <Text style={ep.sectionLabel}>{item.label}</Text>
+        {renderGrid(emojis, emptyMsg)}
+      </ScrollView>
+    );
+  };
+
+  return (
+    <View style={ep.container}>
+      {/* Search bar */}
+      <View style={ep.searchRow}>
+        <Ionicons name="search-outline" size={15} color={Colors.textMuted} style={{ marginRight: 6 }} />
+        <TextInput
+          style={ep.searchInput}
+          placeholder="Search emoji…"
+          placeholderTextColor={Colors.textMuted}
+          value={search}
+          onChangeText={setSearch}
+          returnKeyType="search"
+          autoCorrect={false}
+        />
+        {!!search && (
+          <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close-circle" size={15} color={Colors.textMuted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Category tab strip */}
+      <ScrollView
+        ref={tabStripRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={ep.tabBar}
+        contentContainerStyle={ep.tabContent}
+      >
+        {PAGES.map((p, i) => (
+          <TouchableOpacity
+            key={p.key}
+            style={[ep.tab, activePage === i && ep.tabActive]}
+            onPress={() => goToPage(i)}
+          >
+            <Text style={ep.tabIcon}>{p.icon}</Text>
+            {activePage === i && <View style={ep.tabDot} />}
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Search results overlay */}
+      {searchResults !== null ? (
+        <ScrollView
+          style={ep.searchPage}
+          contentContainerStyle={ep.pageContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="always"
+        >
+          {renderGrid(
+            searchResults,
+            `No results for "${search}" — try heart, smile, dog, pizza…`,
+          )}
+        </ScrollView>
+      ) : (
+        /* Horizontal pager */
+        <FlatList
+          ref={pagerRef}
+          data={PAGES}
+          renderItem={renderPage}
+          keyExtractor={item => item.key}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          getItemLayout={(_, index) => ({ length: screenWidth, offset: screenWidth * index, index })}
+          onMomentumScrollEnd={onPageChange}
+          initialNumToRender={2}
+          windowSize={3}
+          keyboardShouldPersistTaps="always"
+          style={ep.pager}
+        />
+      )}
+    </View>
+  );
+};
+
+const ep = StyleSheet.create({
+  container:   { height: 330, backgroundColor: '#fff', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.borderLight },
+  searchRow:   { flexDirection: 'row', alignItems: 'center', marginHorizontal: 12, marginVertical: 6, backgroundColor: Colors.backgroundAlt, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
+  searchInput: { flex: 1, fontSize: 14, color: Colors.text, padding: 0 },
+  tabBar:      { maxHeight: 42, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.borderLight },
+  tabContent:  { paddingHorizontal: 4, alignItems: 'center' },
+  tab:         { width: 44, height: 42, alignItems: 'center', justifyContent: 'center' },
+  tabActive:   {},
+  tabIcon:     { fontSize: 22 },
+  tabDot:      { position: 'absolute', bottom: 3, width: 4, height: 4, borderRadius: 2, backgroundColor: Colors.primary },
+  pager:       { flex: 1 },
+  searchPage:  { flex: 1 },
+  pageContent: { paddingHorizontal: 4, paddingBottom: 12 },
+  sectionLabel:{ fontSize: 11, fontFamily: Font.bold, color: Colors.textMuted, letterSpacing: 0.5, textTransform: 'uppercase', paddingHorizontal: 8, paddingTop: 8, paddingBottom: 4 },
+  grid:        { flexDirection: 'row', flexWrap: 'wrap' },
+  cell:        { width: '12.5%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
+  emojiTxt:    { fontSize: 26 },
+  noResults:   { fontSize: 13, color: Colors.textMuted, textAlign: 'center', paddingVertical: 20, paddingHorizontal: 16 },
 });

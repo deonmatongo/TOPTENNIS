@@ -18,7 +18,7 @@ import { useDivisionLeaderboard } from '@/hooks/useDivisionLeaderboard';
 import { useDivisionMatches } from '@/hooks/useDivisionMatches';
 import { useLeagueLeaderboard } from '@/hooks/useLeagueLeaderboard';
 import { supabase } from '@/services/supabase';
-import { Palette, Colors, Shadow, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { Palette, Colors, Shadow, FontSize, Font, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 
@@ -943,30 +943,30 @@ const styles = StyleSheet.create({
 
   // Unavailable state
   unavailableCard: { alignItems: 'center', justifyContent: 'center', paddingVertical: 64, gap: Spacing.sm },
-  unavailableTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.textMuted, textAlign: 'center', maxWidth: 280 },
+  unavailableTitle: { fontSize: FontSize.md, fontFamily: Font.semibold, color: Colors.textMuted, textAlign: 'center', maxWidth: 280 },
   unavailableSub: { fontSize: FontSize.sm, color: Colors.textMuted, textAlign: 'center', maxWidth: 260, opacity: 0.7 },
 
   // Gradient header
-  gradHeader: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xl, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  gradBackBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  gradTitle: { fontSize: 26, fontWeight: FontWeight.black, color: '#fff', letterSpacing: -0.5 },
+  gradHeader: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  gradBackBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  gradTitle: { fontSize: FontSize.xxxl, fontFamily: Font.black, color: '#fff', letterSpacing: -1 },
   gradSub: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
 
   // Stat strip
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   statCard: { width: '47.5%', backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border, gap: 3, ...Shadow.xs },
   statIconRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  statLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
-  statValue: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.text, letterSpacing: -0.5 },
+  statLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, fontFamily: Font.medium },
+  statValue: { fontSize: FontSize.xxl, fontFamily: Font.bold, color: Colors.text, letterSpacing: -0.5 },
   statSub: { fontSize: FontSize.xs, color: Colors.textMuted },
 
   // Overview sections
   sectionBlock: { gap: Spacing.sm },
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-  sectionTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  sectionCount: { fontSize: FontSize.xs, color: Colors.textMuted, fontWeight: FontWeight.medium },
+  sectionTitle: { fontSize: FontSize.xs, fontFamily: Font.bold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionCount: { fontSize: FontSize.xs, color: Colors.textMuted, fontFamily: Font.medium },
   loadMoreBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.separator, marginTop: 4 },
-  loadMoreText: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
+  loadMoreText: { fontSize: FontSize.sm, color: Colors.primary, fontFamily: Font.semibold },
   demoPill: { backgroundColor: Colors.borderLight, paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border },
   demoPillText: { fontSize: 10, color: Colors.textMuted },
 
@@ -975,77 +975,77 @@ const styles = StyleSheet.create({
   leagueCardCompleted: { opacity: 0.75, borderLeftColor: Colors.textMuted },
   leagueCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: Spacing.sm },
   leagueTitleRow: { flex: 1 },
-  leagueName: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
+  leagueName: { fontSize: FontSize.md, fontFamily: Font.bold, color: Colors.text },
   leagueBadgeRow: { flexShrink: 0 },
   playoffReadyBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#16a34a', paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.full },
-  playoffReadyText: { fontSize: 10, color: '#fff', fontWeight: FontWeight.semibold },
+  playoffReadyText: { fontSize: 10, color: '#fff', fontFamily: Font.semibold },
   inProgressBadge2: { backgroundColor: Colors.borderLight, paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.full },
-  inProgressText2: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+  inProgressText2: { fontSize: FontSize.xs, color: Colors.textSecondary, fontFamily: Font.medium },
   completedBadge: { backgroundColor: Colors.borderLight, paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.full },
-  completedBadgeText: { fontSize: FontSize.xs, color: Colors.textMuted, fontWeight: FontWeight.medium },
+  completedBadgeText: { fontSize: FontSize.xs, color: Colors.textMuted, fontFamily: Font.medium },
   divLabel: { fontSize: FontSize.sm, color: Colors.textSecondary },
 
   // Progress bar on league card
   progressSection: { gap: 5 },
   progressLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
   progressLabel: { fontSize: FontSize.xs, color: Colors.textMuted },
-  progressCount: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: Colors.text },
+  progressCount: { fontSize: FontSize.xs, fontFamily: Font.semibold, color: Colors.text },
   progressTrack: { height: 6, backgroundColor: Colors.borderLight, borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: 6, backgroundColor: Colors.primary, borderRadius: 3 },
 
   viewLeagueRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, paddingTop: Spacing.xs, borderTopWidth: 1, borderTopColor: Colors.borderLight },
-  viewLeagueText: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
+  viewLeagueText: { fontSize: FontSize.sm, color: Colors.primary, fontFamily: Font.semibold },
 
   // Browse CTA card
   ctaCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: Colors.primaryLight },
   ctaIcon: { width: 36, height: 36, borderRadius: Radius.md, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  ctaTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
+  ctaTitle: { fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.text },
   ctaSub: { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 1 },
   ctaBtn: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border },
-  ctaBtnText: { fontSize: FontSize.sm, color: Colors.text, fontWeight: FontWeight.medium },
+  ctaBtnText: { fontSize: FontSize.sm, color: Colors.text, fontFamily: Font.medium },
 
   emptyCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.xxl, alignItems: 'center', gap: Spacing.md, borderWidth: 1, borderColor: Colors.border, marginTop: Spacing.lg },
-  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
+  emptyTitle: { fontSize: FontSize.lg, fontFamily: Font.semibold, color: Colors.text },
   emptySub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
   emptyBtn: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, borderRadius: Radius.md, marginTop: Spacing.sm },
-  emptyBtnText: { color: '#fff', fontWeight: FontWeight.semibold, fontSize: FontSize.md },
+  emptyBtnText: { color: '#fff', fontFamily: Font.semibold, fontSize: FontSize.md },
 
   // Detail header
   statusBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.full },
   detailHeader: { backgroundColor: Colors.surface, padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: Spacing.md },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, alignSelf: 'flex-start', paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border },
-  backBtnText: { fontSize: FontSize.sm, color: Colors.text, fontWeight: FontWeight.medium },
+  backBtnText: { fontSize: FontSize.sm, color: Colors.text, fontFamily: Font.medium },
   detailTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   detailIconWrap: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  detailTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
+  detailTitle: { fontSize: FontSize.lg, fontFamily: Font.bold, color: Colors.text },
   detailSub: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
   statusBadgeGreen: { backgroundColor: Colors.successLight },
   statusBadgeGray: { backgroundColor: Colors.borderLight },
-  statusBadgeText: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold },
+  statusBadgeText: { fontSize: FontSize.xs, fontFamily: Font.semibold },
 
   // Tab bar
   tabBar: { flexDirection: 'row', backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border },
   tabItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: Spacing.md, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabItemActive: { borderBottomColor: Colors.primary },
-  tabLabel: { fontSize: FontSize.xs, color: Colors.textMuted, fontWeight: FontWeight.medium },
-  tabLabelActive: { color: Colors.primary, fontWeight: FontWeight.semibold },
+  tabLabel: { fontSize: FontSize.xs, color: Colors.textMuted, fontFamily: Font.medium },
+  tabLabelActive: { color: Colors.primary, fontFamily: Font.semibold },
   tabScroll: { padding: Spacing.lg, gap: Spacing.md },
 
   // Tab empty states
   tabEmpty: { alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.xxl },
-  tabEmptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
+  tabEmptyTitle: { fontSize: FontSize.lg, fontFamily: Font.semibold, color: Colors.text },
   tabEmptySub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20, maxWidth: 280 },
   scheduleBtn: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.primary, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, borderRadius: Radius.md, marginTop: Spacing.sm },
-  scheduleBtnText: { color: '#fff', fontWeight: FontWeight.semibold, fontSize: FontSize.md },
+  scheduleBtnText: { color: '#fff', fontFamily: Font.semibold, fontSize: FontSize.md },
   tabContent: { gap: Spacing.md },
 
   // Tournament banner
   tournamentBanner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: '#f0fdf4', borderWidth: 1, borderColor: '#bbf7d0', borderRadius: Radius.md, padding: Spacing.md },
   tournamentDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: Colors.success },
-  tournamentTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: '#166534' },
+  tournamentTitle: { fontSize: FontSize.sm, fontFamily: Font.semibold, color: '#166534' },
   tournamentSub: { fontSize: FontSize.xs, color: '#16a34a' },
   inProgressBadge: { backgroundColor: '#16a34a', paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.full },
-  inProgressText: { fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.semibold },
+  inProgressText: { fontSize: FontSize.xs, color: '#fff', fontFamily: Font.semibold },
 
   // Match cards
   matchCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: Colors.border, gap: Spacing.sm },
@@ -1057,25 +1057,25 @@ const styles = StyleSheet.create({
   matchIconWin: { backgroundColor: '#dcfce7' },
   matchIconLoss: { backgroundColor: '#fee2e2' },
   matchIconPending: { backgroundColor: '#dbeafe' },
-  matchOpponent: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text },
+  matchOpponent: { fontSize: FontSize.md, fontFamily: Font.semibold, color: Colors.text },
   matchBadgeRow: { flexDirection: 'row', gap: Spacing.xs, marginTop: 2 },
   resultBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: Radius.full },
   resultBadgeWin: { backgroundColor: '#dcfce7' },
   resultBadgeLoss: { backgroundColor: '#fee2e2' },
   resultBadgePending: { backgroundColor: '#dbeafe' },
-  resultBadgeText: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold },
+  resultBadgeText: { fontSize: FontSize.xs, fontFamily: Font.semibold },
   scheduleMatchBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.primary, paddingHorizontal: Spacing.sm, paddingVertical: 6, borderRadius: Radius.sm },
-  scheduleMatchBtnText: { fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.semibold },
+  scheduleMatchBtnText: { fontSize: FontSize.xs, color: '#fff', fontFamily: Font.semibold },
   matchMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   matchMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   matchMetaText: { fontSize: FontSize.xs, color: Colors.textSecondary },
   scoreBox: { backgroundColor: Colors.background, borderRadius: Radius.sm, padding: Spacing.sm },
-  scoreLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: Colors.textSecondary, marginBottom: 2 },
-  scoreValue: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
+  scoreLabel: { fontSize: FontSize.xs, fontFamily: Font.semibold, color: Colors.textSecondary, marginBottom: 2 },
+  scoreValue: { fontSize: FontSize.md, fontFamily: Font.bold, color: Colors.text },
 
   // Schedule new match button
   scheduleNewBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, paddingVertical: Spacing.md, borderRadius: Radius.md, borderWidth: 1.5, borderColor: Colors.primary, borderStyle: 'dashed' },
-  scheduleNewBtnText: { fontSize: FontSize.md, color: Colors.primary, fontWeight: FontWeight.semibold },
+  scheduleNewBtnText: { fontSize: FontSize.md, color: Colors.primary, fontFamily: Font.semibold },
 
   // Demo banner
   demoBanner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, backgroundColor: Colors.borderLight, borderRadius: Radius.md, padding: Spacing.sm, borderWidth: 1, borderColor: Colors.border, borderStyle: 'dashed' },
@@ -1083,7 +1083,7 @@ const styles = StyleSheet.create({
 
   // Match sections (Upcoming / Recent Results grouping)
   matchSection: { gap: Spacing.sm },
-  matchSectionLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 2 },
+  matchSectionLabel: { fontSize: FontSize.xs, fontFamily: Font.bold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 2 },
 
   // Other-player (non-user) match card styling
   matchCardOther: { opacity: 0.85 },
@@ -1092,48 +1092,48 @@ const styles = StyleSheet.create({
   // Badge variants
   resultBadgeOther: { backgroundColor: Colors.borderLight },
   enterScoreBadge: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: Radius.full },
-  enterScoreBadgeText: { fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.bold },
+  enterScoreBadgeText: { fontSize: FontSize.xs, color: '#fff', fontFamily: Font.bold },
 
   // Match action buttons
   matchActions: { flexDirection: 'row', gap: Spacing.sm, paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.borderLight },
   matchActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: Radius.md, borderWidth: 1.5, borderColor: '#ea580c' },
   matchActionBtnOrange: { backgroundColor: '#ea580c', borderColor: '#ea580c' },
-  matchActionBtnText: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
+  matchActionBtnText: { fontSize: FontSize.sm, fontFamily: Font.semibold },
 
   // Playoff inline badge on match card
   playoffMatchBadge: { backgroundColor: '#f59e0b', paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: Radius.full },
-  playoffMatchBadgeText: { fontSize: 10, color: '#fff', fontWeight: FontWeight.bold },
+  playoffMatchBadgeText: { fontSize: 10, color: '#fff', fontFamily: Font.bold },
 
   // Active tournament note
   activeTournamentNote: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: '#f0fdf4', borderRadius: Radius.md, padding: Spacing.sm, marginTop: Spacing.sm },
-  activeTournamentText: { fontSize: FontSize.sm, color: '#166534', fontWeight: FontWeight.medium },
+  activeTournamentText: { fontSize: FontSize.sm, color: '#166534', fontFamily: Font.medium },
 
   // Playoff bracket
   playoffHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
-  playoffHeaderTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text, flex: 1 },
+  playoffHeaderTitle: { fontSize: FontSize.md, fontFamily: Font.bold, color: Colors.text, flex: 1 },
   playoffRound: { gap: Spacing.sm },
-  playoffRoundLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  playoffRoundLabel: { fontSize: FontSize.sm, fontFamily: Font.bold, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
   playoffMatchCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border, gap: Spacing.sm },
   playoffMatchPlayers: { gap: Spacing.xs },
   playoffPlayer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.xs, paddingHorizontal: Spacing.sm, borderRadius: Radius.sm, backgroundColor: Colors.background },
   playoffPlayerWinner: { backgroundColor: '#fef9c3', borderWidth: 1, borderColor: '#fde047' },
-  playoffPlayerName: { fontSize: FontSize.sm, fontWeight: FontWeight.medium, color: Colors.text, flex: 1 },
-  playoffVs: { fontSize: FontSize.xs, color: Colors.textMuted, fontWeight: FontWeight.bold, textAlign: 'center', paddingVertical: 2 },
-  playoffScore: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.text, textAlign: 'center' },
+  playoffPlayerName: { fontSize: FontSize.sm, fontFamily: Font.medium, color: Colors.text, flex: 1 },
+  playoffVs: { fontSize: FontSize.xs, color: Colors.textMuted, fontFamily: Font.bold, textAlign: 'center', paddingVertical: 2 },
+  playoffScore: { fontSize: FontSize.sm, fontFamily: Font.bold, color: Colors.text, textAlign: 'center' },
   playoffMatchMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
 
   // My status card (Division tab)
   myStatusCard: { backgroundColor: Colors.primaryLight, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1.5, borderColor: Colors.primary, gap: Spacing.sm },
   myStatusTop: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   myStatusAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
-  myStatusAvatarText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: '#fff' },
+  myStatusAvatarText: { fontSize: FontSize.sm, fontFamily: Font.bold, color: '#fff' },
   myStatusNameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, flexWrap: 'wrap' },
-  myStatusName: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
+  myStatusName: { fontSize: FontSize.md, fontFamily: Font.bold, color: Colors.text },
   rankPill: { backgroundColor: Colors.surface, paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border },
-  rankPillText: { fontSize: 10, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
+  rankPillText: { fontSize: 10, color: Colors.textSecondary, fontFamily: Font.semibold },
   myStatusStatsRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' },
-  myStatusWins: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.success },
-  myStatusLosses: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.error },
+  myStatusWins: { fontSize: FontSize.sm, fontFamily: Font.bold, color: Colors.success },
+  myStatusLosses: { fontSize: FontSize.sm, fontFamily: Font.bold, color: Colors.error },
   myStatusPts: { fontSize: FontSize.sm, color: Colors.textSecondary },
   myStatusWr: { fontSize: FontSize.sm, color: Colors.textSecondary },
   myStatusProgress: { gap: 5 },
@@ -1142,7 +1142,7 @@ const styles = StyleSheet.create({
   // Division context badges
   divBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
   divBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
-  divBadgeText: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+  divBadgeText: { fontSize: FontSize.xs, color: Colors.textSecondary, fontFamily: Font.medium },
 
   // Footer note
   divFooter: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xs, backgroundColor: Colors.borderLight, borderRadius: Radius.md, padding: Spacing.sm, marginTop: Spacing.xs },
@@ -1150,7 +1150,7 @@ const styles = StyleSheet.create({
 
   // Division standings
   standingsHeader: { gap: 2, marginBottom: Spacing.xs },
-  standingsTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
+  standingsTitle: { fontSize: FontSize.md, fontFamily: Font.bold, color: Colors.text },
   standingsSub: { fontSize: FontSize.xs, color: Colors.textSecondary },
   standingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, borderRadius: Radius.md, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border },
   standingRowSelf: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary, borderWidth: 2 },
@@ -1158,29 +1158,29 @@ const styles = StyleSheet.create({
   rankCircleSelf: { backgroundColor: Colors.primary },
   rankCircleTop: { backgroundColor: '#f59e0b' },
   rankCircleDefault: { backgroundColor: Colors.borderLight },
-  rankText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.textMuted },
+  rankText: { fontSize: FontSize.sm, fontFamily: Font.bold, color: Colors.textMuted },
   standingNameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-  standingName: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
+  standingName: { fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.text },
   youBadge: { backgroundColor: Colors.primary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full },
-  youBadgeText: { fontSize: 10, color: '#fff', fontWeight: FontWeight.bold },
+  youBadgeText: { fontSize: 10, color: '#fff', fontFamily: Font.bold },
   standingStats: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
   standingRight: { alignItems: 'flex-end', gap: Spacing.xs },
   playoffBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#16a34a', paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.full },
-  playoffBadgeText: { fontSize: 10, color: '#fff', fontWeight: FontWeight.semibold },
+  playoffBadgeText: { fontSize: 10, color: '#fff', fontFamily: Font.semibold },
   matchesNeeded: { fontSize: FontSize.xs, color: Colors.textMuted, textAlign: 'right' },
   scheduleSmallBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.primary },
-  scheduleSmallBtnText: { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.medium },
+  scheduleSmallBtnText: { fontSize: FontSize.xs, color: Colors.primary, fontFamily: Font.medium },
 
   // League-wide standings
   myRankBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.primaryLight, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1.5, borderColor: Colors.primary },
   myRankLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  myRankNum: { fontSize: 32, fontWeight: FontWeight.bold, color: Colors.primary },
-  myRankLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.primaryDark },
+  myRankNum: { fontSize: 32, fontFamily: Font.bold, color: Colors.primary },
+  myRankLabel: { fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.primaryDark },
   myRankPts: { fontSize: FontSize.xs, color: Colors.primary, marginTop: 2 },
   myRankGap: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.surface, paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: Radius.full },
-  myRankGapText: { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.semibold },
+  myRankGapText: { fontSize: FontSize.xs, color: Colors.primary, fontFamily: Font.semibold },
   divisionPill: { backgroundColor: Colors.borderLight, paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: Radius.full },
-  divisionPillText: { fontSize: 10, color: Colors.textSecondary, fontWeight: FontWeight.medium },
-  pointsValue: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
+  divisionPillText: { fontSize: 10, color: Colors.textSecondary, fontFamily: Font.medium },
+  pointsValue: { fontSize: FontSize.md, fontFamily: Font.bold, color: Colors.text },
   pointsLabel: { fontSize: FontSize.xs, color: Colors.textMuted },
 });

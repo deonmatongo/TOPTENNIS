@@ -1,23 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState } from 'react'
 import {
-  View,
-  TextInput,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ViewStyle,
-  TextInputProps,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors, FontSize, Radius, Spacing } from '@/theme/colors';
+  TextInput, TouchableOpacity, ViewStyle, TextInputProps,
+} from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
+import { YStack, XStack, Text } from 'tamagui'
+import { Colors, FontSize, Radius, Spacing } from '@/theme/colors'
 
 interface InputProps extends TextInputProps {
-  label?: string;
-  error?: string;
-  leftIcon?: keyof typeof Ionicons.glyphMap;
-  rightIcon?: keyof typeof Ionicons.glyphMap;
-  onRightIconPress?: () => void;
-  containerStyle?: ViewStyle;
+  label?:            string
+  error?:            string
+  leftIcon?:         keyof typeof Ionicons.glyphMap
+  rightIcon?:        keyof typeof Ionicons.glyphMap
+  onRightIconPress?: () => void
+  containerStyle?:   ViewStyle
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -30,39 +25,64 @@ export const Input: React.FC<InputProps> = ({
   secureTextEntry,
   ...props
 }) => {
-  const [focused, setFocused] = useState(false);
-  const [secure, setSecure] = useState(secureTextEntry);
+  const [focused, setFocused] = useState(false)
+  const [secure, setSecure]   = useState(secureTextEntry)
+  const isPassword = secureTextEntry
 
-  const isPassword = secureTextEntry;
+  const borderColor = error
+    ? Colors.error
+    : focused
+    ? Colors.primary
+    : Colors.border
+  const borderWidth = focused && !error ? 2 : 1.5
 
   return (
-    <View style={[styles.wrapper, containerStyle]}>
-      {label && <Text style={styles.label}>{label}</Text>}
-      <View
-        style={[
-          styles.container,
-          focused && styles.focused,
-          !!error && styles.errorBorder,
-        ]}
+    <YStack marginBottom={Spacing.md} gap={4} {...(containerStyle as any)}>
+      {label && (
+        <Text
+          fontSize={FontSize.sm}
+          color={Colors.text}
+          fontWeight="500"
+        >
+          {label}
+        </Text>
+      )}
+
+      <XStack
+        alignItems="center"
+        backgroundColor={Colors.surface}
+        borderWidth={borderWidth}
+        borderColor={borderColor}
+        borderRadius={Radius.md}
+        paddingHorizontal={Spacing.md}
+        height={52}
+        animation="quick"
       >
         {leftIcon && (
           <Ionicons
             name={leftIcon}
             size={18}
             color={focused ? Colors.primary : Colors.textMuted}
-            style={styles.leftIcon}
+            style={{ marginRight: Spacing.sm }}
           />
         )}
+
         <TextInput
-          style={styles.input}
+          style={{
+            flex: 1,
+            fontSize: FontSize.md,
+            color: Colors.text,
+            height: '100%',
+          }}
           placeholderTextColor={Colors.textMuted}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           secureTextEntry={secure}
           {...props}
         />
+
         {isPassword && (
-          <TouchableOpacity onPress={() => setSecure(s => !s)} style={styles.rightIcon}>
+          <TouchableOpacity onPress={() => setSecure(s => !s)} style={{ marginLeft: Spacing.sm }}>
             <Ionicons
               name={secure ? 'eye-off-outline' : 'eye-outline'}
               size={18}
@@ -70,48 +90,19 @@ export const Input: React.FC<InputProps> = ({
             />
           </TouchableOpacity>
         )}
+
         {rightIcon && !isPassword && (
-          <TouchableOpacity onPress={onRightIconPress} style={styles.rightIcon}>
+          <TouchableOpacity onPress={onRightIconPress} style={{ marginLeft: Spacing.sm }}>
             <Ionicons name={rightIcon} size={18} color={Colors.textMuted} />
           </TouchableOpacity>
         )}
-      </View>
-      {error && <Text style={styles.error}>{error}</Text>}
-    </View>
-  );
-};
+      </XStack>
 
-const styles = StyleSheet.create({
-  wrapper: { marginBottom: Spacing.md },
-  label: {
-    fontSize: FontSize.sm,
-    color: Colors.text,
-    fontWeight: '500',
-    marginBottom: Spacing.xs,
-  },
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    height: 52,
-  },
-  focused: { borderColor: Colors.primary },
-  errorBorder: { borderColor: Colors.error },
-  leftIcon: { marginRight: Spacing.sm },
-  rightIcon: { marginLeft: Spacing.sm },
-  input: {
-    flex: 1,
-    fontSize: FontSize.md,
-    color: Colors.text,
-    height: '100%',
-  },
-  error: {
-    fontSize: FontSize.xs,
-    color: Colors.error,
-    marginTop: Spacing.xs,
-  },
-});
+      {error && (
+        <Text fontSize={FontSize.xs} color={Colors.error} marginTop={2}>
+          {error}
+        </Text>
+      )}
+    </YStack>
+  )
+}

@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Avatar } from '@/components/ui/Avatar';
 import { MatchInviteResponseModal } from '@/components/ui/MatchInviteResponseModal';
 import { supabase } from '@/services/supabase';
-import { Palette, Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { Palette, Colors, FontSize, Font, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { StatusBar } from 'expo-status-bar';
 import { format, differenceInHours } from 'date-fns';
 
@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   gradHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.lg, gap: Spacing.md },
   gradBackBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  gradTitle: { fontSize: 22, fontWeight: FontWeight.black, color: '#fff' },
+  gradTitle: { fontSize: 22, fontFamily: Font.black, color: '#fff' },
   gradSub: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
 
   searchRow: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
@@ -353,52 +353,52 @@ const styles = StyleSheet.create({
   tabContent: { paddingHorizontal: Spacing.md, gap: Spacing.xs },
   tab: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabActive: { borderBottomColor: Colors.primary },
-  tabText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.medium },
-  tabTextActive: { color: Colors.primary, fontWeight: FontWeight.semibold },
+  tabText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontFamily: Font.medium },
+  tabTextActive: { color: Colors.primary, fontFamily: Font.semibold },
   tabBadge: { backgroundColor: Colors.borderLight, borderRadius: Radius.full, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   tabBadgeActive: { backgroundColor: Colors.primaryLight },
-  tabBadgeText: { fontSize: 10, color: Colors.textSecondary, fontWeight: FontWeight.bold },
+  tabBadgeText: { fontSize: 10, color: Colors.textSecondary, fontFamily: Font.bold },
   tabBadgeTextActive: { color: Colors.primaryDark },
 
   filterScroll: { flexGrow: 0, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
   filterContent: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: Spacing.xs },
   filterChip: { paddingHorizontal: Spacing.md, paddingVertical: 6, borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.background },
   filterChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  filterChipText: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
-  filterChipTextActive: { color: '#fff', fontWeight: FontWeight.semibold },
+  filterChipText: { fontSize: FontSize.xs, color: Colors.textSecondary, fontFamily: Font.medium },
+  filterChipTextActive: { color: '#fff', fontFamily: Font.semibold },
 
   list: { flex: 1 },
   listContent: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: 40 },
 
   card: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: Colors.border, gap: Spacing.sm },
   cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md },
-  opponentName: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text },
+  opponentName: { fontSize: FontSize.md, fontFamily: Font.semibold, color: Colors.text },
   cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, flexWrap: 'wrap' },
   cardMetaText: { fontSize: FontSize.xs, color: Colors.textSecondary },
   cardBadges: { alignItems: 'flex-end', gap: 4 },
   statusBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.full, borderWidth: 1 },
-  statusBadgeText: { fontSize: 10, fontWeight: FontWeight.bold },
+  statusBadgeText: { fontSize: 10, fontFamily: Font.bold },
   urgencyBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: Radius.full },
-  urgencyText: { fontSize: 10, fontWeight: FontWeight.semibold },
+  urgencyText: { fontSize: 10, fontFamily: Font.semibold },
 
   detailRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   detailText: { fontSize: FontSize.xs, color: Colors.textSecondary },
   messageText: { fontSize: FontSize.xs, color: Colors.textSecondary, fontStyle: 'italic', backgroundColor: Colors.background, padding: Spacing.sm, borderRadius: Radius.sm, borderLeftWidth: 2, borderLeftColor: Colors.primary },
   leaguePill: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', backgroundColor: Colors.primaryLight, paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.full },
-  leaguePillText: { fontSize: 10, color: Colors.primary, fontWeight: FontWeight.semibold },
+  leaguePillText: { fontSize: 10, color: Colors.primary, fontFamily: Font.semibold },
   proposedRow: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#fff7ed', padding: Spacing.sm, borderRadius: Radius.sm },
-  proposedText: { fontSize: FontSize.xs, color: '#ea580c', fontWeight: FontWeight.medium },
+  proposedText: { fontSize: FontSize.xs, color: '#ea580c', fontFamily: Font.medium },
 
   cardActions: { flexDirection: 'row', gap: Spacing.sm, paddingTop: Spacing.xs, borderTopWidth: 1, borderTopColor: Colors.borderLight },
   viewBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, backgroundColor: Colors.primary, paddingVertical: Spacing.sm, borderRadius: Radius.md },
-  viewBtnText: { color: '#fff', fontWeight: FontWeight.semibold, fontSize: FontSize.sm },
+  viewBtnText: { color: '#fff', fontFamily: Font.semibold, fontSize: FontSize.sm },
   cancelBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, borderWidth: 1.5, borderColor: Colors.error, paddingVertical: Spacing.sm, borderRadius: Radius.md },
-  cancelBtnText: { color: Colors.error, fontWeight: FontWeight.semibold, fontSize: FontSize.sm },
+  cancelBtnText: { color: Colors.error, fontFamily: Font.semibold, fontSize: FontSize.sm },
   confirmedRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-  confirmedText: { fontSize: FontSize.sm, color: Colors.success, fontWeight: FontWeight.semibold },
+  confirmedText: { fontSize: FontSize.sm, color: Colors.success, fontFamily: Font.semibold },
   btnDisabled: { opacity: 0.5 },
 
   empty: { alignItems: 'center', paddingTop: 60, gap: Spacing.md },
-  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
+  emptyTitle: { fontSize: FontSize.lg, fontFamily: Font.semibold, color: Colors.text },
   emptySub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center' },
 });

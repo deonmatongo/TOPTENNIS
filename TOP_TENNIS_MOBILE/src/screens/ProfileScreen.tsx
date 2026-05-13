@@ -3,14 +3,15 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Alert, ActivityIndicator, Switch,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { useProfilePicture } from '@/hooks/useProfilePicture';
 import { Avatar } from '@/components/ui/Avatar';
-import { Colors, FontSize, FontWeight, Spacing, Radius, Shadow, Palette } from '@/theme/colors';
+import { Colors, FontSize, Font, FontWeight, Spacing, Radius, Shadow, Palette } from '@/theme/colors';
 
 const SKILL_LEVELS   = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const COMPETITIVENESS = ['casual', 'competitive', 'serious'];
@@ -22,6 +23,7 @@ const skillColor = (l?: number): string => !l ? Palette.gray400 : l <= 3 ? Palet
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const { user, signOut } = useAuth();
   const { player: profile, loading, updatePlayerProfile: updateProfile } = usePlayerProfile();
   const { uploading: uploadingPic, showPicker } = useProfilePicture();
@@ -77,22 +79,36 @@ export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
 
   if (loading) {
     return (
-      <SafeAreaView style={s.safe} edges={['top']}>
+      <SafeAreaView style={s.safe} edges={[]}>
+        <StatusBar style="light" />
+        <LinearGradient colors={[Palette.dark900, Palette.dark700]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.header, { paddingTop: insets.top + Spacing.md }]}>
+          {navigation?.canGoBack?.() && (
+            <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+              <Ionicons name="chevron-back" size={24} color="#fff" />
+            </TouchableOpacity>
+          )}
+          <Text style={s.headerTitle}>My Profile</Text>
+        </LinearGradient>
         <View style={s.center}><ActivityIndicator size="large" color={Colors.primary} /></View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={s.safe} edges={['top']}>
+    <SafeAreaView style={s.safe} edges={[]}>
+      <StatusBar style="light" />
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <View style={s.header}>
+      <LinearGradient
+        colors={[Palette.dark900, Palette.dark700]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={[s.header, { paddingTop: insets.top + Spacing.md }]}
+      >
         {navigation?.canGoBack?.() && (
           <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={Colors.text} />
+            <Ionicons name="chevron-back" size={24} color="#fff" />
           </TouchableOpacity>
         )}
-        <Text style={s.headerTitle}>Profile</Text>
+        <Text style={s.headerTitle}>My Profile</Text>
         <TouchableOpacity
           style={[s.editBtn, editing && s.editBtnSave]}
           onPress={editing ? handleSave : startEdit}
@@ -104,7 +120,7 @@ export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
             : <Text style={s.editBtnText}>{editing ? 'Save' : 'Edit'}</Text>
           }
         </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
@@ -294,7 +310,7 @@ const SectionLabel: React.FC<{ children: string }> = ({ children }) => (
 const sl = StyleSheet.create({
   text: {
     fontSize: FontSize.xxs,
-    fontWeight: FontWeight.black,
+    fontFamily: Font.black,
     color: Palette.gray400,
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -310,7 +326,7 @@ const FieldLabel: React.FC<{ children: string }> = ({ children }) => (
 const fl = StyleSheet.create({
   text: {
     fontSize: FontSize.xxs,
-    fontWeight: FontWeight.bold,
+    fontFamily: Font.bold,
     color: Palette.gray400,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
@@ -334,8 +350,8 @@ const ir = StyleSheet.create({
   row:    { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 12, gap: Spacing.md },
   divider:{ borderBottomWidth: 1, borderBottomColor: Colors.separator },
   iconWrap: { width: 32, height: 32, borderRadius: 8, backgroundColor: Colors.backgroundAlt, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  label:  { fontSize: FontSize.xxs, fontWeight: FontWeight.semibold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
-  value:  { fontSize: FontSize.md, color: Colors.text, fontWeight: FontWeight.medium },
+  label:  { fontSize: FontSize.xxs, fontFamily: Font.semibold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
+  value:  { fontSize: FontSize.md, color: Colors.text, fontFamily: Font.medium },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -350,31 +366,28 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
-    gap: Spacing.sm,
-    backgroundColor: Colors.background,
+    paddingBottom: Spacing.md,
+    gap: Spacing.md,
   },
   backBtn: {
     width: 38, height: 38, borderRadius: 19,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center', justifyContent: 'center',
-    ...Shadow.xs,
   },
   headerTitle: {
     flex: 1,
     fontSize: FontSize.xxxl,
-    fontWeight: FontWeight.black,
-    color: Colors.text,
+    fontFamily: Font.black,
+    color: '#fff',
     letterSpacing: -1,
   },
   editBtn: {
     paddingHorizontal: Spacing.lg,
     paddingVertical: 9,
     borderRadius: Radius.full,
-    backgroundColor: Colors.backgroundAlt,
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: 'rgba(255,255,255,0.25)',
   },
   editBtnSave: {
     backgroundColor: Colors.primary,
@@ -383,19 +396,16 @@ const s = StyleSheet.create({
   },
   editBtnText: {
     fontSize: FontSize.sm,
-    fontWeight: FontWeight.bold,
-    color: Colors.text,
+    fontFamily: Font.bold,
+    color: '#fff',
   },
 
   // Hero
   hero: {
-    marginHorizontal: Spacing.lg,
-    borderRadius: Radius.xl,
     padding: Spacing.xl,
     alignItems: 'center',
     gap: Spacing.sm,
     overflow: 'hidden',
-    ...Shadow.lg,
   },
   avatarWrap: { position: 'relative', marginBottom: 4 },
   cameraOverlay: {
@@ -404,11 +414,11 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.38)',
     alignItems: 'center', justifyContent: 'center',
   },
-  heroName:  { fontSize: FontSize.xxl, fontWeight: FontWeight.black, color: '#fff', letterSpacing: -0.5, marginTop: 4 },
-  heroEmail: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.55)', fontWeight: FontWeight.medium },
+  heroName:  { fontSize: FontSize.xxl, fontFamily: Font.black, color: '#fff', letterSpacing: -0.5, marginTop: 4 },
+  heroEmail: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.55)', fontFamily: Font.medium },
   heroBadges:{ flexDirection: 'row', gap: 8, marginTop: 4 },
   levelBadge:{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.full },
-  levelBadgeText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  levelBadgeText: { color: '#fff', fontSize: FontSize.xs, fontFamily: Font.bold },
   ustaBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 10, paddingVertical: 4,
@@ -416,7 +426,7 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.20)',
   },
-  ustaBadgeText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  ustaBadgeText: { color: '#fff', fontSize: FontSize.xs, fontFamily: Font.bold },
 
   statsRow: {
     flexDirection: 'row',
@@ -428,8 +438,8 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
   },
   statCol:  { flex: 1, alignItems: 'center', gap: 3 },
-  statNum:  { fontSize: FontSize.xl, fontWeight: FontWeight.black, color: '#fff', letterSpacing: -0.5 },
-  statLbl:  { fontSize: FontSize.xxs, color: 'rgba(255,255,255,0.50)', fontWeight: FontWeight.semibold, textTransform: 'uppercase', letterSpacing: 0.3 },
+  statNum:  { fontSize: FontSize.xl, fontFamily: Font.black, color: '#fff', letterSpacing: -0.5 },
+  statLbl:  { fontSize: FontSize.xxs, color: 'rgba(255,255,255,0.50)', fontFamily: Font.semibold, textTransform: 'uppercase', letterSpacing: 0.3 },
   statDiv:  { width: 1, backgroundColor: 'rgba(255,255,255,0.12)', marginVertical: 4 },
 
   // Card
@@ -463,7 +473,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.surface,
   },
-  skillBtnText: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.textSecondary },
+  skillBtnText: { fontSize: FontSize.md, fontFamily: Font.bold, color: Colors.textSecondary },
 
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 2 },
   chip: {
@@ -472,7 +482,7 @@ const s = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   chipActive: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary },
-  chipText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
+  chipText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontFamily: Font.semibold },
   chipTextActive: { color: Colors.primary },
 
   switchRow: {
@@ -481,7 +491,7 @@ const s = StyleSheet.create({
     borderTopWidth: 1, borderTopColor: Colors.separator,
     marginTop: Spacing.sm,
   },
-  switchLabel: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text },
+  switchLabel: { fontSize: FontSize.md, fontFamily: Font.semibold, color: Colors.text },
   switchSub:   { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
 
   // Actions section
@@ -500,6 +510,6 @@ const s = StyleSheet.create({
     paddingHorizontal: Spacing.lg, paddingVertical: 14,
   },
   actionIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  actionLabel: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text },
+  actionLabel: { flex: 1, fontSize: FontSize.md, fontFamily: Font.semibold, color: Colors.text },
   actionDivider: { height: 1, backgroundColor: Colors.separator, marginHorizontal: Spacing.lg },
 });

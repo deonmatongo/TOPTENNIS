@@ -1,13 +1,13 @@
-import React from 'react';
-import { Text, StyleSheet, ViewStyle, Image, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, FontWeight } from '@/theme/colors';
+import React from 'react'
+import { Text, Image, View } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
+import { Colors, FontWeight } from '@/theme/colors'
 
 interface AvatarProps {
-  name: string;
-  size?: number;
-  style?: ViewStyle;
-  imageUrl?: string | null;
+  name:      string
+  size?:     number
+  style?:    object
+  imageUrl?: string | null
 }
 
 export const Avatar: React.FC<AvatarProps> = ({ name, size = 44, style, imageUrl }) => {
@@ -17,18 +17,23 @@ export const Avatar: React.FC<AvatarProps> = ({ name, size = 44, style, imageUrl
     .map(n => n[0])
     .slice(0, 2)
     .join('')
-    .toUpperCase();
+    .toUpperCase()
 
   if (imageUrl) {
     return (
-      <View style={[styles.imageContainer, { width: size, height: size, borderRadius: size / 2 }, style]}>
+      <View
+        style={[
+          { width: size, height: size, borderRadius: size / 2, overflow: 'hidden' },
+          style as any,
+        ]}
+      >
         <Image
           source={{ uri: imageUrl }}
           style={{ width: size, height: size, borderRadius: size / 2 }}
           resizeMode="cover"
         />
       </View>
-    );
+    )
   }
 
   return (
@@ -37,26 +42,19 @@ export const Avatar: React.FC<AvatarProps> = ({ name, size = 44, style, imageUrl
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[
-        styles.container,
-        { width: size, height: size, borderRadius: size / 2 },
-        style,
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        style as any,
       ]}
     >
-      <Text style={[styles.text, { fontSize: size * 0.38 }]}>{initials}</Text>
+      <Text style={{ color: '#fff', fontWeight: FontWeight.bold, fontSize: size * 0.38 }}>
+        {initials}
+      </Text>
     </LinearGradient>
-  );
-};
-
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  imageContainer: {
-    overflow: 'hidden',
-  },
-  text: {
-    color: Colors.textInverse,
-    fontWeight: FontWeight.bold,
-  },
-});
+  )
+}

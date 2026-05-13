@@ -11,7 +11,7 @@ import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { Avatar } from '@/components/ui/Avatar';
 import { PlayerProfileSheet, PlayerSearchResult } from '@/components/ui/PlayerProfileSheet';
-import { Palette, Colors, Shadow, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { Palette, Colors, Shadow, FontSize, Font, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/services/supabase';
 
@@ -112,7 +112,7 @@ export const CasualMatchScreen: React.FC<{ navigation: any }> = ({ navigation })
         colors={[Palette.dark900, Palette.dark700]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[s.header, { paddingTop: insets.top + Spacing.lg }]}
+        style={[s.header, { paddingTop: insets.top + Spacing.md }]}
       >
         <TouchableOpacity style={s.backBtn} onPress={() => mode !== 'selection' ? setMode('selection') : navigation.goBack()}>
           <Ionicons name="chevron-back" size={24} color="#fff" />
@@ -258,22 +258,22 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
 
   // ── Header ──
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.lg, gap: Spacing.md },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.md, gap: Spacing.md },
   backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 22, fontWeight: FontWeight.black, color: '#fff' },
+  headerTitle: { fontSize: FontSize.xxxl, fontFamily: Font.black, color: '#fff', letterSpacing: -1 },
   headerSub: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
 
   scroll: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: 32 },
 
   section: { gap: Spacing.md },
-  sectionTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.text },
+  sectionTitle: { fontSize: FontSize.xl, fontFamily: Font.bold, color: Colors.text },
   sectionSub: { fontSize: FontSize.sm, color: Colors.textSecondary },
 
   // ── Mode cards ──
   modeCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: Spacing.lg, borderWidth: 1, borderColor: Colors.border, ...Shadow.sm },
   modeIcon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   modeInfo: { flex: 1, gap: 4 },
-  modeTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
+  modeTitle: { fontSize: FontSize.md, fontFamily: Font.bold, color: Colors.text },
   modeSub: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 19 },
   modeChevron: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.surfaceWarm, alignItems: 'center', justifyContent: 'center' },
 
@@ -288,9 +288,9 @@ const s = StyleSheet.create({
   playerCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border, ...Shadow.xs },
   playerInfo: { flex: 1, gap: 4 },
   playerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  playerName: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text },
+  playerName: { fontSize: FontSize.md, fontFamily: Font.semibold, color: Colors.text },
   friendPill: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#DCFCE7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full },
-  friendPillTxt: { fontSize: 10, color: Colors.success, fontWeight: FontWeight.semibold },
+  friendPillTxt: { fontSize: 10, color: Colors.success, fontFamily: Font.semibold },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: Colors.surfaceWarm, paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: Radius.sm },
   chipTxt: { fontSize: FontSize.xs, color: Colors.textSecondary },
@@ -298,15 +298,15 @@ const s = StyleSheet.create({
   compatRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: 2 },
   compatBar: { flex: 1, height: 4, backgroundColor: Colors.borderLight, borderRadius: 2, overflow: 'hidden' },
   compatFill: { height: 4, backgroundColor: Colors.success, borderRadius: 2 },
-  compatTxt: { fontSize: FontSize.xs, color: Colors.success, fontWeight: FontWeight.semibold },
+  compatTxt: { fontSize: FontSize.xs, color: Colors.success, fontFamily: Font.semibold },
   inviteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.primaryLight, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.primaryMuted },
-  inviteBtnTxt: { fontSize: FontSize.sm, color: Colors.primaryDark, fontWeight: FontWeight.semibold },
+  inviteBtnTxt: { fontSize: FontSize.sm, color: Colors.primaryDark, fontFamily: Font.semibold },
 
   // ── Empty state ──
   emptyCard: { backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: Spacing.xxl, alignItems: 'center', gap: Spacing.xs, borderWidth: 1, borderColor: Colors.border, marginTop: Spacing.md },
   emptyIconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.surfaceWarm, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
+  emptyTitle: { fontSize: FontSize.lg, fontFamily: Font.bold, color: Colors.text },
   emptySub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
   emptyBtn: { marginTop: Spacing.sm, backgroundColor: Colors.primary, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.sm, borderRadius: Radius.full },
-  emptyBtnTxt: { color: '#fff', fontWeight: FontWeight.semibold, fontSize: FontSize.sm },
+  emptyBtnTxt: { color: '#fff', fontFamily: Font.semibold, fontSize: FontSize.sm },
 });

@@ -20,8 +20,10 @@ export interface MatchInvite {
   proposed_start_time?: string;
   proposed_end_time?: string;
   winner_id?: string | null;
-  sender?: { first_name: string; last_name: string; skill_level?: number; profile_picture_url?: string; wins?: number; losses?: number; usta_rating?: string; competitiveness?: string; city?: string };
-  receiver?: { first_name: string; last_name: string; skill_level?: number; profile_picture_url?: string };
+  player1_score?: number | null;
+  player2_score?: number | null;
+  sender?: { first_name: string; last_name: string; skill_level?: number; profile_picture_url?: string; wins?: number; losses?: number; usta_rating?: string; competitiveness?: string; city?: string; age_range?: string };
+  receiver?: { first_name: string; last_name: string; skill_level?: number; profile_picture_url?: string; wins?: number; losses?: number; usta_rating?: string; competitiveness?: string; city?: string; age_range?: string };
 }
 
 export const useMatches = () => {
@@ -89,7 +91,7 @@ export const useMatches = () => {
 
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, skill_level, profile_picture_url')
+        .select('id, first_name, last_name, skill_level, profile_picture_url, age_range, wins, losses, usta_rating, competitiveness, city')
         .in('id', Array.from(userIds));
 
       const profileMap = new Map((profiles || []).map(p => [p.id, p]));

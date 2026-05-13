@@ -11,7 +11,7 @@ import { useLeagueRegistrations } from '@/hooks/useLeagueRegistrations';
 import { useLeagueLeaderboard } from '@/hooks/useLeagueLeaderboard';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { PlayerProfileModal, PlayerSearchResult } from '@/components/ui/PlayerProfileModal';
-import { Palette, Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { Palette, Colors, FontSize, Font, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { StatusBar } from 'expo-status-bar';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -64,7 +64,7 @@ export const CompetitionScreen: React.FC<{ navigation: any }> = ({ navigation })
         colors={[Palette.dark900, Palette.dark700]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.gradHeader, { paddingTop: insets.top + Spacing.lg }]}
+        style={[styles.gradHeader, { paddingTop: insets.top + Spacing.md }]}
       >
         <TouchableOpacity style={styles.gradBackBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={24} color="#fff" />
@@ -308,54 +308,54 @@ export const CompetitionScreen: React.FC<{ navigation: any }> = ({ navigation })
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  gradHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.lg, gap: Spacing.md },
+  gradHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.md, gap: Spacing.md },
   gradBackBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  gradTitle: { fontSize: 22, fontWeight: FontWeight.black, color: '#fff' },
+  gradTitle: { fontSize: FontSize.xxxl, fontFamily: Font.black, color: '#fff', letterSpacing: -1 },
   gradSub: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
   content: { padding: Spacing.lg, gap: Spacing.lg, paddingBottom: 40 },
 
   noLeague: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md, padding: Spacing.xl },
-  noLeagueTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.text },
+  noLeagueTitle: { fontSize: FontSize.xl, fontFamily: Font.bold, color: Colors.text },
   noLeagueSub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
   joinBtn: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, borderRadius: Radius.md, marginTop: Spacing.sm },
-  joinBtnText: { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.md },
+  joinBtnText: { color: '#fff', fontFamily: Font.bold, fontSize: FontSize.md },
 
   leagueTabScroll: { flexGrow: 0, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border },
   leagueTabContent: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: Spacing.xs },
   leagueTab: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.background },
   leagueTabActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  leagueTabText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.medium },
-  leagueTabTextActive: { color: '#fff', fontWeight: FontWeight.semibold },
+  leagueTabText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontFamily: Font.medium },
+  leagueTabTextActive: { color: '#fff', fontFamily: Font.semibold },
 
   rankHero: { borderRadius: Radius.xl, padding: Spacing.lg, gap: Spacing.md },
   rankHeroLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  rankHeroNum: { fontSize: 48, fontWeight: FontWeight.bold, color: '#fff', lineHeight: 52 },
-  rankHeroLabel: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: '#fff' },
+  rankHeroNum: { fontSize: 48, fontFamily: Font.bold, color: '#fff', lineHeight: 52 },
+  rankHeroLabel: { fontSize: FontSize.lg, fontFamily: Font.bold, color: '#fff' },
   rankHeroSub: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
   rankHeroStats: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: Radius.lg, padding: Spacing.md },
   rankHeroStat: { flex: 1, alignItems: 'center', gap: 2 },
-  rankHeroStatNum: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: '#fff' },
+  rankHeroStatNum: { fontSize: FontSize.xl, fontFamily: Font.bold, color: '#fff' },
   rankHeroStatLabel: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.8)' },
   rankHeroStatDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.3)', marginVertical: 4 },
   rankHeroProgress: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, alignSelf: 'flex-start' },
-  rankHeroProgressText: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.95)', fontWeight: FontWeight.semibold },
+  rankHeroProgressText: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.95)', fontFamily: Font.semibold },
   playoffEligibleBadge: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, alignSelf: 'flex-start' },
-  playoffEligibleText: { fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.bold },
+  playoffEligibleText: { fontSize: FontSize.xs, color: '#fff', fontFamily: Font.bold },
 
   notRankedCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: Colors.border },
   notRankedText: { fontSize: FontSize.sm, color: Colors.textSecondary, flex: 1 },
 
   peerCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: Colors.border, gap: Spacing.md },
-  peerTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
+  peerTitle: { fontSize: FontSize.md, fontFamily: Font.bold, color: Colors.text },
   peerSub: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: -8 },
   peerStats: { flexDirection: 'row', backgroundColor: Colors.background, borderRadius: Radius.md, padding: Spacing.md },
   peerStat: { flex: 1, alignItems: 'center', gap: 2 },
-  peerStatNum: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.text },
+  peerStatNum: { fontSize: FontSize.xl, fontFamily: Font.bold, color: Colors.text },
   peerStatLabel: { fontSize: FontSize.xs, color: Colors.textSecondary },
   peerStatDivider: { width: 1, backgroundColor: Colors.border, marginVertical: 4 },
 
   section: { gap: Spacing.sm },
-  sectionTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
+  sectionTitle: { fontSize: FontSize.md, fontFamily: Font.bold, color: Colors.text },
 
   emptyLb: { alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.xl },
   emptyLbText: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center' },
@@ -366,23 +366,23 @@ const styles = StyleSheet.create({
   lbRankSelf: { backgroundColor: Colors.primary },
   lbRankTop: { backgroundColor: '#f59e0b' },
   lbRankDefault: { backgroundColor: Colors.borderLight },
-  lbRankText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.textMuted },
+  lbRankText: { fontSize: FontSize.sm, fontFamily: Font.bold, color: Colors.textMuted },
   lbNameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-  lbName: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text, flex: 1 },
+  lbName: { fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.text, flex: 1 },
   youBadge: { backgroundColor: Colors.primary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full },
-  youBadgeText: { fontSize: 10, color: '#fff', fontWeight: FontWeight.bold },
+  youBadgeText: { fontSize: 10, color: '#fff', fontFamily: Font.bold },
   lbMeta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginTop: 2 },
   lbMetaText: { fontSize: FontSize.xs, color: Colors.textSecondary },
   divPill: { backgroundColor: Colors.borderLight, paddingHorizontal: Spacing.xs, paddingVertical: 2, borderRadius: Radius.full },
-  divPillText: { fontSize: 9, color: Colors.textMuted, fontWeight: FontWeight.medium },
+  divPillText: { fontSize: 9, color: Colors.textMuted, fontFamily: Font.medium },
   lbPoints: { alignItems: 'center', gap: 2 },
-  lbPointsNum: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
+  lbPointsNum: { fontSize: FontSize.md, fontFamily: Font.bold, color: Colors.text },
   lbPointsLabel: { fontSize: FontSize.xs, color: Colors.textMuted },
   playoffDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#16a34a' },
 
   myPositionCard: { backgroundColor: Colors.primaryLight, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1.5, borderColor: Colors.primary, gap: Spacing.sm },
-  myPositionLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.primaryDark, textTransform: 'uppercase', letterSpacing: 0.5 },
+  myPositionLabel: { fontSize: FontSize.xs, fontFamily: Font.bold, color: Colors.primaryDark, textTransform: 'uppercase', letterSpacing: 0.5 },
 
   viewAllBtn: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border },
-  viewAllText: { flex: 1, fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
+  viewAllText: { flex: 1, fontSize: FontSize.sm, color: Colors.primary, fontFamily: Font.semibold },
 });

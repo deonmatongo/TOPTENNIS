@@ -3,20 +3,21 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { StatusBar } from 'expo-status-bar';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { useLeagueRegistrations } from '@/hooks/useLeagueRegistrations';
 import { useAchievements } from '@/hooks/useAchievements';
 import { useMatchHistory } from '@/hooks/useMatchHistory';
-import { Colors, FontSize, FontWeight, Spacing, Radius, Shadow, Palette } from '@/theme/colors';
+import { Colors, FontSize, Font, FontWeight, Spacing, Radius, Shadow, Palette } from '@/theme/colors';
 import { format } from 'date-fns';
 
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const PerformanceScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const { player, refetch }          = usePlayerProfile();
   const { registrations }             = useLeagueRegistrations();
   const { history, loading: histL }   = useMatchHistory(15);
@@ -39,16 +40,35 @@ export const PerformanceScreen: React.FC<{ navigation: any }> = ({ navigation })
   const casualLosses     = casualHistory.filter(m => m.result === 'loss').length;
   const displayedHistory = showAll ? history : history.slice(0, 5);
 
+  const totalSetsWon  = history.reduce((s, m) => s + (m.setsWon  ?? 0), 0);
+  const totalSetsLost = history.reduce((s, m) => s + (m.setsLost ?? 0), 0);
+  const hoursPlayed   = Math.round(history.reduce((s, m) => s + (m.durationMinutes ?? 0), 0) / 60 * 10) / 10;
+
   const METRICS = [
-    { label: 'Total Matches', value: total,       icon: 'tennisball-outline' as const, color: Palette.blue500,   bg: Palette.blueBg   },
-    { label: 'Win Rate',      value: `${winRate}%`, icon: 'trophy-outline'   as const, color: Palette.green500,  bg: Palette.greenBg  },
-    { label: 'Win Streak',    value: streak,        icon: 'flame-outline'    as const, color: Palette.orange500, bg: Palette.orange50 },
-    { label: 'Best Streak',   value: bestStr,       icon: 'ribbon-outline'   as const, color: Palette.purple500, bg: Palette.purpleBg },
+    { label: 'Total Matches', value: total,          icon: 'tennisball-outline' as const, color: Palette.blue500,   bg: Palette.blueBg   },
+    { label: 'Win Rate',      value: `${winRate}%`,  icon: 'trophy-outline'    as const, color: Palette.green500,  bg: Palette.greenBg  },
+    { label: 'Win Streak',    value: streak,          icon: 'flame-outline'    as const, color: Palette.orange500, bg: Palette.orange50 },
+    { label: 'Best Streak',   value: bestStr,         icon: 'ribbon-outline'   as const, color: Palette.purple500, bg: Palette.purpleBg },
+    ...(totalSetsWon + totalSetsLost > 0 ? [{ label: 'Sets Record', value: `${totalSetsWon}–${totalSetsLost}`, icon: 'stats-chart-outline' as const, color: Palette.blue500, bg: Palette.blueBg }] : []),
+    ...(hoursPlayed > 0 ? [{ label: 'Hours Played', value: `${hoursPlayed}h`, icon: 'time-outline' as const, color: Palette.green500, bg: Palette.greenBg }] : []),
   ];
 
   return (
-    <SafeAreaView style={s.safe} edges={['top']}>
-      <ScreenHeader title="Performance" subtitle="Stats & analytics" navigation={navigation} showBack />
+    <SafeAreaView style={s.safe} edges={[]}>
+      <StatusBar style="light" />
+      <LinearGradient
+        colors={[Palette.dark900, Palette.dark700]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={[s.gradHeader, { paddingTop: insets.top + Spacing.md }]}
+      >
+        <TouchableOpacity style={s.gradBackBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={24} color="#fff" />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={s.gradTitle}>Performance</Text>
+          <Text style={s.gradSub}>Stats & analytics</Text>
+        </View>
+      </LinearGradient>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -244,8 +264,16 @@ export const PerformanceScreen: React.FC<{ navigation: any }> = ({ navigation })
                       <View style={s.histMeta}>
                         <Ionicons name="calendar-outline" size={11} color={Colors.textMuted} />
                         <Text style={s.histMetaTxt}>{format(new Date(m.match_date), 'MMM d, yyyy')}</Text>
+                        {m.durationMinutes ? <><Text style={s.dot}>·</Text><Text style={s.histMetaTxt}>{m.durationMinutes} min</Text></> : null}
                         {m.court_location && <><Text style={s.dot}>·</Text><Text style={s.histMetaTxt} numberOfLines={1}>{m.court_location}</Text></>}
                       </View>
+                      {(m.straightSets || m.comeback || m.bagel) && (
+                        <View style={s.badgeRow}>
+                          {m.straightSets && <View style={s.matchBadge}><Text style={s.matchBadgeTxt}>Straight Sets</Text></View>}
+                          {m.comeback     && <View style={[s.matchBadge, { backgroundColor: Palette.purpleBg }]}><Text style={[s.matchBadgeTxt, { color: Palette.purple500 }]}>Comeback</Text></View>}
+                          {m.bagel        && <View style={[s.matchBadge, { backgroundColor: Palette.orange50 }]}><Text style={[s.matchBadgeTxt, { color: Palette.orange500 }]}>Bagel</Text></View>}
+                        </View>
+                      )}
                     </View>
                     <View style={s.histRight}>
                       <View style={[s.resultPill, {
@@ -296,7 +324,11 @@ export const PerformanceScreen: React.FC<{ navigation: any }> = ({ navigation })
 // ─────────────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: Colors.background },
+  safe:        { flex: 1, backgroundColor: Colors.background },
+  gradHeader:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md, gap: Spacing.md },
+  gradBackBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  gradTitle:   { fontSize: FontSize.xxxl, fontFamily: Font.black, color: '#fff', letterSpacing: -1 },
+  gradSub:     { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
   scroll: { padding: Spacing.lg, gap: Spacing.lg },
 
   // Hero
@@ -309,17 +341,17 @@ const s = StyleSheet.create({
   },
   heroLabel: {
     fontSize: FontSize.xxs,
-    fontWeight: FontWeight.black,
+    fontFamily: Font.black,
     color: 'rgba(255,255,255,0.45)',
     letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
   heroRecord: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xl, marginVertical: 4 },
   heroStatCol: { alignItems: 'center', gap: 4 },
-  heroStatNum: { fontSize: FontSize.display, fontWeight: FontWeight.black, color: '#fff', letterSpacing: -2 },
-  heroStatLbl: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.55)', fontWeight: FontWeight.semibold },
+  heroStatNum: { fontSize: FontSize.display, fontFamily: Font.black, color: '#fff', letterSpacing: -2 },
+  heroStatLbl: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.55)', fontFamily: Font.semibold },
   heroDash:    { alignItems: 'center' },
-  heroDashText:{ fontSize: FontSize.xxxl, color: 'rgba(255,255,255,0.20)', fontWeight: FontWeight.black },
+  heroDashText:{ fontSize: FontSize.xxxl, color: 'rgba(255,255,255,0.20)', fontFamily: Font.black },
 
   winBar: {
     flexDirection: 'row',
@@ -331,7 +363,7 @@ const s = StyleSheet.create({
   },
   winBarFill:  { backgroundColor: Palette.green400 },
   lossBarFill: { backgroundColor: Palette.red400 },
-  winBarLabel: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.50)', fontWeight: FontWeight.medium },
+  winBarLabel: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.50)', fontFamily: Font.medium },
 
   // Metrics grid
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md },
@@ -344,8 +376,8 @@ const s = StyleSheet.create({
     ...Shadow.xs,
   },
   metricIcon:  { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  metricValue: { fontSize: FontSize.xxl, fontWeight: FontWeight.black, letterSpacing: -0.5 },
-  metricLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'center', fontWeight: FontWeight.medium },
+  metricValue: { fontSize: FontSize.xxl, fontFamily: Font.black, letterSpacing: -0.5 },
+  metricLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'center', fontFamily: Font.medium },
 
   // Generic card
   card: {
@@ -357,9 +389,9 @@ const s = StyleSheet.create({
     ...Shadow.xs,
   },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  cardTitle:{ fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text, letterSpacing: -0.2 },
-  cardSub:  { fontSize: FontSize.xs, color: Colors.textMuted, fontWeight: FontWeight.medium },
-  cardLink: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
+  cardTitle:{ fontSize: FontSize.lg, fontFamily: Font.bold, color: Colors.text, letterSpacing: -0.2 },
+  cardSub:  { fontSize: FontSize.xs, color: Colors.textMuted, fontFamily: Font.medium },
+  cardLink: { fontSize: FontSize.sm, color: Colors.primary, fontFamily: Font.semibold },
 
   // League chips
   leagueChip: {
@@ -368,7 +400,7 @@ const s = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   leagueChipActive: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary },
-  leagueChipText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
+  leagueChipText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontFamily: Font.semibold },
   leagueChipTextActive: { color: Colors.primary },
   leagueSummary: { fontSize: FontSize.xs, color: Colors.textMuted },
 
@@ -376,19 +408,19 @@ const s = StyleSheet.create({
   achieveProgress: { alignItems: 'flex-end', gap: 3 },
   achieveBar:  { width: 80, height: 6, borderRadius: 3, backgroundColor: Colors.backgroundAlt, overflow: 'hidden' },
   achieveFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 3 },
-  achievePct:  { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.bold },
+  achievePct:  { fontSize: FontSize.xs, color: Colors.primary, fontFamily: Font.bold },
   achieveList: { gap: Spacing.sm },
   achieveRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md, padding: Spacing.sm, borderRadius: Radius.md, backgroundColor: Colors.backgroundAlt },
   achieveRowLocked: { opacity: 0.50 },
   achieveIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   achieveNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.xs, marginBottom: 2 },
-  achieveName: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text, flex: 1 },
+  achieveName: { fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.text, flex: 1 },
   achieveNameLocked: { color: Colors.textMuted },
   achieveDesc: { fontSize: FontSize.xs, color: Colors.textMuted, lineHeight: 16 },
   unlockedPill: { backgroundColor: Palette.greenBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full },
-  unlockedPillText: { fontSize: FontSize.xxs, color: Palette.green600, fontWeight: FontWeight.bold },
+  unlockedPillText: { fontSize: FontSize.xxs, color: Palette.green600, fontFamily: Font.bold },
   lockedPill:   { backgroundColor: Colors.backgroundAlt, paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full },
-  lockedPillText:{ fontSize: FontSize.xxs, color: Colors.textMuted, fontWeight: FontWeight.semibold },
+  lockedPillText:{ fontSize: FontSize.xxs, color: Colors.textMuted, fontFamily: Font.semibold },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   progressBar: { flex: 1, height: 4, borderRadius: 2, backgroundColor: Colors.border, overflow: 'hidden' },
   progressFill:{ height: '100%', backgroundColor: Colors.primary, borderRadius: 2 },
@@ -401,24 +433,30 @@ const s = StyleSheet.create({
   histRowDivider:{ borderBottomWidth: 1, borderBottomColor: Colors.separator },
   histDot:      { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
   histNameRow:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  histOpponent: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text, flex: 1 },
+  histOpponent: { fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.text, flex: 1 },
   leagueMini:   { backgroundColor: Palette.blueBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full },
-  leagueMiniText:{ fontSize: FontSize.xxs, color: Palette.blue600, fontWeight: FontWeight.bold },
+  leagueMiniText:{ fontSize: FontSize.xxs, color: Palette.blue600, fontFamily: Font.bold },
   histMeta:     { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   histMetaTxt:  { fontSize: FontSize.xs, color: Colors.textMuted },
   dot:          { fontSize: FontSize.xs, color: Colors.textMuted },
   histRight:    { alignItems: 'flex-end', gap: 3 },
   resultPill:   { paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full },
-  resultPillText:{ fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  resultPillText:{ fontSize: FontSize.xs, fontFamily: Font.bold },
   scoreText:    { fontSize: FontSize.xxs, color: Colors.textMuted, fontFamily: 'monospace' },
+
+  // Match special badges (Straight Sets, Comeback, Bagel)
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+  matchBadge: { backgroundColor: Palette.greenBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full },
+  matchBadgeTxt: { fontSize: 9, fontFamily: Font.extrabold, color: Palette.green600, letterSpacing: 0.3, textTransform: 'uppercase' },
+
   showMore:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.separator },
-  showMoreTxt:  { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
+  showMoreTxt:  { fontSize: FontSize.sm, color: Colors.primary, fontFamily: Font.semibold },
 
   // Casual match summary
   casualSummaryRow: { flexDirection: 'row', gap: Spacing.sm },
   casualStatBox:    { flex: 1, borderRadius: Radius.md, padding: Spacing.md, alignItems: 'center', gap: 2 },
-  casualStatNum:    { fontSize: FontSize.xxl, fontWeight: FontWeight.black, letterSpacing: -0.5 },
-  casualStatLbl:    { fontSize: FontSize.xs, fontWeight: FontWeight.semibold },
+  casualStatNum:    { fontSize: FontSize.xxl, fontFamily: Font.black, letterSpacing: -0.5 },
+  casualStatLbl:    { fontSize: FontSize.xs, fontFamily: Font.semibold },
 
   // Casual match dashboard grid
   casualGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
@@ -431,8 +469,8 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.border, ...Shadow.xs,
   },
   emptyIconWrap: { width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.backgroundAlt, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
+  emptyTitle: { fontSize: FontSize.lg, fontFamily: Font.bold, color: Colors.text },
   emptySub:   { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
   emptyBtn:   { backgroundColor: Colors.primary, paddingHorizontal: Spacing.xxl, paddingVertical: Spacing.md, borderRadius: Radius.full, ...Shadow.orange },
-  emptyBtnText:{ color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.md },
+  emptyBtnText:{ color: '#fff', fontFamily: Font.bold, fontSize: FontSize.md },
 });

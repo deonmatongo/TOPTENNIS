@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLeagueRegistrations } from '@/hooks/useLeagueRegistrations';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
-import { Palette, Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { Palette, Colors, FontSize, Font, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { LeagueRegistrationModal } from '@/components/ui/LeagueRegistrationModal';
 import type { League } from '@/hooks/useLeagueRegistrations';
 import { StatusBar } from 'expo-status-bar';
@@ -119,7 +119,7 @@ export const JoinLeagueScreen: React.FC<{ navigation: any }> = ({ navigation }) 
               <View style={styles.infoBanner}>
                 <Ionicons name="information-circle-outline" size={16} color="#92400e" />
                 <Text style={styles.infoBannerText}>
-                  <Text style={{ fontWeight: FontWeight.bold }}>Important: </Text>
+                  <Text style={{ fontFamily: Font.bold }}>Important: </Text>
                   If you register for a league with a status of "Waitlist", Top Tennis League will make all efforts to place you in a division. If we are unable to, we will refund your registration fees in full.
                 </Text>
               </View>
@@ -159,7 +159,7 @@ export const JoinLeagueScreen: React.FC<{ navigation: any }> = ({ navigation }) 
                             {league.prize && (
                               <View style={styles.detailRow}>
                                 <Ionicons name="cash-outline" size={13} color={Colors.success} />
-                                <Text style={[styles.detailText, { color: Colors.success, fontWeight: FontWeight.semibold }]}>
+                                <Text style={[styles.detailText, { color: Colors.success, fontFamily: Font.semibold }]}>
                                   Sign-Up Fee: {league.prize}
                                 </Text>
                               </View>
@@ -263,7 +263,7 @@ export const JoinLeagueScreen: React.FC<{ navigation: any }> = ({ navigation }) 
                 <View style={styles.blueBanner}>
                   <Ionicons name="information-circle-outline" size={16} color="#1d4ed8" />
                   <Text style={styles.blueBannerText}>
-                    <Text style={{ fontWeight: FontWeight.bold }}>Multi-League Participation: </Text>
+                    <Text style={{ fontFamily: Font.bold }}>Multi-League Participation: </Text>
                     You can participate in multiple leagues simultaneously. Each league operates independently, so you can enjoy different formats and competition levels.
                   </Text>
                 </View>
@@ -287,23 +287,23 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   gradHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.lg, gap: Spacing.md },
   gradBackBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  gradTitle: { fontSize: 22, fontWeight: FontWeight.black, color: '#fff' },
+  gradTitle: { fontSize: 22, fontFamily: Font.black, color: '#fff' },
   gradSub: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
   content: { padding: Spacing.lg, gap: Spacing.md },
-  sectionTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
+  sectionTitle: { fontSize: FontSize.lg, fontFamily: Font.semibold, color: Colors.text },
   sectionSub: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 20, marginTop: -Spacing.sm },
 
   // Active registrations card
   activeCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: '#bbf7d0', gap: Spacing.sm },
   activeCardHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  activeCardTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text },
+  activeCardTitle: { fontSize: FontSize.md, fontFamily: Font.semibold, color: Colors.text },
   activeCardSub: { fontSize: FontSize.sm, color: Colors.textSecondary },
   activeRegRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f0fdf4', borderRadius: Radius.md, padding: Spacing.md, borderWidth: 1, borderColor: '#bbf7d0' },
   activeRegInfo: { flex: 1 },
-  activeRegName: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: '#166534' },
+  activeRegName: { fontSize: FontSize.sm, fontFamily: Font.semibold, color: '#166534' },
   activeRegDate: { fontSize: FontSize.xs, color: '#16a34a', marginTop: 2 },
   activeBadge: { backgroundColor: '#dcfce7', paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.full, borderWidth: 1, borderColor: '#bbf7d0' },
-  activeBadgeText: { fontSize: FontSize.xs, color: '#166534', fontWeight: FontWeight.semibold },
+  activeBadgeText: { fontSize: FontSize.xs, color: '#166534', fontFamily: Font.semibold },
 
   // Banners
   infoBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#fde68a', borderRadius: Radius.md, padding: Spacing.md },
@@ -319,9 +319,9 @@ const styles = StyleSheet.create({
   leagueCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   leagueInfo: { flex: 1, gap: 4 },
   leagueNameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, flexWrap: 'wrap' },
-  leagueName: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
+  leagueName: { fontSize: FontSize.lg, fontFamily: Font.semibold, color: Colors.text },
   privacyBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#ede9fe', paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full },
-  privacyBadgeText: { fontSize: 10, color: '#6d28d9', fontWeight: FontWeight.semibold },
+  privacyBadgeText: { fontSize: 10, color: '#6d28d9', fontFamily: Font.semibold },
   privacyBadgePrivate: { backgroundColor: Colors.backgroundAlt },
   privacyBadgePrivateText: { color: '#374151' },
   detailRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -333,24 +333,24 @@ const styles = StyleSheet.create({
 
   // Badges
   registeredBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.successLight, paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: Radius.full },
-  registeredText: { fontSize: FontSize.xs, color: Colors.success, fontWeight: FontWeight.semibold },
+  registeredText: { fontSize: FontSize.xs, color: Colors.success, fontFamily: Font.semibold },
   statusBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: Radius.full },
-  statusText: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold },
+  statusText: { fontSize: FontSize.xs, fontFamily: Font.semibold },
   completedBadge: { backgroundColor: Colors.borderLight, paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.full, alignSelf: 'flex-start' },
   completedText: { fontSize: FontSize.xs, color: Colors.textMuted },
 
   // Buttons
   registerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, backgroundColor: Colors.primary, paddingVertical: Spacing.md, borderRadius: Radius.md },
   registerBtnDisabled: { backgroundColor: Colors.textMuted },
-  registerBtnText: { color: '#fff', fontWeight: FontWeight.semibold, fontSize: FontSize.md },
+  registerBtnText: { color: '#fff', fontFamily: Font.semibold, fontSize: FontSize.md },
 
   // Unavailable state
   unavailableCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.xxl + 8, alignItems: 'center', gap: Spacing.md, borderWidth: 1, borderColor: Colors.border, marginTop: Spacing.xl },
-  unavailableTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text, textAlign: 'center' },
+  unavailableTitle: { fontSize: FontSize.lg, fontFamily: Font.semibold, color: Colors.text, textAlign: 'center' },
   unavailableSub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
 
   // Empty state
   emptyCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.xxl, alignItems: 'center', gap: Spacing.md, borderWidth: 1, borderColor: Colors.border, marginTop: Spacing.lg },
-  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
+  emptyTitle: { fontSize: FontSize.lg, fontFamily: Font.semibold, color: Colors.text },
   emptySub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
 });

@@ -6,13 +6,15 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
+import { useBlockedUsers } from '@/hooks/useBlockedUsers';
 import { Avatar } from '@/components/ui/Avatar';
 import { PlayerProfileSheet, PlayerSearchResult } from '@/components/ui/PlayerProfileSheet';
-import { Palette, Colors, Shadow, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { Palette, Colors, Shadow, FontSize, Font, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCallContext } from '@/contexts/CallContext';
 
 type Tab = 'requests' | 'friends' | 'find';
 
@@ -46,10 +48,12 @@ const EmptyState: React.FC<{ icon: string; title: string; sub: string; btnLabel?
 export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { startCall } = useCallContext();
   const {
     pendingReceived, pendingSent, friends, loading,
     updateRequestStatus, cancelRequest, sendFriendRequest, refetch,
   } = useFriendRequests();
+  const { blockUser, unfriendUser } = useBlockedUsers();
   const [activeTab, setActiveTab] = useState<Tab>('requests');
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -113,6 +117,40 @@ export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     catch (e: any) { Alert.alert('Error', e?.message || 'Failed to update request.'); }
   };
 
+  const handleUnfriend = (friendUserId: string, friendName: string) => {
+    Alert.alert(
+      'Remove Friend',
+      `Remove ${friendName} from your friends list?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove', style: 'destructive',
+          onPress: async () => {
+            const ok = await unfriendUser(friendUserId);
+            if (ok) await refetch();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleBlock = (friendUserId: string, friendName: string) => {
+    Alert.alert(
+      'Block User',
+      `Block ${friendName}? They won't be able to send you messages or match invites.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block', style: 'destructive',
+          onPress: async () => {
+            const ok = await blockUser(friendUserId);
+            if (ok) await refetch();
+          },
+        },
+      ]
+    );
+  };
+
   const alreadyFriendOrPending = (userId: string) =>
     friends.some(f => f.sender_id === userId || f.receiver_id === userId) ||
     pendingSent.some(r => r.receiver_id === userId) ||
@@ -125,7 +163,7 @@ export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       <LinearGradient
         colors={[Palette.dark900, Palette.dark700]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={[s.header, { paddingTop: insets.top + Spacing.lg }]}
+        style={[s.header, { paddingTop: insets.top + Spacing.md }]}
       >
         <View>
           <Text style={s.headerTitle}>Network</Text>
@@ -270,22 +308,49 @@ export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             friends.map(req => {
               const friend = req.sender_id === user?.id ? req.receiver : req.sender;
               const friendUserId = req.sender_id === user?.id ? req.receiver_id : req.sender_id;
+              const friendName = friend?.name || 'Unknown';
               return (
                 <View key={req.id} style={s.personCard}>
-                  <Avatar name={friend?.name || 'P'} size={48} imageUrl={friend?.profile_picture_url} />
+                  <Avatar name={friendName} size={48} imageUrl={friend?.profile_picture_url} />
                   <View style={s.personInfo}>
-                    <Text style={s.personName}>{friend?.name || 'Unknown'}</Text>
+                    <Text style={s.personName}>{friendName}</Text>
                     <View style={s.chipRow}>
                       {friend?.skill_level && <View style={s.chip}><Text style={s.chipTxt}>Level {friend.skill_level}</Text></View>}
                       {friend?.usta_rating && <View style={s.chip}><Text style={s.chipTxt}>USTA {friend.usta_rating}</Text></View>}
                     </View>
                   </View>
-                  <TouchableOpacity
-                    style={s.msgBtn}
-                    onPress={() => navigation.navigate('Messages', { openDMUserId: friendUserId })}
-                  >
-                    <Ionicons name="chatbubble-outline" size={16} color={Colors.primary} />
-                  </TouchableOpacity>
+                  <View style={s.friendActions}>
+                    <TouchableOpacity
+                      style={s.msgBtn}
+                      onPress={() => navigation.navigate('Messages', { openDMUserId: friendUserId })}
+                    >
+                      <Ionicons name="chatbubble-outline" size={16} color={Colors.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={s.callBtn}
+                      onPress={() => startCall(friendUserId, 'audio').catch(() => {})}
+                    >
+                      <Ionicons name="call-outline" size={16} color={Colors.success} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={s.callBtn}
+                      onPress={() => startCall(friendUserId, 'video').catch(() => {})}
+                    >
+                      <Ionicons name="videocam-outline" size={16} color={Colors.accent} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={s.unfriendBtn}
+                      onPress={() => handleUnfriend(friendUserId, friendName)}
+                    >
+                      <Ionicons name="person-remove-outline" size={15} color={Colors.textMuted} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={s.blockBtn}
+                      onPress={() => handleBlock(friendUserId, friendName)}
+                    >
+                      <Ionicons name="ban-outline" size={15} color={Colors.error} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               );
             })
@@ -356,12 +421,12 @@ const s = StyleSheet.create({
 
   // ── Header ──
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md },
-  headerTitle: { fontSize: 28, fontWeight: FontWeight.black, color: '#fff' },
+  headerTitle: { fontSize: 28, fontFamily: Font.black, color: '#fff' },
   headerSub: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
   headerCounts: { flexDirection: 'row', gap: Spacing.sm },
   headerCountItem: { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: Radius.lg, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, alignItems: 'center', minWidth: 52 },
-  headerCountVal: { fontSize: FontSize.lg, fontWeight: FontWeight.black, color: '#fff' },
-  headerCountLabel: { fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: FontWeight.medium },
+  headerCountVal: { fontSize: FontSize.lg, fontFamily: Font.black, color: '#fff' },
+  headerCountLabel: { fontSize: 10, color: 'rgba(255,255,255,0.7)', fontFamily: Font.medium },
 
   // ── Search ──
   searchWrap: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
@@ -372,40 +437,44 @@ const s = StyleSheet.create({
   tabRow: { flexDirection: 'row', gap: 8, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md },
   tab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: Spacing.md, paddingVertical: 8, borderRadius: Radius.full, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
   tabActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  tabTxt: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.textSecondary },
+  tabTxt: { fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.textSecondary },
   tabTxtActive: { color: '#fff' },
   tabPip: { backgroundColor: Colors.error, borderRadius: 8, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   tabPipActive: { backgroundColor: 'rgba(255,255,255,0.25)' },
-  tabPipTxt: { fontSize: 10, fontWeight: FontWeight.bold, color: '#fff' },
+  tabPipTxt: { fontSize: 10, fontFamily: Font.bold, color: '#fff' },
   tabPipTxtActive: { color: '#fff' },
 
   // ── Content ──
   content: { paddingHorizontal: Spacing.lg, paddingBottom: 32, gap: Spacing.sm },
-  sectionLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: Spacing.sm, marginBottom: 2 },
+  sectionLabel: { fontSize: FontSize.xs, fontFamily: Font.bold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: Spacing.sm, marginBottom: 2 },
 
   // ── Person card ──
   personCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border, ...Shadow.xs },
   personInfo: { flex: 1, gap: 4 },
-  personName: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text },
+  personName: { fontSize: FontSize.md, fontFamily: Font.semibold, color: Colors.text },
   personSub: { fontSize: FontSize.xs, color: Colors.textSecondary },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   chip: { backgroundColor: Colors.surfaceWarm, paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: Radius.sm },
-  chipTxt: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+  chipTxt: { fontSize: FontSize.xs, color: Colors.textSecondary, fontFamily: Font.medium },
 
   // ── Actions ──
   reqActions: { flexDirection: 'row', gap: 8 },
+  friendActions: { flexDirection: 'row', gap: 6 },
   acceptBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.success, alignItems: 'center', justifyContent: 'center' },
   declineBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.errorLight, alignItems: 'center', justifyContent: 'center' },
   cancelBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.errorLight, alignItems: 'center', justifyContent: 'center' },
-  msgBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  msgBtn:  { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  callBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.successLight, alignItems: 'center', justifyContent: 'center' },
+  unfriendBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.backgroundAlt, alignItems: 'center', justifyContent: 'center' },
+  blockBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.errorLight, alignItems: 'center', justifyContent: 'center' },
   addBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
   connectedBadge: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
 
   // ── Empty ──
   emptyCard: { backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: Spacing.xxl, alignItems: 'center', gap: Spacing.xs, borderWidth: 1, borderColor: Colors.border, marginTop: Spacing.md },
   emptyIconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.surfaceWarm, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
+  emptyTitle: { fontSize: FontSize.lg, fontFamily: Font.bold, color: Colors.text },
   emptySub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
   emptyBtn: { marginTop: Spacing.sm, backgroundColor: Colors.primary, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.sm, borderRadius: Radius.full },
-  emptyBtnTxt: { color: '#fff', fontWeight: FontWeight.semibold, fontSize: FontSize.sm },
+  emptyBtnTxt: { color: '#fff', fontFamily: Font.semibold, fontSize: FontSize.sm },
 });

@@ -14,6 +14,12 @@ export interface MatchHistoryEntry {
   league_name?: string;
   division_name?: string;
   status: string;
+  setsWon?: number;
+  setsLost?: number;
+  durationMinutes?: number;
+  straightSets?: boolean;
+  comeback?: boolean;
+  bagel?: boolean;
 }
 
 export const useMatchHistory = (limit = 20) => {
@@ -62,13 +68,38 @@ export const useMatchHistory = (limit = 20) => {
           const opponentId = isPlayer1 ? m.player2_id : m.player1_id;
 
           let scoreDisplay = 'No score';
+          let setsWon = 0, setsLost = 0;
+          let straightSets = false, comeback = false, bagel = false;
+
           if (m.score) {
-            const s = typeof m.score === 'string' ? JSON.parse(m.score) : m.score;
-            const sets = [];
-            if (s.set1_p1 !== undefined) sets.push(`${isPlayer1 ? s.set1_p1 : s.set1_p2}-${isPlayer1 ? s.set1_p2 : s.set1_p1}`);
-            if (s.set2_p1 !== undefined) sets.push(`${isPlayer1 ? s.set2_p1 : s.set2_p2}-${isPlayer1 ? s.set2_p2 : s.set2_p1}`);
-            if (s.set3_p1 !== undefined && s.set3_p1 !== null) sets.push(`${isPlayer1 ? s.set3_p1 : s.set3_p2}-${isPlayer1 ? s.set3_p2 : s.set3_p1}`);
+            const sc = typeof m.score === 'string' ? JSON.parse(m.score) : m.score;
+            const sets: string[] = [];
+            const rawSets: [number, number][] = [];
+
+            const addSet = (myGames: number | undefined, oppGames: number | undefined) => {
+              if (myGames === undefined || myGames === null) return;
+              sets.push(`${myGames}-${oppGames ?? 0}`);
+              rawSets.push([myGames, oppGames ?? 0]);
+              if (myGames > (oppGames ?? 0)) setsWon++;
+              else setsLost++;
+            };
+
+            addSet(isPlayer1 ? sc.set1_p1 : sc.set1_p2, isPlayer1 ? sc.set1_p2 : sc.set1_p1);
+            addSet(isPlayer1 ? sc.set2_p1 : sc.set2_p2, isPlayer1 ? sc.set2_p2 : sc.set2_p1);
+            if (sc.set3_p1 !== undefined && sc.set3_p1 !== null) {
+              addSet(isPlayer1 ? sc.set3_p1 : sc.set3_p2, isPlayer1 ? sc.set3_p2 : sc.set3_p1);
+            }
+
             if (sets.length > 0) scoreDisplay = sets.join(', ');
+
+            const isWinner = m.winner_id === user.id;
+            if (isWinner) {
+              straightSets = setsWon === 2 && setsLost === 0;
+              // comeback: lost first set, won the match
+              comeback = rawSets.length >= 2 && rawSets[0][0] < rawSets[0][1];
+              // bagel: any set won 6-0
+              bagel = rawSets.some(([my, opp]) => my === 6 && opp === 0);
+            }
           }
 
           entries.push({
@@ -83,6 +114,12 @@ export const useMatchHistory = (limit = 20) => {
             league_name: m.league_name,
             division_name: m.division_name,
             status: m.status,
+            setsWon,
+            setsLost,
+            durationMinutes: m.duration_minutes ?? undefined,
+            straightSets,
+            comeback,
+            bagel,
           });
         });
 

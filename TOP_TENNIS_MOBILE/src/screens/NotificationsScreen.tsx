@@ -3,10 +3,11 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   RefreshControl, ActivityIndicator, TextInput, Alert, Platform,
 } from 'react-native';
+import { supabase } from '@/services/supabase';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNotifications, Notification, NotificationType } from '@/hooks/useNotifications';
-import { Colors, FontSize, FontWeight, Spacing, Radius, Shadow, Palette } from '@/theme/colors';
+import { Colors, FontSize, Font, FontWeight, Spacing, Radius, Shadow, Palette } from '@/theme/colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import * as ExpoNotifications from 'expo-notifications';
@@ -133,6 +134,9 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
   const [readFilter, setReadFilter]   = useState<ReadFilter>('all');
   const [typeFilter, setTypeFilter]   = useState<TypeFilter>('all');
   const [showTypeMenu, setShowTypeMenu] = useState(false);
+  const [selectMode, setSelectMode]   = useState(false);
+  const [selected, setSelected]       = useState<Set<string>>(new Set());
+  const [responding, setResponding]   = useState<string | null>(null);
   const autoMarkedRef = useRef(false);
 
   useEffect(() => { registerForPush().catch(() => {}); }, []);
@@ -151,6 +155,53 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
     autoMarkedRef.current = false;
     await refetch();
     setRefreshing(false);
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const exitSelectMode = () => { setSelectMode(false); setSelected(new Set()); };
+
+  const bulkMarkRead = async () => {
+    await Promise.all(Array.from(selected).map(id => markAsRead(id)));
+    exitSelectMode();
+  };
+
+  const bulkDelete = () => {
+    Alert.alert('Delete', `Delete ${selected.size} notification${selected.size > 1 ? 's' : ''}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        await Promise.all(Array.from(selected).map(id => deleteNotification(id)));
+        exitSelectMode();
+      }},
+    ]);
+  };
+
+  const respondToMatchInvite = async (notif: Notification, status: 'accepted' | 'declined') => {
+    const matchId = notif.metadata?.match_id;
+    if (!matchId) return;
+    setResponding(notif.id);
+    try {
+      await supabase.from('match_invites').update({ status, updated_at: new Date().toISOString() }).eq('id', matchId);
+      markAsRead(notif.id);
+    } catch {}
+    finally { setResponding(null); }
+  };
+
+  const respondToFriendRequest = async (notif: Notification, status: 'accepted' | 'declined') => {
+    const requestId = notif.metadata?.request_id;
+    if (!requestId) return;
+    setResponding(notif.id);
+    try {
+      await supabase.from('friend_requests').update({ status }).eq('id', requestId);
+      markAsRead(notif.id);
+    } catch {}
+    finally { setResponding(null); }
   };
 
   const filtered = useMemo(() => notifications.filter(n => {
@@ -183,17 +234,30 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
     const icon       = getIcon(item.type);
     const iconColor  = getIconColor(item.type);
     const actionLbl  = getActionLabel(item.type);
+    const isSelected = selected.has(item.id);
+    const isResponding_ = responding === item.id;
+
+    const showInlineRespond = (item.type === 'match_invite' || item.type === 'match_rescheduled') && !!item.metadata?.match_id;
+    const showFriendRespond = item.type === 'friend_request' && !!item.metadata?.request_id;
 
     return (
       <TouchableOpacity
-        style={[s.notifRow, !item.read && s.notifRowUnread]}
-        onPress={() => handleTap(item)}
-        onLongPress={() => Alert.alert('Delete Notification', 'Remove this notification?', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: () => deleteNotification(item.id) },
-        ])}
+        style={[s.notifRow, !item.read && s.notifRowUnread, isSelected && s.notifRowSelected]}
+        onPress={() => selectMode ? toggleSelect(item.id) : handleTap(item)}
+        onLongPress={() => {
+          if (!selectMode) {
+            setSelectMode(true);
+            setSelected(new Set([item.id]));
+          }
+        }}
         activeOpacity={0.8}
       >
+        {selectMode && (
+          <View style={[s.checkbox, isSelected && s.checkboxSelected]}>
+            {isSelected && <Ionicons name="checkmark" size={12} color="#fff" />}
+          </View>
+        )}
+
         <View style={[s.iconBox, { backgroundColor: iconColor + '18' }]}>
           <Ionicons name={icon} size={20} color={iconColor} />
           {!item.read && <View style={s.unreadDot} />}
@@ -207,7 +271,40 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
             <Text style={s.notifTime}>{fmtAgo(item.createdAt)}</Text>
           </View>
           <Text style={s.notifMsg} numberOfLines={2}>{item.message}</Text>
-          {actionLbl && (
+
+          {/* Inline respond for match invites */}
+          {!selectMode && showInlineRespond && (
+            <View style={s.inlineActions}>
+              {isResponding_ ? <ActivityIndicator size="small" color={Colors.primary} /> : (
+                <>
+                  <TouchableOpacity style={s.inlineAccept} onPress={() => respondToMatchInvite(item, 'accepted')}>
+                    <Text style={s.inlineAcceptTxt}>Accept</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.inlineDecline} onPress={() => respondToMatchInvite(item, 'declined')}>
+                    <Text style={s.inlineDeclineTxt}>Decline</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          )}
+
+          {/* Inline respond for friend requests */}
+          {!selectMode && showFriendRespond && (
+            <View style={s.inlineActions}>
+              {isResponding_ ? <ActivityIndicator size="small" color={Colors.primary} /> : (
+                <>
+                  <TouchableOpacity style={s.inlineAccept} onPress={() => respondToFriendRequest(item, 'accepted')}>
+                    <Text style={s.inlineAcceptTxt}>Accept</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.inlineDecline} onPress={() => respondToFriendRequest(item, 'declined')}>
+                    <Text style={s.inlineDeclineTxt}>Decline</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          )}
+
+          {!selectMode && !showInlineRespond && !showFriendRespond && actionLbl && (
             <TouchableOpacity style={s.actionPill} onPress={() => handleTap(item)}>
               <Text style={s.actionPillText}>{actionLbl}</Text>
               <Ionicons name="chevron-forward" size={11} color={Colors.primary} />
@@ -227,17 +324,39 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={[s.header, { paddingTop: insets.top + Spacing.md }]}
       >
-        <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={20} color="#fff" />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={s.headerTitle}>Notifications</Text>
-          {unreadCount > 0 && <Text style={s.headerSub}>{unreadCount} unread</Text>}
-        </View>
-        {unreadCount > 0 && (
-          <TouchableOpacity style={s.markAllBtn} onPress={markAllAsRead} activeOpacity={0.8}>
-            <Text style={s.markAllTxt}>Mark all read</Text>
+        {selectMode ? (
+          <TouchableOpacity style={s.backBtn} onPress={exitSelectMode} activeOpacity={0.7}>
+            <Ionicons name="close" size={20} color="#fff" />
           </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+            <Ionicons name="chevron-back" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={s.headerTitle}>{selectMode ? `${selected.size} selected` : 'Notifications'}</Text>
+          {!selectMode && unreadCount > 0 && <Text style={s.headerSub}>{unreadCount} unread</Text>}
+        </View>
+        {selectMode ? (
+          <View style={s.bulkActions}>
+            <TouchableOpacity style={s.bulkBtn} onPress={bulkMarkRead} disabled={selected.size === 0}>
+              <Text style={[s.bulkBtnTxt, selected.size === 0 && { opacity: 0.4 }]}>Read</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.bulkBtn, s.bulkBtnDanger]} onPress={bulkDelete} disabled={selected.size === 0}>
+              <Text style={[s.bulkBtnTxt, { color: '#FF6B6B' }, selected.size === 0 && { opacity: 0.4 }]}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={s.headerRight}>
+            {unreadCount > 0 && (
+              <TouchableOpacity style={s.markAllBtn} onPress={markAllAsRead} activeOpacity={0.8}>
+                <Text style={s.markAllTxt}>Mark all read</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={s.selectBtn} onPress={() => setSelectMode(true)} activeOpacity={0.8}>
+              <Text style={s.selectBtnTxt}>Select</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </LinearGradient>
 
@@ -297,7 +416,7 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
               style={[s.typeMenuItem, typeFilter === val && s.typeMenuItemActive]}
               onPress={() => { setTypeFilter(val); setShowTypeMenu(false); }}
             >
-              <Text style={[s.typeMenuText, typeFilter === val && { color: Colors.primary, fontWeight: FontWeight.bold }]}>{label}</Text>
+              <Text style={[s.typeMenuText, typeFilter === val && { color: Colors.primary, fontFamily: Font.bold }]}>{label}</Text>
               {typeFilter === val && <Ionicons name="checkmark" size={14} color={Colors.primary} />}
             </TouchableOpacity>
           ))}
@@ -354,14 +473,21 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center', justifyContent: 'center',
   },
-  headerTitle: { fontSize: FontSize.xxxl, fontWeight: FontWeight.black, color: '#fff', letterSpacing: -1 },
-  headerSub:   { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)', fontWeight: FontWeight.semibold, marginTop: 1 },
+  headerTitle: { fontSize: FontSize.xxxl, fontFamily: Font.black, color: '#fff', letterSpacing: -1 },
+  headerSub:   { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)', fontFamily: Font.semibold, marginTop: 1 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   markAllBtn:  {
     paddingHorizontal: Spacing.md, paddingVertical: 7,
     borderRadius: Radius.full,
     backgroundColor: 'rgba(255,255,255,0.15)',
   },
-  markAllTxt:  { fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.bold },
+  markAllTxt:  { fontSize: FontSize.xs, color: '#fff', fontFamily: Font.bold },
+  selectBtn: { paddingHorizontal: Spacing.md, paddingVertical: 7, borderRadius: Radius.full, backgroundColor: 'rgba(255,255,255,0.15)' },
+  selectBtnTxt: { fontSize: FontSize.xs, color: '#fff', fontFamily: Font.bold },
+  bulkActions: { flexDirection: 'row', gap: 6 },
+  bulkBtn: { paddingHorizontal: Spacing.md, paddingVertical: 7, borderRadius: Radius.full, backgroundColor: 'rgba(255,255,255,0.15)' },
+  bulkBtnDanger: { backgroundColor: 'rgba(255,107,107,0.2)' },
+  bulkBtnTxt: { fontSize: FontSize.xs, color: '#fff', fontFamily: Font.bold },
 
   // Search
   searchWrap: {
@@ -396,7 +522,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.border,
   },
   filterPillActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  filterPillText:   { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: Colors.textSecondary },
+  filterPillText:   { fontSize: FontSize.xs, fontFamily: Font.semibold, color: Colors.textSecondary },
   filterPillTextActive: { color: '#fff' },
 
   // Type dropdown
@@ -431,6 +557,33 @@ const s = StyleSheet.create({
     gap: Spacing.md,
   },
   notifRowUnread: { backgroundColor: '#F0F5FF' },
+  notifRowSelected: { backgroundColor: Colors.primaryLight },
+
+  // Checkbox
+  checkbox: {
+    width: 22, height: 22, borderRadius: 11,
+    borderWidth: 2, borderColor: Colors.border,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.surface,
+    alignSelf: 'center', flexShrink: 0,
+  },
+  checkboxSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+
+  // Inline respond buttons
+  inlineActions: { flexDirection: 'row', gap: 6, marginTop: 8 },
+  inlineAccept: {
+    paddingHorizontal: 12, paddingVertical: 5,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.success,
+  },
+  inlineAcceptTxt: { fontSize: FontSize.xs, fontFamily: Font.bold, color: '#fff' },
+  inlineDecline: {
+    paddingHorizontal: 12, paddingVertical: 5,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.errorLight,
+    borderWidth: 1, borderColor: Colors.error + '30',
+  },
+  inlineDeclineTxt: { fontSize: FontSize.xs, fontFamily: Font.bold, color: Colors.error },
   iconBox: {
     width: 46, height: 46,
     borderRadius: 23,
@@ -445,8 +598,8 @@ const s = StyleSheet.create({
     borderWidth: 1.5, borderColor: Colors.surface,
   },
   notifTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 3 },
-  notifTitle: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.medium, color: Colors.text },
-  notifTitleBold: { fontWeight: FontWeight.bold },
+  notifTitle: { flex: 1, fontSize: FontSize.md, fontFamily: Font.medium, color: Colors.text },
+  notifTitleBold: { fontFamily: Font.bold },
   notifTime:  { fontSize: FontSize.xxs, color: Colors.textMuted, flexShrink: 0 },
   notifMsg:   { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 19 },
   actionPill: {
@@ -457,14 +610,14 @@ const s = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 4,
     borderRadius: Radius.full,
   },
-  actionPillText: { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.bold },
+  actionPillText: { fontSize: FontSize.xs, color: Colors.primary, fontFamily: Font.bold },
 
   // Empty
   center:     { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: Spacing.md },
   emptyIcon:  { width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.backgroundAlt, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
+  emptyTitle: { fontSize: FontSize.lg, fontFamily: Font.bold, color: Colors.text },
   emptySub:   { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', paddingHorizontal: 32, lineHeight: 20 },
   clearBtn:   { backgroundColor: Colors.primaryLight, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderRadius: Radius.full },
-  clearBtnText:{ fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.bold },
+  clearBtnText:{ fontSize: FontSize.sm, color: Colors.primary, fontFamily: Font.bold },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Modal, TextInput, Alert, ActivityIndicator, RefreshControl, Dimensions,
@@ -11,28 +11,24 @@ import { useMatches } from '@/hooks/useMatches';
 import { useDivisionAssignments } from '@/hooks/useDivisionAssignments';
 import { useLeagueMatches } from '@/hooks/useLeagueMatches';
 import { useCalendarExport } from '@/hooks/useCalendarExport';
-import { Palette, Colors, Shadow, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { supabase } from '@/services/supabase';
+import { Palette, Colors, Shadow, FontSize, Font, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import {
-  format, addDays, subDays, addWeeks, subWeeks,
+  format, addDays, subWeeks, addWeeks,
   startOfWeek, endOfWeek, eachDayOfInterval,
-  isToday, isPast, parseISO, startOfDay,
+  isToday, isPast, parseISO, startOfDay, isSameDay,
   startOfMonth, endOfMonth, addMonths, subMonths, isSameMonth,
 } from 'date-fns';
 
-const HOUR_HEIGHT = 56;
-const START_HOUR = 6;
-const END_HOUR = 22;
-const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
-const TIME_COL_W = 44;
 const { width: SCREEN_W } = Dimensions.get('window');
 
-type ViewMode = 'day' | 'week' | 'month';
+type ViewMode = 'agenda' | 'month';
 
 interface CalEvent {
   id: string;
-  type: 'availability' | 'match' | 'invite';
+  type: 'availability' | 'match' | 'invite' | 'sent_invite';
   date: string;
   start_time: string;
   end_time: string;
@@ -44,56 +40,32 @@ interface CalEvent {
 }
 
 const US_TIMEZONES = [
-  { value: 'America/New_York', label: 'Eastern Time (ET)', offset: -5 },
-  { value: 'America/Chicago', label: 'Central Time (CT)', offset: -6 },
-  { value: 'America/Denver', label: 'Mountain Time (MT)', offset: -7 },
-  { value: 'America/Los_Angeles', label: 'Pacific Time (PT)', offset: -8 },
-  { value: 'America/Anchorage', label: 'Alaska Time (AKT)', offset: -9 },
-  { value: 'Pacific/Honolulu', label: 'Hawaii Time (HT)', offset: -10 },
-  { value: 'America/Phoenix', label: 'Arizona Time (MST)', offset: -7 },
+  { value: 'America/New_York',   label: 'Eastern Time (ET)',  offset: -5  },
+  { value: 'America/Chicago',    label: 'Central Time (CT)',  offset: -6  },
+  { value: 'America/Denver',     label: 'Mountain Time (MT)', offset: -7  },
+  { value: 'America/Los_Angeles',label: 'Pacific Time (PT)',  offset: -8  },
+  { value: 'America/Anchorage',  label: 'Alaska Time (AKT)',  offset: -9  },
+  { value: 'Pacific/Honolulu',   label: 'Hawaii Time (HT)',   offset: -10 },
+  { value: 'America/Phoenix',    label: 'Arizona Time (MST)', offset: -7  },
 ];
 
 type RecurrencePattern = 'none' | 'daily' | 'weekly' | 'monthly';
 
 interface FormData {
-  date: string;
-  start_time: string;
-  end_time: string;
-  is_available: boolean;
-  notes: string;
-  privacy_level: string;
-  timezone: string;
+  date: string; start_time: string; end_time: string;
+  is_available: boolean; notes: string;
+  privacy_level: string; timezone: string;
 }
+interface RecurrenceData { pattern: RecurrencePattern; interval: number; endDate: string; }
 
-interface RecurrenceData {
-  pattern: RecurrencePattern;
-  interval: number;
-  endDate: string;
-}
-
-const DEFAULT_FORM: FormData = {
-  date: '',
-  start_time: '09:00',
-  end_time: '10:00',
-  is_available: true,
-  notes: '',
-  privacy_level: 'public',
-  timezone: 'America/New_York',
-};
-
+const DEFAULT_FORM: FormData = { date: '', start_time: '09:00', end_time: '10:00', is_available: true, notes: '', privacy_level: 'public', timezone: 'America/New_York' };
 const DEFAULT_RECURRENCE: RecurrenceData = { pattern: 'none', interval: 1, endDate: '' };
 
-const timeToMinutes = (t: string) => {
-  const [h, m] = t.split(':').map(Number);
-  return h * 60 + (m || 0);
-};
+const timeToMinutes = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); };
 const fmtTime = (t: string) => {
   const [h, m] = t.split(':').map(Number);
-  const ap = h >= 12 ? 'PM' : 'AM';
-  return `${h % 12 || 12}:${String(m || 0).padStart(2, '0')} ${ap}`;
+  return `${h % 12 || 12}:${String(m || 0).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
 };
-const hourLabel = (h: number) =>
-  h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`;
 
 const generateRecurringDates = (startDate: string, rec: RecurrenceData): string[] => {
   const dates: string[] = [startDate];
@@ -112,13 +84,22 @@ const generateRecurringDates = (startDate: string, rec: RecurrenceData): string[
   return dates;
 };
 
-// ── Event color palette ───────────────────────────────────────────────────────
 const EV = {
-  avail:  { bg: '#DCFCE7', border: '#16A34A', text: '#15803D' },
-  match:  { bg: '#DBEAFE', border: '#2563EB', text: '#1D4ED8' },
-  invite: { bg: '#FEF3C7', border: '#F59E0B', text: '#92400E' },
-  league: { bg: '#F3E8FF', border: '#9333EA', text: '#6B21A8' },
+  avail:      { bg: '#DCFCE7', border: '#16A34A', text: '#15803D' },
+  match:      { bg: '#DBEAFE', border: '#2563EB', text: '#1D4ED8' },
+  invite:     { bg: '#FEF3C7', border: '#F59E0B', text: '#92400E' },
+  sent_invite:{ bg: '#FFF7ED', border: '#EA580C', text: '#9A3412' },
+  league:     { bg: '#F3E8FF', border: '#9333EA', text: '#6B21A8' },
 };
+
+const EVENT_ICON: Record<string, any> = {
+  availability: 'time-outline',
+  match: 'tennisball-outline',
+  invite: 'mail-outline',
+  sent_invite: 'paper-plane-outline',
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -130,7 +111,34 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
   const { userMatches: leagueMatches } = useLeagueMatches(primaryDivisionId);
   const { exportMultiple, exporting } = useCalendarExport();
 
-  const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const scrollRef = useRef<ScrollView>(null);
+  const sectionOffsets = useRef<Record<string, number>>({});
+  const agendaDaysRef = useRef<Date[]>([]);
+
+  const scrollToDate = useCallback((date: Date) => {
+    requestAnimationFrame(() => {
+      const targetKey = format(date, 'yyyy-MM-dd');
+      const days = agendaDaysRef.current;
+      const exact = sectionOffsets.current[targetKey];
+      if (exact !== undefined) {
+        scrollRef.current?.scrollTo({ y: exact, animated: true });
+        return;
+      }
+      // Nearest future day with events
+      const targetTime = startOfDay(date).getTime();
+      for (const d of days) {
+        if (d.getTime() >= targetTime) {
+          const offset = sectionOffsets.current[format(d, 'yyyy-MM-dd')];
+          if (offset !== undefined) {
+            scrollRef.current?.scrollTo({ y: offset, animated: true });
+            return;
+          }
+        }
+      }
+    });
+  }, []);
+
+  const [viewMode, setViewMode] = useState<ViewMode>('agenda');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -144,29 +152,21 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
   const [showEventSheet, setShowEventSheet] = useState(false);
 
   const goBack = () => {
-    if (viewMode === 'day') setCurrentDate(d => subDays(d, 1));
-    else if (viewMode === 'week') setCurrentDate(d => subWeeks(d, 1));
+    if (viewMode === 'agenda') setCurrentDate(d => subWeeks(d, 1));
     else setCurrentDate(d => subMonths(d, 1));
   };
   const goForward = () => {
-    if (viewMode === 'day') setCurrentDate(d => addDays(d, 1));
-    else if (viewMode === 'week') setCurrentDate(d => addWeeks(d, 1));
+    if (viewMode === 'agenda') setCurrentDate(d => addWeeks(d, 1));
     else setCurrentDate(d => addMonths(d, 1));
   };
 
-  const headerLabel = useMemo(() => {
-    if (viewMode === 'day') return format(currentDate, 'EEEE, MMM d');
-    if (viewMode === 'month') return format(currentDate, 'MMMM yyyy');
-    const ws = startOfWeek(currentDate, { weekStartsOn: 0 });
-    const we = endOfWeek(currentDate, { weekStartsOn: 0 });
-    return `${format(ws, 'MMM d')} – ${format(we, 'MMM d')}`;
-  }, [currentDate, viewMode]);
+  const headerLabel = useMemo(() => format(currentDate, 'MMMM yyyy'), [currentDate]);
 
-  const displayDays = useMemo(() => {
-    if (viewMode === 'day') return [currentDate];
+  // 7-day week strip for current week
+  const weekDays = useMemo(() => {
     const ws = startOfWeek(currentDate, { weekStartsOn: 0 });
     return eachDayOfInterval({ start: ws, end: endOfWeek(currentDate, { weekStartsOn: 0 }) });
-  }, [currentDate, viewMode]);
+  }, [currentDate]);
 
   const eventsByDate = useMemo(() => {
     const map: Record<string, CalEvent[]> = {};
@@ -189,6 +189,13 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
       const name = sender ? `${sender.first_name || ''} ${sender.last_name || ''}`.trim() : 'Someone';
       map[inv.date].push({ id: inv.id, type: 'invite', date: inv.date, start_time: inv.start_time, end_time: inv.end_time, title: `From ${name}`, bgColor: EV.invite.bg, borderColor: EV.invite.border, textColor: EV.invite.text, data: inv });
     });
+    (invites || []).filter(i => i.status === 'pending' && i.sender_id === user?.id).forEach(inv => {
+      if (!inv.date) return;
+      if (!map[inv.date]) map[inv.date] = [];
+      const rec = inv.receiver;
+      const name = rec ? `${rec.first_name || ''} ${rec.last_name || ''}`.trim() : 'Player';
+      map[inv.date].push({ id: inv.id, type: 'sent_invite', date: inv.date, start_time: inv.start_time, end_time: inv.end_time, title: `Sent to ${name}`, bgColor: EV.sent_invite.bg, borderColor: EV.sent_invite.border, textColor: EV.sent_invite.text, data: inv });
+    });
     (leagueMatches || []).filter(m => m.scheduled_date && (m.status === 'scheduled' || m.status === 'pending')).forEach(m => {
       const date = m.scheduled_date!;
       if (!map[date]) map[date] = [];
@@ -199,6 +206,20 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
     });
     return map;
   }, [availability, invites, leagueMatches, user?.id]);
+
+  // Agenda: next 60 days, only days with events (always include today)
+  const agendaDays = useMemo(() => {
+    const days: Date[] = [];
+    const start = startOfDay(new Date());
+    for (let i = 0; i < 60; i++) {
+      const d = addDays(start, i);
+      const key = format(d, 'yyyy-MM-dd');
+      if (isToday(d) || (eventsByDate[key] && eventsByDate[key].length > 0)) {
+        days.push(d);
+      }
+    }
+    return days;
+  }, [eventsByDate]);
 
   const pendingInvites = useMemo(() =>
     (invites || []).filter(i => i.status === 'pending' && i.receiver_id === user?.id),
@@ -211,8 +232,8 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
     setRefreshing(false);
   };
 
-  const openAdd = (date: Date, hour?: number) => {
-    setFormData({ ...DEFAULT_FORM, date: format(date, 'yyyy-MM-dd'), start_time: hour !== undefined ? `${String(hour).padStart(2, '0')}:00` : '09:00', end_time: hour !== undefined ? `${String(Math.min(hour + 1, 23)).padStart(2, '0')}:00` : '10:00' });
+  const openAdd = (date: Date, defaultTime?: string) => {
+    setFormData({ ...DEFAULT_FORM, date: format(date, 'yyyy-MM-dd'), start_time: defaultTime || '09:00', end_time: defaultTime ? `${String(parseInt(defaultTime.split(':')[0]) + 1).padStart(2, '0')}:00` : '10:00' });
     setRecurrence(DEFAULT_RECURRENCE);
     setShowRecurrence(false);
     setTimeError(false);
@@ -260,15 +281,25 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
     catch (e: any) { Alert.alert('Error', e?.message || 'Failed to respond.'); }
   };
 
-  const getEventLayout = (start: string, end: string) => {
-    const top = ((timeToMinutes(start) - START_HOUR * 60) / 60) * HOUR_HEIGHT;
-    const height = Math.max(((timeToMinutes(end) - timeToMinutes(start)) / 60) * HOUR_HEIGHT - 2, 22);
-    return { top, height };
+  const handleCancelInvite = (id: string) => {
+    Alert.alert('Cancel Invite', 'Cancel this match invite?', [
+      { text: 'No', style: 'cancel' },
+      { text: 'Cancel Invite', style: 'destructive', onPress: async () => {
+        try { await supabase.from('match_invites').update({ status: 'cancelled' }).eq('id', id).eq('sender_id', user!.id); await refetchInvites(); setShowEventSheet(false); }
+        catch (e: any) { Alert.alert('Error', e?.message || 'Failed to cancel invite.'); }
+      }},
+    ]);
   };
 
-  const dayColW = viewMode === 'day'
-    ? SCREEN_W - TIME_COL_W - 2
-    : Math.floor((SCREEN_W - TIME_COL_W - 2) / 7);
+  const handleCancelMatch = (id: string) => {
+    Alert.alert('Cancel Match', 'Cancel this confirmed match? Both players will be notified.', [
+      { text: 'No', style: 'cancel' },
+      { text: 'Cancel Match', style: 'destructive', onPress: async () => {
+        try { await supabase.from('match_invites').update({ status: 'cancelled' }).eq('id', id); await refetchInvites(); setShowEventSheet(false); }
+        catch (e: any) { Alert.alert('Error', e?.message || 'Failed to cancel match.'); }
+      }},
+    ]);
+  };
 
   const handleExportAll = async () => {
     const acceptedMatches = (invites || []).filter(i => i.status === 'accepted' && i.date);
@@ -291,69 +322,92 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
     await exportMultiple(events);
   };
 
+  agendaDaysRef.current = agendaDays;
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
     <SafeAreaView style={s.safe} edges={[]}>
       <StatusBar style="light" />
+
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <LinearGradient
         colors={[Palette.dark900, Palette.dark700]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[s.header, { paddingTop: insets.top }]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={[s.header, { paddingTop: insets.top + Spacing.md }]}
       >
-        <View style={s.headerInner}>
-          <View style={s.headerLeft}>
-            <Text style={s.headerTitle}>Schedule</Text>
-            <Text style={s.headerSub} numberOfLines={1}>{headerLabel}</Text>
-          </View>
-          <View style={s.headerRight}>
+        {/* Title row */}
+        <View style={s.headerRow}>
+          <Text style={s.headerTitle}>Schedule</Text>
+          <View style={s.headerActions}>
             <TouchableOpacity style={s.hBtn} onPress={handleExportAll} disabled={exporting}>
               {exporting
                 ? <ActivityIndicator size="small" color="#fff" />
-                : <Ionicons name="calendar-outline" size={20} color="#fff" />
-              }
-            </TouchableOpacity>
-            <TouchableOpacity style={[s.hBtn, s.hBtnAdd]} onPress={() => openAdd(currentDate)}>
-              <Ionicons name="add" size={22} color="#fff" />
+                : <Ionicons name="calendar-outline" size={20} color="#fff" />}
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* View mode + navigation strip */}
-        <View style={s.controlBar}>
-          {/* Segmented control */}
+        {/* Month + nav + view toggle */}
+        <View style={s.subRow}>
+          <View style={s.monthNav}>
+            <TouchableOpacity style={s.navArrow} onPress={goBack}>
+              <Ionicons name="chevron-back" size={15} color="rgba(255,255,255,0.85)" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setCurrentDate(new Date())} activeOpacity={0.7}>
+              <Text style={s.monthLabel}>{headerLabel}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.navArrow} onPress={goForward}>
+              <Ionicons name="chevron-forward" size={15} color="rgba(255,255,255,0.85)" />
+            </TouchableOpacity>
+          </View>
+
           <View style={s.segControl}>
-            {(['day', 'week', 'month'] as ViewMode[]).map(v => (
+            {(['agenda', 'month'] as ViewMode[]).map(v => (
               <TouchableOpacity key={v} style={[s.segBtn, viewMode === v && s.segBtnActive]} onPress={() => setViewMode(v)}>
                 <Text style={[s.segBtnText, viewMode === v && s.segBtnTextActive]}>
-                  {v === 'day' ? 'Day' : v === 'week' ? 'Week' : 'Month'}
+                  {v === 'agenda' ? 'Agenda' : 'Month'}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
-
-          {/* Nav arrows + today */}
-          <View style={s.navRow}>
-            <TouchableOpacity style={s.navArrow} onPress={goBack}>
-              <Ionicons name="chevron-back" size={16} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity style={s.todayPill} onPress={() => setCurrentDate(new Date())}>
-              <Text style={s.todayPillText}>Today</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.navArrow} onPress={goForward}>
-              <Ionicons name="chevron-forward" size={16} color="#fff" />
-            </TouchableOpacity>
-          </View>
         </View>
       </LinearGradient>
+
+      {/* ── Week date strip (agenda mode only) ────────────────────────────── */}
+      {viewMode === 'agenda' && (
+        <View style={s.weekStrip}>
+          {weekDays.map(day => {
+            const key = format(day, 'yyyy-MM-dd');
+            const hasEvents = (eventsByDate[key] || []).length > 0;
+            const today = isToday(day);
+            const selected = isSameDay(day, currentDate);
+            const past = isPast(startOfDay(day)) && !today;
+            return (
+              <TouchableOpacity key={key} style={s.weekDayBtn} onPress={() => { setCurrentDate(day); scrollToDate(day); }} activeOpacity={0.7}>
+                <Text style={[s.weekDayName, today && s.weekDayNameToday, past && s.dimTxt]}>
+                  {format(day, 'EEE')}
+                </Text>
+                <View style={[s.weekDayCircle, today && s.weekDayCircleToday, selected && !today && s.weekDayCircleSel]}>
+                  <Text style={[s.weekDayNum, today && s.weekDayNumToday, selected && !today && s.weekDayNumSel, past && s.dimTxt]}>
+                    {format(day, 'd')}
+                  </Text>
+                </View>
+                {hasEvents && <View style={[s.weekDot, today && s.weekDotToday]} />}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
 
       {/* ── Legend ─────────────────────────────────────────────────────────── */}
       <View style={s.legend}>
         {[
-          { ...EV.avail, label: 'Available' },
-          { ...EV.match, label: 'Match' },
-          { ...EV.invite, label: 'Invite' },
-          { ...EV.league, label: 'League' },
+          { ...EV.avail,       label: 'Available' },
+          { ...EV.match,       label: 'Match' },
+          { ...EV.invite,      label: 'Invite' },
+          { ...EV.sent_invite, label: 'Sent' },
+          { ...EV.league,      label: 'League' },
         ].map(l => (
           <View key={l.label} style={s.legendItem}>
             <View style={[s.legendDot, { backgroundColor: l.bg, borderColor: l.border }]} />
@@ -374,8 +428,9 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
         </TouchableOpacity>
       )}
 
-      {/* ── Main content ───────────────────────────────────────────────────── */}
+      {/* ── Content ────────────────────────────────────────────────────────── */}
       <ScrollView
+        ref={scrollRef}
         style={s.scroll}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
@@ -386,108 +441,95 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
           <MonthGrid
             currentDate={currentDate}
             eventsByDate={eventsByDate}
-            onDayPress={day => { setCurrentDate(day); setViewMode('day'); }}
+            onDayPress={day => { setCurrentDate(day); setViewMode('agenda'); scrollToDate(day); }}
           />
         ) : (
+          /* ── Agenda view ── */
           <>
-            {/* Day column headers */}
-            <View style={[s.dayHeaders, { marginLeft: TIME_COL_W }]}>
-              {displayDays.map(day => {
+            {agendaDays.length === 0 ? (
+              <View style={s.emptyWrap}>
+                <Ionicons name="calendar-outline" size={52} color={Colors.textMuted} />
+                <Text style={s.emptyTitle}>No upcoming events</Text>
+                <Text style={s.emptySub}>Tap + to add your availability or schedule a match</Text>
+              </View>
+            ) : (
+              agendaDays.map(day => {
+                const key = format(day, 'yyyy-MM-dd');
+                const dayEvents = (eventsByDate[key] || []).slice().sort((a, b) =>
+                  timeToMinutes(a.start_time) - timeToMinutes(b.start_time)
+                );
                 const today = isToday(day);
-                const pastDay = isPast(startOfDay(day)) && !today;
-                const hasDot = (eventsByDate[format(day, 'yyyy-MM-dd')] || []).length > 0;
+                const tomorrow = isSameDay(day, addDays(new Date(), 1));
+                const chipLabel = today ? 'TODAY' : tomorrow ? 'TOMORROW' : format(day, 'EEE').toUpperCase();
+                const dateLabel = format(day, today || tomorrow ? 'EEEE, MMMM d' : 'MMMM d');
+
                 return (
-                  <View key={day.toISOString()} style={[s.dayHeader, { width: dayColW }, today && s.dayHeaderToday]}>
-                    <Text style={[s.dayHeaderName, today && s.dayHeaderNameToday, pastDay && s.dimText]}>
-                      {format(day, viewMode === 'week' ? 'EEE' : 'EEEE')}
-                    </Text>
-                    <View style={[s.dayNumCircle, today && s.dayNumCircleToday]}>
-                      <Text style={[s.dayNum, today && s.dayNumToday, pastDay && s.dimText]}>
-                        {format(day, viewMode === 'week' ? 'd' : 'MMM d')}
-                      </Text>
+                  <View
+                    key={key}
+                    style={s.agendaSection}
+                    onLayout={(e) => { sectionOffsets.current[key] = e.nativeEvent.layout.y; }}
+                  >
+                    {/* Day header */}
+                    <View style={s.agendaDayHeader}>
+                      <View style={[s.agendaChip, today && s.agendaChipToday]}>
+                        <Text style={[s.agendaChipText, today && s.agendaChipTextToday]}>{chipLabel}</Text>
+                      </View>
+                      <Text style={s.agendaDateLabel}>{dateLabel}</Text>
                     </View>
-                    {hasDot && <View style={[s.dayDot, today && s.dayDotToday]} />}
+
+                    {/* Event cards */}
+                    {dayEvents.length === 0 ? (
+                      <Text style={s.agendaEmpty}>Nothing scheduled</Text>
+                    ) : (
+                      <View style={s.agendaCards}>
+                        {dayEvents.map(ev => (
+                          <TouchableOpacity
+                            key={ev.id}
+                            style={s.agendaCard}
+                            onPress={() => handleEventTap(ev)}
+                            activeOpacity={0.75}
+                          >
+                            {/* Left color bar */}
+                            <View style={[s.agendaCardBar, { backgroundColor: ev.borderColor }]} />
+
+                            {/* Content */}
+                            <View style={s.agendaCardContent}>
+                              <View style={s.agendaCardTitleRow}>
+                                <View style={[s.agendaCardIcon, { backgroundColor: ev.bgColor }]}>
+                                  <Ionicons name={EVENT_ICON[ev.type]} size={13} color={ev.textColor} />
+                                </View>
+                                <Text style={s.agendaCardTitle} numberOfLines={1}>{ev.title}</Text>
+                              </View>
+                              <View style={s.agendaCardMeta}>
+                                <Ionicons name="time-outline" size={11} color={Colors.textMuted} />
+                                <Text style={s.agendaCardMetaTxt}>
+                                  {fmtTime(ev.start_time)} – {fmtTime(ev.end_time)}
+                                </Text>
+                                {ev.data?.court_location && (
+                                  <>
+                                    <View style={s.metaSep} />
+                                    <Ionicons name="location-outline" size={11} color={Colors.textMuted} />
+                                    <Text style={s.agendaCardMetaTxt} numberOfLines={1}>
+                                      {ev.data.court_location}
+                                    </Text>
+                                  </>
+                                )}
+                              </View>
+                            </View>
+
+                            <Ionicons name="chevron-forward" size={14} color={Colors.textMuted} style={{ alignSelf: 'center' }} />
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
                   </View>
                 );
-              })}
-            </View>
-
-            {/* Time grid */}
-            <View style={s.gridRow}>
-              {/* Time labels */}
-              <View style={[s.timeCol, { width: TIME_COL_W }]}>
-                {HOURS.map(h => (
-                  <View key={h} style={[s.timeCell, { height: HOUR_HEIGHT }]}>
-                    <Text style={s.timeLabel}>{hourLabel(h)}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {/* Day columns */}
-              <View style={{ flex: 1, flexDirection: 'row' }}>
-                {displayDays.map(day => {
-                  const dateKey = format(day, 'yyyy-MM-dd');
-                  const dayEvents = eventsByDate[dateKey] || [];
-                  const today = isToday(day);
-                  const pastDay = isPast(startOfDay(day)) && !today;
-                  return (
-                    <View key={dateKey} style={{ width: dayColW }}>
-                      {HOURS.map(h => (
-                        <TouchableOpacity key={h}
-                          style={[s.hourCell, { height: HOUR_HEIGHT, width: dayColW }, today && s.hourCellToday, pastDay && s.hourCellPast]}
-                          onPress={() => !pastDay && openAdd(day, h)}
-                          activeOpacity={pastDay ? 1 : 0.4}
-                        />
-                      ))}
-                      <View style={StyleSheet.absoluteFill}>
-                        {dayEvents.map(ev => {
-                          const { top, height } = getEventLayout(ev.start_time, ev.end_time);
-                          return (
-                            <TouchableOpacity key={ev.id}
-                              style={[s.eventBlock, { top, height, backgroundColor: ev.bgColor, borderLeftColor: ev.borderColor }]}
-                              onPress={() => handleEventTap(ev)} activeOpacity={0.8}>
-                              <Text style={[s.eventTitle, { color: ev.textColor }]} numberOfLines={1}>{ev.title}</Text>
-                              {height > 28 && <Text style={[s.eventTime, { color: ev.textColor }]} numberOfLines={1}>{fmtTime(ev.start_time)}</Text>}
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Upcoming matches */}
-            {(invites || []).filter(i => i.status === 'accepted').length > 0 && (
-              <View style={s.section}>
-                <Text style={s.sectionLabel}>UPCOMING MATCHES</Text>
-                {(invites || []).filter(i => i.status === 'accepted').sort((a, b) => a.date.localeCompare(b.date)).slice(0, 5).map(inv => {
-                  const other = inv.sender_id === user?.id ? inv.receiver : inv.sender;
-                  const name = other ? `${other.first_name || ''} ${other.last_name || ''}`.trim() : 'Opponent';
-                  return (
-                    <View key={inv.id} style={s.matchCard}>
-                      <View style={s.matchIconWrap}>
-                        <Ionicons name="tennisball-outline" size={18} color={Colors.primary} />
-                      </View>
-                      <View style={s.matchInfo}>
-                        <Text style={s.matchName}>vs {name}</Text>
-                        <Text style={s.matchTime}>{format(parseISO(inv.date), 'EEE, MMM d')} · {fmtTime(inv.start_time)}–{fmtTime(inv.end_time)}</Text>
-                        <Text style={s.matchLoc}><Ionicons name="location-outline" size={10} color={Colors.textMuted} /> {inv.court_location || 'No location set'}</Text>
-                      </View>
-                      <View style={s.confirmedBadge}>
-                        <Ionicons name="checkmark-circle" size={12} color={Colors.success} />
-                        <Text style={s.confirmedText}>Confirmed</Text>
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
+              })
             )}
 
-            {/* Pending invites */}
+            {/* Pending invites section */}
             {pendingInvites.length > 0 && (
-              <View style={s.section}>
+              <View style={s.inviteSection}>
                 <Text style={s.sectionLabel}>PENDING INVITES</Text>
                 {pendingInvites.map(inv => {
                   const sender = inv.sender;
@@ -518,10 +560,15 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
               </View>
             )}
 
-            <View style={{ height: 80 }} />
+            <View style={{ height: 120 }} />
           </>
         )}
       </ScrollView>
+
+      {/* ── FAB ────────────────────────────────────────────────────────────── */}
+      <TouchableOpacity style={[s.fab, { bottom: insets.bottom + 16 }]} onPress={() => openAdd(currentDate)} activeOpacity={0.85}>
+        <Ionicons name="add" size={28} color="#fff" />
+      </TouchableOpacity>
 
       {/* ── Add Availability Modal ──────────────────────────────────────────── */}
       <Modal visible={showAddModal} animationType="slide" presentationStyle="pageSheet">
@@ -534,19 +581,16 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
             <TouchableOpacity onPress={handleSaveSlot} disabled={saving} style={s.modalSaveBtn}>
               {saving
                 ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={s.modalSaveTxt}>Save</Text>
-              }
+                : <Text style={s.modalSaveTxt}>Save</Text>}
             </TouchableOpacity>
           </View>
           <ScrollView style={s.modalBody} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-            {/* Date */}
             <View style={s.fGroup}>
               <Text style={s.fLabel}>DATE</Text>
               <TextInput style={s.fInput} value={formData.date} onChangeText={v => setFormData(p => ({ ...p, date: v }))} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.textMuted} />
             </View>
 
-            {/* Timezone */}
             <View style={s.fGroup}>
               <Text style={s.fLabel}>TIMEZONE</Text>
               <TouchableOpacity style={s.fSelect} onPress={() => setShowTzPicker(true)}>
@@ -556,7 +600,6 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
               </TouchableOpacity>
             </View>
 
-            {/* Time row */}
             <View style={s.fRow}>
               <View style={[s.fGroup, { flex: 1, marginRight: Spacing.sm }]}>
                 <Text style={s.fLabel}>START TIME</Text>
@@ -569,7 +612,6 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
             </View>
             {timeError && <Text style={s.fError}>End time must be after start time</Text>}
 
-            {/* Privacy */}
             <View style={s.fGroup}>
               <Text style={s.fLabel}>PRIVACY</Text>
               <View style={s.pills}>
@@ -583,7 +625,6 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
               <Text style={s.fHint}>{formData.privacy_level === 'public' ? 'Visible to all players' : 'Used for matching only'}</Text>
             </View>
 
-            {/* Available toggle */}
             <View style={s.toggleRow}>
               <View style={s.toggleInfo}>
                 <Text style={s.toggleLabel}>Available for matches</Text>
@@ -594,7 +635,6 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
               </TouchableOpacity>
             </View>
 
-            {/* Recurring toggle */}
             <View style={[s.toggleRow, s.toggleRowBorder]}>
               <View style={s.toggleInfo}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -635,7 +675,6 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
               </View>
             )}
 
-            {/* Notes */}
             <View style={s.fGroup}>
               <Text style={s.fLabel}>NOTES (OPTIONAL)</Text>
               <TextInput style={[s.fInput, s.fTextArea]} value={formData.notes} onChangeText={v => setFormData(p => ({ ...p, notes: v }))} placeholder="Add any notes..." placeholderTextColor={Colors.textMuted} multiline numberOfLines={3} />
@@ -673,11 +712,10 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
           {selectedEvent && (
             <>
               <View style={s.sheetHandle} />
-              {/* Type badge */}
               <View style={[s.sheetBadge, { backgroundColor: selectedEvent.bgColor, borderColor: selectedEvent.borderColor }]}>
-                <Ionicons name={selectedEvent.type === 'availability' ? 'time-outline' : selectedEvent.type === 'match' ? 'tennisball-outline' : 'mail-outline'} size={13} color={selectedEvent.textColor} />
+                <Ionicons name={EVENT_ICON[selectedEvent.type]} size={13} color={selectedEvent.textColor} />
                 <Text style={[s.sheetBadgeText, { color: selectedEvent.textColor }]}>
-                  {selectedEvent.type === 'availability' ? 'Available Slot' : selectedEvent.type === 'match' ? 'Confirmed Match' : 'Match Invite'}
+                  {selectedEvent.type === 'availability' ? 'Available Slot' : selectedEvent.type === 'match' ? 'Confirmed Match' : selectedEvent.type === 'sent_invite' ? 'Invite Sent' : 'Match Invite'}
                 </Text>
               </View>
               <Text style={s.sheetTitle}>{selectedEvent.title}</Text>
@@ -713,6 +751,21 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                     </TouchableOpacity>
                   </>
                 )}
+                {selectedEvent.type === 'sent_invite' && (
+                  <TouchableOpacity style={[s.shBtn, s.shBtnDelete]} onPress={() => handleCancelInvite(selectedEvent.id)}>
+                    <Ionicons name="close-circle-outline" size={16} color="#fff" />
+                    <Text style={s.shBtnText}>Cancel Invite</Text>
+                  </TouchableOpacity>
+                )}
+                {selectedEvent.type === 'match' && !selectedEvent.data?._isLeagueMatch && (() => {
+                  const past = new Date(`${selectedEvent.date}T${selectedEvent.start_time}`) < new Date();
+                  return !past ? (
+                    <TouchableOpacity style={[s.shBtn, s.shBtnDelete]} onPress={() => handleCancelMatch(selectedEvent.id)}>
+                      <Ionicons name="close-circle-outline" size={16} color="#fff" />
+                      <Text style={s.shBtnText}>Cancel Match</Text>
+                    </TouchableOpacity>
+                  ) : null;
+                })()}
                 {selectedEvent.type === 'availability' && (
                   <TouchableOpacity style={[s.shBtn, s.shBtnDelete]} onPress={() => handleDeleteAvailability(selectedEvent.id)}>
                     <Ionicons name="trash-outline" size={16} color="#fff" />
@@ -731,7 +784,7 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
   );
 };
 
-// ── Month grid extracted for clarity ──────────────────────────────────────────
+// ── Month grid ─────────────────────────────────────────────────────────────────
 const MonthGrid: React.FC<{
   currentDate: Date;
   eventsByDate: Record<string, CalEvent[]>;
@@ -747,7 +800,6 @@ const MonthGrid: React.FC<{
 
   return (
     <View style={mg.grid}>
-      {/* Day-of-week header */}
       <View style={mg.dowRow}>
         {DOW.map(d => (
           <View key={d} style={[mg.dowCell, { width: cellW }]}>
@@ -755,7 +807,6 @@ const MonthGrid: React.FC<{
           </View>
         ))}
       </View>
-      {/* Weeks */}
       {Array.from({ length: allDays.length / 7 }, (_, wi) => (
         <View key={wi} style={mg.weekRow}>
           {allDays.slice(wi * 7, wi * 7 + 7).map(day => {
@@ -763,25 +814,15 @@ const MonthGrid: React.FC<{
             const dayEvents = eventsByDate[dateKey] || [];
             const today = isToday(day);
             const inMonth = isSameMonth(day, currentDate);
-            const availCount = dayEvents.filter(e => e.type === 'availability').length;
-            const matchCount = dayEvents.filter(e => e.type === 'match').length;
-            const inviteCount = dayEvents.filter(e => e.type === 'invite').length;
             return (
-              <TouchableOpacity
-                key={dateKey}
-                style={[mg.cell, { width: cellW }, !inMonth && mg.cellOther]}
-                onPress={() => onDayPress(day)}
-                activeOpacity={0.7}
-              >
+              <TouchableOpacity key={dateKey} style={[mg.cell, { width: cellW }, !inMonth && mg.cellOther]} onPress={() => onDayPress(day)} activeOpacity={0.7}>
                 <View style={[mg.numWrap, today && mg.numWrapToday]}>
-                  <Text style={[mg.num, today && mg.numToday, !inMonth && mg.numOther]}>
-                    {format(day, 'd')}
-                  </Text>
+                  <Text style={[mg.num, today && mg.numToday, !inMonth && mg.numOther]}>{format(day, 'd')}</Text>
                 </View>
                 <View style={mg.dots}>
-                  {availCount > 0 && <View style={[mg.dot, { backgroundColor: EV.avail.border }]} />}
-                  {matchCount > 0 && <View style={[mg.dot, { backgroundColor: EV.match.border }]} />}
-                  {inviteCount > 0 && <View style={[mg.dot, { backgroundColor: EV.invite.border }]} />}
+                  {dayEvents.filter(e => e.type === 'availability').length > 0 && <View style={[mg.dot, { backgroundColor: EV.avail.border }]} />}
+                  {dayEvents.filter(e => e.type === 'match').length > 0 && <View style={[mg.dot, { backgroundColor: EV.match.border }]} />}
+                  {dayEvents.filter(e => e.type === 'invite').length > 0 && <View style={[mg.dot, { backgroundColor: EV.invite.border }]} />}
                 </View>
                 {dayEvents.length > 0 && (
                   <Text style={[mg.evLabel, !inMonth && { opacity: 0.4 }]} numberOfLines={1}>
@@ -798,177 +839,181 @@ const MonthGrid: React.FC<{
   );
 };
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+// ── Styles ─────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
 
   // Header
-  header: { paddingBottom: Spacing.sm },
-  headerInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm, paddingBottom: 6 },
-  headerLeft: { flex: 1 },
-  headerTitle: { fontSize: 28, fontWeight: FontWeight.black, color: '#fff' },
-  headerSub: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.75)', marginTop: 1 },
-  headerRight: { flexDirection: 'row', gap: Spacing.sm },
-  hBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  hBtnAdd: { backgroundColor: 'rgba(255,255,255,0.3)' },
+  header:       { paddingBottom: Spacing.sm },
+  headerRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingBottom: 6 },
+  headerTitle:  { flex: 1, fontSize: FontSize.xxxl, fontFamily: Font.black, color: '#fff', letterSpacing: -1 },
+  headerActions:{ flexDirection: 'row', gap: Spacing.sm },
+  hBtn:         { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
 
-  // Control bar
-  controlBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingTop: 4, paddingBottom: Spacing.sm },
-  segControl: { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.15)', borderRadius: Radius.full, padding: 3 },
-  segBtn: { paddingHorizontal: Spacing.md, paddingVertical: 5, borderRadius: Radius.full },
-  segBtnActive: { backgroundColor: '#fff' },
-  segBtnText: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: 'rgba(255,255,255,0.8)' },
+  // Sub-row: month nav + toggle
+  subRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
+  monthNav:      { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  monthLabel:    { fontSize: FontSize.md, fontFamily: Font.bold, color: '#fff', letterSpacing: -0.3 },
+  navArrow:      { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  segControl:    { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.18)', borderRadius: Radius.full, padding: 3 },
+  segBtn:        { paddingHorizontal: 14, paddingVertical: 5, borderRadius: Radius.full },
+  segBtnActive:  { backgroundColor: '#fff' },
+  segBtnText:    { fontSize: FontSize.xs, fontFamily: Font.semibold, color: 'rgba(255,255,255,0.75)' },
   segBtnTextActive: { color: Colors.primary },
-  navRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-  navArrow: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  todayPill: { paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: Radius.full, backgroundColor: 'rgba(255,255,255,0.2)' },
-  todayPillText: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: '#fff' },
+
+  // Week strip
+  weekStrip:           { flexDirection: 'row', backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight, paddingVertical: Spacing.sm },
+  weekDayBtn:          { flex: 1, alignItems: 'center', gap: 3 },
+  weekDayName:         { fontSize: 10, fontFamily: Font.semibold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.3 },
+  weekDayNameToday:    { color: Colors.primary },
+  weekDayCircle:       { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  weekDayCircleToday:  { backgroundColor: Colors.primary },
+  weekDayCircleSel:    { borderWidth: 1.5, borderColor: Colors.primary },
+  weekDayNum:          { fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.text },
+  weekDayNumToday:     { color: '#fff' },
+  weekDayNumSel:       { color: Colors.primary },
+  weekDot:             { width: 5, height: 5, borderRadius: 2.5, backgroundColor: Colors.primary },
+  weekDotToday:        { backgroundColor: '#fff' },
+  dimTxt:              { opacity: 0.35 },
 
   // Legend
-  legend: { flexDirection: 'row', gap: Spacing.lg, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 10, height: 10, borderRadius: 3, borderWidth: 1.5 },
-  legendText: { fontSize: 10, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+  legend:     { flexDirection: 'row', gap: Spacing.md, paddingHorizontal: Spacing.lg, paddingVertical: 8, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendDot:  { width: 10, height: 10, borderRadius: 3, borderWidth: 1.5 },
+  legendText: { fontSize: 10, color: Colors.textSecondary, fontFamily: Font.medium },
 
   // Pending banner
-  pendingBanner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginHorizontal: Spacing.lg, marginTop: Spacing.sm, marginBottom: 4, backgroundColor: EV.invite.bg, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderWidth: 1, borderColor: EV.invite.border },
-  pendingDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: EV.invite.border, marginRight: 2 },
-  pendingText: { flex: 1, fontSize: FontSize.xs, color: EV.invite.text, fontWeight: FontWeight.medium },
+  pendingBanner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginHorizontal: Spacing.lg, marginTop: Spacing.sm, marginBottom: 2, backgroundColor: EV.invite.bg, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderWidth: 1, borderColor: EV.invite.border },
+  pendingDot:    { width: 7, height: 7, borderRadius: 3.5, backgroundColor: EV.invite.border, marginRight: 2 },
+  pendingText:   { flex: 1, fontSize: FontSize.xs, color: EV.invite.text, fontFamily: Font.medium },
 
   scroll: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
 
-  // Calendar day headers
-  dayHeaders: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: Colors.surface },
-  dayHeader: { alignItems: 'center', paddingVertical: Spacing.xs + 2, borderLeftWidth: 1, borderLeftColor: Colors.borderLight },
-  dayHeaderToday: { backgroundColor: Colors.primaryLight },
-  dayHeaderName: { fontSize: 9, fontWeight: FontWeight.semibold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 },
-  dayHeaderNameToday: { color: Colors.primary },
-  dayNumCircle: { marginTop: 2, paddingHorizontal: 4, paddingVertical: 1, borderRadius: Radius.full },
-  dayNumCircleToday: { backgroundColor: Colors.primary },
-  dayNum: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.text },
-  dayNumToday: { color: '#fff' },
-  dayDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: Colors.primary, marginTop: 2 },
-  dayDotToday: { backgroundColor: Colors.primaryDark },
-  dimText: { opacity: 0.35 },
+  // Empty state
+  emptyWrap:  { alignItems: 'center', paddingTop: 80, paddingHorizontal: 40 },
+  emptyTitle: { fontSize: FontSize.lg, fontFamily: Font.semibold, color: Colors.text, marginTop: Spacing.lg, marginBottom: Spacing.sm },
+  emptySub:   { fontSize: FontSize.sm, color: Colors.textMuted, textAlign: 'center', lineHeight: 20 },
 
-  // Time grid
-  gridRow: { flexDirection: 'row' },
-  timeCol: { borderRightWidth: 1, borderRightColor: Colors.border, backgroundColor: Colors.surface },
-  timeCell: { justifyContent: 'flex-start', paddingTop: 4, paddingRight: 5, borderBottomWidth: 1, borderBottomColor: Colors.borderLight, alignItems: 'flex-end' },
-  timeLabel: { fontSize: 9, color: Colors.textMuted },
-  hourCell: { borderBottomWidth: 1, borderBottomColor: Colors.borderLight, borderLeftWidth: 1, borderLeftColor: Colors.borderLight },
-  hourCellToday: { backgroundColor: 'rgba(249,115,22,0.03)' },
-  hourCellPast: { backgroundColor: Colors.backgroundAlt, opacity: 0.6 },
-  eventBlock: { position: 'absolute', left: 2, right: 2, borderLeftWidth: 3, borderRadius: 4, paddingHorizontal: 4, paddingVertical: 3, overflow: 'hidden' },
-  eventTitle: { fontSize: 9, fontWeight: FontWeight.semibold, lineHeight: 12 },
-  eventTime: { fontSize: 8, opacity: 0.8, lineHeight: 11 },
+  // Agenda sections
+  agendaSection:    { marginTop: Spacing.lg, paddingHorizontal: Spacing.lg },
+  agendaDayHeader:  { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
+  agendaChip:       { paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full, backgroundColor: Colors.backgroundAlt, borderWidth: 1, borderColor: Colors.borderLight },
+  agendaChipToday:  { backgroundColor: Colors.primaryLight, borderColor: Colors.primaryMuted },
+  agendaChipText:   { fontSize: 10, fontFamily: Font.black, color: Colors.textMuted, letterSpacing: 0.5 },
+  agendaChipTextToday: { color: Colors.primary },
+  agendaDateLabel:  { fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.text },
+  agendaEmpty:      { fontSize: FontSize.xs, color: Colors.textMuted, paddingLeft: 2, marginBottom: Spacing.xs },
 
-  // Sections below grid
-  section: { marginTop: Spacing.lg, paddingHorizontal: Spacing.lg, marginBottom: Spacing.sm },
-  sectionLabel: { fontSize: 10, fontWeight: FontWeight.bold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.sm },
+  // Agenda event cards (Outlook-style)
+  agendaCards:         { gap: Spacing.xs },
+  agendaCard:          { flexDirection: 'row', alignItems: 'stretch', backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: Colors.borderLight, ...Shadow.xs as any },
+  agendaCardBar:       { width: 4, borderRadius: 0 },
+  agendaCardContent:   { flex: 1, paddingVertical: 10, paddingHorizontal: Spacing.md, gap: 4 },
+  agendaCardTitleRow:  { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  agendaCardIcon:      { width: 22, height: 22, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  agendaCardTitle:     { flex: 1, fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.text },
+  agendaCardMeta:      { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  agendaCardMetaTxt:   { fontSize: 11, color: Colors.textMuted },
+  metaSep:             { width: 3, height: 3, borderRadius: 1.5, backgroundColor: Colors.textMuted, marginHorizontal: 2 },
 
-  matchCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.sm, borderWidth: 1, borderColor: Colors.border, shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 1, shadowRadius: 3, elevation: 1 },
-  matchIconWrap: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  matchInfo: { flex: 1, gap: 2 },
-  matchName: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
-  matchTime: { fontSize: FontSize.xs, color: Colors.textSecondary },
-  matchLoc: { fontSize: FontSize.xs, color: Colors.textMuted },
-  confirmedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.successLight, paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: Radius.full },
-  confirmedText: { fontSize: 10, fontWeight: FontWeight.semibold, color: Colors.success },
-
-  inviteCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: EV.invite.bg, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.sm, borderWidth: 1, borderColor: EV.invite.border },
-  inviteLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  inviteAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: `${EV.invite.border}22`, alignItems: 'center', justifyContent: 'center' },
-  inviteInfo: { flex: 1, gap: 2 },
-  inviteName: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
-  inviteTime: { fontSize: FontSize.xs, color: Colors.textSecondary },
-  inviteMsg: { fontSize: FontSize.xs, color: Colors.textMuted, fontStyle: 'italic' },
+  // Pending invite cards
+  inviteSection: { marginTop: Spacing.xl, paddingHorizontal: Spacing.lg, marginBottom: Spacing.sm },
+  sectionLabel:  { fontSize: 10, fontFamily: Font.bold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.sm },
+  inviteCard:    { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: EV.invite.bg, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.sm, borderWidth: 1, borderColor: EV.invite.border },
+  inviteLeft:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  inviteAvatar:  { width: 38, height: 38, borderRadius: 19, backgroundColor: `${EV.invite.border}22`, alignItems: 'center', justifyContent: 'center' },
+  inviteInfo:    { flex: 1, gap: 2 },
+  inviteName:    { fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.text },
+  inviteTime:    { fontSize: FontSize.xs, color: Colors.textSecondary },
+  inviteMsg:     { fontSize: FontSize.xs, color: Colors.textMuted, fontStyle: 'italic' },
   inviteActions: { flexDirection: 'row', gap: Spacing.xs },
-  acceptBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.success, alignItems: 'center', justifyContent: 'center' },
-  declineBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.error, alignItems: 'center', justifyContent: 'center' },
+  acceptBtn:     { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.success, alignItems: 'center', justifyContent: 'center' },
+  declineBtn:    { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.error, alignItems: 'center', justifyContent: 'center' },
+
+  // FAB
+  fab: { position: 'absolute', right: Spacing.lg, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 8 },
 
   // Add modal
-  modal: { flex: 1, backgroundColor: Colors.background },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.backgroundAlt, alignItems: 'center', justifyContent: 'center' },
-  modalTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
-  modalSaveBtn: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs + 2, borderRadius: Radius.full, minWidth: 56, alignItems: 'center' },
-  modalSaveTxt: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: '#fff' },
-  modalBody: { padding: Spacing.lg },
+  modal:          { flex: 1, backgroundColor: Colors.background },
+  modalHeader:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  modalCloseBtn:  { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.backgroundAlt, alignItems: 'center', justifyContent: 'center' },
+  modalTitle:     { fontSize: FontSize.lg, fontFamily: Font.semibold, color: Colors.text },
+  modalSaveBtn:   { backgroundColor: Colors.primary, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs + 2, borderRadius: Radius.full, minWidth: 56, alignItems: 'center' },
+  modalSaveTxt:   { fontSize: FontSize.sm, fontFamily: Font.semibold, color: '#fff' },
+  modalBody:      { padding: Spacing.lg },
 
   // Form elements
-  fGroup: { marginBottom: Spacing.lg },
-  fRow: { flexDirection: 'row' },
-  fLabel: { fontSize: 10, fontWeight: FontWeight.bold, color: Colors.textMuted, letterSpacing: 0.6, marginBottom: Spacing.xs, textTransform: 'uppercase' },
-  fInput: { borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, fontSize: FontSize.md, color: Colors.text, backgroundColor: Colors.surface },
-  fTextArea: { height: 80, textAlignVertical: 'top' },
-  fInputErr: { borderColor: Colors.error },
-  fError: { fontSize: FontSize.xs, color: Colors.error, marginTop: -Spacing.sm + 2, marginBottom: Spacing.sm },
-  fHint: { fontSize: 11, color: Colors.textMuted, marginTop: 4 },
-  fSelect: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, backgroundColor: Colors.surface },
+  fGroup:     { marginBottom: Spacing.lg },
+  fRow:       { flexDirection: 'row' },
+  fLabel:     { fontSize: 10, fontFamily: Font.bold, color: Colors.textMuted, letterSpacing: 0.6, marginBottom: Spacing.xs, textTransform: 'uppercase' },
+  fInput:     { borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, fontSize: FontSize.md, color: Colors.text, backgroundColor: Colors.surface },
+  fTextArea:  { height: 80, textAlignVertical: 'top' },
+  fInputErr:  { borderColor: Colors.error },
+  fError:     { fontSize: FontSize.xs, color: Colors.error, marginTop: -Spacing.sm + 2, marginBottom: Spacing.sm },
+  fHint:      { fontSize: 11, color: Colors.textMuted, marginTop: 4 },
+  fSelect:    { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, backgroundColor: Colors.surface },
   fSelectTxt: { flex: 1, fontSize: FontSize.md, color: Colors.text },
 
-  pills: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap', marginBottom: Spacing.xs },
-  pill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.surface },
-  pillActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  pillText: { fontSize: FontSize.sm, fontWeight: FontWeight.medium, color: Colors.textSecondary },
-  pillTextActive: { color: '#fff' },
+  pills:         { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap', marginBottom: Spacing.xs },
+  pill:          { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.surface },
+  pillActive:    { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  pillText:      { fontSize: FontSize.sm, fontFamily: Font.medium, color: Colors.textSecondary },
+  pillTextActive:{ color: '#fff' },
 
-  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.md, marginBottom: Spacing.sm },
+  toggleRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.md, marginBottom: Spacing.sm },
   toggleRowBorder: { borderTopWidth: 1, borderTopColor: Colors.borderLight, marginTop: Spacing.xs },
-  toggleInfo: { flex: 1, marginRight: Spacing.md },
-  toggleLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.medium, color: Colors.text },
-  toggleSub: { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 2 },
-  toggle: { width: 44, height: 26, borderRadius: 13, backgroundColor: Colors.border, justifyContent: 'center', paddingHorizontal: 3 },
-  toggleOn: { backgroundColor: Colors.primary },
-  toggleThumb: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 2 },
-  toggleThumbOn: { alignSelf: 'flex-end' },
+  toggleInfo:      { flex: 1, marginRight: Spacing.md },
+  toggleLabel:     { fontSize: FontSize.sm, fontFamily: Font.medium, color: Colors.text },
+  toggleSub:       { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 2 },
+  toggle:          { width: 44, height: 26, borderRadius: 13, backgroundColor: Colors.border, justifyContent: 'center', paddingHorizontal: 3 },
+  toggleOn:        { backgroundColor: Colors.primary },
+  toggleThumb:     { width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 2 },
+  toggleThumbOn:   { alignSelf: 'flex-end' },
 
-  recBox: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.borderLight },
+  recBox:   { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.borderLight },
   unitText: { fontSize: FontSize.sm, color: Colors.textSecondary, marginLeft: Spacing.xs },
 
   // Bottom sheets
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: Colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: Spacing.lg, paddingBottom: 44, minHeight: 280 },
-  sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginBottom: Spacing.lg },
-  sheetTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text, marginBottom: Spacing.md },
-  sheetBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: Radius.full, borderWidth: 1, marginBottom: Spacing.sm },
-  sheetBadgeText: { fontSize: 11, fontWeight: FontWeight.semibold },
-  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
+  overlay:      { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  sheet:        { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: Colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: Spacing.lg, paddingBottom: 44, minHeight: 280 },
+  sheetHandle:  { width: 36, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginBottom: Spacing.lg },
+  sheetTitle:   { fontSize: FontSize.lg, fontFamily: Font.bold, color: Colors.text, marginBottom: Spacing.md },
+  sheetBadge:   { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: Radius.full, borderWidth: 1, marginBottom: Spacing.sm },
+  sheetBadgeText:{ fontSize: 11, fontFamily: Font.semibold },
+  sheetRow:     { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
   sheetRowText: { fontSize: FontSize.sm, color: Colors.textSecondary, flex: 1 },
-  sheetMsgBox: { backgroundColor: Colors.backgroundAlt, borderRadius: Radius.md, padding: Spacing.sm, marginBottom: Spacing.md },
-  sheetMsg: { fontSize: FontSize.sm, color: Colors.textSecondary, fontStyle: 'italic' },
-  sheetBtns: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.md },
-  shBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm + 2, borderRadius: Radius.full, flex: 1, justifyContent: 'center' },
-  shBtnText: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: '#fff' },
-  shBtnAccept: { backgroundColor: Colors.success },
+  sheetMsgBox:  { backgroundColor: Colors.backgroundAlt, borderRadius: Radius.md, padding: Spacing.sm, marginBottom: Spacing.md },
+  sheetMsg:     { fontSize: FontSize.sm, color: Colors.textSecondary, fontStyle: 'italic' },
+  sheetBtns:    { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.md },
+  shBtn:        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm + 2, borderRadius: Radius.full, flex: 1, justifyContent: 'center' },
+  shBtnText:    { fontSize: FontSize.sm, fontFamily: Font.semibold, color: '#fff' },
+  shBtnAccept:  { backgroundColor: Colors.success },
   shBtnDecline: { backgroundColor: Colors.error },
-  shBtnDelete: { backgroundColor: Colors.error },
-  shBtnClose: { backgroundColor: Colors.backgroundAlt, borderWidth: 1, borderColor: Colors.border },
+  shBtnDelete:  { backgroundColor: Colors.error },
+  shBtnClose:   { backgroundColor: Colors.backgroundAlt, borderWidth: 1, borderColor: Colors.border },
 
-  // Timezone sheet rows
-  tzRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.md, paddingHorizontal: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
+  tzRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.md, paddingHorizontal: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
   tzRowActive: { backgroundColor: Colors.primaryLight },
-  tzLabel: { fontSize: FontSize.sm, color: Colors.text, fontWeight: FontWeight.medium },
-  tzLabelActive: { color: Colors.primary },
-  tzOffset: { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 2 },
+  tzLabel:     { fontSize: FontSize.sm, color: Colors.text, fontFamily: Font.medium },
+  tzLabelActive:{ color: Colors.primary },
+  tzOffset:    { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 2 },
 });
 
 const mg = StyleSheet.create({
-  grid: { paddingTop: 2 },
-  dowRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: Colors.surface },
+  grid:    { paddingTop: 2 },
+  dowRow:  { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: Colors.surface },
   dowCell: { alignItems: 'center', paddingVertical: 7 },
-  dowText: { fontSize: 10, fontWeight: FontWeight.bold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 },
+  dowText: { fontSize: 10, fontFamily: Font.bold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 },
   weekRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
-  cell: { minHeight: 74, borderRightWidth: 1, borderRightColor: Colors.borderLight, padding: 4, alignItems: 'center' },
-  cellOther: { backgroundColor: Colors.backgroundAlt },
-  numWrap: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
-  numWrapToday: { backgroundColor: Colors.primary },
-  num: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
-  numToday: { color: '#fff' },
-  numOther: { color: Colors.textMuted, opacity: 0.5 },
-  dots: { flexDirection: 'row', gap: 3, marginBottom: 2 },
-  dot: { width: 6, height: 6, borderRadius: 3 },
+  cell:    { minHeight: 74, borderRightWidth: 1, borderRightColor: Colors.borderLight, padding: 4, alignItems: 'center' },
+  cellOther:   { backgroundColor: Colors.backgroundAlt },
+  numWrap:     { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  numWrapToday:{ backgroundColor: Colors.primary },
+  num:         { fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.text },
+  numToday:    { color: '#fff' },
+  numOther:    { color: Colors.textMuted, opacity: 0.5 },
+  dots:    { flexDirection: 'row', gap: 3, marginBottom: 2 },
+  dot:     { width: 6, height: 6, borderRadius: 3 },
   evLabel: { fontSize: 9, color: Colors.textSecondary, textAlign: 'center', lineHeight: 12 },
 });

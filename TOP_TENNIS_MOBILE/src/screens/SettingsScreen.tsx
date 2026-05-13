@@ -9,7 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { supabase } from '@/services/supabase';
-import { Palette, Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { Palette, Colors, FontSize, Font, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { StatusBar } from 'expo-status-bar';
 import { useBiometrics } from '@/hooks/useBiometrics';
 
@@ -94,7 +94,7 @@ function SectionHeader({ icon, label, color }: { icon: keyof typeof Ionicons.gly
 const sh = StyleSheet.create({
   wrap: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm + 2, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
   iconWrap: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  label: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.text },
+  label: { fontSize: FontSize.sm, fontFamily: Font.bold, color: Colors.text },
 });
 
 function SettingRow({
@@ -120,7 +120,7 @@ const sr = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, gap: Spacing.md },
   border: { borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
   disabled: { opacity: 0.45 },
-  label: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
+  label: { fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.text },
   desc: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2, lineHeight: 16 },
 });
 
@@ -146,8 +146,8 @@ const cr = StyleSheet.create({
   border: { borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
   chip: { paddingHorizontal: Spacing.sm + 2, paddingVertical: Spacing.xs + 1, borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.background },
   chipActive: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary },
-  chipText: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
-  chipTextActive: { color: Colors.primaryDark, fontWeight: FontWeight.semibold },
+  chipText: { fontSize: FontSize.xs, color: Colors.textSecondary, fontFamily: Font.medium },
+  chipTextActive: { color: Colors.primaryDark, fontFamily: Font.semibold },
 });
 
 function NavRow({ icon, label, desc, color, onPress, danger = false }: { icon: keyof typeof Ionicons.glyphMap; label: string; desc?: string; color: string; onPress: () => void; danger?: boolean }) {
@@ -167,7 +167,7 @@ function NavRow({ icon, label, desc, color, onPress, danger = false }: { icon: k
 const nr = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, gap: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
   icon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  label: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
+  label: { fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.text },
   desc: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
 });
 
@@ -182,7 +182,7 @@ function LabelRow({ label, desc, last = false }: { label: string; desc?: string;
 const lr = StyleSheet.create({
   row: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs + 2 },
   border: { borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
-  label: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
+  label: { fontSize: FontSize.xs, fontFamily: Font.semibold, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
   desc: { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 2 },
 });
 
@@ -358,7 +358,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
       colors={[Palette.dark900, Palette.dark700]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={[styles.gradHeader, { paddingTop: insets.top + Spacing.lg }]}
+      style={[styles.gradHeader, { paddingTop: insets.top + Spacing.md }]}
     >
       <TouchableOpacity style={styles.gradBackBtn} onPress={() => navigation.goBack()}>
         <Ionicons name="chevron-back" size={24} color="#fff" />
@@ -801,9 +801,9 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  gradHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.lg, gap: Spacing.md },
+  gradHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.md, gap: Spacing.md },
   gradBackBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  gradTitle: { fontSize: 22, fontWeight: FontWeight.black, color: '#fff' },
+  gradTitle: { fontSize: FontSize.xxxl, fontFamily: Font.black, color: '#fff', letterSpacing: -1 },
   gradSub: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
   content: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: 48 },
 
@@ -825,9 +825,9 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.borderLight,
   },
   aboutLabel: { fontSize: FontSize.sm, color: Colors.textSecondary },
-  aboutValue: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
+  aboutValue: { fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.text },
 
-  deleteBtn: { fontSize: FontSize.sm, color: Colors.error, fontWeight: FontWeight.semibold },
+  deleteBtn: { fontSize: FontSize.sm, color: Colors.error, fontFamily: Font.semibold },
 
   footer: {
     fontSize: FontSize.xs,

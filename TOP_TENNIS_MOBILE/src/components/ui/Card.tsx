@@ -1,50 +1,21 @@
-import React from 'react';
-import { View, StyleSheet, ViewStyle } from 'react-native';
-import { Colors, Radius, Shadow } from '@/theme/colors';
+import React from 'react'
+import { ViewStyle } from 'react-native'
+import { YStack } from 'tamagui'
+import { Colors, Radius, Shadow } from '@/theme/colors'
 
-type CardVariant = 'default' | 'elevated' | 'flat' | 'outlined' | 'dark';
+type CardVariant = 'default' | 'elevated' | 'flat' | 'outlined' | 'dark'
 
 interface CardProps {
-  children: React.ReactNode;
-  style?: ViewStyle;
-  elevated?: boolean;
-  variant?: CardVariant;
-  padding?: number;
-  radius?: number;
+  children:  React.ReactNode
+  style?:    ViewStyle
+  elevated?: boolean
+  variant?:  CardVariant
+  padding?:  number
+  radius?:   number
+  onPress?:  () => void
 }
 
-export const Card: React.FC<CardProps> = ({
-  children,
-  style,
-  elevated = false,
-  variant,
-  padding = 16,
-  radius,
-}) => {
-  const v: CardVariant = variant ?? (elevated ? 'elevated' : 'default');
-
-  return (
-    <View style={[
-      styles.base,
-      radius !== undefined && { borderRadius: radius },
-      v === 'default'  && styles.default,
-      v === 'elevated' && styles.elevated,
-      v === 'flat'     && styles.flat,
-      v === 'outlined' && styles.outlined,
-      v === 'dark'     && styles.dark,
-      { padding },
-      style,
-    ]}>
-      {children}
-    </View>
-  );
-};
-
-const styles = StyleSheet.create({
-  base: {
-    borderRadius: Radius.lg,
-    overflow: 'hidden',
-  },
+const variantStyles: Record<CardVariant, object> = {
   default: {
     backgroundColor: Colors.surface,
     borderWidth: 1,
@@ -69,4 +40,41 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     ...Shadow.md,
   },
-});
+}
+
+export const Card: React.FC<CardProps> = ({
+  children, style, elevated = false, variant,
+  padding = 16, radius, onPress,
+}) => {
+  const v: CardVariant = variant ?? (elevated ? 'elevated' : 'default')
+  const vs = variantStyles[v]
+
+  if (onPress) {
+    return (
+      <YStack
+        onPress={onPress}
+        pressStyle={{ opacity: 0.88, scale: 0.985 }}
+        animation="fast"
+        borderRadius={radius ?? Radius.lg}
+        overflow="hidden"
+        padding={padding}
+        {...(vs as any)}
+        {...(style as any)}
+      >
+        {children}
+      </YStack>
+    )
+  }
+
+  return (
+    <YStack
+      borderRadius={radius ?? Radius.lg}
+      overflow="hidden"
+      padding={padding}
+      {...(vs as any)}
+      {...(style as any)}
+    >
+      {children}
+    </YStack>
+  )
+}
