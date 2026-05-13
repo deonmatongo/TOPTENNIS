@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
+
+function getLocalAuth() {
+  try { return require('expo-local-authentication') as typeof import('expo-local-authentication'); } catch { return null; }
+}
 
 const CREDS_KEY = 'toptennis_biometric_creds';
 
@@ -16,16 +19,18 @@ export const useBiometrics = () => {
 
   useEffect(() => {
     const init = async () => {
-      const compatible = await LocalAuthentication.hasHardwareAsync();
-      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      const LA = getLocalAuth();
+      if (!LA) return;
+      const compatible = await LA.hasHardwareAsync();
+      const enrolled = await LA.isEnrolledAsync();
       if (!compatible || !enrolled) return;
 
       setAvailable(true);
 
-      const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-      if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+      const types = await LA.supportedAuthenticationTypesAsync();
+      if (types.includes(LA.AuthenticationType.FACIAL_RECOGNITION)) {
         setBiometricType('faceid');
-      } else if (types.includes(LocalAuthentication.AuthenticationType.IRIS)) {
+      } else if (types.includes(LA.AuthenticationType.IRIS)) {
         setBiometricType('iris');
       } else {
         setBiometricType('fingerprint');
@@ -45,7 +50,9 @@ export const useBiometrics = () => {
       ? 'Sign in with Iris'
       : 'Sign in with Fingerprint';
 
-    const result = await LocalAuthentication.authenticateAsync({
+    const LA = getLocalAuth();
+    if (!LA) return null;
+    const result = await LA.authenticateAsync({
       promptMessage,
       cancelLabel: 'Cancel',
       fallbackLabel: 'Use Password',
