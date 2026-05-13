@@ -28,14 +28,10 @@ const ACHIEVEMENTS = [
 ]
 
 const QUICK_ACTIONS = [
-  { label: 'Schedule',    icon: 'calendar-outline'   as const, screen: 'Schedule',    bg: Palette.orange50, color: Palette.orange500 },
-  { label: 'Matches',     icon: 'tennisball-outline'  as const, screen: 'Matches',     bg: Palette.orange50, color: Palette.orange500 },
   { label: 'My Leagues',  icon: 'trophy-outline'      as const, screen: 'MyLeagues',   bg: Palette.orange50, color: Palette.orange500 },
   { label: 'Rankings',    icon: 'podium-outline'      as const, screen: 'Competition', bg: Palette.orange50, color: Palette.orange500 },
   { label: 'Performance', icon: 'bar-chart-outline'   as const, screen: 'Performance', bg: Palette.orange50, color: Palette.orange500 },
   { label: 'Social',      icon: 'people-outline'      as const, screen: 'Social',      bg: Palette.orange50, color: Palette.orange500 },
-  { label: 'Messages',    icon: 'chatbubble-outline'  as const, screen: 'Messages',    bg: Palette.orange50, color: Palette.orange500 },
-  { label: 'Settings',    icon: 'settings-outline'    as const, screen: 'Settings',    bg: Palette.orange50, color: Palette.orange500 },
 ]
 
 const getGreeting = () => {
@@ -486,30 +482,6 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
             </XStack>
           </YStack>
 
-          {/* Shortcuts */}
-          <YStack
-            backgroundColor={Colors.surface}
-            borderRadius={Radius.xl}
-            borderWidth={1}
-            borderColor={Colors.border}
-            overflow="hidden"
-          >
-            <TouchableOpacity style={s.shortcutRow} onPress={() => navigation.navigate('NotificationSettings')}>
-              <YStack width={36} height={36} borderRadius={Radius.md} backgroundColor="#FFF7ED" alignItems="center" justifyContent="center">
-                <Ionicons name="notifications-outline" size={18} color={Colors.primary} />
-              </YStack>
-              <Text style={s.shortcutTxt}>Notification Settings</Text>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
-            </TouchableOpacity>
-            <View style={{ height: 1, backgroundColor: Colors.borderLight, marginHorizontal: Spacing.md }} />
-            <TouchableOpacity style={s.shortcutRow} onPress={() => navigation.navigate('Profile')}>
-              <YStack width={36} height={36} borderRadius={Radius.md} backgroundColor="#F0FDF4" alignItems="center" justifyContent="center">
-                <Ionicons name="person-outline" size={18} color="#10b981" />
-              </YStack>
-              <Text style={s.shortcutTxt}>Edit Profile</Text>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
-            </TouchableOpacity>
-          </YStack>
         </YStack>
       </ScrollView>
 
@@ -553,9 +525,6 @@ const s = StyleSheet.create({
 
   leagueRow:    { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border, ...Shadow.xs },
   leagueName:   { flex: 1, fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.text },
-
-  shortcutRow:  { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md },
-  shortcutTxt:  { flex: 1, fontSize: FontSize.sm, color: Colors.text, fontFamily: Font.medium },
 
   searchInput:  { flex: 1, fontSize: FontSize.sm, color: '#fff', paddingVertical: 0 },
   searchRow:    { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
