@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/services/supabase';
+import { captureError } from '@/services/sentry';
 
 export interface DivisionAssignment {
   id: string;
@@ -42,7 +43,10 @@ export const useDivisionAssignments = () => {
       .eq('user_id', user.id)
       .eq('status', 'active');
 
-    if (error) console.error('[useDivisionAssignments]', error.message);
+    if (error) {
+      captureError(error);
+      if (__DEV__) console.error('[useDivisionAssignments]', error.message);
+    }
     setAssignments(data || []);
     setLoading(false);
   };

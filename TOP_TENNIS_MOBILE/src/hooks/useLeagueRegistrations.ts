@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { captureError } from '@/services/sentry';
 
 export interface League {
   id: string;
@@ -95,7 +96,8 @@ export function useLeagueRegistrations() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('[useLeagueRegistrations] fetch error:', error.message);
+      captureError(error);
+      if (__DEV__) console.error('[useLeagueRegistrations] fetch error:', error.message);
     }
     // Attach static league data to each registration
     const enriched = (data || []).map(r => ({

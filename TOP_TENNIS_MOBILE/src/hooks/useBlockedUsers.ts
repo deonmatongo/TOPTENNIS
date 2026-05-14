@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { captureError } from '@/services/sentry';
 
 export interface BlockedUser {
   id: string;
@@ -34,7 +35,8 @@ export const useBlockedUsers = () => {
       }
       setBlockedUsers(data || []);
     } catch (err) {
-      console.error('useBlockedUsers fetch error:', err);
+      captureError(err);
+      if (__DEV__) console.error('useBlockedUsers fetch error:', err);
     } finally {
       setLoading(false);
     }

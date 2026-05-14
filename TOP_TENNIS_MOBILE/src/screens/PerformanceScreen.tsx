@@ -128,11 +128,11 @@ export const PerformanceScreen: React.FC<{ navigation: any }> = ({ navigation })
               </TouchableOpacity>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
-              {['all', ...registrations.map(r => r.league_id)].map(id => {
+              {['all', ...registrations.map(r => r.league_id)].map((id, idx) => {
                 const reg = registrations.find(r => r.league_id === id);
                 return (
                   <TouchableOpacity
-                    key={id}
+                    key={id ?? `league-${idx}`}
                     style={[s.leagueChip, leagueId === id && s.leagueChipActive]}
                     onPress={() => setLeagueId(id)}
                   >

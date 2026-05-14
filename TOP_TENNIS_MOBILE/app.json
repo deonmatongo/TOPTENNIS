@@ -89,7 +89,8 @@
         }
       ],
       "expo-web-browser",
-      "@config-plugins/react-native-webrtc"
+      "@config-plugins/react-native-webrtc",
+      "@sentry/react-native/expo"
     ],
     "notification": {
       "icon": "./assets/notification-icon.png",

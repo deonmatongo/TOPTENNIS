@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { captureError } from '@/services/sentry';
 
 export interface MatchInvite {
   id: string;
@@ -105,7 +106,8 @@ export const useMatches = () => {
       setInvites(enriched);
       checkPastDueMatches(enriched).catch(() => {});
     } catch (e) {
-      console.error('Error fetching matches:', e);
+      captureError(e);
+      if (__DEV__) console.error('Error fetching matches:', e);
     } finally {
       setLoading(false);
     }

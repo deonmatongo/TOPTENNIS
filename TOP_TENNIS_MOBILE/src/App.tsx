@@ -1,4 +1,8 @@
 import React, { useEffect } from 'react';
+import { initSentry, setUser, clearUser } from '@/services/sentry';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+
+initSentry();
 import { TamaguiProvider } from 'tamagui';
 import tamaguiConfig from '../tamagui.config';
 import { View, ActivityIndicator, StyleSheet, Text, Platform, Linking } from 'react-native';
@@ -242,20 +246,22 @@ export default function App() {
   }
 
   return (
-    <TamaguiProvider config={tamaguiConfig}>
-      <SafeAreaProvider>
-        <AuthProvider>
-          <CallProvider>
-            <NavigationContainer linking={linking}>
-              <StatusBar style="dark" />
-              <AppNavigator />
-              <NetworkBanner />
-              <CallOverlayManager />
-            </NavigationContainer>
-          </CallProvider>
-        </AuthProvider>
-      </SafeAreaProvider>
-    </TamaguiProvider>
+    <ErrorBoundary>
+      <TamaguiProvider config={tamaguiConfig}>
+        <SafeAreaProvider>
+          <AuthProvider>
+            <CallProvider>
+              <NavigationContainer linking={linking}>
+                <StatusBar style="dark" />
+                <AppNavigator />
+                <NetworkBanner />
+                <CallOverlayManager />
+              </NavigationContainer>
+            </CallProvider>
+          </AuthProvider>
+        </SafeAreaProvider>
+      </TamaguiProvider>
+    </ErrorBoundary>
   );
 }
 

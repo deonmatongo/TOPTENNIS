@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/services/supabase';
+import { captureError } from '@/services/sentry';
 
 export interface LeagueMatch {
   id: string;
@@ -87,7 +88,8 @@ export const useLeagueMatches = (divisionId?: string) => {
 
       setMatches(formatted);
     } catch (e: any) {
-      console.error('[useLeagueMatches]', e.message);
+      captureError(e);
+      if (__DEV__) console.error('[useLeagueMatches]', e);
     } finally {
       setLoading(false);
     }

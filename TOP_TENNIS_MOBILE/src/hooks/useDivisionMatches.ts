@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/services/supabase';
+import { captureError } from '@/services/sentry';
 
 export interface DivisionMatch {
   id: string;
@@ -103,7 +104,8 @@ export const useDivisionMatches = (divisionId?: string) => {
 
         setMatches(formatted);
       } catch (e: any) {
-        console.error('[useDivisionMatches]', e.message);
+        captureError(e);
+        if (__DEV__) console.error('[useDivisionMatches]', e);
       } finally {
         setLoading(false);
       }

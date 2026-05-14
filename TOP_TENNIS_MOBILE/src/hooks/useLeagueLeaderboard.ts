@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/services/supabase';
+import { captureError } from '@/services/sentry';
 
 export interface LeagueLeaderboardPlayer {
   id: string;
@@ -100,7 +101,8 @@ export const useLeagueLeaderboard = (leagueId?: string) => {
 
         setLeaderboard(sorted);
       } catch (e: any) {
-        console.error('[useLeagueLeaderboard]', e.message);
+        captureError(e);
+        if (__DEV__) console.error('[useLeagueLeaderboard]', e);
       } finally {
         setLoading(false);
       }

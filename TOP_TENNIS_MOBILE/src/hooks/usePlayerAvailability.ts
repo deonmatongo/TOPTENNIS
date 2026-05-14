@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/services/supabase';
+import { captureError } from '@/services/sentry';
 
 export interface AvailabilitySlot {
   id: string;
@@ -29,7 +30,10 @@ export function usePlayerAvailability(playerUserId?: string) {
       .order('date', { ascending: true })
       .order('start_time', { ascending: true });
 
-    if (error) console.error('[usePlayerAvailability]', error.message);
+    if (error) {
+      captureError(error);
+      if (__DEV__) console.error('[usePlayerAvailability]', error.message);
+    }
     setAvailability(data || []);
     setLoading(false);
   };

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { captureError } from '@/services/sentry';
 
 export interface Message {
   id: string;
@@ -57,7 +58,8 @@ export const useMessages = () => {
 
       setMessages(enriched);
     } catch (e) {
-      console.error('Error fetching messages:', e);
+      captureError(e);
+      if (__DEV__) console.error('Error fetching messages:', e);
     } finally {
       setLoading(false);
     }

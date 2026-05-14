@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { captureError } from '@/services/sentry';
 
 export interface ConversationMember {
   user_id: string;
@@ -134,7 +135,8 @@ export const useConversations = () => {
 
       setConversations(built);
     } catch (err) {
-      console.error('useConversations fetch error:', err);
+      captureError(err);
+      if (__DEV__) console.error('useConversations fetch error:', err);
     } finally {
       setLoading(false);
     }

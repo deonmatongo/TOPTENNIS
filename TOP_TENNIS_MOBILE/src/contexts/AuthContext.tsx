@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/services/supabase';
+import { setUser as setSentryUser, clearUser as clearSentryUser } from '@/services/sentry';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 
@@ -44,6 +45,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      if (session?.user) {
+        setSentryUser(session.user.id, session.user.email);
+      } else {
+        clearSentryUser();
+      }
     });
 
     return () => subscription.unsubscribe();

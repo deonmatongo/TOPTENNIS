@@ -382,7 +382,7 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
             const isTop3 = index < 3;
             return (
               <TouchableOpacity
-                key={p.user_id}
+                key={p.user_id ?? `lb-${index}`}
                 style={[styles.standingRow, p.isCurrentUser && styles.standingRowSelf]}
                 onPress={() => {
                   if (!p.isCurrentUser) {
@@ -491,7 +491,7 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
           const medals = ['🥇', '🥈', '🥉'];
           return (
             <TouchableOpacity
-              key={p.user_id}
+              key={p.user_id ?? `llb-${index}`}
               style={[styles.standingRow, p.isCurrentUser && styles.standingRowSelf]}
               onPress={() => {
                 if (!p.isCurrentUser) {

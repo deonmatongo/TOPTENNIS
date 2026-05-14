@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/services/supabase';
+import { captureError } from '@/services/sentry';
 
 export interface MatchHistoryEntry {
   id: string;
@@ -146,7 +147,8 @@ export const useMatchHistory = (limit = 20) => {
 
         setHistory(entries.slice(0, limit));
       } catch (e: any) {
-        console.error('[useMatchHistory]', e.message);
+        captureError(e);
+        if (__DEV__) console.error('[useMatchHistory]', e);
       } finally {
         setLoading(false);
       }

@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
+import { captureError } from '@/services/sentry';
 
 interface Opponent {
   user_id: string;
@@ -70,7 +71,8 @@ export const ScheduleLeagueMatchModal: React.FC<Props> = ({ visible, divisionId,
       if (error) throw error;
       setOpponents(data || []);
     } catch (e: any) {
-      console.error('[ScheduleLeagueMatchModal] fetch opponents:', e.message);
+      captureError(e);
+      if (__DEV__) console.error('[ScheduleLeagueMatchModal] fetch opponents:', e);
     } finally {
       setLoadingOpponents(false);
     }

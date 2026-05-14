@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { captureError } from '@/services/sentry';
 
 export interface AvailabilitySlot {
   id: string;
@@ -31,7 +32,8 @@ export function useUserAvailability() {
       if (error) throw error;
       setAvailability(data || []);
     } catch (e) {
-      console.error('Error fetching availability:', e);
+      captureError(e);
+      if (__DEV__) console.error('Error fetching availability:', e);
     } finally {
       setLoading(false);
     }

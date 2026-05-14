@@ -204,7 +204,7 @@ export const CompetitionScreen: React.FC<{ navigation: any }> = ({ navigation })
                     const isTop3 = index < 3;
                     return (
                       <TouchableOpacity
-                        key={p.user_id}
+                        key={p.user_id ?? `comp-${index}`}
                         style={[styles.lbRow, p.isCurrentUser && styles.lbRowSelf]}
                         onPress={() => {
                           if (!p.isCurrentUser) {

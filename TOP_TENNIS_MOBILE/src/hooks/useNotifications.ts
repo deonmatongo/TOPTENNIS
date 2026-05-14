@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { captureError } from '@/services/sentry';
 
 export type NotificationType =
   | 'message_received'
@@ -82,7 +83,8 @@ export const useNotifications = () => {
       pendingQueueRef.current.forEach(r => injectRow(r));
       pendingQueueRef.current = [];
     } catch (e) {
-      console.error('Error fetching notifications:', e);
+      captureError(e);
+      if (__DEV__) console.error('Error fetching notifications:', e);
       setNotifications([]);
       setUnreadCount(0);
       hasLoadedRef.current = true;
