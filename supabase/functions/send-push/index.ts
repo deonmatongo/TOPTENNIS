@@ -8,18 +8,11 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const EXPO_PUSH_URL = 'https://exp.host/--/exponent-apis/push/send'
+const EXPO_PUSH_URL = 'https://api.expo.dev/v2/push/send'
 
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 })
-  }
-
-  // Verify caller provides the anon key — limits abuse while keeping trigger simple
-  const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-  const bearer  = req.headers.get('Authorization')?.replace('Bearer ', '') ?? ''
-  if (anonKey && bearer !== anonKey) {
-    return new Response('Unauthorized', { status: 401 })
   }
 
   let body: Record<string, unknown>
@@ -76,13 +69,25 @@ Deno.serve(async (req: Request) => {
     body: JSON.stringify(pushMessage),
   })
 
-  const result = await expoRes.json()
+  let result: Record<string, unknown>
+  try {
+    result = await expoRes.json()
+  } catch {
+    const text = await expoRes.text()
+    return new Response(JSON.stringify({ error: 'Non-JSON response from Expo', raw: text }), {
+      status: 502,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
 
-  // Log delivery errors from Expo
-  const tickets = Array.isArray(result.data) ? result.data : [result]
-  for (const ticket of tickets) {
-    if (ticket.status === 'error') {
-      console.error('[send-push] Expo delivery error:', JSON.stringify(ticket))
+  // v2 API wraps the ticket in { data: {...} }
+  const ticket = result.data as Record<string, unknown> | undefined
+  if (ticket?.status === 'error') {
+    console.error('[send-push] Expo delivery error:', JSON.stringify(ticket))
+    // Auto-clear stale/invalid tokens so we don't keep retrying
+    const errCode = (ticket.details as any)?.error
+    if (errCode === 'DeviceNotRegistered' || errCode === 'InvalidCredentials') {
+      await supabase.from('profiles').update({ push_token: null }).eq('id', userId)
     }
   }
 
