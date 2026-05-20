@@ -671,23 +671,30 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
   };
 
   return (
-    <View style={{ flex: 1 }}>
-      <View style={[styles.detailHeader, { paddingTop: detailInsets.top + Spacing.md }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-          <Ionicons name="arrow-back" size={20} color={Colors.text} />
-          <Text style={styles.backBtnText}>Back</Text>
+    <View style={{ flex: 1, backgroundColor: Colors.background }}>
+      <StatusBar style="light" />
+      {/* Dark gradient header — matches every other screen */}
+      <LinearGradient
+        colors={[Palette.dark900, Palette.dark700]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.gradHeader, { paddingTop: detailInsets.top + Spacing.md }]}
+      >
+        <TouchableOpacity style={styles.gradBackBtn} onPress={onBack}>
+          <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <View style={styles.detailTitleWrap}>
-          <View style={styles.detailIconWrap}><Ionicons name="trophy" size={22} color={Colors.primary} /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.detailTitle} numberOfLines={1}>{registration.league_name}</Text>
-            <Text style={styles.detailSub}>Season {new Date(registration.created_at).getFullYear()}{divisionInfo ? `  •  ${divisionInfo.division_name}` : ''}</Text>
-          </View>
-          <View style={[styles.statusBadge, status === 'In Progress' ? styles.statusBadgeGreen : styles.statusBadgeGray]}>
-            <Text style={[styles.statusBadgeText, { color: status === 'In Progress' ? Colors.success : Colors.textMuted }]}>{status}</Text>
-          </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.gradTitle} numberOfLines={1}>{registration.league_name}</Text>
+          <Text style={styles.gradSub}>
+            Season {new Date(registration.created_at).getFullYear()}{divisionInfo ? `  •  ${divisionInfo.division_name}` : ''}
+          </Text>
         </View>
-      </View>
+        <View style={[styles.statusBadge, status === 'In Progress' ? styles.statusBadgeGreen : styles.statusBadgeGray]}>
+          <Text style={[styles.statusBadgeText, { color: status === 'In Progress' ? Colors.success : Colors.textMuted }]}>{status}</Text>
+        </View>
+      </LinearGradient>
+
+      {/* Matches / Division / League / Playoffs pill tabs */}
       <View style={styles.tabBar}>
         {TABS.map(tab => (
           <TouchableOpacity key={tab.key} style={[styles.tabItem, activeTab === tab.key && styles.tabItemActive]} onPress={() => setActiveTab(tab.key)}>
@@ -696,7 +703,8 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
           </TouchableOpacity>
         ))}
       </View>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.tabScroll, { paddingBottom: detailInsets.bottom + Spacing.xl }]}>
         {activeTab === 'matches' && renderMatches()}
         {activeTab === 'division' && renderDivision()}
         {activeTab === 'league' && renderLeagueStandings()}
@@ -803,6 +811,7 @@ export const MyLeaguesScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
+        contentContainerStyle={{ paddingBottom: insets.bottom + Spacing.xl }}
       >
         <View style={styles.content}>
           {!LEAGUE_ACTIVITIES_AVAILABLE ? (
