@@ -391,7 +391,30 @@ export const MatchBookingSheet: React.FC<MatchBookingSheetProps> = ({
               </View>
             ) : (
               <ScrollView showsVerticalScrollIndicator={false} style={bs.slotsScroll}>
-                <Text style={bs.slotsDateLabel}>{format(DAYS[selectedDay], 'EEEE, MMMM d')}</Text>
+                {/* Per-day available slot count */}
+                {(() => {
+                  const availCount = HOURS.filter(h =>
+                    slotCoversHour(myAvail, selectedDate, h) &&
+                    (members.length !== 1 || slotCoversHour(theirAvail, selectedDate, h))
+                  ).length;
+                  const myCount = HOURS.filter(h => slotCoversHour(myAvail, selectedDate, h)).length;
+                  const hasAny = members.length === 1 ? availCount > 0 : myCount > 0;
+                  const count  = members.length === 1 ? availCount : myCount;
+                  return (
+                    <View style={[bs.daySlotNote, hasAny ? bs.daySlotNoteGreen : bs.daySlotNoteGray]}>
+                      <Ionicons
+                        name={hasAny ? 'checkmark-circle' : 'close-circle-outline'}
+                        size={15}
+                        color={hasAny ? Colors.success : Colors.textMuted}
+                      />
+                      <Text style={[bs.daySlotNoteTxt, { color: hasAny ? Colors.success : Colors.textMuted }]}>
+                        {hasAny
+                          ? `${count} available slot${count > 1 ? 's' : ''} on ${format(DAYS[selectedDay], 'EEE, MMM d')}`
+                          : `No available slots on ${format(DAYS[selectedDay], 'EEE, MMM d')}`}
+                      </Text>
+                    </View>
+                  );
+                })()}
 
                 {/* Legend */}
                 {members.length === 1 && (
@@ -418,6 +441,7 @@ export const MatchBookingSheet: React.FC<MatchBookingSheetProps> = ({
                       ? slotCoversHour(theirAvail, selectedDate, h)
                       : true;
                     const mutual     = meAvail && themAvail;
+                    const myFree     = meAvail && !themAvail && members.length === 1;
                     const theirOnly  = !meAvail && themAvail && members.length === 1;
                     const isSelected = selectedHour === h;
 
@@ -425,16 +449,27 @@ export const MatchBookingSheet: React.FC<MatchBookingSheetProps> = ({
                     let labelColor = Colors.textMuted;
                     let badge: string | null = null;
                     let badgeColor = '';
+                    let borderColor = 'transparent';
 
-                    if (mutual)      { bg = '#e8faf0'; labelColor = Colors.success; badge = '⭐ Mutual'; badgeColor = Colors.success; }
-                    else if (theirOnly) { bg = '#fff3e6'; labelColor = Colors.accent; badge = 'Their time'; badgeColor = Colors.accent; }
+                    if (mutual) {
+                      bg = '#d4f5e0'; labelColor = '#1a7a45';
+                      badge = '✓ Both free'; badgeColor = Colors.success;
+                      borderColor = Colors.success + '55';
+                    } else if (myFree) {
+                      bg = '#e8faf0'; labelColor = Colors.success;
+                      badge = 'My time'; badgeColor = Colors.success;
+                      borderColor = Colors.success + '33';
+                    } else if (theirOnly) {
+                      bg = '#fff3e6'; labelColor = Colors.accent;
+                      badge = 'Their time'; badgeColor = Colors.accent;
+                    }
 
                     return (
                       <TouchableOpacity
                         key={h}
                         style={[
                           bs.slot,
-                          { backgroundColor: bg },
+                          { backgroundColor: bg, borderColor },
                           isSelected && bs.slotSelected,
                         ]}
                         onPress={() => {
@@ -616,7 +651,10 @@ const bs = StyleSheet.create({
   loadTxt:     { fontSize: 14, color: Colors.textMuted },
 
   slotsScroll: { flex: 1 },
-  slotsDateLabel: { fontSize: 14, fontFamily: Font.semibold, color: Colors.text, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 },
+  daySlotNote:      { flexDirection: 'row', alignItems: 'center', gap: 7, marginHorizontal: 12, marginTop: 10, marginBottom: 4, paddingHorizontal: 12, paddingVertical: 9, borderRadius: Radius.md, borderWidth: 1 },
+  daySlotNoteGreen: { backgroundColor: '#edfaf3', borderColor: '#a8eac5' },
+  daySlotNoteGray:  { backgroundColor: '#f5f5f5', borderColor: Colors.borderLight },
+  daySlotNoteTxt:   { fontSize: 13, fontFamily: Font.medium, flex: 1 },
   legend:      { flexDirection: 'row', gap: 16, paddingHorizontal: 16, paddingBottom: 10 },
   legendItem:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendDot:   { width: 10, height: 10, borderRadius: 5 },

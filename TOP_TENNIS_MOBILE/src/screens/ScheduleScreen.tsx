@@ -4,6 +4,7 @@ import {
   Modal, TextInput, Alert, ActivityIndicator, RefreshControl, Dimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserAvailability } from '@/hooks/useUserAvailability';
@@ -110,6 +111,8 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
   const primaryDivisionId = assignments[0]?.division_id;
   const { userMatches: leagueMatches } = useLeagueMatches(primaryDivisionId);
   const { exportMultiple, exporting } = useCalendarExport();
+
+  useFocusEffect(useCallback(() => { refetchInvites(); }, [refetchInvites]));
 
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<string, number>>({});

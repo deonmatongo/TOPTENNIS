@@ -147,6 +147,99 @@ export const useMatches = () => {
     await fetchInvites();
   }, [user, invites, fetchInvites]);
 
+  /**
+   * Record the result of a casual (non-league) match.
+   * The caller is the winner. Updates match_invites and increments
+   * win/loss counters on both player profiles.
+   */
+  const recordMatchResult = useCallback(async (
+    matchId: string,
+    winnerId: string,
+    senderSetsWon: number,
+    receiverSetsWon: number,
+  ) => {
+    // 1. Persist result on the match invite
+    const { error } = await supabase
+      .from('match_invites')
+      .update({
+        winner_id: winnerId,
+        player1_score: senderSetsWon,
+        player2_score: receiverSetsWon,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', matchId);
+    if (error) throw error;
+
+    // 2. Determine loser id from the cached invites
+    const invite = invites.find(i => i.id === matchId);
+    if (invite) {
+      const loserId = winnerId === invite.sender_id ? invite.receiver_id : invite.sender_id;
+
+      // Update win/loss counters on both profiles (display) and players (leaderboard)
+      const { data: profileRows } = await supabase
+        .from('profiles')
+        .select('id, wins, losses')
+        .in('id', [winnerId, loserId]);
+
+      const profileMap = new Map((profileRows || []).map(p => [p.id, p]));
+      const winnerProfile = profileMap.get(winnerId);
+      const loserProfile  = profileMap.get(loserId);
+
+      const { data: playerRows } = await supabase
+        .from('players')
+        .select('id, user_id, wins, losses')
+        .in('user_id', [winnerId, loserId]);
+
+      const playerMap = new Map((playerRows || []).map(p => [p.user_id, p]));
+      const winnerPlayer = playerMap.get(winnerId);
+      const loserPlayer  = playerMap.get(loserId);
+
+      const updates: any[] = [];
+      if (winnerProfile) {
+        updates.push(supabase.from('profiles').update({ wins: (winnerProfile.wins || 0) + 1 }).eq('id', winnerId));
+      }
+      if (loserProfile) {
+        updates.push(supabase.from('profiles').update({ losses: (loserProfile.losses || 0) + 1 }).eq('id', loserId));
+      }
+      if (winnerPlayer) {
+        updates.push(supabase.from('players').update({ wins: (winnerPlayer.wins || 0) + 1 }).eq('user_id', winnerId));
+      }
+      if (loserPlayer) {
+        updates.push(supabase.from('players').update({ losses: (loserPlayer.losses || 0) + 1 }).eq('user_id', loserId));
+      }
+      await Promise.allSettled(updates);
+
+      // 3. Notify the opponent
+      if (user) {
+        const { data: myProfile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('id', user.id)
+          .single();
+        const myName = myProfile
+          ? `${myProfile.first_name} ${myProfile.last_name}`.trim()
+          : 'Your opponent';
+
+        const notifiedUserId = user.id === invite.sender_id ? invite.receiver_id : invite.sender_id;
+        const didOppWin = winnerId === notifiedUserId;
+
+        await supabase.from('notifications').insert({
+          user_id: notifiedUserId,
+          type: 'match_result',
+          title: didOppWin ? 'Match Result — You Won!' : 'Match Result Logged',
+          message: didOppWin
+            ? `${myName} has logged the match result. You won ${receiverSetsWon}–${senderSetsWon} in sets.`
+            : `${myName} has logged the match result. They won ${senderSetsWon}–${receiverSetsWon} in sets.`,
+          read: false,
+          action_url: '/matches',
+          metadata: { match_id: matchId },
+        }).then(() => {}); // non-critical
+      }
+    }
+
+    await fetchInvites();
+  }, [invites, user, fetchInvites]);
+
   const pendingReceived = invites.filter(
     i => i.status === 'pending' && i.receiver_id === user?.id
   );
@@ -159,5 +252,5 @@ export const useMatches = () => {
 
   useEffect(() => { fetchInvites(); }, [fetchInvites]);
 
-  return { invites, loading, pendingReceived, upcoming, history, respondToInvite, refetch: fetchInvites };
+  return { invites, loading, pendingReceived, upcoming, history, respondToInvite, recordMatchResult, refetch: fetchInvites };
 };

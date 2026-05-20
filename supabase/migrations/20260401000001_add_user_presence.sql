@@ -1,8 +1,5 @@
 -- ============================================================
 -- Add user_presence table for reliable online status tracking.
--- Replaces Supabase Realtime Presence (which requires a separate
--- dashboard toggle) with postgres_changes, which is already
--- used and confirmed working for notifications.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS user_presence (
@@ -12,17 +9,29 @@ CREATE TABLE IF NOT EXISTS user_presence (
 
 ALTER TABLE user_presence ENABLE ROW LEVEL SECURITY;
 
--- Authenticated users can view all presence records
-CREATE POLICY "view_presence" ON user_presence
-  FOR SELECT TO authenticated USING (true);
+-- Create policies only if they don't already exist
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'user_presence' AND policyname = 'view_presence'
+  ) THEN
+    CREATE POLICY "view_presence" ON user_presence
+      FOR SELECT TO authenticated USING (true);
+  END IF;
 
--- Users can only insert their own presence
-CREATE POLICY "insert_own_presence" ON user_presence
-  FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'user_presence' AND policyname = 'insert_own_presence'
+  ) THEN
+    CREATE POLICY "insert_own_presence" ON user_presence
+      FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+  END IF;
 
--- Users can only update their own presence
-CREATE POLICY "update_own_presence" ON user_presence
-  FOR UPDATE TO authenticated USING (user_id = auth.uid());
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'user_presence' AND policyname = 'update_own_presence'
+  ) THEN
+    CREATE POLICY "update_own_presence" ON user_presence
+      FOR UPDATE TO authenticated USING (user_id = auth.uid());
+  END IF;
+END $$;
 
 -- Enable full row data in realtime payloads
 ALTER TABLE user_presence REPLICA IDENTITY FULL;

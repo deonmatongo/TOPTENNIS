@@ -81,6 +81,21 @@ export const useBiometrics = () => {
     setCredentialsStored(false);
   }, []);
 
+  const verifyIdentity = useCallback(async (): Promise<boolean> => {
+    const LA = getLocalAuth();
+    if (!LA) return false;
+    const promptMessage = biometricType === 'faceid' ? 'Unlock TopTennis'
+      : biometricType === 'iris' ? 'Unlock with Iris'
+      : 'Unlock with Fingerprint';
+    const result = await LA.authenticateAsync({
+      promptMessage,
+      cancelLabel: 'Cancel',
+      fallbackLabel: 'Use Password',
+      disableDeviceFallback: false,
+    });
+    return result.success;
+  }, [biometricType]);
+
   const biometricLabel =
     biometricType === 'faceid' ? 'Face ID'
     : biometricType === 'iris' ? 'Iris'
@@ -92,6 +107,7 @@ export const useBiometrics = () => {
     biometricLabel,
     credentialsStored,
     authenticate,
+    verifyIdentity,
     saveCredentials,
     clearCredentials,
   };

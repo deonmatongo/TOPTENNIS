@@ -9,7 +9,7 @@ import { useMatches } from '@/hooks/useMatches';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar } from '@/components/ui/Avatar';
 import { MatchInviteResponseModal } from '@/components/ui/MatchInviteResponseModal';
-import { ScoreConfirmationModal } from '@/components/ui/ScoreConfirmationModal';
+import { CasualMatchScoringModal } from '@/components/ui/CasualMatchScoringModal';
 import { ProposeNewTimeModal } from '@/components/ui/ProposeNewTimeModal';
 import { useCalendarExport } from '@/hooks/useCalendarExport';
 import { supabase } from '@/services/supabase';
@@ -25,7 +25,7 @@ type Tab = 'pending' | 'upcoming' | 'history';
 export const MatchesScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { pendingReceived, upcoming, history, loading, respondToInvite, refetch } = useMatches();
+  const { pendingReceived, upcoming, history, loading, respondToInvite, recordMatchResult, refetch } = useMatches();
   const [tab, setTab] = useState<Tab>('pending');
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -178,9 +178,16 @@ export const MatchesScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
         onDecline={async (id) => { await handleRespond(id, 'declined'); setSelectedInvite(null); }}
         onProposeNewTime={async (id, date, start, end) => { await handleProposeNewTime(id, date, start, end); setSelectedInvite(null); }}
       />
-      <ScoreConfirmationModal
-        visible={!!scoreMatch} match={scoreMatch} userId={user?.id || ''}
-        onClose={() => setScoreMatch(null)} onConfirmed={() => { setScoreMatch(null); refetch(); }}
+      <CasualMatchScoringModal
+        visible={!!scoreMatch}
+        match={scoreMatch}
+        userId={user?.id || ''}
+        onClose={() => setScoreMatch(null)}
+        onSubmit={async (winnerId, senderSets, receiverSets) => {
+          await recordMatchResult(scoreMatch.id, winnerId, senderSets, receiverSets);
+          Alert.alert('Result Saved!', 'The match result has been logged and both players notified.');
+          setScoreMatch(null);
+        }}
       />
       <ProposeNewTimeModal
         visible={!!rescheduleInvite} invite={rescheduleInvite} userId={user?.id || ''}
@@ -307,17 +314,26 @@ function MatchCard({ invite, userId, getOpponent, onReschedule, onExport, onReco
   const iWon = hasWinner && invite.winner_id === userId;
   const hasScore = invite.player1_score != null && invite.player2_score != null;
 
+  // Resolve which score belongs to me vs opponent
+  const mySets  = isSender ? invite.player1_score : invite.player2_score;
+  const oppSets = isSender ? invite.player2_score : invite.player1_score;
+
   return (
     <View style={s.card}>
-      {/* Top: avatar + name + status */}
+      {/* Top: avatar + name + result/status badge */}
       <View style={s.cardTop}>
         <Avatar name={name} size={48} imageUrl={imageUrl} />
         <View style={s.cardIdentity}>
           <Text style={s.cardName}>{name}</Text>
-          <Text style={s.cardSub}>{isSender ? 'You invited' : 'Invited you'}</Text>
+          <Text style={s.cardSub}>{format(new Date(invite.date), 'EEEE, MMMM d')}</Text>
         </View>
         {isPast && hasWinner ? (
           <View style={[s.resultBadge, iWon ? s.resultBadgeWon : s.resultBadgeLost]}>
+            <Ionicons
+              name={iWon ? 'trophy' : 'ribbon-outline'}
+              size={11}
+              color={iWon ? Colors.success : Palette.red500}
+            />
             <Text style={[s.resultBadgeTxt, { color: iWon ? Colors.success : Palette.red500 }]}>
               {iWon ? 'WON' : 'LOST'}
             </Text>
@@ -326,23 +342,36 @@ function MatchCard({ invite, userId, getOpponent, onReschedule, onExport, onReco
           <View style={[s.statusBadge, isPast ? s.statusBadgeGray : s.statusBadgeGreen]}>
             <View style={[s.statusDot, { backgroundColor: isPast ? Colors.textMuted : Colors.success }]} />
             <Text style={[s.statusTxt, { color: isPast ? Colors.textMuted : Colors.success }]}>
-              {isPast ? 'Completed' : 'Confirmed'}
+              {isPast ? 'Played' : 'Confirmed'}
             </Text>
           </View>
         )}
       </View>
 
-      {/* Strava-style 3-up stats */}
+      {/* Score display — only when a result has been logged */}
+      {isPast && hasScore && hasWinner && (
+        <View style={s.scoreSummary}>
+          <View style={[s.scoreSummaryPlayer, iWon && s.scoreSummaryWinner]}>
+            <Text style={s.scoreSummaryLabel}>You</Text>
+            <Text style={[s.scoreSummaryNum, iWon && s.scoreSummaryNumWinner]}>{mySets}</Text>
+          </View>
+          <Text style={s.scoreSummarySep}>sets</Text>
+          <View style={[s.scoreSummaryPlayer, !iWon && hasWinner && s.scoreSummaryWinner]}>
+            <Text style={s.scoreSummaryLabel}>{name.split(' ')[0]}</Text>
+            <Text style={[s.scoreSummaryNum, !iWon && hasWinner && s.scoreSummaryNumWinner]}>{oppSets}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* 3-up stats */}
       <View style={s.statsRow}>
         <View style={s.stat}>
           <Text style={s.statLabel}>DATE</Text>
           <Text style={s.statValue}>{format(new Date(invite.date), 'MMM d')}</Text>
         </View>
         <View style={[s.stat, s.statMid]}>
-          <Text style={s.statLabel}>{isPast && hasScore ? 'SCORE' : 'TIME'}</Text>
-          <Text style={s.statValue} numberOfLines={1}>
-            {isPast && hasScore ? `${invite.player1_score}–${invite.player2_score}` : invite.start_time}
-          </Text>
+          <Text style={s.statLabel}>TIME</Text>
+          <Text style={s.statValue}>{invite.start_time}</Text>
         </View>
         <View style={s.stat}>
           <Text style={s.statLabel}>COURT</Text>
@@ -350,7 +379,25 @@ function MatchCard({ invite, userId, getOpponent, onReschedule, onExport, onReco
         </View>
       </View>
 
-      {/* Actions */}
+      {/* Pending result prompt — for past matches with no result yet */}
+      {isPast && !hasWinner && (
+        <TouchableOpacity
+          style={s.recordBanner}
+          onPress={onRecordResult}
+          activeOpacity={0.85}
+        >
+          <View style={s.recordBannerLeft}>
+            <Ionicons name="trophy" size={18} color={Colors.primary} />
+            <View>
+              <Text style={s.recordBannerTitle}>Log the result</Text>
+              <Text style={s.recordBannerSub}>Tap to enter the match score</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={Colors.primary} />
+        </TouchableOpacity>
+      )}
+
+      {/* Actions row */}
       {!isPast ? (
         <View style={s.actionRow}>
           <TouchableOpacity style={s.actionBtn} onPress={onReschedule} activeOpacity={0.75}>
@@ -368,12 +415,7 @@ function MatchCard({ invite, userId, getOpponent, onReschedule, onExport, onReco
             <Text style={s.actionBtnTxt}>Record</Text>
           </TouchableOpacity>
         </View>
-      ) : !hasWinner && (
-        <TouchableOpacity style={s.recordResultBtn} onPress={onRecordResult} activeOpacity={0.85}>
-          <Ionicons name="trophy-outline" size={15} color={Colors.primary} />
-          <Text style={s.recordResultTxt}>Record Result</Text>
-        </TouchableOpacity>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -567,21 +609,54 @@ const s = StyleSheet.create({
   profileChipTxt: { fontSize: FontSize.xxs, fontFamily: Font.semibold, color: Colors.textSecondary },
 
   // ── Result badge (Won / Lost) ─────────────────────────────────────────────
-  resultBadge: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: Radius.xs },
+  resultBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 5, borderRadius: Radius.xs,
+  },
   resultBadgeWon:  { backgroundColor: Colors.successLight },
   resultBadgeLost: { backgroundColor: '#FFEEEE' },
   resultBadgeTxt:  { fontSize: 11, fontFamily: Font.extrabold, letterSpacing: 0.5 },
 
-  // ── Record result button (history, no winner) ────────────────────────────
-  recordResultBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    marginHorizontal: Spacing.lg, marginBottom: Spacing.md, marginTop: 4,
-    paddingVertical: 11,
+  // ── Score summary (shown on history cards with a result) ─────────────────
+  scoreSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+    marginHorizontal: Spacing.lg,
+  },
+  scoreSummaryPlayer: {
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
     borderRadius: Radius.md,
-    borderWidth: 1.5, borderColor: Colors.primary,
+  },
+  scoreSummaryWinner: { backgroundColor: Colors.successLight },
+  scoreSummaryLabel: { fontSize: FontSize.xs, fontFamily: Font.semibold, color: Colors.textMuted },
+  scoreSummaryNum: { fontSize: 36, fontFamily: Font.black, color: Colors.text, letterSpacing: -1 },
+  scoreSummaryNumWinner: { color: Colors.success },
+  scoreSummarySep: { fontSize: FontSize.sm, fontFamily: Font.medium, color: Colors.textMuted },
+
+  // ── Record result inline banner (past match, no result) ───────────────────
+  recordBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: Spacing.lg,
+    marginVertical: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
     backgroundColor: Colors.primaryLight,
   },
-  recordResultTxt: { fontSize: FontSize.sm, fontFamily: Font.bold, color: Colors.primary },
+  recordBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  recordBannerTitle: { fontSize: FontSize.sm, fontFamily: Font.bold, color: Colors.primary },
+  recordBannerSub: { fontSize: FontSize.xs, fontFamily: Font.medium, color: Colors.primaryDark, marginTop: 1 },
 
   // ── Empty / loading ──────────────────────────────────────────────────────
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
