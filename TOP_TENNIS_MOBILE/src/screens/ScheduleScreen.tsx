@@ -12,6 +12,7 @@ import { useMatches } from '@/hooks/useMatches';
 import { useDivisionAssignments } from '@/hooks/useDivisionAssignments';
 import { useLeagueMatches } from '@/hooks/useLeagueMatches';
 import { useCalendarExport } from '@/hooks/useCalendarExport';
+import { CasualMatchScoringModal } from '@/components/ui/CasualMatchScoringModal';
 import { supabase } from '@/services/supabase';
 import { Palette, Colors, Shadow, FontSize, Font, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -106,7 +107,7 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { availability, loading, fetchAvailability, createAvailability, deleteAvailability } = useUserAvailability();
-  const { invites, respondToInvite, refetch: refetchInvites } = useMatches();
+  const { invites, respondToInvite, recordMatchResult, refetch: refetchInvites } = useMatches();
   const { assignments } = useDivisionAssignments();
   const primaryDivisionId = assignments[0]?.division_id;
   const { userMatches: leagueMatches } = useLeagueMatches(primaryDivisionId);
@@ -153,6 +154,7 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
   const [timeError, setTimeError] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalEvent | null>(null);
   const [showEventSheet, setShowEventSheet] = useState(false);
+  const [scoreMatch, setScoreMatch] = useState<any>(null);
 
   const goBack = () => {
     if (viewMode === 'agenda') setCurrentDate(d => subWeeks(d, 1));
@@ -762,12 +764,23 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                 )}
                 {selectedEvent.type === 'match' && !selectedEvent.data?._isLeagueMatch && (() => {
                   const past = new Date(`${selectedEvent.date}T${selectedEvent.start_time}`) < new Date();
-                  return !past ? (
+                  const hasScore = !!selectedEvent.data?.winner_id;
+                  return past ? (
+                    !hasScore ? (
+                      <TouchableOpacity
+                        style={[s.shBtn, s.shBtnAccept]}
+                        onPress={() => { setShowEventSheet(false); setScoreMatch(selectedEvent.data); }}
+                      >
+                        <Ionicons name="trophy-outline" size={16} color="#fff" />
+                        <Text style={s.shBtnText}>Record Score</Text>
+                      </TouchableOpacity>
+                    ) : null
+                  ) : (
                     <TouchableOpacity style={[s.shBtn, s.shBtnDelete]} onPress={() => handleCancelMatch(selectedEvent.id)}>
                       <Ionicons name="close-circle-outline" size={16} color="#fff" />
                       <Text style={s.shBtnText}>Cancel Match</Text>
                     </TouchableOpacity>
-                  ) : null;
+                  );
                 })()}
                 {selectedEvent.type === 'availability' && (
                   <TouchableOpacity style={[s.shBtn, s.shBtnDelete]} onPress={() => handleDeleteAvailability(selectedEvent.id)}>
@@ -783,6 +796,18 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
           )}
         </View>
       </Modal>
+      <CasualMatchScoringModal
+        visible={!!scoreMatch}
+        match={scoreMatch}
+        userId={user?.id || ''}
+        onClose={() => setScoreMatch(null)}
+        onSubmit={async (winnerId, senderSets, receiverSets) => {
+          await recordMatchResult(scoreMatch.id, winnerId, senderSets, receiverSets);
+          Alert.alert('Result Saved!', 'The match result has been logged and both players notified.');
+          setScoreMatch(null);
+          refetchInvites();
+        }}
+      />
     </SafeAreaView>
   );
 };

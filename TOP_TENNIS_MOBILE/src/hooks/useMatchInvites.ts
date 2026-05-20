@@ -45,9 +45,9 @@ export function useMatchInvites() {
     endTime: string;
     courtLocation?: string;
     message?: string;
-  }): Promise<string[]> => {
+  }): Promise<MatchInviteRecord[]> => {
     if (!user) throw new Error('Not authenticated');
-    const ids: string[] = [];
+    const records: MatchInviteRecord[] = [];
     for (const receiverId of params.receiverIds) {
       const { data, error } = await supabase
         .from('match_invites')
@@ -61,10 +61,14 @@ export function useMatchInvites() {
           message: params.message || null,
           status: 'pending',
         })
-        .select('id')
+        .select(`
+          *,
+          sender:profiles!match_invites_sender_id_fkey(first_name,last_name,profile_picture_url),
+          receiver:profiles!match_invites_receiver_id_fkey(first_name,last_name,profile_picture_url)
+        `)
         .single();
       if (error) throw error;
-      ids.push(data.id);
+      records.push(data as MatchInviteRecord);
       await supabase.from('notifications').insert({
         user_id: receiverId,
         type: 'match_invite',
@@ -74,7 +78,7 @@ export function useMatchInvites() {
         metadata: { invite_id: data.id },
       });
     }
-    return ids;
+    return records;
   }, [user]);
 
   const respondToInvite = useCallback(async (inviteId: string, status: 'accepted' | 'declined') => {

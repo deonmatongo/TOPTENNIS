@@ -19,7 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCallContext } from '@/contexts/CallContext';
 import { Avatar } from '@/components/ui/Avatar';
 import { MatchInviteCard, MatchBookingSheet, BookingMember } from '@/components/chat/MatchBooking';
-import { useMatchInvites } from '@/hooks/useMatchInvites';
+import { useMatchInvites, MatchInviteRecord } from '@/hooks/useMatchInvites';
 import { Palette, Colors, Shadow, FontSize, Font, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { StatusBar } from 'expo-status-bar';
@@ -182,7 +182,8 @@ const Bubble: React.FC<{
   onCopy: () => void;
   onDismiss: () => void;
   onSenderPress?: (senderId: string) => void;
-}> = ({ item, replySource, isMine, isGroup, prevSameSender, isLongPressed, onLongPress, onReply, onDelete, onCopy, onDismiss, onSenderPress }) => {
+  recentInvites?: Map<string, MatchInviteRecord>;
+}> = ({ item, replySource, isMine, isGroup, prevSameSender, isLongPressed, onLongPress, onReply, onDelete, onCopy, onDismiss, onSenderPress, recentInvites }) => {
   const senderName = getSenderName(item);
   const showAvatar = isGroup && !isMine && !prevSameSender;
   const showName = isGroup && !isMine && !prevSameSender;
@@ -204,7 +205,7 @@ const Bubble: React.FC<{
         )}
         <View style={bub.col}>
           {showName && <Text style={bub.senderName}>{senderName}</Text>}
-          <MatchInviteCard inviteId={inviteId} isMine={isMine} />
+          <MatchInviteCard inviteId={inviteId} isMine={isMine} initialData={recentInvites?.get(inviteId)} />
           <Text style={[bub.time, isMine ? bub.timeR : bub.timeL, { marginTop: 4 }]}>
             {fmtMsgTime(item.created_at)}
           </Text>
@@ -614,6 +615,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [showBookingSheet, setShowBookingSheet] = useState(false);
+  const [recentInvites, setRecentInvites] = useState<Map<string, MatchInviteRecord>>(new Map());
   const [isRecording, setIsRecording] = useState(false);
   const [recordingCancelled, setRecordingCancelled] = useState(false);
   const [recordSecs, setRecordSecs] = useState(0);
@@ -671,10 +673,15 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
     } finally { setSending(false); }
   };
 
-  const handleBooked = async (inviteIds: string[]) => {
+  const handleBooked = async (invites: MatchInviteRecord[]) => {
     if (!selectedConvId) return;
-    for (const id of inviteIds) {
-      await sendMessage(selectedConvId, `__match_invite__:${id}`, undefined).catch(() => {});
+    setRecentInvites(prev => {
+      const next = new Map(prev);
+      invites.forEach(inv => next.set(inv.id, inv));
+      return next;
+    });
+    for (const inv of invites) {
+      await sendMessage(selectedConvId, `__match_invite__:${inv.id}`, undefined).catch(() => {});
     }
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
   };
@@ -961,6 +968,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
                   onCopy={() => { Clipboard.setString(msg.content); setLongPressMsg(null); }}
                   onDismiss={() => setLongPressMsg(null)}
                   onSenderPress={uid => (navigation as any)?.push?.('PlayerProfile', { userId: uid })}
+                  recentInvites={recentInvites}
                 />
               );
             }}

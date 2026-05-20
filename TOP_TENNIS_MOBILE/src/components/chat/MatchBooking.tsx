@@ -50,12 +50,13 @@ const HOURS = Array.from({ length: 16 }, (_, i) => i + 7); // 7AM – 10PM
 interface MatchInviteCardProps {
   inviteId: string;
   isMine: boolean;
+  initialData?: MatchInviteRecord;
 }
 
-export const MatchInviteCard: React.FC<MatchInviteCardProps> = ({ inviteId, isMine }) => {
+export const MatchInviteCard: React.FC<MatchInviteCardProps> = ({ inviteId, isMine, initialData }) => {
   const { user } = useAuth();
   const { fetchInvite, respondToInvite, acceptProposedTime, cancelInvite } = useMatchInvites();
-  const [invite, setInvite] = useState<MatchInviteRecord | null>(null);
+  const [invite, setInvite] = useState<MatchInviteRecord | null>(initialData ?? null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -63,7 +64,10 @@ export const MatchInviteCard: React.FC<MatchInviteCardProps> = ({ inviteId, isMi
     setInvite(data);
   }, [inviteId, fetchInvite]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    // Only fetch if we don't already have data
+    if (!initialData) load();
+  }, []);
 
   if (!invite) {
     return (
@@ -222,8 +226,8 @@ export interface BookingMember {
 interface MatchBookingSheetProps {
   visible: boolean;
   onClose: () => void;
-  members: BookingMember[];        // other participants in the conversation
-  onBooked: (inviteIds: string[]) => void;
+  members: BookingMember[];
+  onBooked: (invites: MatchInviteRecord[]) => void;
 }
 
 type Step = 'slots' | 'confirm';
@@ -296,7 +300,7 @@ export const MatchBookingSheet: React.FC<MatchBookingSheetProps> = ({
     if (!receivers.length) { Alert.alert('Select at least one player'); return; }
     setSending(true);
     try {
-      const ids = await sendMatchInvites({
+      const records = await sendMatchInvites({
         receiverIds: receivers,
         date: selectedDate,
         startTime,
@@ -304,7 +308,7 @@ export const MatchBookingSheet: React.FC<MatchBookingSheetProps> = ({
         courtLocation: court.trim() || undefined,
         message: msgText.trim() || undefined,
       });
-      onBooked(ids);
+      onBooked(records);
       onClose();
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to send invite');

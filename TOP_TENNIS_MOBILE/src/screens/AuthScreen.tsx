@@ -1,21 +1,23 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import {
-  View, TextInput, TouchableOpacity, ScrollView,
+  View, Text, TextInput, TouchableOpacity, ScrollView,
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
+  StyleSheet, Dimensions,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
-import { YStack, XStack, Text } from 'tamagui'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/services/supabase'
 import { Palette, Colors, FontSize, FontWeight, Radius, Spacing } from '@/theme/colors'
 import { useBiometrics } from '@/hooks/useBiometrics'
 
+const { width: W } = Dimensions.get('window')
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const getPasswordStrength = (pw: string) => {
-  if (!pw) return { score: 0, label: '', color: Colors.border, suggestions: [] as string[] }
+  if (!pw) return { score: 0, label: '', color: 'transparent', suggestions: [] as string[] }
   let score = 0
   const suggestions: string[] = []
   if (pw.length >= 8) score++; else suggestions.push('At least 8 characters')
@@ -36,45 +38,31 @@ const formatPhone = (raw: string): string => {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
 }
 
-// ── Field component ────────────────────────────────────────────────────────────
+// ── Field ─────────────────────────────────────────────────────────────────────
 
 const Field: React.FC<{
-  label:        string
-  error?:       string
-  icon?:        string
-  focused:      boolean
-  onFocus:      () => void
-  onBlur:       () => void
-  flex?:        number
-  children:     React.ReactNode
-}> = ({ label, error, icon, focused, onFocus, onBlur, flex, children }) => (
-  <YStack gap={6} flex={flex}>
-    <Text color={Colors.text} fontSize={FontSize.xs} fontWeight={FontWeight.bold as any} textTransform="uppercase" letterSpacing={0.5}>
-      {label}
-    </Text>
-    <XStack
-      alignItems="center"
-      backgroundColor={Colors.surface}
-      borderWidth={focused ? 2 : 1.5}
-      borderColor={error ? Colors.error : focused ? Colors.primary : Colors.border}
-      borderRadius={Radius.lg}
-      paddingHorizontal={Spacing.md}
-      minHeight={50}
-    >
+  label: string
+  error?: string
+  icon?: string
+  focused: boolean
+  flex?: number
+  children: React.ReactNode
+}> = ({ label, error, icon, focused, flex, children }) => (
+  <View style={[s.fieldWrap, flex ? { flex } : undefined]}>
+    <Text style={s.fieldLabel}>{label}</Text>
+    <View style={[s.fieldBox, focused && s.fieldBoxFocused, !!error && s.fieldBoxError]}>
       {icon && (
         <Ionicons
           name={icon as any}
           size={16}
-          color={focused ? Colors.primary : Colors.textMuted}
+          color={focused ? Palette.orange500 : 'rgba(255,255,255,0.35)'}
           style={{ marginRight: 8 }}
         />
       )}
       {children}
-    </XStack>
-    {!!error && (
-      <Text color={Colors.error} fontSize={FontSize.xs} marginTop={-2}>{error}</Text>
-    )}
-  </YStack>
+    </View>
+    {!!error && <Text style={s.fieldError}>{error}</Text>}
+  </View>
 )
 
 // ── Main Screen ────────────────────────────────────────────────────────────────
@@ -100,13 +88,9 @@ export const AuthScreen: React.FC = () => {
 
   const handleGoogleAuth = async () => {
     setGoogleLoading(true)
-    try {
-      await signInWithGoogle()
-    } catch (e: any) {
-      Alert.alert('Google Sign-In Failed', e?.message || 'Could not sign in with Google. Please try again.')
-    } finally {
-      setGoogleLoading(false)
-    }
+    try { await signInWithGoogle() }
+    catch (e: any) { Alert.alert('Google Sign-In Failed', e?.message || 'Could not sign in with Google.') }
+    finally { setGoogleLoading(false) }
   }
 
   const handleBiometricSignIn = useCallback(async () => {
@@ -117,15 +101,13 @@ export const AuthScreen: React.FC = () => {
       await signIn(creds.email, creds.password)
     } catch (e: any) {
       Alert.alert('Sign In Failed', e?.message || 'Could not sign in. Please use your password.')
-    } finally {
-      setBiometricLoading(false)
-    }
+    } finally { setBiometricLoading(false) }
   }, [authenticate, signIn])
 
   useEffect(() => {
     if (available && credentialsStored && mode === 'signin') {
-      const timer = setTimeout(() => handleBiometricSignIn(), 400)
-      return () => clearTimeout(timer)
+      const t = setTimeout(() => handleBiometricSignIn(), 400)
+      return () => clearTimeout(t)
     }
   }, [available, credentialsStored])
 
@@ -136,479 +118,456 @@ export const AuthScreen: React.FC = () => {
 
   const validateSignup = useCallback((): boolean => {
     const e: Record<string, string> = {}
-    if (!firstName.trim()) e.firstName = 'First name is required'
-    if (!lastName.trim()) e.lastName = 'Last name is required'
+    if (!firstName.trim()) e.firstName = 'Required'
+    if (!lastName.trim()) e.lastName = 'Required'
     if (!email.trim()) e.email = 'Email is required'
-    else if (!/\S+@\S+\.\S+/.test(email)) e.email = 'Enter a valid email address'
+    else if (!/\S+@\S+\.\S+/.test(email)) e.email = 'Enter a valid email'
     const digits = phone.replace(/\D/g, '')
-    if (!phone.trim()) e.phone = 'Phone number is required'
-    else if (digits.length !== 10) e.phone = 'Enter a valid 10-digit phone number'
+    if (!phone.trim()) e.phone = 'Phone is required'
+    else if (digits.length !== 10) e.phone = 'Enter a valid 10-digit number'
     if (!password) e.password = 'Password is required'
-    else if (password.length < 8) e.password = 'Password must be at least 8 characters'
+    else if (password.length < 8) e.password = 'Min 8 characters'
     if (!confirmPassword) e.confirmPassword = 'Please confirm your password'
     else if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match'
-    if (!agreeToTerms) e.agreeToTerms = 'You must agree to the Terms and Privacy Policy'
+    if (!agreeToTerms) e.agreeToTerms = 'You must agree to continue'
     setErrors(e)
     return Object.keys(e).length === 0
   }, [firstName, lastName, email, phone, password, confirmPassword, agreeToTerms])
 
   const handleForgotPassword = async () => {
-    if (!email.trim()) {
-      Alert.alert('Enter your email', 'Please enter your email address above, then tap Forgot Password.')
-      return
-    }
+    if (!email.trim()) { Alert.alert('Enter your email', 'Enter your email above first.'); return }
     setLoading(true)
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: 'toptennis://reset-password',
-      })
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: 'toptennis://reset-password' })
       if (error) throw error
-      Alert.alert('Check your email', `A password reset link has been sent to ${email.trim()}.`)
+      Alert.alert('Check your email', `Reset link sent to ${email.trim()}.`)
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Failed to send reset email.')
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   const handleAuth = async () => {
     if (mode === 'signup') {
       if (!validateSignup()) return
       setLoading(true)
-      try {
-        await signUp(email.trim(), password, firstName.trim(), lastName.trim(), phone)
-      } catch (e: any) {
-        Alert.alert('Registration Failed', e?.message || 'Could not create account. Please try again.')
-      } finally {
-        setLoading(false)
-      }
+      try { await signUp(email.trim(), password, firstName.trim(), lastName.trim(), phone) }
+      catch (e: any) { Alert.alert('Registration Failed', e?.message || 'Could not create account.') }
+      finally { setLoading(false) }
     } else {
-      if (!email.trim() || !password.trim()) {
-        Alert.alert('Missing fields', 'Please enter your email and password.')
-        return
-      }
+      if (!email.trim() || !password.trim()) { Alert.alert('Missing fields', 'Please enter your email and password.'); return }
       setLoading(true)
       try {
         await signIn(email.trim(), password)
         if (available && !credentialsStored) {
-          Alert.alert(
-            `Enable ${biometricLabel}`,
-            `Sign in faster next time using ${biometricLabel}.`,
-            [
-              { text: 'Not Now', style: 'cancel' },
-              { text: `Enable ${biometricLabel}`, onPress: () => saveCredentials(email.trim(), password) },
-            ],
-          )
+          Alert.alert(`Enable ${biometricLabel}`, `Sign in faster next time using ${biometricLabel}.`, [
+            { text: 'Not Now', style: 'cancel' },
+            { text: `Enable`, onPress: () => saveCredentials(email.trim(), password) },
+          ])
         }
-      } catch (e: any) {
-        Alert.alert('Sign In Failed', e?.message || 'Incorrect email or password.')
-      } finally {
-        setLoading(false)
-      }
+      } catch (e: any) { Alert.alert('Sign In Failed', e?.message || 'Incorrect email or password.') }
+      finally { setLoading(false) }
     }
   }
 
   const switchMode = (next: 'signin' | 'signup') => {
-    setMode(next)
-    setErrors({})
-    setPassword('')
-    setConfirmPassword('')
-    setPhone('')
-    setAgreeToTerms(false)
+    setMode(next); setErrors({}); setPassword(''); setConfirmPassword(''); setPhone(''); setAgreeToTerms(false)
   }
 
   const isAnyLoading = loading || googleLoading
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* ── Hero ── */}
-          <LinearGradient
-            colors={[Palette.dark900, Palette.dark700]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{ paddingTop: 56, paddingBottom: 40, alignItems: 'center', justifyContent: 'center', gap: 10, position: 'relative', overflow: 'hidden' }}
+    <LinearGradient colors={['#0d0d18', '#111827']} style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <View style={{ position: 'absolute', bottom: -20, right: -20 }}>
-              <Ionicons name="tennisball" size={120} color="rgba(255,255,255,0.04)" />
+
+            {/* ── Hero ── */}
+            <View style={s.hero}>
+              {/* Decorative rings */}
+              <View style={s.ring1} />
+              <View style={s.ring2} />
+
+              {/* Logo mark */}
+              <View style={s.logoMark}>
+                <LinearGradient
+                  colors={[Palette.orange500, Palette.orange700]}
+                  style={s.logoCircle}
+                >
+                  <Ionicons name="tennisball" size={38} color="#fff" />
+                </LinearGradient>
+                <View style={s.logoGlow} />
+              </View>
+
+              {/* App name */}
+              <View style={s.logoRow}>
+                <Text style={s.logoT}>Top</Text>
+                <Text style={s.logoTennis}>Tennis</Text>
+              </View>
+
+              {/* Headline */}
+              <Text style={s.headline}>
+                {mode === 'signin' ? 'Welcome back.' : 'Join the community.'}
+              </Text>
+              <Text style={s.subline}>
+                {mode === 'signin'
+                  ? 'Sign in to continue your game'
+                  : 'Create your account and start playing'}
+              </Text>
             </View>
-            <XStack alignItems="center" gap={2}>
-              <YStack
-                width={38}
-                height={38}
-                borderRadius={Radius.lg}
-                backgroundColor={Colors.primary}
-                alignItems="center"
-                justifyContent="center"
-              >
-                <Text color="#fff" fontSize={22} fontWeight={FontWeight.black as any}>T</Text>
-              </YStack>
-              <Text color="#fff" fontSize={28} fontWeight={FontWeight.black as any} letterSpacing={-0.5}>opTennis</Text>
-            </XStack>
-            <Text color="rgba(255,255,255,0.55)" fontSize={FontSize.sm} fontWeight={FontWeight.medium as any}>
-              Your tennis community
-            </Text>
-          </LinearGradient>
 
-          {/* ── Mode toggle pill ── */}
-          <XStack
-            marginHorizontal={Spacing.lg}
-            marginTop={Spacing.xl}
-            backgroundColor={Colors.backgroundAlt}
-            borderRadius={Radius.full}
-            padding={4}
-            borderWidth={1}
-            borderColor={Colors.borderLight}
-          >
-            {(['signin', 'signup'] as const).map(m => (
-              <TouchableOpacity
-                key={m}
-                style={{
-                  flex: 1,
-                  paddingVertical: 10,
-                  borderRadius: 999,
-                  alignItems: 'center',
-                  ...(mode === m
-                    ? { backgroundColor: Colors.surface, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 }
-                    : {}),
-                }}
-                onPress={() => switchMode(m)}
-              >
-                <Text
-                  fontSize={FontSize.sm}
-                  fontWeight={FontWeight.semibold as any}
-                  color={mode === m ? Colors.text : Colors.textMuted}
-                >
-                  {m === 'signin' ? 'Sign In' : 'Create Account'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </XStack>
-
-          {/* ── Form ── */}
-          <YStack padding={Spacing.lg} gap={Spacing.md}>
-
-            {/* Signup-only: name row */}
-            {mode === 'signup' && (
-              <>
-                <XStack gap={8}>
-                  <Field
-                    label="First Name"
-                    error={errors.firstName}
-                    focused={focusedField === 'firstName'}
-                    onFocus={() => setFocusedField('firstName')}
-                    onBlur={() => setFocusedField(null)}
-                    flex={1}
-                  >
-                    <TextInput
-                      style={{ flex: 1, fontSize: FontSize.md, color: Colors.text, paddingVertical: 0 }}
-                      placeholder="John"
-                      placeholderTextColor={Colors.textMuted}
-                      value={firstName}
-                      onChangeText={v => { setFirstName(v); clearError('firstName') }}
-                      onFocus={() => setFocusedField('firstName')}
-                      onBlur={() => setFocusedField(null)}
-                      autoCapitalize="words"
-                      autoComplete="given-name"
-                    />
-                  </Field>
-                  <Field
-                    label="Last Name"
-                    error={errors.lastName}
-                    focused={focusedField === 'lastName'}
-                    onFocus={() => setFocusedField('lastName')}
-                    onBlur={() => setFocusedField(null)}
-                    flex={1}
-                  >
-                    <TextInput
-                      style={{ flex: 1, fontSize: FontSize.md, color: Colors.text, paddingVertical: 0 }}
-                      placeholder="Doe"
-                      placeholderTextColor={Colors.textMuted}
-                      value={lastName}
-                      onChangeText={v => { setLastName(v); clearError('lastName') }}
-                      onFocus={() => setFocusedField('lastName')}
-                      onBlur={() => setFocusedField(null)}
-                      autoCapitalize="words"
-                      autoComplete="family-name"
-                    />
-                  </Field>
-                </XStack>
-
-                <Field
-                  label="Phone Number"
-                  error={errors.phone}
-                  icon="call-outline"
-                  focused={focusedField === 'phone'}
-                  onFocus={() => setFocusedField('phone')}
-                  onBlur={() => setFocusedField(null)}
-                >
-                  <TextInput
-                    style={{ flex: 1, fontSize: FontSize.md, color: Colors.text, paddingVertical: 0 }}
-                    placeholder="(555) 123-4567"
-                    placeholderTextColor={Colors.textMuted}
-                    value={phone}
-                    onChangeText={v => { setPhone(formatPhone(v)); clearError('phone') }}
-                    onFocus={() => setFocusedField('phone')}
-                    onBlur={() => setFocusedField(null)}
-                    keyboardType="phone-pad"
-                    autoComplete="tel"
-                  />
-                </Field>
-              </>
-            )}
-
-            {/* Email */}
-            <Field
-              label="Email Address"
-              error={errors.email}
-              icon="mail-outline"
-              focused={focusedField === 'email'}
-              onFocus={() => setFocusedField('email')}
-              onBlur={() => setFocusedField(null)}
-            >
-              <TextInput
-                style={{ flex: 1, fontSize: FontSize.md, color: Colors.text, paddingVertical: 0 }}
-                placeholder="you@example.com"
-                placeholderTextColor={Colors.textMuted}
-                value={email}
-                onChangeText={v => { setEmail(v); clearError('email') }}
-                onFocus={() => setFocusedField('email')}
-                onBlur={() => setFocusedField(null)}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                autoComplete="email"
-              />
-            </Field>
-
-            {/* Password */}
-            <Field
-              label="Password"
-              error={errors.password}
-              icon="lock-closed-outline"
-              focused={focusedField === 'password'}
-              onFocus={() => setFocusedField('password')}
-              onBlur={() => setFocusedField(null)}
-            >
-              <TextInput
-                style={{ flex: 1, fontSize: FontSize.md, color: Colors.text, paddingVertical: 0 }}
-                placeholder={mode === 'signup' ? 'Minimum 8 characters' : '••••••••'}
-                placeholderTextColor={Colors.textMuted}
-                value={password}
-                onChangeText={v => { setPassword(v); clearError('password') }}
-                onFocus={() => setFocusedField('password')}
-                onBlur={() => setFocusedField(null)}
-                secureTextEntry={!showPassword}
-                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-              />
-              <TouchableOpacity onPress={() => setShowPassword(v => !v)} style={{ padding: 4 }}>
-                <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textMuted} />
-              </TouchableOpacity>
-            </Field>
-
-            {/* Password strength */}
-            {mode === 'signup' && password.length > 0 && pwStrength && (
-              <YStack gap={4} marginTop={-4}>
-                <XStack gap={4}>
-                  {[1, 2, 3, 4, 5].map(i => (
-                    <View
-                      key={i}
-                      style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: i <= pwStrength.score ? pwStrength.color : Colors.borderLight }}
-                    />
-                  ))}
-                </XStack>
-                <Text fontSize={FontSize.xs} fontWeight={FontWeight.semibold as any} color={pwStrength.color}>
-                  {pwStrength.label}
-                </Text>
-                {pwStrength.suggestions.length > 0 && (
-                  <Text fontSize={FontSize.xs} color={Colors.textMuted}>{pwStrength.suggestions[0]}</Text>
-                )}
-              </YStack>
-            )}
-
-            {/* Confirm password */}
-            {mode === 'signup' && (
-              <Field
-                label="Confirm Password"
-                error={errors.confirmPassword}
-                icon="lock-closed-outline"
-                focused={focusedField === 'confirmPassword'}
-                onFocus={() => setFocusedField('confirmPassword')}
-                onBlur={() => setFocusedField(null)}
-              >
-                <TextInput
-                  style={{ flex: 1, fontSize: FontSize.md, color: Colors.text, paddingVertical: 0 }}
-                  placeholder="Re-enter your password"
-                  placeholderTextColor={Colors.textMuted}
-                  value={confirmPassword}
-                  onChangeText={v => { setConfirmPassword(v); clearError('confirmPassword') }}
-                  onFocus={() => setFocusedField('confirmPassword')}
-                  onBlur={() => setFocusedField(null)}
-                  secureTextEntry={!showConfirmPassword}
-                  autoComplete="new-password"
-                />
-                <TouchableOpacity onPress={() => setShowConfirmPassword(v => !v)} style={{ padding: 4 }}>
-                  <Ionicons name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textMuted} />
-                </TouchableOpacity>
-              </Field>
-            )}
-
-            {/* Terms */}
-            {mode === 'signup' && (
-              <>
+            {/* ── Tab toggle ── */}
+            <View style={s.tabWrap}>
+              {(['signin', 'signup'] as const).map(m => (
                 <TouchableOpacity
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}
-                  onPress={() => { setAgreeToTerms(v => !v); clearError('agreeToTerms') }}
-                  activeOpacity={0.7}
+                  key={m}
+                  style={[s.tabBtn, mode === m && s.tabBtnActive]}
+                  onPress={() => switchMode(m)}
+                  activeOpacity={0.8}
                 >
-                  <YStack
-                    width={22}
-                    height={22}
-                    borderRadius={6}
-                    borderWidth={2}
-                    borderColor={agreeToTerms ? Colors.primary : Colors.border}
-                    backgroundColor={agreeToTerms ? Colors.primary : 'transparent'}
-                    alignItems="center"
-                    justifyContent="center"
-                  >
-                    {agreeToTerms && <Ionicons name="checkmark" size={13} color="#fff" />}
-                  </YStack>
-                  <Text style={{ fontSize: FontSize.sm, color: Colors.textSecondary, flex: 1, lineHeight: 20 }}>
-                    {'I agree to the '}
-                    <Text style={{ color: Colors.primary, fontWeight: FontWeight.semibold }}>Terms</Text>
-                    {' and '}
-                    <Text style={{ color: Colors.primary, fontWeight: FontWeight.semibold }}>Privacy Policy</Text>
+                  <Text style={[s.tabLabel, mode === m && s.tabLabelActive]}>
+                    {m === 'signin' ? 'Sign In' : 'Create Account'}
                   </Text>
                 </TouchableOpacity>
-                {!!errors.agreeToTerms && (
-                  <Text color={Colors.error} fontSize={FontSize.xs} marginTop={-4}>{errors.agreeToTerms}</Text>
-                )}
-              </>
-            )}
+              ))}
+            </View>
 
-            {/* Submit button */}
-            <TouchableOpacity
-              onPress={handleAuth}
-              disabled={isAnyLoading}
-              activeOpacity={0.87}
-              style={{ borderRadius: Radius.full, overflow: 'hidden', opacity: isAnyLoading ? 0.6 : 1 }}
-            >
-              <LinearGradient
-                colors={[Palette.orange500, Palette.orange700]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={{ height: 52, alignItems: 'center', justifyContent: 'center' }}
-              >
-                {loading
-                  ? <ActivityIndicator color="#fff" />
-                  : <Text color="#fff" fontSize={FontSize.md} fontWeight={FontWeight.bold as any} letterSpacing={0.3}>
-                      {mode === 'signin' ? 'Sign In' : 'Create Account'}
-                    </Text>
-                }
-              </LinearGradient>
-            </TouchableOpacity>
+            {/* ── Form ── */}
+            <View style={s.form}>
 
-            {/* Forgot password */}
-            {mode === 'signin' && (
-              <TouchableOpacity style={{ alignItems: 'center' }} onPress={handleForgotPassword} disabled={loading}>
-                <Text color={Colors.primary} fontSize={FontSize.sm} fontWeight={FontWeight.semibold as any}>
-                  Forgot password?
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {/* Divider */}
-            <XStack alignItems="center" gap={Spacing.md}>
-              <View style={{ flex: 1, height: 1, backgroundColor: Colors.borderLight }} />
-              <Text color={Colors.textMuted} fontSize={FontSize.sm} fontWeight={FontWeight.medium as any}>or</Text>
-              <View style={{ flex: 1, height: 1, backgroundColor: Colors.borderLight }} />
-            </XStack>
-
-            {/* Google */}
-            <TouchableOpacity
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 10,
-                backgroundColor: Colors.surface,
-                borderWidth: 1.5,
-                borderColor: Colors.border,
-                borderRadius: Radius.full,
-                height: 52,
-                opacity: isAnyLoading ? 0.6 : 1,
-              }}
-              onPress={handleGoogleAuth}
-              disabled={isAnyLoading}
-              activeOpacity={0.85}
-            >
-              {googleLoading ? (
-                <ActivityIndicator color={Colors.text} />
-              ) : (
+              {mode === 'signup' && (
                 <>
-                  <YStack width={22} height={22} borderRadius={11} backgroundColor="#fff" alignItems="center" justifyContent="center" borderWidth={1} borderColor="#e5e7eb">
-                    <Text style={{ fontSize: 13, fontWeight: FontWeight.bold, color: '#4285F4', lineHeight: 17 }}>G</Text>
-                  </YStack>
-                  <Text color={Colors.text} fontSize={FontSize.md} fontWeight={FontWeight.semibold as any}>
-                    {mode === 'signin' ? 'Continue with Google' : 'Sign up with Google'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <Field label="First Name" error={errors.firstName} focused={focusedField === 'firstName'} flex={1}>
+                      <TextInput
+                        style={s.input}
+                        placeholder="John"
+                        placeholderTextColor="rgba(255,255,255,0.25)"
+                        value={firstName}
+                        onChangeText={v => { setFirstName(v); clearError('firstName') }}
+                        onFocus={() => setFocusedField('firstName')}
+                        onBlur={() => setFocusedField(null)}
+                        autoCapitalize="words"
+                      />
+                    </Field>
+                    <Field label="Last Name" error={errors.lastName} focused={focusedField === 'lastName'} flex={1}>
+                      <TextInput
+                        style={s.input}
+                        placeholder="Doe"
+                        placeholderTextColor="rgba(255,255,255,0.25)"
+                        value={lastName}
+                        onChangeText={v => { setLastName(v); clearError('lastName') }}
+                        onFocus={() => setFocusedField('lastName')}
+                        onBlur={() => setFocusedField(null)}
+                        autoCapitalize="words"
+                      />
+                    </Field>
+                  </View>
+
+                  <Field label="Phone Number" error={errors.phone} icon="call-outline" focused={focusedField === 'phone'}>
+                    <TextInput
+                      style={s.input}
+                      placeholder="(555) 123-4567"
+                      placeholderTextColor="rgba(255,255,255,0.25)"
+                      value={phone}
+                      onChangeText={v => { setPhone(formatPhone(v)); clearError('phone') }}
+                      onFocus={() => setFocusedField('phone')}
+                      onBlur={() => setFocusedField(null)}
+                      keyboardType="phone-pad"
+                    />
+                  </Field>
                 </>
               )}
-            </TouchableOpacity>
 
-            {/* Biometric */}
-            {mode === 'signin' && available && credentialsStored && (
-              <TouchableOpacity
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 10,
-                  backgroundColor: Colors.primaryLight,
-                  borderWidth: 1.5,
-                  borderColor: Colors.primaryMuted,
-                  borderRadius: Radius.full,
-                  height: 52,
-                  opacity: isAnyLoading || biometricLoading ? 0.6 : 1,
-                }}
-                onPress={handleBiometricSignIn}
-                disabled={isAnyLoading || biometricLoading}
-                activeOpacity={0.85}
-              >
-                {biometricLoading ? (
-                  <ActivityIndicator color={Colors.primary} />
+              <Field label="Email Address" error={errors.email} icon="mail-outline" focused={focusedField === 'email'}>
+                <TextInput
+                  style={s.input}
+                  placeholder="you@example.com"
+                  placeholderTextColor="rgba(255,255,255,0.25)"
+                  value={email}
+                  onChangeText={v => { setEmail(v); clearError('email') }}
+                  onFocus={() => setFocusedField('email')}
+                  onBlur={() => setFocusedField(null)}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoComplete="email"
+                />
+              </Field>
+
+              <Field label="Password" error={errors.password} icon="lock-closed-outline" focused={focusedField === 'password'}>
+                <TextInput
+                  style={s.input}
+                  placeholder={mode === 'signup' ? 'Min 8 characters' : '••••••••'}
+                  placeholderTextColor="rgba(255,255,255,0.25)"
+                  value={password}
+                  onChangeText={v => { setPassword(v); clearError('password') }}
+                  onFocus={() => setFocusedField('password')}
+                  onBlur={() => setFocusedField(null)}
+                  secureTextEntry={!showPassword}
+                  autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                />
+                <TouchableOpacity onPress={() => setShowPassword(v => !v)} style={{ padding: 4 }}>
+                  <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color="rgba(255,255,255,0.35)" />
+                </TouchableOpacity>
+              </Field>
+
+              {/* Password strength */}
+              {mode === 'signup' && password.length > 0 && pwStrength && (
+                <View style={{ gap: 6, marginTop: -4 }}>
+                  <View style={{ flexDirection: 'row', gap: 4 }}>
+                    {[1, 2, 3, 4, 5].map(i => (
+                      <View key={i} style={{ flex: 1, height: 3, borderRadius: 2, backgroundColor: i <= pwStrength.score ? pwStrength.color : 'rgba(255,255,255,0.1)' }} />
+                    ))}
+                  </View>
+                  <Text style={{ fontSize: 11, fontWeight: FontWeight.semibold, color: pwStrength.color }}>
+                    {pwStrength.label}
+                  </Text>
+                </View>
+              )}
+
+              {mode === 'signup' && (
+                <Field label="Confirm Password" error={errors.confirmPassword} icon="lock-closed-outline" focused={focusedField === 'confirmPassword'}>
+                  <TextInput
+                    style={s.input}
+                    placeholder="Re-enter your password"
+                    placeholderTextColor="rgba(255,255,255,0.25)"
+                    value={confirmPassword}
+                    onChangeText={v => { setConfirmPassword(v); clearError('confirmPassword') }}
+                    onFocus={() => setFocusedField('confirmPassword')}
+                    onBlur={() => setFocusedField(null)}
+                    secureTextEntry={!showConfirmPassword}
+                    autoComplete="new-password"
+                  />
+                  <TouchableOpacity onPress={() => setShowConfirmPassword(v => !v)} style={{ padding: 4 }}>
+                    <Ionicons name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color="rgba(255,255,255,0.35)" />
+                  </TouchableOpacity>
+                </Field>
+              )}
+
+              {/* Terms */}
+              {mode === 'signup' && (
+                <>
+                  <TouchableOpacity style={s.termsRow} onPress={() => { setAgreeToTerms(v => !v); clearError('agreeToTerms') }} activeOpacity={0.7}>
+                    <View style={[s.checkbox, agreeToTerms && s.checkboxActive]}>
+                      {agreeToTerms && <Ionicons name="checkmark" size={12} color="#fff" />}
+                    </View>
+                    <Text style={s.termsText}>
+                      {'I agree to the '}
+                      <Text style={s.termsLink}>Terms</Text>
+                      {' and '}
+                      <Text style={s.termsLink}>Privacy Policy</Text>
+                    </Text>
+                  </TouchableOpacity>
+                  {!!errors.agreeToTerms && <Text style={s.fieldError}>{errors.agreeToTerms}</Text>}
+                </>
+              )}
+
+              {/* Submit */}
+              <TouchableOpacity onPress={handleAuth} disabled={isAnyLoading} activeOpacity={0.87} style={{ opacity: isAnyLoading ? 0.6 : 1 }}>
+                <LinearGradient
+                  colors={[Palette.orange500, Palette.orange700]}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={s.submitBtn}
+                >
+                  {loading
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={s.submitBtnText}>{mode === 'signin' ? 'Sign In' : 'Create Account'}</Text>
+                  }
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {/* Forgot password */}
+              {mode === 'signin' && (
+                <TouchableOpacity style={{ alignItems: 'center' }} onPress={handleForgotPassword} disabled={loading}>
+                  <Text style={s.forgotText}>Forgot password?</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Divider */}
+              <View style={s.divider}>
+                <View style={s.dividerLine} />
+                <Text style={s.dividerText}>or</Text>
+                <View style={s.dividerLine} />
+              </View>
+
+              {/* Google */}
+              <TouchableOpacity style={[s.socialBtn, { opacity: isAnyLoading ? 0.6 : 1 }]} onPress={handleGoogleAuth} disabled={isAnyLoading} activeOpacity={0.85}>
+                {googleLoading ? (
+                  <ActivityIndicator color="#fff" />
                 ) : (
                   <>
-                    <Ionicons
-                      name={biometricType === 'faceid' ? 'scan-outline' : 'finger-print-outline'}
-                      size={22}
-                      color={Colors.primary}
-                    />
-                    <Text color={Colors.primary} fontSize={FontSize.md} fontWeight={FontWeight.semibold as any}>
-                      Sign in with {biometricLabel}
-                    </Text>
+                    <View style={s.googleIcon}>
+                      <Text style={{ fontSize: 13, fontWeight: FontWeight.bold, color: '#4285F4' }}>G</Text>
+                    </View>
+                    <Text style={s.socialBtnText}>{mode === 'signin' ? 'Continue with Google' : 'Sign up with Google'}</Text>
                   </>
                 )}
               </TouchableOpacity>
-            )}
 
-            {/* Switch mode */}
-            <Text style={{ fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center' }}>
-              {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
-              <Text
-                style={{ color: Colors.primary, fontWeight: FontWeight.bold }}
-                onPress={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}
-              >
-                {mode === 'signin' ? 'Sign Up' : 'Sign In'}
+              {/* Biometric */}
+              {mode === 'signin' && available && credentialsStored && (
+                <TouchableOpacity
+                  style={[s.biometricBtn, { opacity: isAnyLoading || biometricLoading ? 0.6 : 1 }]}
+                  onPress={handleBiometricSignIn}
+                  disabled={isAnyLoading || biometricLoading}
+                  activeOpacity={0.85}
+                >
+                  {biometricLoading ? (
+                    <ActivityIndicator color={Palette.orange500} />
+                  ) : (
+                    <>
+                      <Ionicons name={biometricType === 'faceid' ? 'scan-outline' : 'finger-print-outline'} size={20} color={Palette.orange500} />
+                      <Text style={s.biometricBtnText}>Sign in with {biometricLabel}</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+
+              {/* Switch mode */}
+              <Text style={s.switchText}>
+                {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
+                <Text style={s.switchLink} onPress={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}>
+                  {mode === 'signin' ? 'Sign Up' : 'Sign In'}
+                </Text>
               </Text>
-            </Text>
-          </YStack>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </LinearGradient>
   )
 }
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
+  // Hero
+  hero: {
+    paddingHorizontal: 28,
+    paddingTop: 40,
+    paddingBottom: 36,
+    alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  ring1: {
+    position: 'absolute', left: '50%', top: 20,
+    width: 280, height: 280, borderRadius: 140,
+    marginLeft: -140,
+    borderWidth: 1, borderColor: 'rgba(251,146,60,0.08)',
+  },
+  ring2: {
+    position: 'absolute', left: '50%', top: 50,
+    width: 180, height: 180, borderRadius: 90,
+    marginLeft: -90,
+    borderWidth: 1, borderColor: 'rgba(251,146,60,0.05)',
+  },
+  logoMark: { alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  logoCircle: {
+    width: 80, height: 80, borderRadius: 40,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: Palette.orange500,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  logoGlow: {
+    position: 'absolute',
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: Palette.orange500,
+    opacity: 0.15,
+    transform: [{ scaleX: 1.4 }, { scaleY: 0.4 }],
+    top: 60,
+  },
+  logoRow: { flexDirection: 'row', alignItems: 'baseline', gap: 2, marginBottom: 20 },
+  logoT: { color: '#fff', fontSize: 28, fontWeight: FontWeight.black, letterSpacing: -0.5 },
+  logoTennis: { color: Palette.orange500, fontSize: 28, fontWeight: FontWeight.black, letterSpacing: -0.5 },
+  headline: { color: '#fff', fontSize: 32, fontWeight: FontWeight.black, letterSpacing: -0.8, marginBottom: 8, textAlign: 'center' },
+  subline: { color: 'rgba(255,255,255,0.45)', fontSize: 15, fontWeight: FontWeight.medium, textAlign: 'center' },
+
+  // Tabs
+  tabWrap: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    marginBottom: 24,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: Radius.full,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  tabBtn: { flex: 1, paddingVertical: 10, borderRadius: 999, alignItems: 'center' },
+  tabBtnActive: { backgroundColor: Palette.orange500 },
+  tabLabel: { fontSize: 14, fontWeight: FontWeight.semibold, color: 'rgba(255,255,255,0.45)' },
+  tabLabelActive: { color: '#fff' },
+
+  // Form
+  form: { paddingHorizontal: 20, gap: 16 },
+
+  // Fields
+  fieldWrap: { gap: 6 },
+  fieldLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 0.8 },
+  fieldBox: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: Radius.lg, paddingHorizontal: 14, minHeight: 52,
+  },
+  fieldBoxFocused: { borderColor: Palette.orange500, backgroundColor: 'rgba(251,146,60,0.07)' },
+  fieldBoxError: { borderColor: '#ef4444' },
+  fieldError: { color: '#ef4444', fontSize: 11 },
+  input: { flex: 1, fontSize: 15, color: '#fff', paddingVertical: 0 },
+
+  // Terms
+  termsRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  checkbox: {
+    width: 20, height: 20, borderRadius: 5,
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  checkboxActive: { backgroundColor: Palette.orange500, borderColor: Palette.orange500 },
+  termsText: { flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 20 },
+  termsLink: { color: Palette.orange500, fontWeight: FontWeight.semibold },
+
+  // Submit
+  submitBtn: { height: 54, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
+  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.3 },
+
+  // Forgot
+  forgotText: { color: Palette.orange500, fontSize: 14, fontWeight: FontWeight.semibold },
+
+  // Divider
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.08)' },
+  dividerText: { color: 'rgba(255,255,255,0.3)', fontSize: 13 },
+
+  // Social
+  socialBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: Radius.full, height: 52,
+  },
+  socialBtnText: { color: '#fff', fontSize: 15, fontWeight: FontWeight.semibold },
+  googleIcon: {
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
+  },
+
+  // Biometric
+  biometricBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    borderWidth: 1, borderColor: 'rgba(251,146,60,0.35)',
+    borderRadius: Radius.full, height: 52,
+    backgroundColor: 'rgba(251,146,60,0.08)',
+  },
+  biometricBtnText: { color: Palette.orange500, fontSize: 15, fontWeight: FontWeight.semibold },
+
+  // Switch
+  switchText: { fontSize: 14, color: 'rgba(255,255,255,0.4)', textAlign: 'center' },
+  switchLink: { color: Palette.orange500, fontWeight: FontWeight.bold },
+})
