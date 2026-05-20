@@ -1,114 +1,96 @@
 // Supabase Edge Function — send-push
-// Reads all stored PushSubscription objects for a given user and delivers
-// a Web Push message to every device using VAPID authentication.
+// Called by the notify_push_on_notification_insert DB trigger after every
+// notifications row INSERT. Looks up the user's Expo push token from the
+// profiles table and delivers the notification via the Expo Push API.
 //
-// Environment variables required (set in Supabase dashboard → Edge Functions → Secrets):
-//   VAPID_SUBJECT      e.g. "mailto:admin@toptennis.app"
-//   VAPID_PUBLIC_KEY   BCepmTz4SJSYIMfo1thaqH_-lPXRtzInBVfQlkzQzaCNCFZHWfa2zAiM60mCPY2-5AKBuLvzcYlAkWUMOtQuCdk
-//   VAPID_PRIVATE_KEY  BhLvKVjrJzAbTmt4laAbJRXppLpL0Plzy-38jnpf3Bw
-//   SUPABASE_URL       (automatically provided by Supabase)
-//   SUPABASE_SERVICE_ROLE_KEY (automatically provided by Supabase)
+// Deploy with:
+//   supabase functions deploy send-push --no-verify-jwt
+//
+// One-time setup (run in Supabase SQL Editor):
+//   ALTER DATABASE postgres SET "app.supabase_project_ref"    = 'qrhladnnblgbobcnxjsz';
+//   ALTER DATABASE postgres SET "app.supabase_service_role_key" = '<your-service-role-key>';
 
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import webpush from 'npm:web-push';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// ── VAPID configuration ───────────────────────────────────────────────────────
-const VAPID_SUBJECT     = Deno.env.get('VAPID_SUBJECT')     ?? 'mailto:admin@toptennis.app';
-const VAPID_PUBLIC_KEY  = Deno.env.get('VAPID_PUBLIC_KEY')  ?? 'BCepmTz4SJSYIMfo1thaqH_-lPXRtzInBVfQlkzQzaCNCFZHWfa2zAiM60mCPY2-5AKBuLvzcYlAkWUMOtQuCdk';
-const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY') ?? 'BhLvKVjrJzAbTmt4laAbJRXppLpL0Plzy-38jnpf3Bw';
+const EXPO_PUSH_URL = 'https://exp.host/--/exponent-apis/push/send'
 
-webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-
-// ── Supabase client (service role — bypasses RLS to read subscriptions) ───────
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-);
-
-// ── Handler ───────────────────────────────────────────────────────────────────
-serve(async (req: Request) => {
-  // Allow only POST
+Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405 });
+    return new Response('Method Not Allowed', { status: 405 })
   }
 
-  let body: {
-    userId:    string;
-    title:     string;
-    body?:     string;
-    tag?:      string;
-    actionUrl?: string;
-  };
+  // Verify the caller is the database trigger (matches SUPABASE_SERVICE_ROLE_KEY)
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  const bearer = req.headers.get('Authorization')?.replace('Bearer ', '') ?? ''
+  if (serviceKey && bearer !== serviceKey) {
+    return new Response('Unauthorized', { status: 401 })
+  }
 
+  let body: Record<string, unknown>
   try {
-    body = await req.json();
+    body = await req.json()
   } catch {
-    return new Response('Bad Request: invalid JSON', { status: 400 });
+    return new Response('Invalid JSON', { status: 400 })
   }
 
-  if (!body.userId || !body.title) {
-    return new Response('Bad Request: missing userId or title', { status: 400 });
+  // Trigger sends camelCase (userId, body) — also accept snake_case
+  const userId   = (body.userId   ?? body.user_id)  as string | undefined
+  const title    = body.title                         as string | undefined
+  const message  = (body.body     ?? body.message)   as string | undefined
+  const type     = (body.type     ?? 'general')       as string
+  const metadata = (body.metadata ?? {})              as Record<string, unknown>
+
+  if (!userId || !title) {
+    return new Response('Missing required fields', { status: 400 })
   }
 
-  // Fetch all push subscriptions for this user
-  const { data: subs, error } = await supabase
-    .from('push_subscriptions')
-    .select('endpoint, p256dh, auth')
-    .eq('user_id', body.userId);
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  )
 
-  if (error) {
-    console.error('[send-push] Failed to fetch subscriptions:', error);
-    return new Response('Internal Server Error', { status: 500 });
-  }
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('push_token')
+    .eq('id', userId)
+    .single()
 
-  if (!subs || subs.length === 0) {
-    return new Response(JSON.stringify({ sent: 0 }), {
+  if (!profile?.push_token) {
+    return new Response(JSON.stringify({ skipped: 'no push token' }), {
       headers: { 'Content-Type': 'application/json' },
-    });
+    })
   }
 
-  const payload = JSON.stringify({
-    title:     body.title,
-    body:      body.body   ?? '',
-    tag:       body.tag    ?? String(Date.now()),
-    actionUrl: body.actionUrl ?? '/dashboard',
-  });
+  const pushMessage = {
+    to: profile.push_token,
+    sound: 'default',
+    title,
+    body: message ?? '',
+    data: { type, ...metadata },
+    badge: 1,
+    channelId: 'default',
+  }
 
-  // Fan out to all subscriptions in parallel
-  const results = await Promise.allSettled(
-    subs.map(sub =>
-      webpush.sendNotification(
-        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        payload,
-      )
-    )
-  );
+  const expoRes = await fetch(EXPO_PUSH_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify(pushMessage),
+  })
 
-  // Remove subscriptions that are no longer valid (410 Gone / 404)
-  const expiredEndpoints: string[] = [];
-  results.forEach((result, i) => {
-    if (result.status === 'rejected') {
-      const err = result.reason as any;
-      if (err?.statusCode === 410 || err?.statusCode === 404) {
-        expiredEndpoints.push(subs[i].endpoint);
-      } else {
-        console.warn('[send-push] Delivery failed for subscription:', err?.message);
-      }
+  const result = await expoRes.json()
+
+  // Log delivery errors from Expo
+  const tickets = Array.isArray(result.data) ? result.data : [result]
+  for (const ticket of tickets) {
+    if (ticket.status === 'error') {
+      console.error('[send-push] Expo delivery error:', JSON.stringify(ticket))
     }
-  });
-
-  if (expiredEndpoints.length > 0) {
-    await supabase
-      .from('push_subscriptions')
-      .delete()
-      .in('endpoint', expiredEndpoints);
   }
 
-  const sent = results.filter(r => r.status === 'fulfilled').length;
-  console.log(`[send-push] Delivered to ${sent}/${subs.length} subscriptions for user ${body.userId}`);
-
-  return new Response(JSON.stringify({ sent, total: subs.length }), {
+  return new Response(JSON.stringify(result), {
     headers: { 'Content-Type': 'application/json' },
-  });
-});
+  })
+})
