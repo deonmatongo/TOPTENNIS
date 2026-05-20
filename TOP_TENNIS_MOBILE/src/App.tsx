@@ -28,6 +28,9 @@ import { IncomingCallOverlay } from '@/components/ui/IncomingCallOverlay';
 import { useMatches } from '@/hooks/useMatches';
 import { useConversations } from '@/hooks/useConversations';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
+import { useNotifications } from '@/hooks/useNotifications';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { navigationRef } from '@/navigation/navigationRef';
 
 import { AuthScreen } from '@/screens/AuthScreen';
 import { AppIntroScreen } from '@/screens/AppIntroScreen';
@@ -64,6 +67,8 @@ const Tab = createBottomTabNavigator();
 function TabNavigator() {
   const { pendingReceived } = useMatches();
   const { getTotalUnread } = useConversations();
+  const { unreadCount } = useNotifications();
+  usePushNotifications(unreadCount);
   const unreadMessages = getTotalUnread();
 
   const TAB_ITEMS = [
@@ -304,7 +309,7 @@ export default function App() {
         <SafeAreaProvider>
           <AuthProvider>
             <CallProvider>
-              <NavigationContainer linking={linking}>
+              <NavigationContainer ref={navigationRef} linking={linking}>
                 <StatusBar style="dark" />
                 <AppNavigator />
                 <NetworkBanner />

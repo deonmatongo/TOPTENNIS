@@ -101,7 +101,7 @@ export const useNotifications = () => {
     fetchNotifications();
 
     const buildChannel = () => supabase
-      .channel(`notifications-mobile-${user.id}-${Date.now()}`)
+      .channel(`notifications:${user.id}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
