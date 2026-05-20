@@ -66,6 +66,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "expo-apple-authentication",
       [
         "expo-notifications",
         {
@@ -90,7 +91,8 @@
       ],
       "expo-web-browser",
       "@config-plugins/react-native-webrtc",
-      "@sentry/react-native/expo"
+      "@sentry/react-native/expo",
+      "./plugins/android-permissions"
     ],
     "notification": {
       "icon": "./assets/notification-icon.png",

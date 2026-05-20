@@ -284,13 +284,26 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const handleDeleteAccount = () => {
     Alert.alert(
       'Delete Account',
-      'This will permanently delete your account and all data. This action cannot be undone.',
+      'This will permanently delete your account, profile, match history, and all associated data. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete Account',
           style: 'destructive',
-          onPress: () => Alert.alert('Contact Support', 'Please email support@toptennis.app to complete account deletion.'),
+          onPress: async () => {
+            setSaving(true);
+            try {
+              const { error } = await supabase.functions.invoke('delete-account', {
+                body: { userId: user!.id },
+              });
+              if (error) throw error;
+              await signOut();
+            } catch (e: any) {
+              Alert.alert('Deletion Failed', e?.message ?? 'Please try again or contact support@toptennis.app.');
+            } finally {
+              setSaving(false);
+            }
+          },
         },
       ]
     );

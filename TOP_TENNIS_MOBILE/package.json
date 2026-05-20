@@ -13,8 +13,12 @@
   },
   "jest": {
     "preset": "jest-expo",
-    "setupFiles": ["<rootDir>/src/__tests__/setup.ts"],
-    "setupFilesAfterFramework": ["@testing-library/jest-native/extend-expect"],
+    "setupFiles": [
+      "<rootDir>/src/__tests__/setup.ts"
+    ],
+    "setupFilesAfterFramework": [
+      "@testing-library/jest-native/extend-expect"
+    ],
     "transformIgnorePatterns": [
       "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|@sentry/.*|tamagui|@tamagui/.*)"
     ],
@@ -44,6 +48,7 @@
     "@tamagui/native": "^2.0.0-rc.41",
     "date-fns": "^3.6.0",
     "expo": "~54.0.34",
+    "expo-apple-authentication": "~8.0.8",
     "expo-auth-session": "~7.0.11",
     "expo-av": "^16.0.8",
     "expo-calendar": "~15.0.8",
