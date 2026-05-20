@@ -18,6 +18,7 @@ import { useTypingIndicator, TypingUser } from '@/hooks/useTypingIndicator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCallContext } from '@/contexts/CallContext';
 import { Avatar } from '@/components/ui/Avatar';
+import { PlayerProfileSheet, PlayerSearchResult } from '@/components/ui/PlayerProfileSheet';
 import { MatchInviteCard, MatchBookingSheet, BookingMember } from '@/components/chat/MatchBooking';
 import { useMatchInvites, MatchInviteRecord } from '@/hooks/useMatchInvites';
 import { Palette, Colors, Shadow, FontSize, Font, FontWeight, Spacing, Radius } from '@/theme/colors';
@@ -610,6 +611,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
   const [responding, setResponding] = useState<string | null>(null);
   const [showGroupCreate, setShowGroupCreate] = useState(false);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [profilePlayer, setProfilePlayer] = useState<PlayerSearchResult | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [longPressMsg, setLongPressMsg] = useState<string | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -847,7 +849,16 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
             style={th.identity}
             onPress={() => {
               if (selectedConv.is_group) setShowGroupInfo(true);
-              else if (otherId) (navigation as any)?.push?.('PlayerProfile', { userId: otherId });
+              else if (otherId) {
+                const m = selectedConv.members.find(mb => mb.user_id === otherId);
+                setProfilePlayer({
+                  id: m?.profile?.id ?? otherId,
+                  user_id: otherId,
+                  name: convName,
+                  profile_picture_url: convAvatar ?? null,
+                  email: m?.profile?.email,
+                });
+              }
             }}
             activeOpacity={0.8}
           >
@@ -967,7 +978,17 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
                   ])}
                   onCopy={() => { Clipboard.setString(msg.content); setLongPressMsg(null); }}
                   onDismiss={() => setLongPressMsg(null)}
-                  onSenderPress={uid => (navigation as any)?.push?.('PlayerProfile', { userId: uid })}
+                  onSenderPress={uid => {
+                    const m = selectedConv.members.find(mb => mb.user_id === uid);
+                    if (!m) return;
+                    setProfilePlayer({
+                      id: m.profile?.id ?? uid,
+                      user_id: uid,
+                      name: getMemberName(m),
+                      profile_picture_url: m.profile?.profile_picture_url ?? null,
+                      email: m.profile?.email,
+                    });
+                  }}
                   recentInvites={recentInvites}
                 />
               );
@@ -1055,6 +1076,17 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
             )}
           </View>
         </KeyboardAvoidingView>
+
+        <PlayerProfileSheet
+          visible={!!profilePlayer}
+          player={profilePlayer}
+          onClose={() => setProfilePlayer(null)}
+          onMessage={async (uid) => {
+            setProfilePlayer(null);
+            const convId = await getOrCreateDM(uid);
+            if (convId) setSelectedConvId(convId);
+          }}
+        />
 
         {selectedConv.is_group && (
           <GroupInfoModal
