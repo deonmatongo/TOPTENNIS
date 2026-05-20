@@ -86,7 +86,7 @@ const getLeagueStatus = (reg: any) => {
 
 const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; navigation: any }> = ({ registration, onBack, navigation }) => {
   const detailInsets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<Tab>('matches');
+  const [activeTab, setActiveTab] = useState<Tab>('division');
   const [divisionInfo, setDivisionInfo] = useState<any>(null);
   const [scoringMatch, setScoringMatch] = useState<LeagueMatch | null>(null);
   const [confirmMatch, setConfirmMatch] = useState<LeagueMatch | null>(null);
@@ -365,8 +365,6 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
   };
 
   const renderDivision = () => {
-    if (leaderboardLoading) return <ActivityIndicator color={Colors.primary} style={{ marginTop: 32 }} />;
-
     const displayBoard = leaderboard.length > 0 ? leaderboard : DUMMY_DIVISION_LEADERBOARD;
     const meStats = displayBoard.find(p => p.isCurrentUser);
     const myRank  = displayBoard.findIndex(p => p.isCurrentUser) + 1;
@@ -538,8 +536,6 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
   };
 
   const renderLeagueStandings = () => {
-    if (leagueLeaderboardLoading) return <ActivityIndicator color={Colors.primary} style={{ marginTop: 32 }} />;
-
     const displayLeagueBoard = leagueLeaderboard.length > 0 ? leagueLeaderboard : DUMMY_LEAGUE_LEADERBOARD;
     const leagueCurrentUserDisplay = displayLeagueBoard.find(p => p.isCurrentUser) ?? leagueCurrentUser;
     const myRank = leagueCurrentUserDisplay?.rank;
