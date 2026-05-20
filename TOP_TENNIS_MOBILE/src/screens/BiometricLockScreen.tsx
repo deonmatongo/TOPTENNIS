@@ -17,27 +17,30 @@ export const BiometricLockScreen: React.FC<Props> = ({ onUnlock, onSignOut }) =>
   const { available, biometricType, biometricLabel, verifyIdentity } = useBiometrics();
   const [verifying, setVerifying] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   const handleUnlock = async () => {
     if (verifying) return;
     setVerifying(true);
+    setFailed(false);
     try {
       const ok = await verifyIdentity();
       if (ok) {
         onUnlock();
+      } else {
+        setFailed(true);
       }
     } catch {
-      Alert.alert('Authentication Failed', 'Could not verify your identity. Please try again.');
+      setFailed(true);
     } finally {
       setVerifying(false);
     }
   };
 
-  // Auto-trigger biometric prompt 400ms after mount
+  // Auto-trigger as soon as biometrics are confirmed available
   useEffect(() => {
-    const t = setTimeout(() => {
-      if (available) handleUnlock();
-    }, 400);
+    if (!available) return;
+    const t = setTimeout(handleUnlock, 300);
     return () => clearTimeout(t);
   }, [available]);
 
@@ -77,12 +80,31 @@ export const BiometricLockScreen: React.FC<Props> = ({ onUnlock, onSignOut }) =>
 
         {/* Lock content */}
         <View style={styles.center}>
-          <View style={styles.lockRing}>
-            <Ionicons name="lock-closed" size={52} color="rgba(255,255,255,0.18)" />
-          </View>
+          <TouchableOpacity
+            style={[styles.lockRing, failed && styles.lockRingFailed]}
+            onPress={available ? handleUnlock : undefined}
+            activeOpacity={available ? 0.7 : 1}
+            disabled={verifying}
+          >
+            {verifying ? (
+              <ActivityIndicator size="large" color="rgba(255,255,255,0.6)" />
+            ) : (
+              <Ionicons
+                name={failed ? iconName as any : 'lock-closed'}
+                size={52}
+                color={failed ? Palette.orange500 : 'rgba(255,255,255,0.18)'}
+              />
+            )}
+          </TouchableOpacity>
 
-          <Text style={styles.lockTitle}>App Locked</Text>
-          <Text style={styles.lockSub}>Authenticate to continue where you left off</Text>
+          <Text style={styles.lockTitle}>{failed ? 'Try Again' : 'App Locked'}</Text>
+          <Text style={styles.lockSub}>
+            {verifying
+              ? `Verifying with ${biometricLabel}…`
+              : failed
+              ? `Tap the icon or the button below to retry ${biometricLabel}`
+              : 'Authenticate to continue where you left off'}
+          </Text>
 
           {available ? (
             <TouchableOpacity
@@ -102,7 +124,9 @@ export const BiometricLockScreen: React.FC<Props> = ({ onUnlock, onSignOut }) =>
                 ) : (
                   <>
                     <Ionicons name={iconName as any} size={24} color="#fff" />
-                    <Text style={styles.unlockText}>Unlock with {biometricLabel}</Text>
+                    <Text style={styles.unlockText}>
+                      {failed ? `Retry ${biometricLabel}` : `Unlock with ${biometricLabel}`}
+                    </Text>
                   </>
                 )}
               </LinearGradient>
@@ -164,6 +188,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.10)',
     alignItems: 'center', justifyContent: 'center',
     marginBottom: Spacing.sm,
+  },
+  lockRingFailed: {
+    borderColor: Palette.orange500,
+    backgroundColor: 'rgba(249,115,22,0.08)',
   },
 
   lockTitle: {
