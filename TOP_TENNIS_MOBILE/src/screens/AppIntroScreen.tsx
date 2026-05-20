@@ -1,13 +1,11 @@
 import React, { useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Palette, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
-
-const { width: W } = Dimensions.get('window');
 
 const SLIDES = [
   {
@@ -47,6 +45,7 @@ interface Props {
 }
 
 export const AppIntroScreen: React.FC<Props> = ({ onDone }) => {
+  const { width: W } = useWindowDimensions();
   const [index, setIndex] = useState(0);
   const listRef = useRef<FlatList>(null);
   const isLast = index === SLIDES.length - 1;
@@ -75,6 +74,8 @@ export const AppIntroScreen: React.FC<Props> = ({ onDone }) => {
         renderItem={({ item: s }) => (
           <LinearGradient colors={s.bg} style={[styles.slide, { width: W }]}>
             <SafeAreaView style={styles.slideInner} edges={['top']}>
+              {/* Center content on wide screens */}
+              <View style={styles.slideContent}>
               {/* Logo */}
               <View style={styles.logoRow}>
                 <View style={[styles.logoBox, { backgroundColor: s.id === '1' ? Colors.primary : 'rgba(255,255,255,0.18)' }]}>
@@ -92,6 +93,7 @@ export const AppIntroScreen: React.FC<Props> = ({ onDone }) => {
               <Text style={styles.eyebrow}>{s.eyebrow}</Text>
               <Text style={styles.title}>{s.title}</Text>
               <Text style={styles.sub}>{s.sub}</Text>
+              </View>
             </SafeAreaView>
           </LinearGradient>
         )}
@@ -149,11 +151,16 @@ const styles = StyleSheet.create({
   slide: { flex: 1 },
   slideInner: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  slideContent: {
+    width: '100%',
+    maxWidth: 560,
     paddingHorizontal: Spacing.xxl,
     paddingTop: Spacing.lg,
     paddingBottom: 160,
     alignItems: 'center',
-    justifyContent: 'center',
     gap: Spacing.lg,
   },
 

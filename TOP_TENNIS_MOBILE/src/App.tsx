@@ -5,7 +5,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 initSentry();
 import { TamaguiProvider } from 'tamagui';
 import tamaguiConfig from '../tamagui.config';
-import { View, ActivityIndicator, StyleSheet, Text, Platform, Linking, AppState, AppStateStatus } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, Platform, Linking, AppState, AppStateStatus } from 'react-native';
 import {
   useFonts,
   Nunito_400Regular,
@@ -20,7 +20,6 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { CallProvider, useCallContext } from '@/contexts/CallContext';
 import { CallScreen } from '@/screens/CallScreen';
@@ -30,6 +29,8 @@ import { useConversations } from '@/hooks/useConversations';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { useNotifications } from '@/hooks/useNotifications';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useResponsive } from '@/hooks/useResponsive';
+import { TabBar } from '@/components/navigation/TabBar';
 import { navigationRef } from '@/navigation/navigationRef';
 
 import { AuthScreen } from '@/screens/AuthScreen';
@@ -53,7 +54,7 @@ import { CompetitionScreen } from '@/screens/CompetitionScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { ResetPasswordScreen } from '@/screens/ResetPasswordScreen';
 
-import { Colors, Font, FontWeight, Palette } from '@/theme/colors';
+import { Colors, Font } from '@/theme/colors';
 import { NetworkBanner } from '@/components/ui/NetworkBanner';
 import { supabase } from '@/services/supabase';
 import * as SecureStore from 'expo-secure-store';
@@ -69,39 +70,19 @@ function TabNavigator() {
   const { getTotalUnread } = useConversations();
   const { unreadCount } = useNotifications();
   usePushNotifications(unreadCount);
+  const { isTablet, sidebarWidth } = useResponsive();
   const unreadMessages = getTotalUnread();
-
-  const TAB_ITEMS = [
-    { name: 'Home',     label: 'Home',     icon: 'home',        iconOut: 'home-outline',        badge: 0                    },
-    { name: 'Schedule', label: 'Schedule', icon: 'calendar',    iconOut: 'calendar-outline',    badge: pendingReceived.length },
-    { name: 'Matches',  label: 'Matches',  icon: 'tennisball',  iconOut: 'tennisball-outline',  badge: 0                    },
-    { name: 'Messages', label: 'Messages', icon: 'chatbubbles', iconOut: 'chatbubbles-outline', badge: unreadMessages        },
-    { name: 'Settings', label: 'Settings', icon: 'settings',    iconOut: 'settings-outline',    badge: 0                    },
-  ];
 
   return (
     <Tab.Navigator
+      tabBar={(props) => <TabBar {...props} />}
+      sceneContainerStyle={isTablet ? { marginLeft: sidebarWidth } : undefined}
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarStyle: tabStyles.bar,
-        tabBarShowLabel: false,
-        tabBarIcon: ({ focused }) => {
-          const item = TAB_ITEMS.find(t => t.name === route.name)!;
-          return (
-            <View style={[tabStyles.iconWrap, focused && tabStyles.iconWrapActive]}>
-              <Ionicons
-                name={(focused ? item.icon : item.iconOut) as any}
-                size={22}
-                color={focused ? '#fff' : Palette.gray400}
-              />
-              {item.badge > 0 && (
-                <View style={tabStyles.pip}>
-                  <Text style={tabStyles.pipText}>{item.badge > 9 ? '9+' : item.badge}</Text>
-                </View>
-              )}
-            </View>
-          );
-        },
+        tabBarBadge:
+          route.name === 'Schedule' ? (pendingReceived.length || undefined) :
+          route.name === 'Messages' ? (unreadMessages || undefined) :
+          undefined,
       })}
     >
       <Tab.Screen name="Home"     component={HomeNavigator}     />
@@ -328,49 +309,4 @@ const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
 });
 
-// ─── Tab bar styles ───────────────────────────────────────────────────────────
-const tabStyles = StyleSheet.create({
-  bar: {
-    backgroundColor: '#fff',
-    borderTopWidth: 0,
-    height: Platform.OS === 'ios' ? 82 : 66,
-    paddingBottom: Platform.OS === 'ios' ? 22 : 8,
-    paddingTop: 8,
-    shadowColor: 'rgba(13,13,24,0.12)',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 1,
-    shadowRadius: 16,
-    elevation: 18,
-  } as any,
-  iconWrap: {
-    width: 48,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconWrapActive: {
-    backgroundColor: Palette.orange500,
-    shadowColor: Palette.orange500,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  pip: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    minWidth: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 2,
-    borderWidth: 1.5,
-    borderColor: '#fff',
-  },
-  pipText: { color: '#fff', fontSize: 8, fontFamily: Font.black },
-});
 
