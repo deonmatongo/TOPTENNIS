@@ -30,6 +30,7 @@
         "NSCalendarsUsageDescription": "Top Tennis adds your upcoming matches to your calendar.",
         "NSUserNotificationsUsageDescription": "Top Tennis sends you match reminders and league updates.",
         "NSLocationWhenInUseUsageDescription": "Top Tennis uses your location to find nearby courts and players.",
+        "NSFaceIDUsageDescription": "Top Tennis uses Face ID to quickly and securely unlock the app.",
         "UIBackgroundModes": [
           "remote-notification",
           "voip",
@@ -67,6 +68,7 @@
     },
     "plugins": [
       "expo-apple-authentication",
+      "expo-local-authentication",
       [
         "expo-notifications",
         {
