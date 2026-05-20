@@ -53,22 +53,29 @@ export const useLeagueLeaderboard = (leagueId?: string) => {
         // Get all assignments across all divisions
         const { data: assignments, error } = await supabase
           .from('division_assignments')
-          .select(`
-            user_id,
-            division_id,
-            matches_completed,
-            matches_required,
-            playoff_eligible,
-            players!inner(id, name, wins, losses, total_matches, skill_level, usta_rating, profile_picture_url)
-          `)
+          .select('user_id, division_id, matches_completed, matches_required, playoff_eligible')
           .in('division_id', divisionIds)
           .eq('status', 'active');
 
         if (error) throw error;
+        if (!assignments || assignments.length === 0) {
+          setLeaderboard([]);
+          setLoading(false);
+          return;
+        }
+
+        // Fetch players separately (no FK between division_assignments and players)
+        const userIds = assignments.map((a: any) => a.user_id);
+        const { data: players } = await supabase
+          .from('players')
+          .select('id, user_id, name, wins, losses, total_matches, skill_level, usta_rating, profile_picture_url')
+          .in('user_id', userIds);
+
+        const playerMap = new Map((players || []).map((p: any) => [p.user_id, p]));
 
         const data: LeagueLeaderboardPlayer[] = (assignments || []).map((a: any) => {
-          const p = a.players;
-          const points = (p.wins * 3) + Math.floor((a.matches_completed || 0) / 2);
+          const p = playerMap.get(a.user_id) ?? { id: a.user_id, name: 'Unknown', wins: 0, losses: 0, total_matches: 0, skill_level: 0 };
+          const points = ((p.wins ?? 0) * 3) + Math.floor((a.matches_completed || 0) / 2);
           return {
             id: p.id,
             user_id: a.user_id,

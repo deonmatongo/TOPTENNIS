@@ -286,7 +286,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <TamaguiProvider config={tamaguiConfig}>
+      <TamaguiProvider config={tamaguiConfig} defaultTheme="light">
         <SafeAreaProvider>
           <AuthProvider>
             <CallProvider>
