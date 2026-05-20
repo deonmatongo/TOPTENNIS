@@ -52,26 +52,31 @@ export const useDivisionLeaderboard = (divisionId?: string) => {
 
         const playerMap = new Map((players || []).map((p: any) => [p.user_id, p]));
 
-        const data: LeaderboardPlayer[] = assignments.map((a: any) => {
-          const p = playerMap.get(a.user_id) ?? { id: a.user_id, name: 'Unknown', wins: 0, losses: 0, total_matches: 0, skill_level: 0 };
-          const points = ((p.wins ?? 0) * 3) + Math.floor((a.matches_completed ?? 0) / 2);
-          return {
-            id: p.id ?? a.user_id,
-            user_id: a.user_id,
-            name: p.name || 'Unknown',
-            wins: p.wins || 0,
-            losses: p.losses || 0,
-            total_matches: p.total_matches || 0,
-            skill_level: p.skill_level || 0,
-            usta_rating: p.usta_rating,
-            points,
-            matches_completed: a.matches_completed || 0,
-            matches_required: a.matches_required || 5,
-            playoff_eligible: a.playoff_eligible || false,
-            isCurrentUser: a.user_id === user?.id,
-            rank: 0,
-          };
-        });
+        const data: LeaderboardPlayer[] = assignments
+          .filter((a: any) => {
+            const p = playerMap.get(a.user_id);
+            return p && p.name;
+          })
+          .map((a: any) => {
+            const p = playerMap.get(a.user_id);
+            const points = ((p.wins ?? 0) * 3) + Math.floor((a.matches_completed ?? 0) / 2);
+            return {
+              id: p.id,
+              user_id: a.user_id,
+              name: p.name,
+              wins: p.wins || 0,
+              losses: p.losses || 0,
+              total_matches: p.total_matches || 0,
+              skill_level: p.skill_level || 0,
+              usta_rating: p.usta_rating,
+              points,
+              matches_completed: a.matches_completed || 0,
+              matches_required: a.matches_required || 5,
+              playoff_eligible: a.playoff_eligible || false,
+              isCurrentUser: a.user_id === user?.id,
+              rank: 0,
+            };
+          });
 
         const sorted = data
           .sort((a, b) => {

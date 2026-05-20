@@ -365,7 +365,8 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
   };
 
   const renderDivision = () => {
-    const displayBoard = leaderboard.length > 0 ? leaderboard : DUMMY_DIVISION_LEADERBOARD;
+    const realBoard = leaderboard.filter(p => p.name && p.name !== 'Unknown');
+    const displayBoard = (!leaderboardLoading && realBoard.length > 0) ? realBoard : DUMMY_DIVISION_LEADERBOARD;
     const meStats = displayBoard.find(p => p.isCurrentUser);
     const myRank  = displayBoard.findIndex(p => p.isCurrentUser) + 1;
     const currentAssignment = assignments.find(a => a.league_registration_id === registration.id);
@@ -536,7 +537,8 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
   };
 
   const renderLeagueStandings = () => {
-    const displayLeagueBoard = leagueLeaderboard.length > 0 ? leagueLeaderboard : DUMMY_LEAGUE_LEADERBOARD;
+    const realLeagueBoard = leagueLeaderboard.filter(p => p.name && p.name !== 'Unknown');
+    const displayLeagueBoard = (!leagueLeaderboardLoading && realLeagueBoard.length > 0) ? realLeagueBoard : DUMMY_LEAGUE_LEADERBOARD;
     const leagueCurrentUserDisplay = displayLeagueBoard.find(p => p.isCurrentUser) ?? leagueCurrentUser;
     const myRank = leagueCurrentUserDisplay?.rank;
     const myPoints = leagueCurrentUserDisplay?.points ?? 0;
