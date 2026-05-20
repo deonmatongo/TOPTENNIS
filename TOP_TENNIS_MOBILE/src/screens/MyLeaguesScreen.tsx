@@ -44,6 +44,28 @@ const DUMMY_MATCHES = [
   { id: '__dm6', match_date: _p(6),  player1_name: 'Alex Chen',   player2_name: 'Sam Rivera',    player1_id: '__p2__', player2_id: '__p5__', winner_id: '__p2__',  status: 'completed', court_location: 'Court 1 — East Wing',  isUserMatch: false, userIsPlayer1: false, opponent_name: '',            opponent_user_id: '',        result: 'pending' as const, set1_player1: 7, set1_player2: 5 },
 ];
 
+const DUMMY_DIVISION_LEADERBOARD = [
+  { id: '__dd1', user_id: '__dd1', name: 'Alex Chen',     wins: 8, losses: 2, total_matches: 10, skill_level: 4, points: 29, matches_completed: 10, matches_required: 10, playoff_eligible: true,  isCurrentUser: false, rank: 1 },
+  { id: '__dd2', user_id: '__dd2', name: 'Jordan Lee',    wins: 7, losses: 3, total_matches: 10, skill_level: 4, points: 26, matches_completed: 10, matches_required: 10, playoff_eligible: true,  isCurrentUser: false, rank: 2 },
+  { id: '__dd3', user_id: '__dd3', name: 'You',           wins: 5, losses: 3, total_matches:  8, skill_level: 3, points: 19, matches_completed:  8, matches_required: 10, playoff_eligible: false, isCurrentUser: true,  rank: 3 },
+  { id: '__dd4', user_id: '__dd4', name: 'Marcus Webb',   wins: 4, losses: 5, total_matches:  9, skill_level: 3, points: 16, matches_completed:  9, matches_required: 10, playoff_eligible: false, isCurrentUser: false, rank: 4 },
+  { id: '__dd5', user_id: '__dd5', name: 'Priya Nair',    wins: 3, losses: 5, total_matches:  8, skill_level: 3, points: 13, matches_completed:  8, matches_required: 10, playoff_eligible: false, isCurrentUser: false, rank: 5 },
+  { id: '__dd6', user_id: '__dd6', name: 'Sam Rivera',    wins: 2, losses: 7, total_matches:  9, skill_level: 3, points: 10, matches_completed:  9, matches_required: 10, playoff_eligible: false, isCurrentUser: false, rank: 6 },
+  { id: '__dd7', user_id: '__dd7', name: 'Taylor Brooks', wins: 1, losses: 8, total_matches:  9, skill_level: 3, points:  7, matches_completed:  9, matches_required: 10, playoff_eligible: false, isCurrentUser: false, rank: 7 },
+];
+
+const DUMMY_LEAGUE_LEADERBOARD = [
+  { id: '__dl1', user_id: '__dl1', name: 'Alex Chen',     wins: 8, losses: 2, total_matches: 10, skill_level: 4, points: 29, matches_completed: 10, matches_required: 10, playoff_eligible: true,  division_name: 'Division A', division_id: '__da', isCurrentUser: false, rank: 1 },
+  { id: '__dl2', user_id: '__dl2', name: 'Jordan Lee',    wins: 7, losses: 3, total_matches: 10, skill_level: 4, points: 26, matches_completed: 10, matches_required: 10, playoff_eligible: true,  division_name: 'Division B', division_id: '__db', isCurrentUser: false, rank: 2 },
+  { id: '__dl3', user_id: '__dl3', name: 'Chris Park',    wins: 7, losses: 2, total_matches:  9, skill_level: 4, points: 23, matches_completed:  9, matches_required: 10, playoff_eligible: true,  division_name: 'Division C', division_id: '__dc', isCurrentUser: false, rank: 3 },
+  { id: '__dl4', user_id: '__dl4', name: 'You',           wins: 5, losses: 3, total_matches:  8, skill_level: 3, points: 19, matches_completed:  8, matches_required: 10, playoff_eligible: false, division_name: 'Division A', division_id: '__da', isCurrentUser: true,  rank: 4 },
+  { id: '__dl5', user_id: '__dl5', name: 'Maya Osei',     wins: 5, losses: 4, total_matches:  9, skill_level: 3, points: 17, matches_completed:  9, matches_required: 10, playoff_eligible: false, division_name: 'Division C', division_id: '__dc', isCurrentUser: false, rank: 5 },
+  { id: '__dl6', user_id: '__dl6', name: 'Marcus Webb',   wins: 4, losses: 5, total_matches:  9, skill_level: 3, points: 16, matches_completed:  9, matches_required: 10, playoff_eligible: false, division_name: 'Division C', division_id: '__dc', isCurrentUser: false, rank: 6 },
+  { id: '__dl7', user_id: '__dl7', name: 'Priya Nair',    wins: 3, losses: 5, total_matches:  8, skill_level: 3, points: 13, matches_completed:  8, matches_required: 10, playoff_eligible: false, division_name: 'Division B', division_id: '__db', isCurrentUser: false, rank: 7 },
+  { id: '__dl8', user_id: '__dl8', name: 'Sam Rivera',    wins: 2, losses: 7, total_matches:  9, skill_level: 3, points: 10, matches_completed:  9, matches_required: 10, playoff_eligible: false, division_name: 'Division B', division_id: '__db', isCurrentUser: false, rank: 8 },
+  { id: '__dl9', user_id: '__dl9', name: 'Taylor Brooks', wins: 1, losses: 8, total_matches:  9, skill_level: 3, points:  7, matches_completed:  9, matches_required: 10, playoff_eligible: false, division_name: 'Division A', division_id: '__da', isCurrentUser: false, rank: 9 },
+];
+
 type Tab = 'matches' | 'division' | 'league' | 'playoffs';
 const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: 'matches', label: 'Matches', icon: 'calendar-outline' },
@@ -345,12 +367,13 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
   const renderDivision = () => {
     if (leaderboardLoading) return <ActivityIndicator color={Colors.primary} style={{ marginTop: 32 }} />;
 
-    const meStats = leaderboard.find(p => p.isCurrentUser);
-    const myRank  = leaderboard.findIndex(p => p.isCurrentUser) + 1;
+    const displayBoard = leaderboard.length > 0 ? leaderboard : DUMMY_DIVISION_LEADERBOARD;
+    const meStats = displayBoard.find(p => p.isCurrentUser);
+    const myRank  = displayBoard.findIndex(p => p.isCurrentUser) + 1;
     const currentAssignment = assignments.find(a => a.league_registration_id === registration.id);
-    const completed  = currentAssignment?.matches_completed ?? 0;
-    const required   = currentAssignment?.matches_required  ?? 5;
-    const eligible   = currentAssignment?.playoff_eligible  ?? false;
+    const completed  = currentAssignment?.matches_completed ?? meStats?.matches_completed ?? 0;
+    const required   = currentAssignment?.matches_required  ?? meStats?.matches_required  ?? 5;
+    const eligible   = currentAssignment?.playoff_eligible  ?? meStats?.playoff_eligible  ?? false;
     const pct = Math.min(100, Math.round((completed / required) * 100));
 
     return (
@@ -412,14 +435,7 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
           </View>
         )}
 
-        {leaderboard.length === 0 ? (
-          <View style={styles.tabEmpty}>
-            <Ionicons name="bar-chart-outline" size={40} color={Colors.textMuted} />
-            <Text style={styles.tabEmptyTitle}>No standings yet</Text>
-            <Text style={styles.tabEmptySub}>Rankings appear once matches are played.</Text>
-          </View>
-        ) : (
-          <View style={styles.leagueTable}>
+        <View style={styles.leagueTable}>
             {/* ── Table header ── */}
             <LinearGradient
               colors={[Palette.dark900, Palette.dark700]}
@@ -440,7 +456,7 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
             </LinearGradient>
 
             {/* ── Table rows ── */}
-            {leaderboard.map((p, index) => {
+            {displayBoard.map((p, index) => {
               const winRate = p.total_matches > 0 ? Math.round((p.wins / p.total_matches) * 100) : 0;
               const medals = ['🥇', '🥈', '🥉'];
               const isTop3 = index < 3;
@@ -451,7 +467,7 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
                     styles.tableRow,
                     index % 2 === 1 && styles.tableRowAlt,
                     p.isCurrentUser && styles.tableRowSelf,
-                    index === leaderboard.length - 1 && styles.tableRowLast,
+                    index === displayBoard.length - 1 && styles.tableRowLast,
                   ]}
                   onPress={() => {
                     if (!p.isCurrentUser) {
@@ -509,7 +525,6 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
               );
             })}
           </View>
-        )}
 
         {/* Footer note */}
         <View style={styles.divFooter}>
@@ -524,29 +539,24 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
 
   const renderLeagueStandings = () => {
     if (leagueLeaderboardLoading) return <ActivityIndicator color={Colors.primary} style={{ marginTop: 32 }} />;
-    if (leagueLeaderboard.length === 0) return (
-      <View style={styles.tabEmpty}>
-        <Ionicons name="trophy-outline" size={40} color={Colors.textMuted} />
-        <Text style={styles.tabEmptyTitle}>No League Standings Yet</Text>
-        <Text style={styles.tabEmptySub}>League-wide rankings will appear once players start competing across all divisions.</Text>
-      </View>
-    );
 
-    const myRank = leagueCurrentUser?.rank;
-    const myPoints = leagueCurrentUser?.points ?? 0;
-    const nextPlayer = myRank && myRank > 1 ? leagueLeaderboard[myRank - 2] : null;
+    const displayLeagueBoard = leagueLeaderboard.length > 0 ? leagueLeaderboard : DUMMY_LEAGUE_LEADERBOARD;
+    const leagueCurrentUserDisplay = displayLeagueBoard.find(p => p.isCurrentUser) ?? leagueCurrentUser;
+    const myRank = leagueCurrentUserDisplay?.rank;
+    const myPoints = leagueCurrentUserDisplay?.points ?? 0;
+    const nextPlayer = myRank && myRank > 1 ? displayLeagueBoard[myRank - 2] : null;
     const pointsGap = nextPlayer ? nextPlayer.points - myPoints : 0;
 
     return (
       <View style={styles.tabContent}>
         {/* My position banner */}
-        {leagueCurrentUser && (
+        {leagueCurrentUserDisplay && (
           <View style={styles.myRankBanner}>
             <View style={styles.myRankLeft}>
               <Text style={styles.myRankNum}>#{myRank}</Text>
               <View>
                 <Text style={styles.myRankLabel}>Your League Rank</Text>
-                <Text style={styles.myRankPts}>{myPoints} pts  •  {leagueCurrentUser.wins}W – {leagueCurrentUser.losses}L</Text>
+                <Text style={styles.myRankPts}>{myPoints} pts  •  {leagueCurrentUserDisplay.wins}W – {leagueCurrentUserDisplay.losses}L</Text>
               </View>
             </View>
             {pointsGap > 0 && (
@@ -560,7 +570,7 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
 
         <View style={styles.standingsHeader}>
           <Text style={styles.standingsTitle}>{registration.league_name} — All Divisions</Text>
-          <Text style={styles.standingsSub}>{leagueLeaderboard.length} players competing</Text>
+          <Text style={styles.standingsSub}>{displayLeagueBoard.length} players competing</Text>
         </View>
 
         <View style={styles.leagueTable}>
@@ -584,7 +594,7 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
           </LinearGradient>
 
           {/* ── Table rows ── */}
-          {leagueLeaderboard.map((p, index) => {
+          {displayLeagueBoard.map((p, index) => {
             const winRate = p.total_matches > 0 ? Math.round((p.wins / p.total_matches) * 100) : 0;
             const medals = ['🥇', '🥈', '🥉'];
             const isTop3 = index < 3;
@@ -595,7 +605,7 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
                   styles.tableRow,
                   index % 2 === 1 && styles.tableRowAlt,
                   p.isCurrentUser && styles.tableRowSelf,
-                  index === leagueLeaderboard.length - 1 && styles.tableRowLast,
+                  index === displayLeagueBoard.length - 1 && styles.tableRowLast,
                 ]}
                 onPress={() => {
                   if (!p.isCurrentUser) {
