@@ -5,10 +5,6 @@
 //
 // Deploy with:
 //   supabase functions deploy send-push --no-verify-jwt
-//
-// One-time setup (run in Supabase SQL Editor):
-//   ALTER DATABASE postgres SET "app.supabase_project_ref"    = 'qrhladnnblgbobcnxjsz';
-//   ALTER DATABASE postgres SET "app.supabase_service_role_key" = '<your-service-role-key>';
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -19,10 +15,10 @@ Deno.serve(async (req: Request) => {
     return new Response('Method Not Allowed', { status: 405 })
   }
 
-  // Verify the caller is the database trigger (matches SUPABASE_SERVICE_ROLE_KEY)
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  const bearer = req.headers.get('Authorization')?.replace('Bearer ', '') ?? ''
-  if (serviceKey && bearer !== serviceKey) {
+  // Verify caller provides the anon key — limits abuse while keeping trigger simple
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+  const bearer  = req.headers.get('Authorization')?.replace('Bearer ', '') ?? ''
+  if (anonKey && bearer !== anonKey) {
     return new Response('Unauthorized', { status: 401 })
   }
 
