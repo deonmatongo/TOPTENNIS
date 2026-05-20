@@ -19,6 +19,7 @@ export interface LeagueMatch {
   is_playoff: boolean;
   round_number: number;
   match_number?: number;
+  week_number?: number;
   created_at: string;
   // derived
   isUserMatch: boolean;
@@ -32,18 +33,29 @@ export interface LeagueMatch {
 export const useLeagueMatches = (divisionId?: string) => {
   const { user } = useAuth();
   const [matches, setMatches] = useState<LeagueMatch[]>([]);
+  const [allDivisionMatches, setAllDivisionMatches] = useState<LeagueMatch[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchMatches = async () => {
     if (!divisionId) { setLoading(false); return; }
     setLoading(true);
     try {
-      // Fetch league_matches with profile names via view or direct join
-      const { data, error } = await supabase
-        .from('user_league_matches')
-        .select('*')
-        .eq('division_id', divisionId)
-        .order('scheduled_date', { ascending: true });
+      const [userRes, allRes] = await Promise.all([
+        supabase
+          .from('user_league_matches')
+          .select('*')
+          .eq('division_id', divisionId)
+          .order('week_number', { ascending: true, nullsFirst: false })
+          .order('scheduled_date', { ascending: true }),
+        supabase
+          .from('division_league_matches')
+          .select('*')
+          .eq('division_id', divisionId)
+          .order('week_number', { ascending: true, nullsFirst: false })
+          .order('scheduled_date', { ascending: true }),
+      ]);
+
+      const { data, error } = userRes;
 
       if (error) throw error;
 
@@ -76,6 +88,7 @@ export const useLeagueMatches = (divisionId?: string) => {
           is_playoff: m.is_playoff || false,
           round_number: m.round_number || 1,
           match_number: m.match_number,
+          week_number: m.week_number ?? undefined,
           created_at: m.created_at,
           isUserMatch,
           userIsPlayer1,
@@ -87,6 +100,35 @@ export const useLeagueMatches = (divisionId?: string) => {
       });
 
       setMatches(formatted);
+
+      // Map all division matches (for "Other matches this week" display)
+      const mapMatch = (m: any, uid?: string): LeagueMatch => {
+        const userIsP1 = m.player1_id === uid;
+        const isUser   = m.player1_id === uid || m.player2_id === uid;
+        let result: 'win' | 'loss' | 'pending' = 'pending';
+        if (m.status === 'completed' && m.winner_id && isUser) {
+          result = m.winner_id === uid ? 'win' : 'loss';
+        }
+        return {
+          id: m.id, division_id: m.division_id,
+          player1_id: m.player1_id, player2_id: m.player2_id,
+          player1_name: `${m.player1_first_name} ${m.player1_last_name}`,
+          player2_name: `${m.player2_first_name} ${m.player2_last_name}`,
+          scheduled_date: m.scheduled_date, scheduled_time: m.scheduled_time,
+          court_location: m.court_location, status: m.status,
+          winner_id: m.winner_id, score: m.score,
+          is_playoff: m.is_playoff || false, round_number: m.round_number || 1,
+          match_number: m.match_number, week_number: m.week_number ?? undefined,
+          created_at: m.created_at,
+          isUserMatch: isUser, userIsPlayer1: userIsP1,
+          opponent_name: m.opponent_name || (userIsP1 ? `${m.player2_first_name} ${m.player2_last_name}` : `${m.player1_first_name} ${m.player1_last_name}`),
+          opponent_id: m.opponent_id || (userIsP1 ? m.player2_id : m.player1_id),
+          result,
+          needsScoreReport: m.status === 'completed' && !m.winner_id && isUser,
+        };
+      };
+
+      setAllDivisionMatches((allRes.data || []).map((m: any) => mapMatch(m, user?.id)));
     } catch (e: any) {
       captureError(e);
       if (__DEV__) console.error('[useLeagueMatches]', e);
@@ -160,6 +202,7 @@ export const useLeagueMatches = (divisionId?: string) => {
 
   return {
     matches,
+    allDivisionMatches,
     loading,
     refetch: fetchMatches,
     submitScore,

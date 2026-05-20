@@ -74,8 +74,8 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
   const { player } = usePlayerProfile();
   const { assignments } = useDivisionAssignments();
   const divisionId = assignments.find(a => a.league_registration_id === registration.id)?.division_id;
-  const { userMatches, playoffMatches, loading: matchesLoading, submitScore, scheduleMatch } = useLeagueMatches(divisionId);
-  const { matches: allDivMatches, loading: divMatchesLoading } = useDivisionMatches(divisionId);
+  const { userMatches, allDivisionMatches, playoffMatches, loading: matchesLoading, submitScore, scheduleMatch } = useLeagueMatches(divisionId);
+  const { loading: divMatchesLoading } = useDivisionMatches(divisionId);
   const isDemoLeague = !!(registration.is_demo);
   const { leaderboard, loading: leaderboardLoading } = useDivisionLeaderboard(divisionId);
   const { leaderboard: leagueLeaderboard, loading: leagueLeaderboardLoading, currentUser: leagueCurrentUser } = useLeagueLeaderboard(registration.league_id);
@@ -96,9 +96,20 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
     const isLoading = isDemoLeague ? false : (matchesLoading || divMatchesLoading);
     if (isLoading) return <ActivityIndicator color={Colors.primary} style={{ marginTop: 32 }} />;
 
-    // Use demo matches for demo leagues; real division matches for real leagues
-    const allMatches: any[] = isDemoLeague ? DUMMY_MATCHES : allDivMatches;
+    // Use demo matches for demo leagues; real league_matches for real leagues
+    const allMatches: any[] = isDemoLeague ? DUMMY_MATCHES : allDivisionMatches;
     const isTournamentActive = !isDemoLeague && divisionInfo?.tournament_status === 'active';
+
+    // Group by week for round-robin display
+    const hasWeeks = !isDemoLeague && allMatches.some((m: any) => m.week_number != null);
+    const weekGroups: Map<number | null, any[]> = hasWeeks
+      ? allMatches.reduce((acc, m) => {
+          const w = m.week_number ?? null;
+          if (!acc.has(w)) acc.set(w, []);
+          acc.get(w)!.push(m);
+          return acc;
+        }, new Map<number | null, any[]>())
+      : new Map([[null, allMatches]]);
 
     const upcoming  = allMatches.filter(m => m.status === 'scheduled' || m.status === 'pending');
     const completed = allMatches.filter(m => m.status === 'completed');
@@ -278,9 +289,28 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
           <View style={styles.tabEmpty}>
             <Ionicons name="time-outline" size={40} color={Colors.textMuted} />
             <Text style={styles.tabEmptyTitle}>No matches yet</Text>
-            <Text style={styles.tabEmptySub}>Schedule a match with a division opponent to get started.</Text>
+            <Text style={styles.tabEmptySub}>Division schedule will appear once players are assigned.</Text>
           </View>
+        ) : hasWeeks ? (
+          // Week-grouped round-robin schedule
+          Array.from(weekGroups.entries())
+            .sort(([a], [b]) => (a ?? 9999) - (b ?? 9999))
+            .map(([week, weekMatches]) => (
+              <View key={`week-${week}`} style={styles.matchSection}>
+                <View style={styles.weekHeader}>
+                  <View style={styles.weekDot} />
+                  <Text style={styles.weekLabel}>Week {week ?? '—'}</Text>
+                  {weekMatches[0]?.scheduled_date && (
+                    <Text style={styles.weekDate}>
+                      {new Date(weekMatches[0].scheduled_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </Text>
+                  )}
+                </View>
+                {weekMatches.map((m: any) => <MatchCard key={m.id} match={m} />)}
+              </View>
+            ))
         ) : (
+          // No week numbers — fallback to upcoming/completed split
           <>
             {upcoming.length > 0 && (
               <View style={styles.matchSection}>
@@ -1085,6 +1115,10 @@ const styles = StyleSheet.create({
   // Match sections (Upcoming / Recent Results grouping)
   matchSection: { gap: Spacing.sm },
   matchSectionLabel: { fontSize: FontSize.xs, fontFamily: Font.bold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 2 },
+  weekHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: 2, marginBottom: 2 },
+  weekDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.primary },
+  weekLabel: { fontSize: FontSize.xs, fontFamily: Font.bold, color: Colors.primary, textTransform: 'uppercase', letterSpacing: 0.5, flex: 1 },
+  weekDate: { fontSize: FontSize.xs, fontFamily: Font.regular, color: Colors.textMuted },
 
   // Other-player (non-user) match card styling
   matchCardOther: { opacity: 0.85 },
