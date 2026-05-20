@@ -22,6 +22,7 @@ interface Opponent {
 interface Props {
   visible: boolean;
   divisionId: string | undefined;
+  initialOpponentId?: string;
   onClose: () => void;
   onSchedule: (params: {
     divisionId: string;
@@ -41,7 +42,7 @@ const TIME_SLOTS = [
   '19:00', '20:00', '21:00',
 ];
 
-export const ScheduleLeagueMatchModal: React.FC<Props> = ({ visible, divisionId, onClose, onSchedule }) => {
+export const ScheduleLeagueMatchModal: React.FC<Props> = ({ visible, divisionId, initialOpponentId, onClose, onSchedule }) => {
   const { user } = useAuth();
   const [opponents, setOpponents] = useState<Opponent[]>([]);
   const [loadingOpponents, setLoadingOpponents] = useState(false);
@@ -57,8 +58,26 @@ export const ScheduleLeagueMatchModal: React.FC<Props> = ({ visible, divisionId,
   useEffect(() => {
     if (visible && divisionId && user) {
       fetchOpponents();
+    } else if (!visible) {
+      setSelectedOpponent(null);
+      setDate('');
+      setTime('');
+      setTimezone('America/New_York');
+      setCourtLocation('');
+      setMessage('');
+      setStep('opponent');
     }
   }, [visible, divisionId, user]);
+
+  // Auto-select opponent and skip to details when initialOpponentId is provided
+  useEffect(() => {
+    if (!initialOpponentId || opponents.length === 0 || !visible) return;
+    const found = opponents.find(o => o.user_id === initialOpponentId);
+    if (found) {
+      setSelectedOpponent(found);
+      setStep('details');
+    }
+  }, [opponents, initialOpponentId, visible]);
 
   const fetchOpponents = async () => {
     if (!divisionId || !user) return;

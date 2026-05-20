@@ -69,6 +69,7 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
   const [scoringMatch, setScoringMatch] = useState<LeagueMatch | null>(null);
   const [confirmMatch, setConfirmMatch] = useState<LeagueMatch | null>(null);
   const [showSchedule, setShowSchedule] = useState(false);
+  const [schedulingOpponentId, setSchedulingOpponentId] = useState<string | null>(null);
   const [selectedLeaderboardPlayer, setSelectedLeaderboardPlayer] = useState<PlayerSearchResult | null>(null);
   const { user } = useAuth();
   const { player } = usePlayerProfile();
@@ -229,6 +230,17 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
               <Text style={styles.scoreLabel}>Final Score</Text>
               <Text style={styles.scoreValue}>{scoreText}</Text>
             </View>
+          )}
+
+          {/* Book Match — for user's pending (unbooked) matches */}
+          {isUserMatch && match.status === 'pending' && !isDemoLeague && (
+            <TouchableOpacity
+              style={styles.bookMatchBtn}
+              onPress={() => setSchedulingOpponentId(match.opponent_id || '')}
+            >
+              <Ionicons name="calendar" size={14} color="#fff" />
+              <Text style={styles.bookMatchBtnText}>Book Court &amp; Time</Text>
+            </TouchableOpacity>
           )}
 
           {/* Action buttons — only for user's own matches */}
@@ -407,61 +419,96 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
             <Text style={styles.tabEmptySub}>Rankings appear once matches are played.</Text>
           </View>
         ) : (
-          leaderboard.map((p, index) => {
-            const winRate = p.total_matches > 0 ? Math.round((p.wins / p.total_matches) * 100) : 0;
-            const medals = ['🥇', '🥈', '🥉'];
-            const isTop3 = index < 3;
-            return (
-              <TouchableOpacity
-                key={p.user_id ?? `lb-${index}`}
-                style={[styles.standingRow, p.isCurrentUser && styles.standingRowSelf]}
-                onPress={() => {
-                  if (!p.isCurrentUser) {
-                    setSelectedLeaderboardPlayer({
-                      id: p.user_id,
-                      first_name: p.name.split(' ')[0] || p.name,
-                      last_name: p.name.split(' ').slice(1).join(' ') || '',
-                      wins: p.wins,
-                      losses: p.losses,
-                    });
-                  }
-                }}
-                activeOpacity={p.isCurrentUser ? 1 : 0.7}
-              >
-                <View style={[styles.rankCircle, p.isCurrentUser ? styles.rankCircleSelf : isTop3 ? styles.rankCircleTop : styles.rankCircleDefault]}>
-                  {isTop3 && !p.isCurrentUser
-                    ? <Text style={{ fontSize: 14 }}>{medals[index]}</Text>
-                    : <Text style={[styles.rankText, p.isCurrentUser && { color: '#fff' }]}>{index + 1}</Text>}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.standingNameRow}>
-                    <Text style={[styles.standingName, p.isCurrentUser && { color: Colors.primary }]} numberOfLines={1}>{p.name}</Text>
-                    {p.isCurrentUser && <View style={styles.youBadge}><Text style={styles.youBadgeText}>You</Text></View>}
-                    {p.playoff_eligible && (
-                      <View style={[styles.playoffBadge, { marginLeft: 2 }]}>
-                        <Ionicons name="shield-checkmark-outline" size={10} color="#fff" />
+          <View style={styles.leagueTable}>
+            {/* ── Table header ── */}
+            <LinearGradient
+              colors={[Palette.dark900, Palette.dark700]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={styles.tableHeader}
+            >
+              <View style={styles.tableRankCol}>
+                <Text style={styles.tableHeaderText}>#</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.tableHeaderText}>Player</Text>
+              </View>
+              <Text style={[styles.tableHeaderText, styles.tableNumHeader]}>Pld</Text>
+              <Text style={[styles.tableHeaderText, styles.tableNumHeader]}>W</Text>
+              <Text style={[styles.tableHeaderText, styles.tableNumHeader]}>L</Text>
+              <Text style={[styles.tableHeaderText, styles.tableNumHeaderPts]}>Pts</Text>
+              <Text style={[styles.tableHeaderText, styles.tableNumHeaderWr]}>WR%</Text>
+            </LinearGradient>
+
+            {/* ── Table rows ── */}
+            {leaderboard.map((p, index) => {
+              const winRate = p.total_matches > 0 ? Math.round((p.wins / p.total_matches) * 100) : 0;
+              const medals = ['🥇', '🥈', '🥉'];
+              const isTop3 = index < 3;
+              return (
+                <TouchableOpacity
+                  key={p.user_id ?? `lb-${index}`}
+                  style={[
+                    styles.tableRow,
+                    index % 2 === 1 && styles.tableRowAlt,
+                    p.isCurrentUser && styles.tableRowSelf,
+                    index === leaderboard.length - 1 && styles.tableRowLast,
+                  ]}
+                  onPress={() => {
+                    if (!p.isCurrentUser) {
+                      setSelectedLeaderboardPlayer({
+                        id: p.user_id,
+                        first_name: p.name.split(' ')[0] || p.name,
+                        last_name: p.name.split(' ').slice(1).join(' ') || '',
+                        wins: p.wins,
+                        losses: p.losses,
+                      });
+                    }
+                  }}
+                  activeOpacity={p.isCurrentUser ? 1 : 0.75}
+                >
+                  {/* Rank / Medal */}
+                  <View style={styles.tableRankCol}>
+                    {isTop3 && !p.isCurrentUser
+                      ? <Text style={styles.tableMedal}>{medals[index]}</Text>
+                      : <Text style={[styles.tableRankNum, p.isCurrentUser && styles.tableRankNumSelf]}>{index + 1}</Text>
+                    }
+                  </View>
+
+                  {/* Player name + YOU / playoff badges */}
+                  <View style={styles.tableNameCell}>
+                    <Text style={[styles.tablePlayerName, p.isCurrentUser && styles.tablePlayerNameSelf]} numberOfLines={1}>
+                      {p.name}
+                    </Text>
+                    {(p.isCurrentUser || p.playoff_eligible) && (
+                      <View style={styles.tableNameBadges}>
+                        {p.isCurrentUser && (
+                          <View style={styles.tableYouBadge}>
+                            <Text style={styles.tableYouText}>YOU</Text>
+                          </View>
+                        )}
+                        {p.playoff_eligible && (
+                          <View style={styles.tablePlayoffDot}>
+                            <Ionicons name="shield-checkmark-outline" size={8} color="#fff" />
+                          </View>
+                        )}
                       </View>
                     )}
                   </View>
-                  <Text style={styles.standingStats}>{p.wins}W – {p.losses}L  •  {winRate}%  •  {p.points} pts</Text>
-                </View>
-                <View style={styles.standingRight}>
-                  {p.playoff_eligible
-                    ? <View style={styles.playoffBadge}><Ionicons name="medal-outline" size={11} color="#fff" /><Text style={styles.playoffBadgeText}>Playoff</Text></View>
-                    : <Text style={styles.matchesNeeded}>{Math.max(0, p.matches_required - p.matches_completed)} needed</Text>}
-                  {!p.isCurrentUser && (
-                    <TouchableOpacity
-                      style={styles.scheduleSmallBtn}
-                      onPress={() => handleMatchRequest(p.user_id, p.name)}
-                    >
-                      <Ionicons name="tennisball-outline" size={13} color={Colors.primary} />
-                      <Text style={styles.scheduleSmallBtnText}>Request</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          })
+
+                  {/* Pld */}
+                  <Text style={[styles.tableNumCell, p.isCurrentUser && styles.tableNumSelf]}>{p.total_matches}</Text>
+                  {/* W */}
+                  <Text style={[styles.tableNumCell, styles.tableWinNum]}>{p.wins}</Text>
+                  {/* L */}
+                  <Text style={[styles.tableNumCell, styles.tableLossNum]}>{p.losses}</Text>
+                  {/* Pts */}
+                  <Text style={[styles.tablePtsCell, p.isCurrentUser && styles.tableNumSelf]}>{p.points}</Text>
+                  {/* WR% */}
+                  <Text style={[styles.tableWrCell, p.isCurrentUser && styles.tableNumSelf]}>{winRate}%</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         )}
 
         {/* Footer note */}
@@ -734,9 +781,10 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
       />
 
       <ScheduleLeagueMatchModal
-        visible={showSchedule}
+        visible={showSchedule || !!schedulingOpponentId}
         divisionId={divisionId}
-        onClose={() => setShowSchedule(false)}
+        initialOpponentId={schedulingOpponentId ?? undefined}
+        onClose={() => { setShowSchedule(false); setSchedulingOpponentId(null); }}
         onSchedule={scheduleMatch}
       />
     </View>
@@ -1227,4 +1275,41 @@ const styles = StyleSheet.create({
   divisionPillText: { fontSize: 10, color: Colors.textSecondary, fontFamily: Font.medium },
   pointsValue: { fontSize: FontSize.md, fontFamily: Font.bold, color: Colors.text },
   pointsLabel: { fontSize: FontSize.xs, color: Colors.textMuted },
+
+  // ── Beautiful League Table (Division standings) ──────────────────────────────
+  leagueTable: { backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border, ...Shadow.sm },
+  tableHeader: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12 },
+  tableHeaderText: { fontSize: 10, fontFamily: Font.bold, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 0.5 },
+  tableNumHeader: { width: 28, textAlign: 'center' as const },
+  tableNumHeaderPts: { width: 32, textAlign: 'center' as const },
+  tableNumHeaderWr: { width: 38, textAlign: 'center' as const },
+
+  tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.borderLight },
+  tableRowAlt: { backgroundColor: '#f8fafc' },
+  tableRowSelf: { backgroundColor: '#fff7ed', borderLeftWidth: 3, borderLeftColor: Colors.primary },
+  tableRowLast: { borderBottomWidth: 0 },
+
+  tableRankCol: { width: 32, alignItems: 'center', justifyContent: 'center' },
+  tableRankNum: { fontSize: 13, fontFamily: Font.bold, color: Colors.textMuted, textAlign: 'center' },
+  tableRankNumSelf: { color: Colors.primary },
+  tableMedal: { fontSize: 16, textAlign: 'center' },
+
+  tableNameCell: { flex: 1, paddingRight: 4 },
+  tablePlayerName: { fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.text },
+  tablePlayerNameSelf: { color: Colors.primary, fontFamily: Font.bold },
+  tableNameBadges: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
+  tableYouBadge: { backgroundColor: Colors.primary, paddingHorizontal: 5, paddingVertical: 1, borderRadius: Radius.full },
+  tableYouText: { fontSize: 8, color: '#fff', fontFamily: Font.bold, letterSpacing: 0.5 },
+  tablePlayoffDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#16a34a', alignItems: 'center', justifyContent: 'center' },
+
+  tableNumCell: { width: 28, textAlign: 'center' as const, fontSize: FontSize.xs, fontFamily: Font.semibold, color: Colors.text },
+  tableNumSelf: { color: Palette.orange500 },
+  tableWinNum: { color: Colors.success },
+  tableLossNum: { color: Colors.error },
+  tablePtsCell: { width: 32, textAlign: 'center' as const, fontSize: FontSize.sm, fontFamily: Font.bold, color: Colors.primary },
+  tableWrCell: { width: 38, textAlign: 'center' as const, fontSize: FontSize.xs, fontFamily: Font.semibold, color: Colors.textSecondary },
+
+  // ── Book Match button ─────────────────────────────────────────────────────────
+  bookMatchBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, paddingVertical: Spacing.sm, borderRadius: Radius.md, backgroundColor: Colors.primary },
+  bookMatchBtnText: { fontSize: FontSize.sm, fontFamily: Font.semibold, color: '#fff' },
 });

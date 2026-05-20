@@ -71,7 +71,7 @@ BEGIN
   END IF;
 
   -- Collect active players ordered by assignment date (deterministic)
-  SELECT ARRAY_AGG(user_id ORDER BY created_at, user_id)
+  SELECT ARRAY_AGG(user_id ORDER BY user_id)
   INTO v_players
   FROM public.division_assignments
   WHERE division_id = p_division_id AND status = 'active';
