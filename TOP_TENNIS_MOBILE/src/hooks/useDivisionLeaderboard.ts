@@ -30,25 +30,33 @@ export const useDivisionLeaderboard = (divisionId?: string) => {
     const fetch = async () => {
       setLoading(true);
       try {
-        const { data: assignments, error } = await supabase
+        const { data: assignments, error: aErr } = await supabase
           .from('division_assignments')
-          .select(`
-            user_id,
-            matches_completed,
-            matches_required,
-            playoff_eligible,
-            players!inner(id, name, wins, losses, total_matches, skill_level, usta_rating)
-          `)
+          .select('user_id, matches_completed, matches_required, playoff_eligible')
           .eq('division_id', divisionId)
           .eq('status', 'active');
 
-        if (error) throw error;
+        if (aErr) throw aErr;
+        if (!assignments || assignments.length === 0) {
+          setLeaderboard([]);
+          return;
+        }
 
-        const data: LeaderboardPlayer[] = (assignments || []).map((a: any) => {
-          const p = a.players;
-          const points = (p.wins * 3) + Math.floor(a.matches_completed / 2);
+        const userIds = assignments.map((a: any) => a.user_id);
+        const { data: players, error: pErr } = await supabase
+          .from('players')
+          .select('id, user_id, name, wins, losses, total_matches, skill_level, usta_rating')
+          .in('user_id', userIds);
+
+        if (pErr) throw pErr;
+
+        const playerMap = new Map((players || []).map((p: any) => [p.user_id, p]));
+
+        const data: LeaderboardPlayer[] = assignments.map((a: any) => {
+          const p = playerMap.get(a.user_id) ?? { id: a.user_id, name: 'Unknown', wins: 0, losses: 0, total_matches: 0, skill_level: 0 };
+          const points = ((p.wins ?? 0) * 3) + Math.floor((a.matches_completed ?? 0) / 2);
           return {
-            id: p.id,
+            id: p.id ?? a.user_id,
             user_id: a.user_id,
             name: p.name || 'Unknown',
             wins: p.wins || 0,

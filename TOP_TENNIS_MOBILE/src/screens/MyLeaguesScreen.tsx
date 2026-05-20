@@ -63,6 +63,7 @@ const getLeagueStatus = (reg: any) => {
 };
 
 const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; navigation: any }> = ({ registration, onBack, navigation }) => {
+  const detailInsets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<Tab>('matches');
   const [divisionInfo, setDivisionInfo] = useState<any>(null);
   const [scoringMatch, setScoringMatch] = useState<LeagueMatch | null>(null);
@@ -641,7 +642,7 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
 
   return (
     <View style={{ flex: 1 }}>
-      <View style={styles.detailHeader}>
+      <View style={[styles.detailHeader, { paddingTop: detailInsets.top + Spacing.md }]}>
         <TouchableOpacity style={styles.backBtn} onPress={onBack}>
           <Ionicons name="arrow-back" size={20} color={Colors.text} />
           <Text style={styles.backBtnText}>Back</Text>

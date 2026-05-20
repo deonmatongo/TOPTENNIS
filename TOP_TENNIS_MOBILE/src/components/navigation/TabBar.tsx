@@ -82,6 +82,10 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     );
   }
 
+  // ── Hide when focused screen requests it (e.g. chat conversation open) ──────
+  const focusedOptions = descriptors[state.routes[state.index].key]?.options as any;
+  if (focusedOptions?.tabBarStyle?.display === 'none') return null;
+
   // ── Phone: bottom tab bar ─────────────────────────────────────────────────
   return (
     <View style={[

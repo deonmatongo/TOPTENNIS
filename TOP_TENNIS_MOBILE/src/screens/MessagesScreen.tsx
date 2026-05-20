@@ -591,6 +591,12 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
   const [activeTab, setActiveTab] = useState<ActiveTab>('chats');
   const [selectedConvId, setSelectedConvId] = useState<string | null>(route?.params?.openConvId ?? null);
 
+  useEffect(() => {
+    (navigation as any)?.setOptions?.({
+      tabBarStyle: selectedConvId ? { display: 'none' } : undefined,
+    });
+  }, [selectedConvId, navigation]);
+
   useFocusEffect(
     useCallback(() => {
       (navigation as any)?.setOptions?.({
