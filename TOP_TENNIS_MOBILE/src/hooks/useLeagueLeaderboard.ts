@@ -121,6 +121,14 @@ export const useLeagueLeaderboard = (leagueId?: string) => {
     };
 
     fetch();
+
+    const channel = supabase
+      .channel(`league-leaderboard-${leagueId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'division_assignments' }, fetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, fetch)
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [leagueId, user?.id]);
 
   return {

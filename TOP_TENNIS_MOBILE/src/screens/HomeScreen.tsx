@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, TextInput, ActivityIndicator,
+  RefreshControl, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -90,9 +90,11 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
       >
 
@@ -372,6 +374,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         visible={!!selectedPlayer}
         onClose={() => setSelectedPlayer(null)}
       />
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

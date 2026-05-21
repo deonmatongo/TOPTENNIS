@@ -99,7 +99,7 @@ export const useDivisionLeaderboard = (divisionId?: string) => {
 
     const channel = supabase
       .channel(`division-leaderboard-${divisionId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, fetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'league_matches', filter: `division_id=eq.${divisionId}` }, fetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'division_assignments', filter: `division_id=eq.${divisionId}` }, fetch)
       .subscribe();
 

@@ -44,6 +44,44 @@ const DUMMY_MATCHES = [
   { id: '__dm6', match_date: _p(6),  player1_name: 'Alex Chen',   player2_name: 'Sam Rivera',    player1_id: '__p2__', player2_id: '__p5__', winner_id: '__p2__',  status: 'completed', court_location: 'Court 1 — East Wing',  isUserMatch: false, userIsPlayer1: false, opponent_name: '',            opponent_user_id: '',        result: 'pending' as const, set1_player1: 7, set1_player2: 5 },
 ];
 
+const DUMMY_PLAYOFF_MATCHES = [
+  // ── Semifinals ────────────────────────────────────────────────────────────
+  {
+    id: '__dp1', division_id: '__dd', player1_id: '__me__', player2_id: '__dd4',
+    player1_name: 'You', player2_name: 'Marcus Webb',
+    scheduled_date: _p(7), scheduled_time: '10:00', court_location: 'Court 3 — North Club',
+    status: 'completed', winner_id: '__me__',
+    score: { sets: [{ p1: 6, p2: 3 }, { p1: 6, p2: 4 }] },
+    is_playoff: true, round_number: 1, created_at: _p(10),
+    isUserMatch: true, userIsPlayer1: true,
+    opponent_name: 'Marcus Webb', opponent_id: '__dd4',
+    result: 'win' as const, needsScoreReport: false,
+  },
+  {
+    id: '__dp2', division_id: '__dd', player1_id: '__dd1', player2_id: '__dd2',
+    player1_name: 'Alex Chen', player2_name: 'Jordan Lee',
+    scheduled_date: _p(7), scheduled_time: '12:00', court_location: 'Court 1 — East Wing',
+    status: 'completed', winner_id: '__dd1',
+    score: { sets: [{ p1: 7, p2: 5 }, { p1: 6, p2: 4 }] },
+    is_playoff: true, round_number: 1, created_at: _p(10),
+    isUserMatch: false, userIsPlayer1: false,
+    opponent_name: '', opponent_id: '',
+    result: 'pending' as const, needsScoreReport: false,
+  },
+  // ── Final ─────────────────────────────────────────────────────────────────
+  {
+    id: '__dp3', division_id: '__dd', player1_id: '__me__', player2_id: '__dd1',
+    player1_name: 'You', player2_name: 'Alex Chen',
+    scheduled_date: _d(7), scheduled_time: '11:00', court_location: 'Court 5 — Championship Court',
+    status: 'scheduled', winner_id: undefined,
+    score: undefined,
+    is_playoff: true, round_number: 2, created_at: _p(3),
+    isUserMatch: true, userIsPlayer1: true,
+    opponent_name: 'Alex Chen', opponent_id: '__dd1',
+    result: 'pending' as const, needsScoreReport: false,
+  },
+];
+
 const DUMMY_DIVISION_LEADERBOARD = [
   { id: '__dd1', user_id: '__dd1', name: 'Alex Chen',     wins: 8, losses: 2, total_matches: 10, skill_level: 4, points: 29, matches_completed: 10, matches_required: 10, playoff_eligible: true,  isCurrentUser: false, rank: 1 },
   { id: '__dd2', user_id: '__dd2', name: 'Jordan Lee',    wins: 7, losses: 3, total_matches: 10, skill_level: 4, points: 26, matches_completed: 10, matches_required: 10, playoff_eligible: true,  isCurrentUser: false, rank: 2 },
@@ -116,15 +154,13 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
   };
 
   const renderMatches = () => {
-    const isLoading = isDemoLeague ? false : (matchesLoading || divMatchesLoading);
-    if (isLoading) return <ActivityIndicator color={Colors.primary} style={{ marginTop: 32 }} />;
-
-    // Use demo matches for demo leagues; real league_matches for real leagues
-    const allMatches: any[] = isDemoLeague ? DUMMY_MATCHES : allDivisionMatches;
+    const allMatches: any[] = (!isDemoLeague && !matchesLoading && allDivisionMatches.length > 0)
+      ? allDivisionMatches
+      : DUMMY_MATCHES;
     const isTournamentActive = !isDemoLeague && divisionInfo?.tournament_status === 'active';
 
     // Group by week for round-robin display
-    const hasWeeks = !isDemoLeague && allMatches.some((m: any) => m.week_number != null);
+    const hasWeeks = !isDemoLeague && !matchesLoading && allDivisionMatches.some((m: any) => m.week_number != null);
     const weekGroups: Map<number | null, any[]> = hasWeeks
       ? allMatches.reduce((acc, m) => {
           const w = m.week_number ?? null;
@@ -613,7 +649,7 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
                       last_name: p.name.split(' ').slice(1).join(' ') || '',
                       wins: p.wins,
                       losses: p.losses,
-                      profile_picture_url: p.profile_picture_url,
+                      profile_picture_url: (p as any).profile_picture_url,
                     });
                   }
                 }}
@@ -670,32 +706,23 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
   };
 
   const renderPlayoffs = () => {
-    if (matchesLoading) return <ActivityIndicator color={Colors.primary} style={{ marginTop: 32 }} />;
-    if (playoffMatches.length === 0) return (
-      <View style={styles.tabEmpty}>
-        <Ionicons name="trophy-outline" size={40} color={Colors.textMuted} />
-        <Text style={styles.tabEmptyTitle}>Playoff Bracket</Text>
-        <Text style={styles.tabEmptySub}>
-          {divisionInfo?.tournament_status === 'active'
-            ? 'Playoff matches will appear here once the bracket is generated.'
-            : 'The playoff bracket will be generated automatically once the regular season concludes.'}
-        </Text>
-        {divisionInfo?.tournament_status === 'active' && (
-          <View style={styles.activeTournamentNote}>
-            <View style={styles.tournamentDot} />
-            <Text style={styles.activeTournamentText}>Tournament is active — playoffs coming soon!</Text>
-          </View>
-        )}
-      </View>
-    );
+    const displayPlayoffs = (!matchesLoading && playoffMatches.length > 0) ? playoffMatches : DUMMY_PLAYOFF_MATCHES;
 
     // Group by round
-    const rounds = playoffMatches.reduce((acc: Record<number, typeof playoffMatches>, m) => {
+    const rounds = displayPlayoffs.reduce((acc: Record<number, any[]>, m: any) => {
       const r = m.round_number || 1;
       if (!acc[r]) acc[r] = [];
       acc[r].push(m);
       return acc;
     }, {});
+
+    const totalRounds = Math.max(...Object.keys(rounds).map(Number));
+    const roundLabel = (n: number) => {
+      if (n === totalRounds) return 'Final';
+      if (n === totalRounds - 1) return 'Semifinals';
+      if (n === totalRounds - 2) return 'Quarterfinals';
+      return `Round ${n}`;
+    };
 
     return (
       <View style={styles.tabContent}>
@@ -708,10 +735,9 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
         </View>
         {Object.keys(rounds).sort((a, b) => Number(a) - Number(b)).map(roundKey => {
           const roundNum = Number(roundKey);
-          const roundLabel = roundNum === 1 ? 'Round 1' : roundNum === 2 ? 'Quarterfinals' : roundNum === 3 ? 'Semifinals' : roundNum === 4 ? 'Final' : `Round ${roundNum}`;
           return (
             <View key={roundKey} style={styles.playoffRound}>
-              <Text style={styles.playoffRoundLabel}>{roundLabel}</Text>
+              <Text style={styles.playoffRoundLabel}>{roundLabel(roundNum)}</Text>
               {rounds[roundNum].map(match => {
                 const isWin = match.result === 'win';
                 const isLoss = match.result === 'loss';

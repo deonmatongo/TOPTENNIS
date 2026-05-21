@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Modal, ScrollView, TouchableOpacity,
-  TextInput, ActivityIndicator, Alert, Platform,
+  TextInput, ActivityIndicator, Alert, Platform, KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/services/supabase';
@@ -280,6 +280,11 @@ export const ScheduleLeagueMatchModal: React.FC<Props> = ({ visible, divisionId,
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -339,6 +344,7 @@ export const ScheduleLeagueMatchModal: React.FC<Props> = ({ visible, divisionId,
           )}
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };

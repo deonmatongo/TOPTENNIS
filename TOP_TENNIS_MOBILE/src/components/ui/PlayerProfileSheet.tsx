@@ -473,8 +473,8 @@ export const PlayerProfileSheet: React.FC<Props> = ({ player, visible, onClose, 
 
         {/* Booking Modal */}
         <Modal visible={showBooking} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setShowBooking(false)}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-            <SafeAreaView style={styles.bookingSafe} edges={['top', 'bottom']}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+            <SafeAreaView style={styles.bookingSafe} edges={['top']}>
               <View style={styles.bookingHeader}>
                 <TouchableOpacity onPress={() => setShowBooking(false)}>
                   <Ionicons name="close" size={24} color={Colors.text} />
@@ -483,7 +483,12 @@ export const PlayerProfileSheet: React.FC<Props> = ({ player, visible, onClose, 
                 <View style={{ width: 24 }} />
               </View>
 
-              <ScrollView style={styles.bookingBody} contentContainerStyle={{ padding: Spacing.lg, gap: Spacing.lg }}>
+              <ScrollView
+                style={styles.bookingBody}
+                contentContainerStyle={{ padding: Spacing.lg, gap: Spacing.lg, paddingBottom: Spacing.xxl }}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
                 {/* Slot summary */}
                 <View style={styles.slotSummary}>
                   <LinearGradient colors={Colors.gradientWarm} style={styles.slotSummaryGrad}>
