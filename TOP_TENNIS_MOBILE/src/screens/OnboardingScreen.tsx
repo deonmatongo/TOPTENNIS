@@ -6,6 +6,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  FadeInDown,
+  FadeInRight,
+  FadeInUp,
+  ZoomIn,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from 'react-native-reanimated';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
@@ -44,7 +54,11 @@ function SelCard({ label, desc, icon, selected, onPress }: {
   label: string; desc?: string; icon: string; selected: boolean; onPress: () => void;
 }) {
   return (
-    <TouchableOpacity style={[styles.selCard, selected && styles.selCardActive]} onPress={onPress} activeOpacity={0.8}>
+    <TouchableOpacity
+      style={[styles.selCard, selected && styles.selCardActive]}
+      onPress={() => { Haptics.selectionAsync().catch(() => {}); onPress(); }}
+      activeOpacity={0.8}
+    >
       <View style={[styles.selCardIcon, selected && styles.selCardIconActive]}>
         <Ionicons name={icon as any} size={20} color={selected ? Colors.primary : Colors.textSecondary} />
       </View>
@@ -84,9 +98,11 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
 
   const handleNext = () => {
     if (!validateStep(step)) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
       Alert.alert('Required fields', 'Please complete all required fields before continuing.');
       return;
     }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     if (step < TOTAL_STEPS) setStep(s => s + 1);
     else handleSubmit();
   };
@@ -113,6 +129,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
         city: form.city,
         zip_code: form.zip_code || undefined,
       });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setDone(true);
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Failed to create profile. Please try again.');
@@ -122,6 +139,11 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
   };
 
   const progress = done ? 100 : step === TOTAL_STEPS ? 90 : ((step - 1) / TOTAL_STEPS) * 100;
+  const progressSv = useSharedValue(progress);
+  React.useEffect(() => {
+    progressSv.value = withSpring(progress, { damping: 18, stiffness: 140 });
+  }, [progress]);
+  const progressStyle = useAnimatedStyle(() => ({ width: `${progressSv.value}%` as any }));
 
   // ── CELEBRATION ─────────────────────────────────────────────────────────────
   if (done) {
@@ -129,17 +151,27 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.celebWrap}>
           <LinearGradient colors={Colors.gradientWarm} style={styles.celebGrad}>
-            <Text style={styles.celebEmoji}>🎉</Text>
-            <Text style={styles.celebTitle}>Congratulations!</Text>
-            <Text style={styles.celebSub}>
-              You have successfully created your profile.{'\n\n'}
-              Now, let's update your calendar to show your availability.
-            </Text>
+            <Animated.View entering={ZoomIn.springify().damping(9).stiffness(160)} style={styles.celebBall}>
+              <Ionicons name="trophy" size={64} color={Colors.primary} />
+            </Animated.View>
+            <Animated.Text entering={FadeInUp.delay(220).duration(500)} style={styles.celebEyebrow}>
+              GAME · SET · MATCH
+            </Animated.Text>
+            <Animated.Text entering={FadeInUp.delay(320).duration(500)} style={styles.celebTitle}>
+              You're On The Roster!
+            </Animated.Text>
+            <Animated.Text entering={FadeInUp.delay(440).duration(500)} style={styles.celebSub}>
+              Your player profile is live.{'\n'}
+              Set your availability and let's get you on court.
+            </Animated.Text>
           </LinearGradient>
-          <TouchableOpacity style={styles.celebBtn} onPress={onComplete}>
-            <Text style={styles.celebBtnText}>Go to Dashboard</Text>
-            <Ionicons name="arrow-forward" size={20} color="#fff" />
-          </TouchableOpacity>
+          <Animated.View entering={FadeInDown.delay(600).duration(450)}>
+            <TouchableOpacity style={styles.celebBtn} onPress={onComplete}>
+              <Ionicons name="tennisball" size={20} color="#fff" />
+              <Text style={styles.celebBtnText}>Step On Court</Text>
+              <Ionicons name="arrow-forward" size={20} color="#fff" />
+            </TouchableOpacity>
+          </Animated.View>
         </View>
       </SafeAreaView>
     );
@@ -338,13 +370,15 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
             })}
           </View>
           <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${progress}%` as any }]} />
+            <Animated.View style={[styles.progressFill, progressStyle]} />
           </View>
           <Text style={styles.progressText}>Step {step} of {TOTAL_STEPS} — {STEP_TITLES[step - 1]}</Text>
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          {renderStep()}
+          <Animated.View key={step} entering={FadeInRight.springify().damping(19).stiffness(160)}>
+            {renderStep()}
+          </Animated.View>
         </ScrollView>
 
         {/* Bottom Buttons */}
@@ -464,7 +498,13 @@ const styles = StyleSheet.create({
   // ── Celebration screen ────────────────────────────────────────────────────
   celebWrap: { flex: 1, justifyContent: 'space-between' },
   celebGrad: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xxxl, gap: Spacing.lg },
-  celebEmoji: { fontSize: 72 },
+  celebBall: {
+    width: 128, height: 128, borderRadius: 64,
+    backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 12,
+  },
+  celebEyebrow: { fontSize: FontSize.xs, fontWeight: FontWeight.extrabold, color: 'rgba(255,255,255,0.75)', letterSpacing: 3 },
   celebTitle: { fontSize: FontSize.xxxl, fontWeight: FontWeight.extrabold, color: '#fff', textAlign: 'center' },
   celebSub: { fontSize: FontSize.lg, color: 'rgba(255,255,255,0.9)', textAlign: 'center', lineHeight: 26 },
   celebBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, backgroundColor: Colors.primary, margin: Spacing.xl, borderRadius: Radius.md, paddingVertical: Spacing.lg },

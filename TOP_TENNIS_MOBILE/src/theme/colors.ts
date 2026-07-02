@@ -31,6 +31,16 @@ export const Palette = {
   dark700:   '#1C1C2E',
   dark600:   '#24243A',
 
+  // Tennis — optic ball yellow, court + grass greens, clay
+  optic300:  '#EEFF6A',   // highlight
+  optic400:  '#DFF23D',   // tennis-ball felt
+  optic500:  '#C8E020',   // pressed / borders
+  opticInk:  '#2A3500',   // text on optic surfaces
+  court600:  '#1F7A4D',   // grass court
+  court700:  '#166139',   // grass court deep
+  court800:  '#0E4A2A',   // night grass
+  clay500:   '#D96D45',   // clay court accent
+
   // Semantic
   green400:  '#34D399',
   green500:  '#10B981',
@@ -113,12 +123,20 @@ export const Colors = {
   tabBarActive:  Palette.orange500,
   tabBarInactive:Palette.gray400,
 
+  // Tennis accents
+  optic:         Palette.optic400,
+  opticInk:      Palette.opticInk,
+  court:         Palette.court700,
+  courtLine:     'rgba(255,255,255,0.28)',
+
   // Gradients
   gradientPrimary:   [Palette.orange500, Palette.orange400] as [string, string],
   gradientWarm:      [Palette.orange700, Palette.orange500] as [string, string],
   gradientHero:      [Palette.dark900, Palette.dark700, Palette.dark600] as [string, string, string],
   gradientCard:      [Palette.dark800, Palette.dark700] as [string, string],
   gradientNature:    [Palette.green600, Palette.green400] as [string, string],
+  gradientCourt:     [Palette.court800, Palette.court600] as [string, string],
+  gradientNightMatch:[Palette.dark900, '#10241A'] as [string, string],
   gradientBlue:      [Palette.blue600, Palette.blue400] as [string, string],
   gradientPurple:    ['#6D28D9', Palette.purple500] as [string, string],
   gradientSubtle:    [Palette.white, Palette.gray50] as [string, string],

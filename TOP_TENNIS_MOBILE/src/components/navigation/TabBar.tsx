@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import Animated, { ZoomIn, FadeIn } from 'react-native-reanimated';
 import { Palette, Font } from '@/theme/colors';
 import { useResponsive } from '@/hooks/useResponsive';
 
@@ -26,6 +28,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     const onPress = () => {
       const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
       if (!isFocused && !event.defaultPrevented) {
+        Haptics.selectionAsync().catch(() => {});
         navigation.navigate({ name: route.name, merge: true } as any);
       }
     };
@@ -97,7 +100,11 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     ]}>
       {items.map(({ key, isFocused, meta, badge, onPress }) => (
         <TouchableOpacity key={key} onPress={onPress} activeOpacity={0.8} style={bt.tab}>
-          <View style={[bt.iconWrap, isFocused && bt.iconWrapActive]}>
+          <Animated.View
+            key={`${key}-${isFocused}`}
+            entering={isFocused ? ZoomIn.springify().damping(12).stiffness(260) : FadeIn.duration(150)}
+            style={[bt.iconWrap, isFocused && bt.iconWrapActive]}
+          >
             <Ionicons
               name={(isFocused ? meta.focused : meta.unfocused) as any}
               size={22}
@@ -108,7 +115,10 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 <Text style={bt.pipText}>{badge > 9 ? '9+' : badge}</Text>
               </View>
             )}
-          </View>
+          </Animated.View>
+          {isFocused && (
+            <Animated.View entering={ZoomIn.springify().damping(10).stiffness(300)} style={bt.ballDot} />
+          )}
         </TouchableOpacity>
       ))}
     </View>
@@ -262,5 +272,12 @@ const bt = StyleSheet.create({
     color: '#fff',
     fontSize: 8,
     fontFamily: Font.black,
+  },
+  ballDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: Palette.optic500,
+    marginTop: 3,
   },
 });

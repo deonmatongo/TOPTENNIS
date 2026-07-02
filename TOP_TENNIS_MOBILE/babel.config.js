@@ -30,7 +30,8 @@ module.exports = function(api) {
           },
         },
       ],
-      'react-native-reanimated/plugin',
+      // Reanimated 4 moved the worklets compiler into react-native-worklets
+      'react-native-worklets/plugin',
     ],
   };
 };

@@ -3,8 +3,34 @@ import {
   TouchableOpacity, ActivityIndicator, ViewStyle, TextStyle,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
+import * as Haptics from 'expo-haptics'
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated'
 import { XStack, Text } from 'tamagui'
 import { Colors, Radius, FontSize, FontWeight, Shadow, Palette } from '@/theme/colors'
+
+// Spring press-scale + haptic tick shared by the gradient variants
+const PressScale: React.FC<{
+  onPress: () => void
+  disabled: boolean
+  style?: any
+  children: React.ReactNode
+}> = ({ onPress, disabled, style, children }) => {
+  const scale = useSharedValue(1)
+  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] as any }))
+  return (
+    <Animated.View style={[animStyle, style]}>
+      <TouchableOpacity
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); onPress() }}
+        onPressIn={() => { scale.value = withSpring(0.96, { damping: 20, stiffness: 420 }) }}
+        onPressOut={() => { scale.value = withSpring(1, { damping: 14, stiffness: 320 }) }}
+        disabled={disabled}
+        activeOpacity={0.9}
+      >
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  )
+}
 
 type Variant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'dark'
 type Size    = 'xs' | 'sm' | 'md' | 'lg'
@@ -61,10 +87,9 @@ export const Button: React.FC<ButtonProps> = ({
 
   if (variant === 'primary') {
     return (
-      <TouchableOpacity
+      <PressScale
         onPress={onPress}
         disabled={isDisabled}
-        activeOpacity={0.82}
         style={[fullWidth ? { width: '100%' } : {}, isDisabled ? { opacity: 0.45 } : {}, style]}
       >
         <LinearGradient
@@ -83,16 +108,15 @@ export const Button: React.FC<ButtonProps> = ({
         >
           {content}
         </LinearGradient>
-      </TouchableOpacity>
+      </PressScale>
     )
   }
 
   if (variant === 'dark') {
     return (
-      <TouchableOpacity
+      <PressScale
         onPress={onPress}
         disabled={isDisabled}
-        activeOpacity={0.82}
         style={[fullWidth ? { width: '100%' } : {}, isDisabled ? { opacity: 0.45 } : {}, style]}
       >
         <LinearGradient
@@ -110,7 +134,7 @@ export const Button: React.FC<ButtonProps> = ({
         >
           {content}
         </LinearGradient>
-      </TouchableOpacity>
+      </PressScale>
     )
   }
 
