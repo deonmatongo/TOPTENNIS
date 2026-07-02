@@ -1046,7 +1046,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
               activeOpacity={0.7}
               onPress={() => {
                 const targetId = selectedConv.is_group ? selectedConvId! : (otherId ?? '');
-                if (targetId) startCall(targetId, 'video', selectedConvId!, selectedConv.is_group).catch(() => {});
+                if (targetId) startCall(targetId, 'video', selectedConvId!, selectedConv.is_group).catch((e: any) => Alert.alert('Call failed', e?.message || 'Could not start the call.'));
               }}
             >
               <Ionicons name="videocam-outline" size={22} color="rgba(255,255,255,0.8)" />
@@ -1056,7 +1056,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
               activeOpacity={0.7}
               onPress={() => {
                 const targetId = selectedConv.is_group ? selectedConvId! : (otherId ?? '');
-                if (targetId) startCall(targetId, 'audio', selectedConvId!, selectedConv.is_group).catch(() => {});
+                if (targetId) startCall(targetId, 'audio', selectedConvId!, selectedConv.is_group).catch((e: any) => Alert.alert('Call failed', e?.message || 'Could not start the call.'));
               }}
             >
               <Ionicons name="call-outline" size={20} color="rgba(255,255,255,0.8)" />

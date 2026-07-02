@@ -237,7 +237,7 @@ function CallOverlayManager() {
       {incomingCall && !activeCall && (
         <IncomingCallOverlay
           call={incomingCall}
-          onAnswer={() => answerCall(incomingCall)}
+          onAnswer={() => answerCall(incomingCall).catch(() => {})}
           onDecline={() => declineCall(incomingCall.id)}
         />
       )}

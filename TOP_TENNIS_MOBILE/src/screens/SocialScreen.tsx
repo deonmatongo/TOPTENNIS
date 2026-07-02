@@ -324,13 +324,13 @@ export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={s.callBtn}
-                      onPress={() => startCall(friendUserId, 'audio').catch(() => {})}
+                      onPress={() => startCall(friendUserId, 'audio').catch((e: any) => Alert.alert('Call failed', e?.message || 'Could not start the call.'))}
                     >
                       <Ionicons name="call-outline" size={16} color={Colors.success} />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={s.callBtn}
-                      onPress={() => startCall(friendUserId, 'video').catch(() => {})}
+                      onPress={() => startCall(friendUserId, 'video').catch((e: any) => Alert.alert('Call failed', e?.message || 'Could not start the call.'))}
                     >
                       <Ionicons name="videocam-outline" size={16} color={Colors.accent} />
                     </TouchableOpacity>
