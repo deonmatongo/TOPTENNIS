@@ -18,6 +18,12 @@ export interface ConversationMember {
   };
 }
 
+export interface MessageReaction {
+  message_id: string;
+  user_id: string;
+  emoji: string;
+}
+
 export interface ConversationMessage {
   id: string;
   conversation_id: string;
@@ -28,6 +34,7 @@ export interface ConversationMessage {
   deleted_at?: string | null;
   is_system?: boolean;
   reply_to_id?: string | null;
+  reactions?: MessageReaction[];
   sender?: {
     id: string;
     first_name?: string | null;
@@ -105,6 +112,21 @@ export const useConversations = () => {
         .order('created_at', { ascending: true });
       if (msgErr) throw msgErr;
 
+      const messageIds: string[] = (allMessages || []).map((m: any) => m.id);
+      const reactionsByMsg = new Map<string, MessageReaction[]>();
+      for (let i = 0; i < messageIds.length; i += 200) {
+        const chunk = messageIds.slice(i, i + 200);
+        const { data: reactionRows } = await db
+          .from('message_reactions')
+          .select('message_id, user_id, emoji')
+          .in('message_id', chunk);
+        for (const r of reactionRows || []) {
+          const list = reactionsByMsg.get(r.message_id) || [];
+          list.push(r);
+          reactionsByMsg.set(r.message_id, list);
+        }
+      }
+
       const senderIds = Array.from(new Set((allMessages || []).map((m: any) => m.sender_id)));
       const { data: senderProfiles } = await supabase
         .from('profiles')
@@ -118,7 +140,7 @@ export const useConversations = () => {
 
         const convMessages: ConversationMessage[] = (allMessages || [])
           .filter((m: any) => m.conversation_id === conv.id)
-          .map((m: any) => ({ ...m, sender: senderMap.get(m.sender_id) }));
+          .map((m: any) => ({ ...m, sender: senderMap.get(m.sender_id), reactions: reactionsByMsg.get(m.id) || [] }));
 
         const convMembers: ConversationMember[] = (allMembers || [])
           .filter((m: any) => m.conversation_id === conv.id)
@@ -145,6 +167,13 @@ export const useConversations = () => {
       setLoading(false);
     }
   }, [user]);
+
+  const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
+    if (!user) return;
+    const { error } = await db.rpc('toggle_reaction', { p_message_id: messageId, p_emoji: emoji });
+    if (error) throw error;
+    await fetchConversations();
+  }, [user, fetchConversations]);
 
   const sendMessage = useCallback(async (conversationId: string, content: string, replyToId?: string) => {
     if (!user || !content.trim()) return;
@@ -258,6 +287,8 @@ export const useConversations = () => {
       .channel(`${msgTopic}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversation_messages' },
         () => fetchConversations())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' },
+        () => fetchConversations())
       .subscribe();
 
     const memChannel = (supabase as any)
@@ -285,6 +316,7 @@ export const useConversations = () => {
     conversations,
     loading,
     sendMessage,
+    toggleReaction,
     getOrCreateDM,
     createGroupChat,
     addMember,

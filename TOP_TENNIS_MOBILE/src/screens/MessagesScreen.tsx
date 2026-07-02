@@ -11,6 +11,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useConversations, Conversation, ConversationMember, ConversationMessage } from '@/hooks/useConversations';
+import { uploadChatMedia, isImageMessage, parseVoiceMessage } from '@/services/chatMedia';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { useBlockedUsers } from '@/hooks/useBlockedUsers';
 import { useOnlinePresence } from '@/hooks/useOnlinePresence';
@@ -93,6 +94,117 @@ function buildItems(messages: ConversationMessage[]): ListItem[] {
   return items;
 }
 
+// ── Media bubbles ──────────────────────────────────────────────────────────────
+
+const QUICK_REACTIONS = ['❤️', '😂', '👍', '🎾', '😮', '🔥'];
+
+const ImageContent: React.FC<{ url: string; onOpen: (url: string) => void }> = ({ url, onOpen }) => (
+  <TouchableOpacity onPress={() => onOpen(url)} activeOpacity={0.9}>
+    <Image source={{ uri: url }} style={mb.image} resizeMode="cover" />
+  </TouchableOpacity>
+);
+
+const VoiceContent: React.FC<{ url: string; isMine: boolean }> = ({ url, isMine }) => {
+  const [playing, setPlaying] = useState(false);
+  const [loadingSnd, setLoadingSnd] = useState(false);
+  const soundRef = useRef<any>(null);
+
+  useEffect(() => () => { soundRef.current?.unloadAsync?.().catch(() => {}); }, []);
+
+  const toggle = async () => {
+    const Audio = getAudio();
+    if (!Audio) { Alert.alert('Not supported', 'Voice playback requires a development build.'); return; }
+    try {
+      if (playing) {
+        await soundRef.current?.pauseAsync();
+        setPlaying(false);
+        return;
+      }
+      if (!soundRef.current) {
+        setLoadingSnd(true);
+        await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
+        const { sound } = await Audio.Sound.createAsync({ uri: url }, { shouldPlay: false });
+        sound.setOnPlaybackStatusUpdate((st: any) => {
+          if (st.didJustFinish) { setPlaying(false); sound.setPositionAsync(0).catch(() => {}); }
+        });
+        soundRef.current = sound;
+        setLoadingSnd(false);
+      }
+      await soundRef.current.playAsync();
+      setPlaying(true);
+    } catch {
+      setLoadingSnd(false);
+      Alert.alert('Error', 'Could not play voice message.');
+    }
+  };
+
+  return (
+    <TouchableOpacity style={mb.voiceRow} onPress={toggle} activeOpacity={0.8}>
+      <View style={[mb.voiceBtn, isMine && mb.voiceBtnMine]}>
+        {loadingSnd
+          ? <ActivityIndicator size="small" color="#fff" />
+          : <Ionicons name={playing ? 'pause' : 'play'} size={16} color="#fff" />}
+      </View>
+      <View style={mb.voiceWave}>
+        {[10, 16, 8, 18, 12, 20, 9, 15, 11, 17, 8, 13].map((h, i) => (
+          <View key={i} style={[mb.voiceBar, { height: h }, playing && mb.voiceBarActive]} />
+        ))}
+      </View>
+      <Ionicons name="mic" size={13} color={CHAT.muted} />
+    </TouchableOpacity>
+  );
+};
+
+const ReactionChips: React.FC<{
+  reactions: { emoji: string; user_id: string }[];
+  myId: string;
+  isMine: boolean;
+  onToggle: (emoji: string) => void;
+}> = ({ reactions, myId, isMine, onToggle }) => {
+  if (!reactions || reactions.length === 0) return null;
+  const grouped = new Map<string, { count: number; mine: boolean }>();
+  for (const r of reactions) {
+    const g = grouped.get(r.emoji) || { count: 0, mine: false };
+    g.count += 1;
+    if (r.user_id === myId) g.mine = true;
+    grouped.set(r.emoji, g);
+  }
+  return (
+    <View style={[mb.chipRow, isMine ? { justifyContent: 'flex-end' } : {}]}>
+      {Array.from(grouped.entries()).map(([emoji, g]) => (
+        <TouchableOpacity
+          key={emoji}
+          style={[mb.chip, g.mine && mb.chipMine]}
+          onPress={() => onToggle(emoji)}
+          activeOpacity={0.7}
+        >
+          <Text style={mb.chipEmoji}>{emoji}</Text>
+          {g.count > 1 && <Text style={mb.chipCount}>{g.count}</Text>}
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+};
+
+const mb = StyleSheet.create({
+  image: { width: 210, height: 210, borderRadius: 10, backgroundColor: Colors.borderLight },
+  voiceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4, minWidth: 170 },
+  voiceBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
+  voiceBtnMine: { backgroundColor: Colors.primaryDark },
+  voiceWave: { flexDirection: 'row', alignItems: 'center', gap: 2, flex: 1 },
+  voiceBar: { width: 3, borderRadius: 1.5, backgroundColor: Colors.primaryMuted },
+  voiceBarActive: { backgroundColor: Colors.primary },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 3 },
+  chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3,
+    borderWidth: 1, borderColor: Colors.borderLight, ...Shadow.xs,
+  },
+  chipMine: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
+  chipEmoji: { fontSize: 13 },
+  chipCount: { fontSize: 11, fontFamily: Font.bold, color: Colors.textSecondary },
+});
+
 // ── Chat tokens ────────────────────────────────────────────────────────────────
 
 const CHAT = {
@@ -173,6 +285,9 @@ const rp = StyleSheet.create({
 const Bubble: React.FC<{
   item: ConversationMessage;
   replySource?: ConversationMessage | null;
+  myId: string;
+  onReact: (messageId: string, emoji: string) => void;
+  onOpenImage: (url: string) => void;
   isMine: boolean;
   isGroup: boolean;
   prevSameSender: boolean;
@@ -184,7 +299,9 @@ const Bubble: React.FC<{
   onDismiss: () => void;
   onSenderPress?: (senderId: string) => void;
   recentInvites?: Map<string, MatchInviteRecord>;
-}> = ({ item, replySource, isMine, isGroup, prevSameSender, isLongPressed, onLongPress, onReply, onDelete, onCopy, onDismiss, onSenderPress, recentInvites }) => {
+}> = ({ item, replySource, isMine, isGroup, prevSameSender, isLongPressed, onLongPress, onReply, onDelete, onCopy, onDismiss, onSenderPress, recentInvites, myId, onReact, onOpenImage }) => {
+  const imageMsg = isImageMessage(item.content);
+  const voiceUrl = parseVoiceMessage(item.content);
   const senderName = getSenderName(item);
   const showAvatar = isGroup && !isMine && !prevSameSender;
   const showName = isGroup && !isMine && !prevSameSender;
@@ -244,7 +361,13 @@ const Bubble: React.FC<{
                 </View>
               </View>
             )}
-            <Text style={[bub.text, isMine ? bub.textR : bub.textL]}>{item.content}</Text>
+            {imageMsg ? (
+              <ImageContent url={item.content.trim()} onOpen={onOpenImage} />
+            ) : voiceUrl ? (
+              <VoiceContent url={voiceUrl} isMine={isMine} />
+            ) : (
+              <Text style={[bub.text, isMine ? bub.textR : bub.textL]}>{item.content}</Text>
+            )}
             <View style={bub.meta}>
               <Text style={[bub.time, isMine ? bub.timeR : bub.timeL]}>{fmtMsgTime(item.created_at)}</Text>
               {isMine && <Ionicons name="checkmark-done" size={13} color={CHAT.tick} style={{ marginLeft: 2 }} />}
@@ -252,8 +375,23 @@ const Bubble: React.FC<{
           </View>
         </TouchableOpacity>
 
+        <ReactionChips
+          reactions={item.reactions || []}
+          myId={myId}
+          isMine={isMine}
+          onToggle={emoji => onReact(item.id, emoji)}
+        />
+
         {isLongPressed && (
-          <View style={[bub.menu, isMine ? bub.menuR : bub.menuL]}>
+          <View style={[bub.menuWrap, isMine ? bub.menuR : bub.menuL]}>
+            <View style={bub.reactRow}>
+              {QUICK_REACTIONS.map(e => (
+                <TouchableOpacity key={e} style={bub.reactBtn} onPress={() => { onReact(item.id, e); onDismiss(); }} activeOpacity={0.7}>
+                  <Text style={bub.reactEmoji}>{e}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={[bub.menu]}>
             <TouchableOpacity style={bub.menuItem} onPress={onReply}>
               <Ionicons name="arrow-undo-outline" size={14} color={Colors.text} />
               <Text style={bub.menuTxt}>Reply</Text>
@@ -277,6 +415,7 @@ const Bubble: React.FC<{
               <Ionicons name="close" size={14} color={CHAT.muted} />
               <Text style={[bub.menuTxt, { color: CHAT.muted }]}>Dismiss</Text>
             </TouchableOpacity>
+            </View>
           </View>
         )}
       </View>
@@ -306,7 +445,11 @@ const bub = StyleSheet.create({
   time: { fontSize: 10 },
   timeR: { color: Colors.primary },
   timeL: { color: CHAT.muted },
-  menu: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 12, marginTop: 4, ...Shadow.md, overflow: 'hidden', alignSelf: 'flex-start' },
+  menuWrap: { marginTop: 4, gap: 4, alignSelf: 'flex-start' },
+  reactRow: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: Radius.full, paddingHorizontal: 6, paddingVertical: 4, gap: 2, ...Shadow.md, alignSelf: 'flex-start' },
+  reactBtn: { paddingHorizontal: 6, paddingVertical: 4 },
+  reactEmoji: { fontSize: 20 },
+  menu: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 12, ...Shadow.md, overflow: 'hidden', alignSelf: 'flex-start' },
   menuR: { alignSelf: 'flex-end' },
   menuL: { alignSelf: 'flex-start' },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 10 },
@@ -582,7 +725,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
   const {
     conversations, loading, sendMessage, getOrCreateDM, createGroupChat,
     addMember, removeMember, deleteMessage, updateGroup, leaveGroup,
-    markConversationRead, getTotalUnread, getMyRole, refetch,
+    markConversationRead, getTotalUnread, getMyRole, refetch, toggleReaction,
   } = useConversations();
   const { friends, pendingReceived, pendingSent, updateRequestStatus, cancelRequest, refetch: refetchFriends } = useFriendRequests();
   const { blockedUsers, blockUser, unblockUser, unfriendUser, refetch: refetchBlocked } = useBlockedUsers();
@@ -622,6 +765,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
   const [longPressMsg, setLongPressMsg] = useState<string | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [viewerImage, setViewerImage] = useState<string | null>(null);
   const [showBookingSheet, setShowBookingSheet] = useState(false);
   const [recentInvites, setRecentInvites] = useState<Map<string, MatchInviteRecord>>(new Map());
   const [isRecording, setIsRecording] = useState(false);
@@ -652,6 +796,21 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
     await markConversationRead(id);
   };
 
+  const handleReact = useCallback(async (messageId: string, emoji: string) => {
+    try { await toggleReaction(messageId, emoji); } catch { /* non-critical */ }
+  }, [toggleReaction]);
+
+  // Keep read receipts current while a thread is open — new incoming
+  // messages are marked read immediately instead of accruing as unread.
+  const openConvMsgCount = selectedConvId
+    ? conversations.find(c => c.id === selectedConvId)?.messages.length ?? 0
+    : 0;
+  useEffect(() => {
+    if (selectedConvId && openConvMsgCount > 0) {
+      markConversationRead(selectedConvId).catch(() => {});
+    }
+  }, [selectedConvId, openConvMsgCount]);
+
   const handleSend = async () => {
     if (!selectedConvId || (!msgInput.trim() && !pendingImage)) return;
     const text = msgInput.trim();
@@ -663,14 +822,8 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
     setSending(true);
     try {
       if (imageUri) {
-        const ext = (imageUri.split('.').pop()?.split('?')[0] ?? 'jpg').toLowerCase();
-        const path = `messages/${user!.id}/${Date.now()}.${ext}`;
-        const res = await fetch(imageUri);
-        const blob = await res.blob();
-        const { error: upErr } = await supabase.storage.from('chat-media').upload(path, blob, { contentType: `image/${ext}`, upsert: false });
-        if (upErr) throw upErr;
-        const { data: urlData } = supabase.storage.from('chat-media').getPublicUrl(path);
-        await sendMessage(selectedConvId, urlData.publicUrl, replyId);
+        const publicUrl = await uploadChatMedia(user!.id, imageUri, 'image');
+        await sendMessage(selectedConvId, publicUrl, replyId);
       }
       if (text) await sendMessage(selectedConvId, text, replyId);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
@@ -760,13 +913,8 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
       const uri = rec.getURI();
       if (!uri || !selectedConvId) return;
       setSending(true);
-      const path = `voice/${user!.id}/${Date.now()}.m4a`;
-      const res = await fetch(uri);
-      const blob = await res.blob();
-      const { error: upErr } = await supabase.storage.from('chat-media').upload(path, blob, { contentType: 'audio/m4a', upsert: false });
-      if (upErr) throw upErr;
-      const { data: urlData } = supabase.storage.from('chat-media').getPublicUrl(path);
-      await sendMessage(selectedConvId, `🎤 ${urlData.publicUrl}`, undefined);
+      const publicUrl = await uploadChatMedia(user!.id, uri, 'voice', 'm4a');
+      await sendMessage(selectedConvId, `🎤 ${publicUrl}`, undefined);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
     } catch { Alert.alert('Error', 'Failed to send voice message.'); }
     finally { setSending(false); setRecordSecs(0); }
@@ -970,10 +1118,13 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
                   item={msg}
                   replySource={replySource}
                   isMine={isMine}
+                  myId={user?.id ?? ''}
+                  onReact={handleReact}
+                  onOpenImage={setViewerImage}
                   isGroup={selectedConv.is_group}
                   prevSameSender={prevSameSender}
                   isLongPressed={longPressMsg === msg.id}
-                  onLongPress={() => (isMine || isAdmin) && setLongPressMsg(msg.id)}
+                  onLongPress={() => setLongPressMsg(msg.id)}
                   onReply={() => { setReplyTo(msg); setLongPressMsg(null); }}
                   onDelete={() => Alert.alert('Delete', 'Delete this message?', [
                     { text: 'Cancel', style: 'cancel' },
@@ -1374,9 +1525,27 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
           openConv(id);
         }}
       />
+
+      {/* Full-screen image viewer */}
+      <Modal visible={!!viewerImage} transparent animationType="fade" onRequestClose={() => setViewerImage(null)}>
+        <View style={iv.backdrop}>
+          <TouchableOpacity style={iv.close} onPress={() => setViewerImage(null)} activeOpacity={0.8}>
+            <Ionicons name="close" size={26} color="#fff" />
+          </TouchableOpacity>
+          {viewerImage && (
+            <Image source={{ uri: viewerImage }} style={iv.img} resizeMode="contain" />
+          )}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
+
+const iv = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.94)', alignItems: 'center', justifyContent: 'center' },
+  close: { position: 'absolute', top: 60, right: 20, zIndex: 2, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  img: { width: '100%', height: '80%' },
+});
 
 // ── Thread styles ──────────────────────────────────────────────────────────────
 
