@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { captureError } from '@/services/sentry';
+import { useUniqueChannel } from '@/hooks/useUniqueChannel';
 
 export interface ConversationMember {
   user_id: string;
@@ -56,6 +57,9 @@ export const useConversations = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const db = supabase as any;
+  const msgTopic = useUniqueChannel('mobile-conv-messages');
+  const memTopic = useUniqueChannel('mobile-conv-members');
+  const convTopic = useUniqueChannel('mobile-conv-updates');
 
   const fetchConversations = useCallback(async () => {
     if (!user) { setLoading(false); return; }
@@ -251,13 +255,13 @@ export const useConversations = () => {
     fetchConversations();
 
     const msgChannel = (supabase as any)
-      .channel('mobile-conv-messages')
+      .channel(`${msgTopic}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversation_messages' },
         () => fetchConversations())
       .subscribe();
 
     const memChannel = (supabase as any)
-      .channel('mobile-conv-members')
+      .channel(`${memTopic}`)
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'conversation_members',
         filter: `user_id=eq.${user.id}`,
@@ -265,7 +269,7 @@ export const useConversations = () => {
       .subscribe();
 
     const convChannel = (supabase as any)
-      .channel('mobile-conv-updates')
+      .channel(`${convTopic}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations' }, () => fetchConversations())
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, () => fetchConversations())
       .subscribe();

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUniqueChannel } from '@/hooks/useUniqueChannel';
 import { captureError } from '@/services/sentry';
 
 export type NotificationType =
@@ -34,6 +35,7 @@ export interface Notification {
 
 export const useNotifications = () => {
   const { user } = useAuth();
+  const notifTopic = useUniqueChannel('notifications');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -101,7 +103,7 @@ export const useNotifications = () => {
     fetchNotifications();
 
     const buildChannel = () => supabase
-      .channel(`notifications:${user.id}`)
+      .channel(`${notifTopic}:${user.id}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',

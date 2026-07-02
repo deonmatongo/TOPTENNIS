@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { captureError } from '@/services/sentry';
+import { useUniqueChannel } from '@/hooks/useUniqueChannel';
 
 export interface BlockedUser {
   id: string;
@@ -17,6 +18,7 @@ export interface BlockedUser {
 
 export const useBlockedUsers = () => {
   const { user } = useAuth();
+  const blockedTopic = useUniqueChannel('mobile-blocked-users');
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -96,7 +98,7 @@ export const useBlockedUsers = () => {
     if (!user) return;
     fetchBlockedUsers();
     const channel = supabase
-      .channel('mobile-blocked-users')
+      .channel(blockedTopic)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
