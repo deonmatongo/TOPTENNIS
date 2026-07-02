@@ -8,7 +8,7 @@ confirmation, leaderboards, messaging, and voice/video calls.
 
 | App | Stack | Location |
 |-----|-------|----------|
-| Web | Vite + React + shadcn/Tailwind | repo root (`src/`) |
+| Web | Vite + React + shadcn/Tailwind | `TOP_TENNIS_WEBSITE/` |
 | Mobile (iOS + Android) | Expo / React Native + Tamagui | `TOP_TENNIS_MOBILE/` |
 
 Both share one Supabase backend (Postgres + RLS, Realtime, Storage, Edge
@@ -18,6 +18,7 @@ Functions) and one LiveKit project for calls.
 
 ### Web
 ```bash
+cd TOP_TENNIS_WEBSITE
 npm install
 npm run dev          # http://localhost:8080
 ```
@@ -46,4 +47,5 @@ Mobile production builds go through EAS — see
 
 ## Deployment
 
-Web deploys to Vercel (`vercel.json`) — see `DEPLOYMENT.md`.
+Web deploys to Vercel — see `TOP_TENNIS_WEBSITE/DEPLOYMENT.md`. The Vercel
+project's **Root Directory** setting must point at `TOP_TENNIS_WEBSITE/`.
