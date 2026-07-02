@@ -209,10 +209,19 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     try {
       const { data } = await supabase
         .from('app_settings')
-        .select('*')
+        .select(Object.keys(DEFAULTS).join(','))
         .eq('user_id', user.id)
         .single();
-      if (data) setSettings({ ...DEFAULTS, ...data });
+      if (data) {
+        // Pick only known settings keys so row metadata (id, created_at)
+        // never leaks into state and gets written back on save
+        const loaded = { ...DEFAULTS };
+        for (const key of Object.keys(DEFAULTS) as (keyof AppSettings)[]) {
+          const v = (data as any)[key];
+          if (v !== undefined && v !== null) (loaded as any)[key] = v;
+        }
+        setSettings(loaded);
+      }
     } catch {
       // Table may not exist — use defaults
     } finally {
@@ -227,7 +236,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     try {
       await supabase
         .from('app_settings')
-        .upsert({ user_id: user!.id, ...next, updated_at: new Date().toISOString() });
+        .upsert({ user_id: user!.id, ...next, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
     } catch {
       setSettings(settings);
       Alert.alert('Error', 'Could not save setting. Please try again.');

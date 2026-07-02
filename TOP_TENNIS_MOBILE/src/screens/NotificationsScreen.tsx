@@ -7,6 +7,7 @@ import { supabase } from '@/services/supabase';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNotifications, Notification, NotificationType } from '@/hooks/useNotifications';
+import { useAuth } from '@/contexts/AuthContext';
 import { Colors, FontSize, Font, FontWeight, Spacing, Radius, Shadow, Palette } from '@/theme/colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
@@ -125,6 +126,7 @@ const fmtAgo = (date: Date): string => {
 
 export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const { notifications, unreadCount, loading, markAsRead, markAllAsRead,
           deleteNotification, markVisibleAsRead, refetch } = useNotifications();
   const [refreshing, setRefreshing]   = useState(false);
@@ -193,10 +195,22 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
 
   const respondToMatchInvite = async (notif: Notification, status: 'accepted' | 'declined') => {
     const matchId = notif.metadata?.match_id;
-    if (!matchId) return;
+    if (!matchId || !user) return;
     setResponding(notif.id);
     try {
-      await supabase.from('match_invites').update({ status, updated_at: new Date().toISOString() }).eq('id', matchId);
+      if (status === 'accepted') {
+        // Accepts + books both players' availability slots + declines conflicts
+        const { data, error } = await supabase.rpc('accept_invite_and_lock_slot', {
+          p_invite_id: matchId,
+          p_user_id: user.id,
+          p_conflicting_invite_ids: [],
+        });
+        if (error) throw error;
+        if (data && data.success === false) throw new Error(data.error);
+      } else {
+        await supabase.from('match_invites').update({ status, response_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', matchId);
+        await supabase.rpc('unlock_slots_for_invite', { p_invite_id: matchId, p_user_id: user.id });
+      }
       markAsRead(notif.id);
     } catch {}
     finally { setResponding(null); }

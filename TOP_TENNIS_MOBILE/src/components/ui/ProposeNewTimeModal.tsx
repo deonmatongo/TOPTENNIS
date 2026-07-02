@@ -84,21 +84,23 @@ export const ProposeNewTimeModal: React.FC<Props> = ({ visible, invite, userId, 
           proposed_date: selectedDate,
           proposed_start_time: selectedStart,
           proposed_end_time: selectedEnd,
-          proposed_message: message.trim() || null,
+          proposed_by_user_id: userId,
+          proposed_at: new Date().toISOString(),
+          status: 'pending',
           updated_at: new Date().toISOString(),
         })
         .eq('id', invite.id);
       if (error) throw error;
 
-      // Notify the other player
+      // Notify the other player (deduped server-side, triggers push)
       const notifyUserId = invite.sender_id === userId ? invite.receiver_id : invite.sender_id;
-      await supabase.from('notifications').insert({
-        user_id: notifyUserId,
-        type: 'match_rescheduled',
-        title: 'New Time Proposed',
-        message: `A new match time has been proposed: ${format(new Date(selectedDate), 'MMM d')} at ${fmtTime(selectedStart)}`,
-        read: false,
-        metadata: { match_id: invite.id },
+      await supabase.rpc('insert_notification_safe', {
+        p_user_id: notifyUserId,
+        p_type: 'match_rescheduled',
+        p_title: 'New Time Proposed',
+        p_message: `A new match time has been proposed: ${format(new Date(selectedDate), 'MMM d')} at ${fmtTime(selectedStart)}${message.trim() ? ` — "${message.trim()}"` : ''}`,
+        p_action_url: null,
+        p_metadata: { match_id: invite.id },
       });
 
       onProposed();

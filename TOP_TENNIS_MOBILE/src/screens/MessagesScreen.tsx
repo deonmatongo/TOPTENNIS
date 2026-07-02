@@ -964,7 +964,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
               const isMine = msg.sender_id === user?.id;
               const prev = index > 0 ? items[index - 1] : null;
               const prevSameSender = prev?.type === 'message' && prev.data.sender_id === msg.sender_id;
-              const replySource = msg.reply_to_message_id ? msgMap.get(msg.reply_to_message_id) ?? null : null;
+              const replySource = msg.reply_to_id ? msgMap.get(msg.reply_to_id) ?? null : null;
               return (
                 <Bubble
                   item={msg}

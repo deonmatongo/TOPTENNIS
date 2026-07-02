@@ -8,7 +8,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
+import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { useMatches } from '@/hooks/useMatches';
+import { searchPlayersByName } from '@/services/playerSearch';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Avatar } from '@/components/ui/Avatar';
 import { Colors, FontSize, FontWeight, Spacing, Radius, Shadow, Palette } from '@/theme/colors';
@@ -34,6 +36,7 @@ const QUICK_ACTIONS = [
 export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuth();
   const { profile, loading: profileLoading, refetch: refetchProfile } = useProfile();
+  const { player, refetch: refetchPlayer } = usePlayerProfile();
   const { upcoming, pendingReceived, loading: matchesLoading, refetch: refetchMatches } = useMatches();
   const { unreadCount } = useNotifications();
 
@@ -50,20 +53,15 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     setSearching(true);
     if (debounce.current) clearTimeout(debounce.current);
     debounce.current = setTimeout(async () => {
-      const { data } = await supabase
-        .from('players')
-        .select('id, name, skill_level, usta_rating, city, user_id, profile_picture_url')
-        .ilike('name', `%${q}%`)
-        .neq('user_id', user?.id || '')
-        .limit(8);
-      setResults(data || []);
+      const rows = await searchPlayersByName(q, { excludeUserId: user?.id, limit: 8 });
+      setResults(rows);
       setSearching(false);
     }, 320);
   }, [user?.id]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refetchProfile(), refetchMatches()]);
+    await Promise.all([refetchProfile(), refetchPlayer(), refetchMatches()]);
     setRefreshing(false);
   };
 
@@ -72,8 +70,9 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     : user?.email?.split('@')[0] || 'Player';
   const firstName = fullName.split(' ')[0];
 
-  const wins    = profile?.wins    ?? 0;
-  const losses  = profile?.losses  ?? 0;
+  // Win/loss stats live on the players row, not profiles
+  const wins    = player?.wins    ?? 0;
+  const losses  = player?.losses  ?? 0;
   const total   = wins + losses;
   const winRate = total > 0 ? Math.round((wins / total) * 100) : null;
   const nextMatch = upcoming[0];
@@ -138,7 +137,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               </View>
               <View style={s.levelBadge}>
                 <Text style={s.levelBadgeText}>
-                  {profile?.usta_rating ? `USTA ${profile.usta_rating}` : skillLabel(profile?.skill_level)}
+                  {player?.usta_rating ? `USTA ${player.usta_rating}` : skillLabel(player?.skill_level)}
                 </Text>
               </View>
             </View>
@@ -285,7 +284,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     <Avatar name={fullName} size={60} imageUrl={profile?.profile_picture_url} />
                   </View>
                   <Text style={s.playerName} numberOfLines={1}>You</Text>
-                  <Text style={s.playerSub}>{skillLabel(profile?.skill_level)}</Text>
+                  <Text style={s.playerSub}>{skillLabel(player?.skill_level)}</Text>
                 </View>
 
                 {/* VS */}
@@ -345,7 +344,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         </View>
 
         {/* ── Profile prompt ────────────────────────────────────────────── */}
-        {profile && !profile.skill_level && (
+        {profile && !player?.skill_level && (
           <View style={s.section}>
             <TouchableOpacity
               style={s.promptCard}

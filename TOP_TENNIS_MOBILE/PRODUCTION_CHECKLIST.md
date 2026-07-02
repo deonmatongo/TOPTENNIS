@@ -18,6 +18,16 @@
 - [x] Network connectivity banner (`NetworkBanner` + `useNetworkStatus`)
 - [x] Casual match result fixed (`'played'` instead of misleading `'win'`)
 - [x] `.env.example` updated with setup instructions
+- [x] Dependency conflicts fixed (`@config-plugins/react-native-webrtc` pinned to v13 for SDK 54, duplicate `react`/`react-dom` copies deduped via npm overrides) — `expo-doctor` passes 17/17
+- [x] TypeScript clean (`npx tsc --noEmit` — 0 errors) and Jest suite green
+- [x] Tamagui config fixed for this codebase's longhand style props (`onlyAllowShorthands: false`, `allowedStyleValues: false`)
+- [x] `voip` background mode removed (App Store rejection risk without CallKit)
+- [x] `ITSAppUsesNonExemptEncryption: false` added (skips export-compliance prompt on every TestFlight build)
+- [x] `expo-system-ui` installed so `userInterfaceStyle: "light"` is enforced on Android
+- [x] ErrorBoundary now reports crashes to Sentry in production
+- [x] Foreground notification handler updated for SDK 54 (`shouldShowBanner`/`shouldShowList`)
+- [x] Production JS bundles verified: `expo export` succeeds for iOS + Android; `expo prebuild` generates both native projects cleanly
+- [x] `.env` created for local dev (same Supabase project as the web app)
 
 ---
 

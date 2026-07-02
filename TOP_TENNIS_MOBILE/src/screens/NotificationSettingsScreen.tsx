@@ -88,13 +88,20 @@ export const NotificationSettingsScreen: React.FC<{ navigation: any }> = ({ navi
     if (!user) { setLoading(false); return; }
     setLoading(true);
     try {
+      // Mobile notification prefs live on app_settings (the deployed
+      // notification_settings table has the web app's older enable_* schema)
       const { data } = await supabase
-        .from('notification_settings')
-        .select('*')
+        .from('app_settings')
+        .select(Object.keys(DEFAULT_SETTINGS).join(','))
         .eq('user_id', user.id)
         .single();
       if (data) {
-        setSettings({ ...DEFAULT_SETTINGS, ...data });
+        const loaded = { ...DEFAULT_SETTINGS };
+        for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof NotifSettings)[]) {
+          const v = (data as any)[key];
+          if (typeof v === 'boolean') loaded[key] = v;
+        }
+        setSettings(loaded);
       }
     } catch {
       // Table may not exist yet — use defaults
@@ -109,8 +116,8 @@ export const NotificationSettingsScreen: React.FC<{ navigation: any }> = ({ navi
     setSaving(true);
     try {
       const { error } = await supabase
-        .from('notification_settings')
-        .upsert({ user_id: user!.id, ...updated, updated_at: new Date().toISOString() });
+        .from('app_settings')
+        .upsert({ user_id: user!.id, ...updated, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
       if (error) throw error;
     } catch (e: any) {
       // Revert on failure
@@ -133,7 +140,7 @@ export const NotificationSettingsScreen: React.FC<{ navigation: any }> = ({ navi
           onPress: async () => {
             const allOff = Object.keys(settings).reduce((acc, k) => ({ ...acc, [k]: false }), {}) as NotifSettings;
             setSettings(allOff);
-            await supabase.from('notification_settings').upsert({ user_id: user!.id, ...allOff });
+            await supabase.from('app_settings').upsert({ user_id: user!.id, ...allOff }, { onConflict: 'user_id' });
           },
         },
       ]

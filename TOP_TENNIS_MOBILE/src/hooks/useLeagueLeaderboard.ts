@@ -34,75 +34,37 @@ export const useLeagueLeaderboard = (leagueId?: string) => {
     const fetch = async () => {
       setLoading(true);
       try {
-        // Get all divisions for this league
-        const { data: divisions } = await supabase
-          .from('divisions')
-          .select('id, division_name')
-          .eq('league_id', leagueId)
-          .eq('status', 'active');
-
-        if (!divisions || divisions.length === 0) {
-          setLeaderboard([]);
-          setLoading(false);
-          return;
-        }
-
-        const divisionIds = divisions.map(d => d.id);
-        const divisionMap = new Map(divisions.map(d => [d.id, d.division_name]));
-
-        // Get all assignments across all divisions
-        const { data: assignments, error } = await supabase
-          .from('division_assignments')
-          .select('user_id, division_id, matches_completed, matches_required, playoff_eligible')
-          .in('division_id', divisionIds)
-          .eq('status', 'active');
+        // league_standings is the server-side standings source (same one the
+        // web app's points formula came from): names + avatars from profiles,
+        // stats from players, points = wins*3 + floor(matches_completed/2).
+        const { data, error } = await supabase
+          .from('league_standings')
+          .select('*')
+          .eq('league_id', leagueId);
 
         if (error) throw error;
-        if (!assignments || assignments.length === 0) {
-          setLeaderboard([]);
-          setLoading(false);
-          return;
-        }
 
-        // Fetch players separately (no FK between division_assignments and players)
-        const userIds = assignments.map((a: any) => a.user_id);
-        const { data: players } = await supabase
-          .from('players')
-          .select('id, user_id, name, wins, losses, total_matches, skill_level, usta_rating, profile_picture_url')
-          .in('user_id', userIds);
-
-        const playerMap = new Map((players || []).map((p: any) => [p.user_id, p]));
-
-        const data: LeagueLeaderboardPlayer[] = (assignments || [])
-          .filter((a: any) => {
-            const p = playerMap.get(a.user_id);
-            return p && p.name;
-          })
-          .map((a: any) => {
-            const p = playerMap.get(a.user_id);
-            const points = ((p.wins ?? 0) * 3) + Math.floor((a.matches_completed || 0) / 2);
-            return {
-              id: p.id,
-              user_id: a.user_id,
-              name: p.name,
-              wins: p.wins || 0,
-              losses: p.losses || 0,
-              total_matches: p.total_matches || 0,
-              skill_level: p.skill_level || 0,
-              usta_rating: p.usta_rating,
-              profile_picture_url: p.profile_picture_url,
-              points,
-              matches_completed: a.matches_completed || 0,
-              matches_required: a.matches_required || 5,
-              playoff_eligible: a.playoff_eligible || false,
-              division_name: divisionMap.get(a.division_id) || 'Division',
-              division_id: a.division_id,
-              isCurrentUser: a.user_id === user?.id,
-              rank: 0,
-            };
-          });
-
-        const sorted = data
+        const sorted: LeagueLeaderboardPlayer[] = (data || [])
+          .filter((r: any) => r.player_name)
+          .map((r: any) => ({
+            id: r.user_id,
+            user_id: r.user_id,
+            name: r.player_name,
+            wins: r.wins || 0,
+            losses: r.losses || 0,
+            total_matches: r.total_matches || 0,
+            skill_level: r.skill_level || 0,
+            usta_rating: r.usta_rating,
+            profile_picture_url: r.avatar_url ?? undefined,
+            points: r.points || 0,
+            matches_completed: r.matches_completed || 0,
+            matches_required: r.matches_required || 5,
+            playoff_eligible: r.playoff_eligible || false,
+            division_name: r.division_name || 'Division',
+            division_id: r.division_id,
+            isCurrentUser: r.user_id === user?.id,
+            rank: 0,
+          }))
           .sort((a, b) => {
             if (b.points !== a.points) return b.points - a.points;
             const aWR = a.total_matches > 0 ? a.wins / a.total_matches : 0;

@@ -56,7 +56,6 @@ export const Input: React.FC<InputProps> = ({
         borderRadius={Radius.md}
         paddingHorizontal={Spacing.md}
         height={52}
-        animation="quick"
       >
         {leftIcon && (
           <Ionicons

@@ -30,53 +30,33 @@ export const useDivisionLeaderboard = (divisionId?: string) => {
     const fetch = async () => {
       setLoading(true);
       try {
-        const { data: assignments, error: aErr } = await supabase
-          .from('division_assignments')
-          .select('user_id, matches_completed, matches_required, playoff_eligible')
-          .eq('division_id', divisionId)
-          .eq('status', 'active');
+        // league_standings computes points server-side (wins*3 + bonus) and
+        // already joins players + profiles, so one query covers everything.
+        const { data: rows, error } = await supabase
+          .from('league_standings')
+          .select('*')
+          .eq('division_id', divisionId);
 
-        if (aErr) throw aErr;
-        if (!assignments || assignments.length === 0) {
-          setLeaderboard([]);
-          return;
-        }
+        if (error) throw error;
 
-        const userIds = assignments.map((a: any) => a.user_id);
-        const { data: players, error: pErr } = await supabase
-          .from('players')
-          .select('id, user_id, name, wins, losses, total_matches, skill_level, usta_rating')
-          .in('user_id', userIds);
-
-        if (pErr) throw pErr;
-
-        const playerMap = new Map((players || []).map((p: any) => [p.user_id, p]));
-
-        const data: LeaderboardPlayer[] = assignments
-          .filter((a: any) => {
-            const p = playerMap.get(a.user_id);
-            return p && p.name;
-          })
-          .map((a: any) => {
-            const p = playerMap.get(a.user_id);
-            const points = ((p.wins ?? 0) * 3) + Math.floor((a.matches_completed ?? 0) / 2);
-            return {
-              id: p.id,
-              user_id: a.user_id,
-              name: p.name,
-              wins: p.wins || 0,
-              losses: p.losses || 0,
-              total_matches: p.total_matches || 0,
-              skill_level: p.skill_level || 0,
-              usta_rating: p.usta_rating,
-              points,
-              matches_completed: a.matches_completed || 0,
-              matches_required: a.matches_required || 5,
-              playoff_eligible: a.playoff_eligible || false,
-              isCurrentUser: a.user_id === user?.id,
-              rank: 0,
-            };
-          });
+        const data: LeaderboardPlayer[] = (rows || [])
+          .filter((r: any) => r.player_name)
+          .map((r: any) => ({
+            id: r.user_id,
+            user_id: r.user_id,
+            name: r.player_name,
+            wins: r.wins || 0,
+            losses: r.losses || 0,
+            total_matches: r.total_matches || 0,
+            skill_level: r.skill_level || 0,
+            usta_rating: r.usta_rating,
+            points: r.points || 0,
+            matches_completed: r.matches_completed || 0,
+            matches_required: r.matches_required || 5,
+            playoff_eligible: r.playoff_eligible || false,
+            isCurrentUser: r.user_id === user?.id,
+            rank: 0,
+          }));
 
         const sorted = data
           .sort((a, b) => {

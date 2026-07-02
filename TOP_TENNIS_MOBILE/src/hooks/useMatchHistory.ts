@@ -117,7 +117,7 @@ export const useMatchHistory = (limit = 20) => {
             status: m.status,
             setsWon,
             setsLost,
-            durationMinutes: m.duration_minutes ?? undefined,
+            durationMinutes: m.match_duration_minutes ?? m.duration_minutes ?? undefined,
             straightSets,
             comeback,
             bagel,

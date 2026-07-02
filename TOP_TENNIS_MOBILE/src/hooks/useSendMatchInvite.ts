@@ -28,19 +28,19 @@ export function useSendMatchInvite() {
         end_time: payload.end_time,
         court_location: payload.court_location || null,
         message: payload.message || null,
+        availability_id: payload.availability_id || null,
         status: 'pending',
       });
       if (error) throw error;
 
-      // Notify the receiver
-      await supabase.from('notifications').insert({
-        user_id: payload.receiver_id,
-        type: 'match_invite',
-        title: 'New Match Request',
-        message: `You have a new match request for ${payload.date} at ${payload.start_time}`,
-        read: false,
-        action_url: '/dashboard?tab=schedule',
-        metadata: { date: payload.date, start_time: payload.start_time },
+      // Notify the receiver (deduped server-side, triggers push)
+      await supabase.rpc('insert_notification_safe', {
+        p_user_id: payload.receiver_id,
+        p_type: 'match_invite',
+        p_title: 'New Match Request',
+        p_message: `You have a new match request for ${payload.date} at ${payload.start_time}`,
+        p_action_url: '/dashboard?tab=schedule',
+        p_metadata: { date: payload.date, start_time: payload.start_time },
       });
     } finally {
       setSending(false);

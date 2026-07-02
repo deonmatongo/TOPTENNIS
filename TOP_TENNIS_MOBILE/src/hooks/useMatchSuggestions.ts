@@ -27,19 +27,33 @@ export function useMatchSuggestions() {
       const { data: me } = await supabase.from('players').select('*').eq('user_id', user.id).maybeSingle();
       if (!me) { setLoading(false); return; }
 
+      // networking_enabled and avatars live on profiles, not players
       const { data } = await supabase
         .from('players')
         .select('*')
         .neq('user_id', user.id)
-        .eq('networking_enabled', true)
         .gte('skill_level', (me.skill_level || 5) - 2)
         .lte('skill_level', (me.skill_level || 5) + 2)
-        .limit(20);
+        .limit(40);
 
-      const scored = (data || []).map(p => ({
-        ...p,
-        compatibility_score: Math.max(0, 100 - Math.abs((p.skill_level || 5) - (me.skill_level || 5)) * 15),
-      })).sort((a, b) => (b.compatibility_score || 0) - (a.compatibility_score || 0));
+      const candidates = data || [];
+      const userIds = candidates.map(p => p.user_id).filter(Boolean);
+      const { data: profiles } = userIds.length > 0
+        ? await supabase
+            .from('profiles')
+            .select('id, networking_enabled, profile_picture_url')
+            .in('id', userIds)
+        : { data: [] as any[] };
+      const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+
+      const scored = candidates
+        .filter(p => profileMap.get(p.user_id)?.networking_enabled !== false)
+        .slice(0, 20)
+        .map(p => ({
+          ...p,
+          profile_picture_url: profileMap.get(p.user_id)?.profile_picture_url ?? undefined,
+          compatibility_score: Math.max(0, 100 - Math.abs((p.skill_level || 5) - (me.skill_level || 5)) * 15),
+        })).sort((a, b) => (b.compatibility_score || 0) - (a.compatibility_score || 0));
 
       setSuggestions(scored);
       setLoading(false);

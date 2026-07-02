@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors, Font, FontSize, Spacing, Radius } from '@/theme/colors';
+import { captureError } from '@/services/sentry';
 
 interface State {
   hasError: boolean;
@@ -18,6 +19,7 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren, Stat
     if (__DEV__) {
       console.error('[ErrorBoundary]', error, info.componentStack);
     }
+    captureError(error, { componentStack: info.componentStack });
   }
 
   handleReset = () => this.setState({ hasError: false, message: '' });
@@ -43,7 +45,7 @@ const s = StyleSheet.create({
   icon:      { fontSize: 48, marginBottom: Spacing.md },
   title:     { fontSize: FontSize.xl, fontFamily: Font.bold, color: Colors.text, marginBottom: Spacing.sm },
   sub:       { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', marginBottom: Spacing.xl },
-  debug:     { fontSize: 11, color: Colors.error, fontFamily: Font.mono ?? Font.medium, marginBottom: Spacing.lg, textAlign: 'center' },
+  debug:     { fontSize: 11, color: Colors.error, fontFamily: Font.medium, marginBottom: Spacing.lg, textAlign: 'center' },
   btn:       { backgroundColor: Colors.primary, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, borderRadius: Radius.full },
   btnTxt:    { color: '#fff', fontFamily: Font.semibold, fontSize: FontSize.sm },
 });

@@ -31,9 +31,9 @@
         "NSUserNotificationsUsageDescription": "Top Tennis sends you match reminders and league updates.",
         "NSLocationWhenInUseUsageDescription": "Top Tennis uses your location to find nearby courts and players.",
         "NSFaceIDUsageDescription": "Top Tennis uses Face ID to quickly and securely unlock the app.",
+        "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": [
           "remote-notification",
-          "voip",
           "audio"
         ]
       }

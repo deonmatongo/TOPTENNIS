@@ -56,10 +56,11 @@ export const ManageBookingsScreen: React.FC<{ navigation: any }> = ({ navigation
             try {
               const { error } = await supabase
                 .from('match_invites')
-                .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+                .update({ status: 'cancelled', cancelled_at: new Date().toISOString(), cancelled_by_user_id: user?.id ?? null, updated_at: new Date().toISOString() })
                 .eq('id', invite.id)
                 .eq('sender_id', user?.id);
               if (error) throw error;
+              if (user) await supabase.rpc('unlock_slots_for_invite', { p_invite_id: invite.id, p_user_id: user.id });
               await refetch();
             } catch (e: any) {
               Alert.alert('Error', e.message || 'Failed to cancel match.');
@@ -75,7 +76,7 @@ export const ManageBookingsScreen: React.FC<{ navigation: any }> = ({ navigation
   const handleProposeNewTime = async (inviteId: string, date: string, startTime: string, endTime: string) => {
     const { error } = await supabase
       .from('match_invites')
-      .update({ proposed_date: date, proposed_start_time: startTime, proposed_end_time: endTime, updated_at: new Date().toISOString() })
+      .update({ proposed_date: date, proposed_start_time: startTime, proposed_end_time: endTime, proposed_by_user_id: user?.id ?? null, proposed_at: new Date().toISOString(), status: 'pending', updated_at: new Date().toISOString() })
       .eq('id', inviteId);
     if (error) throw error;
     await refetch();

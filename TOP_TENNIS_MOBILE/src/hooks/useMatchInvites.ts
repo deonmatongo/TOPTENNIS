@@ -69,25 +69,38 @@ export function useMatchInvites() {
         .single();
       if (error) throw error;
       records.push(data as MatchInviteRecord);
-      await supabase.from('notifications').insert({
-        user_id: receiverId,
-        type: 'match_invite',
-        title: 'New Match Invite',
-        message: `Match request for ${params.date} at ${params.startTime.slice(0, 5)}`,
-        read: false,
-        metadata: { invite_id: data.id },
+      await supabase.rpc('insert_notification_safe', {
+        p_user_id: receiverId,
+        p_type: 'match_invite',
+        p_title: 'New Match Invite',
+        p_message: `Match request for ${params.date} at ${params.startTime.slice(0, 5)}`,
+        p_action_url: null,
+        p_metadata: { invite_id: data.id },
       });
     }
     return records;
   }, [user]);
 
   const respondToInvite = useCallback(async (inviteId: string, status: 'accepted' | 'declined') => {
-    const { error } = await supabase
-      .from('match_invites')
-      .update({ status })
-      .eq('id', inviteId);
-    if (error) throw error;
-  }, []);
+    if (!user) throw new Error('Not authenticated');
+    if (status === 'accepted') {
+      // Accepts + books both players' availability slots + declines conflicts
+      const { data, error } = await supabase.rpc('accept_invite_and_lock_slot', {
+        p_invite_id: inviteId,
+        p_user_id: user.id,
+        p_conflicting_invite_ids: [],
+      });
+      if (error) throw error;
+      if (data && data.success === false) throw new Error(data.error || 'Could not accept invite');
+    } else {
+      const { error } = await supabase
+        .from('match_invites')
+        .update({ status, response_at: new Date().toISOString() })
+        .eq('id', inviteId);
+      if (error) throw error;
+      await supabase.rpc('unlock_slots_for_invite', { p_invite_id: inviteId, p_user_id: user.id });
+    }
+  }, [user]);
 
   const proposeNewTime = useCallback(async (
     inviteId: string, date: string, startTime: string, endTime: string,
@@ -100,6 +113,8 @@ export function useMatchInvites() {
         proposed_start_time: startTime,
         proposed_end_time: endTime,
         proposed_by_user_id: user.id,
+        proposed_at: new Date().toISOString(),
+        status: 'pending',
       })
       .eq('id', inviteId);
     if (error) throw error;
@@ -125,10 +140,18 @@ export function useMatchInvites() {
   const cancelInvite = useCallback(async (inviteId: string) => {
     const { error } = await supabase
       .from('match_invites')
-      .update({ status: 'cancelled' })
+      .update({
+        status: 'cancelled',
+        cancelled_at: new Date().toISOString(),
+        cancelled_by_user_id: user?.id ?? null,
+      })
       .eq('id', inviteId);
     if (error) throw error;
-  }, []);
+    // Free any availability slots held for this match
+    if (user) {
+      await supabase.rpc('unlock_slots_for_invite', { p_invite_id: inviteId, p_user_id: user.id });
+    }
+  }, [user]);
 
   return { fetchInvite, sendMatchInvites, respondToInvite, proposeNewTime, acceptProposedTime, cancelInvite };
 }

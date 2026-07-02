@@ -27,6 +27,42 @@ export interface MatchInvite {
   receiver?: { first_name: string; last_name: string; skill_level?: number; profile_picture_url?: string; wins?: number; losses?: number; usta_rating?: string; competitiveness?: string; city?: string; age_range?: string };
 }
 
+// Identity fields live on `profiles`; tennis stats live on `players` (keyed by
+// user_id). Merge the two so callers get a single opponent object.
+async function fetchParticipants(userIds: string[]) {
+  const [{ data: profiles }, { data: players }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, first_name, last_name, profile_picture_url, city')
+      .in('id', userIds),
+    supabase
+      .from('players')
+      .select('user_id, skill_level, wins, losses, usta_rating, competitiveness, age_range')
+      .in('user_id', userIds),
+  ]);
+  const playerMap = new Map((players || []).map(p => [p.user_id, p]));
+  return new Map(
+    (profiles || []).map(p => {
+      const stats = playerMap.get(p.id) || {};
+      return [p.id, { ...p, ...stats }];
+    })
+  );
+}
+
+async function notify(userId: string, type: string, title: string, message: string, actionUrl?: string, metadata?: Record<string, unknown>) {
+  // insert_notification_safe dedups server-side and triggers the send-push
+  // edge function via the notifications INSERT trigger.
+  const { error } = await supabase.rpc('insert_notification_safe', {
+    p_user_id: userId,
+    p_type: type,
+    p_title: title,
+    p_message: message,
+    p_action_url: actionUrl ?? null,
+    p_metadata: metadata ?? {},
+  });
+  if (error) throw error;
+}
+
 export const useMatches = () => {
   const { user } = useAuth();
   const [invites, setInvites] = useState<MatchInvite[]>([]);
@@ -52,28 +88,18 @@ export const useMatches = () => {
     const toNotify = pastDue.filter(i => !alreadyNotified.has(i.id));
     if (toNotify.length === 0) return;
 
-    const rows = toNotify.flatMap(i => [
-      {
-        user_id: i.sender_id,
-        type: 'score_reminder',
-        title: 'Record Match Score',
-        message: 'Your match has ended. Please record the score so the leaderboard stays up to date.',
-        read: false,
-        action_url: '/dashboard?tab=schedule',
-        metadata: { match_id: i.id },
-      },
-      {
-        user_id: i.receiver_id,
-        type: 'score_reminder',
-        title: 'Record Match Score',
-        message: 'Your match has ended. Please record the score so the leaderboard stays up to date.',
-        read: false,
-        action_url: '/dashboard?tab=schedule',
-        metadata: { match_id: i.id },
-      },
-    ]);
-
-    await supabase.from('notifications').insert(rows);
+    await Promise.allSettled(
+      toNotify.flatMap(i => [i.sender_id, i.receiver_id].map(uid =>
+        notify(
+          uid,
+          'score_reminder',
+          'Record Match Score',
+          'Your match has ended. Please record the score so the leaderboard stays up to date.',
+          '/dashboard?tab=schedule',
+          { match_id: i.id },
+        )
+      ))
+    );
   }, []);
 
   const fetchInvites = useCallback(async () => {
@@ -90,12 +116,7 @@ export const useMatches = () => {
       const userIds = new Set<string>();
       (data || []).forEach(i => { userIds.add(i.sender_id); userIds.add(i.receiver_id); });
 
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, skill_level, profile_picture_url, age_range, wins, losses, usta_rating, competitiveness, city')
-        .in('id', Array.from(userIds));
-
-      const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+      const profileMap = await fetchParticipants(Array.from(userIds));
 
       const enriched: MatchInvite[] = (data || []).map(i => ({
         ...i,
@@ -114,34 +135,47 @@ export const useMatches = () => {
   }, [user, checkPastDueMatches]);
 
   const respondToInvite = useCallback(async (inviteId: string, status: 'accepted' | 'declined') => {
-    const { error } = await supabase
-      .from('match_invites')
-      .update({ status, response_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-      .eq('id', inviteId)
-      .eq('receiver_id', user?.id);
-    if (error) throw error;
+    if (!user) throw new Error('Not signed in');
 
-    if (user) {
-      const invite = invites.find(i => i.id === inviteId);
-      if (invite) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('first_name, last_name')
-          .eq('id', user.id)
-          .single();
-        const name = profile ? `${profile.first_name} ${profile.last_name}`.trim() : 'Someone';
-        await supabase.from('notifications').insert({
-          user_id: invite.sender_id,
-          type: status === 'accepted' ? 'match_accepted' : 'match_declined',
-          title: status === 'accepted' ? 'Match Accepted' : 'Match Declined',
-          message: status === 'accepted'
-            ? `${name} accepted your match invitation`
-            : `${name} declined your match invitation`,
-          read: false,
-          action_url: '/dashboard?tab=schedule',
-          metadata: { match_id: inviteId },
-        });
-      }
+    if (status === 'accepted') {
+      // Server-side: accepts the invite, marks both players' overlapping
+      // availability slots as booked, and auto-declines conflicting invites.
+      const { data, error } = await supabase.rpc('accept_invite_and_lock_slot', {
+        p_invite_id: inviteId,
+        p_user_id: user.id,
+        p_conflicting_invite_ids: [],
+      });
+      if (error) throw error;
+      if (data && data.success === false) throw new Error(data.error || 'Could not accept invite');
+    } else {
+      const { error } = await supabase
+        .from('match_invites')
+        .update({ status, response_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq('id', inviteId)
+        .eq('receiver_id', user.id);
+      if (error) throw error;
+      // Free any slots that were held for this invite (no-op if none)
+      await supabase.rpc('unlock_slots_for_invite', { p_invite_id: inviteId, p_user_id: user.id });
+    }
+
+    const invite = invites.find(i => i.id === inviteId);
+    if (invite) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('id', user.id)
+        .single();
+      const name = profile ? `${profile.first_name} ${profile.last_name}`.trim() : 'Someone';
+      await notify(
+        invite.sender_id,
+        status === 'accepted' ? 'match_accepted' : 'match_declined',
+        status === 'accepted' ? 'Match Accepted' : 'Match Declined',
+        status === 'accepted'
+          ? `${name} accepted your match invitation`
+          : `${name} declined your match invitation`,
+        '/dashboard?tab=schedule',
+        { match_id: inviteId },
+      ).catch(() => {});
     }
 
     await fetchInvites();
@@ -150,7 +184,7 @@ export const useMatches = () => {
   /**
    * Record the result of a casual (non-league) match.
    * The caller is the winner. Updates match_invites and increments
-   * win/loss counters on both player profiles.
+   * win/loss counters on both players rows (the leaderboard source).
    */
   const recordMatchResult = useCallback(async (
     matchId: string,
@@ -175,19 +209,10 @@ export const useMatches = () => {
     if (invite) {
       const loserId = winnerId === invite.sender_id ? invite.receiver_id : invite.sender_id;
 
-      // Update win/loss counters on both profiles (display) and players (leaderboard)
-      const { data: profileRows } = await supabase
-        .from('profiles')
-        .select('id, wins, losses')
-        .in('id', [winnerId, loserId]);
-
-      const profileMap = new Map((profileRows || []).map(p => [p.id, p]));
-      const winnerProfile = profileMap.get(winnerId);
-      const loserProfile  = profileMap.get(loserId);
-
+      // Win/loss counters live on players (profiles has no wins/losses columns)
       const { data: playerRows } = await supabase
         .from('players')
-        .select('id, user_id, wins, losses')
+        .select('id, user_id, wins, losses, total_matches')
         .in('user_id', [winnerId, loserId]);
 
       const playerMap = new Map((playerRows || []).map(p => [p.user_id, p]));
@@ -195,17 +220,17 @@ export const useMatches = () => {
       const loserPlayer  = playerMap.get(loserId);
 
       const updates: any[] = [];
-      if (winnerProfile) {
-        updates.push(supabase.from('profiles').update({ wins: (winnerProfile.wins || 0) + 1 }).eq('id', winnerId));
-      }
-      if (loserProfile) {
-        updates.push(supabase.from('profiles').update({ losses: (loserProfile.losses || 0) + 1 }).eq('id', loserId));
-      }
       if (winnerPlayer) {
-        updates.push(supabase.from('players').update({ wins: (winnerPlayer.wins || 0) + 1 }).eq('user_id', winnerId));
+        updates.push(supabase.from('players').update({
+          wins: (winnerPlayer.wins || 0) + 1,
+          total_matches: (winnerPlayer.total_matches || 0) + 1,
+        }).eq('user_id', winnerId));
       }
       if (loserPlayer) {
-        updates.push(supabase.from('players').update({ losses: (loserPlayer.losses || 0) + 1 }).eq('user_id', loserId));
+        updates.push(supabase.from('players').update({
+          losses: (loserPlayer.losses || 0) + 1,
+          total_matches: (loserPlayer.total_matches || 0) + 1,
+        }).eq('user_id', loserId));
       }
       await Promise.allSettled(updates);
 
@@ -223,17 +248,16 @@ export const useMatches = () => {
         const notifiedUserId = user.id === invite.sender_id ? invite.receiver_id : invite.sender_id;
         const didOppWin = winnerId === notifiedUserId;
 
-        await supabase.from('notifications').insert({
-          user_id: notifiedUserId,
-          type: 'match_result',
-          title: didOppWin ? 'Match Result — You Won!' : 'Match Result Logged',
-          message: didOppWin
+        await notify(
+          notifiedUserId,
+          'match_result',
+          didOppWin ? 'Match Result — You Won!' : 'Match Result Logged',
+          didOppWin
             ? `${myName} has logged the match result. You won ${receiverSetsWon}–${senderSetsWon} in sets.`
             : `${myName} has logged the match result. They won ${senderSetsWon}–${receiverSetsWon} in sets.`,
-          read: false,
-          action_url: '/matches',
-          metadata: { match_id: matchId },
-        }).then(() => {}); // non-critical
+          '/matches',
+          { match_id: matchId },
+        ).catch(() => {}); // non-critical
       }
     }
 

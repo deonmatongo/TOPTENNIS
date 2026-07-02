@@ -290,7 +290,11 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
     Alert.alert('Cancel Invite', 'Cancel this match invite?', [
       { text: 'No', style: 'cancel' },
       { text: 'Cancel Invite', style: 'destructive', onPress: async () => {
-        try { await supabase.from('match_invites').update({ status: 'cancelled' }).eq('id', id).eq('sender_id', user!.id); await refetchInvites(); setShowEventSheet(false); }
+        try {
+          await supabase.from('match_invites').update({ status: 'cancelled', cancelled_at: new Date().toISOString(), cancelled_by_user_id: user!.id }).eq('id', id).eq('sender_id', user!.id);
+          await supabase.rpc('unlock_slots_for_invite', { p_invite_id: id, p_user_id: user!.id });
+          await refetchInvites(); setShowEventSheet(false);
+        }
         catch (e: any) { Alert.alert('Error', e?.message || 'Failed to cancel invite.'); }
       }},
     ]);
@@ -300,7 +304,11 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
     Alert.alert('Cancel Match', 'Cancel this confirmed match? Both players will be notified.', [
       { text: 'No', style: 'cancel' },
       { text: 'Cancel Match', style: 'destructive', onPress: async () => {
-        try { await supabase.from('match_invites').update({ status: 'cancelled' }).eq('id', id); await refetchInvites(); setShowEventSheet(false); }
+        try {
+          await supabase.from('match_invites').update({ status: 'cancelled', cancelled_at: new Date().toISOString(), cancelled_by_user_id: user!.id }).eq('id', id);
+          await supabase.rpc('unlock_slots_for_invite', { p_invite_id: id, p_user_id: user!.id });
+          await refetchInvites(); setShowEventSheet(false);
+        }
         catch (e: any) { Alert.alert('Error', e?.message || 'Failed to cancel match.'); }
       }},
     ]);

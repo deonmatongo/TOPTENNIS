@@ -26,7 +26,7 @@ export interface ConversationMessage {
   updated_at: string;
   deleted_at?: string | null;
   is_system?: boolean;
-  reply_to_message_id?: string | null;
+  reply_to_id?: string | null;
   sender?: {
     id: string;
     first_name?: string | null;
@@ -149,7 +149,7 @@ export const useConversations = () => {
       sender_id: user.id,
       content: content.trim(),
     };
-    if (replyToId) payload.reply_to_message_id = replyToId;
+    if (replyToId) payload.reply_to_id = replyToId;
     const { error } = await db.from('conversation_messages').insert(payload);
     if (error) throw error;
     await fetchConversations();
@@ -195,9 +195,10 @@ export const useConversations = () => {
   }, [fetchConversations]);
 
   const deleteMessage = useCallback(async (messageId: string) => {
+    // Soft delete (same as web) — RLS only allows senders to UPDATE their rows
     const { error } = await db
       .from('conversation_messages')
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq('id', messageId);
     if (error) throw error;
     await fetchConversations();

@@ -30,6 +30,31 @@ export interface PlayerProfile {
   last_name?: string;
 }
 
+// Tennis data lives on `players`; identity data (name parts, bio, avatar,
+// networking flag) lives on `profiles`. Writes must be split accordingly —
+// sending a profiles-only column to players is a hard PostgREST error.
+const PLAYERS_COLUMNS = new Set([
+  'name', 'email', 'phone', 'city', 'zip_code', 'location', 'skill_level',
+  'usta_rating', 'competitiveness', 'age_range', 'gender', 'gender_preference',
+  'age_competition_preference', 'travel_distance', 'wins', 'losses',
+  'total_matches', 'current_streak', 'best_streak', 'hours_played',
+]);
+const PROFILES_COLUMNS = new Set([
+  'first_name', 'last_name', 'bio', 'networking_enabled',
+  'profile_picture_url', 'city', 'zip_code', 'phone', 'location',
+]);
+
+function splitUpdates(updates: Partial<PlayerProfile>) {
+  const playerUpdates: Record<string, unknown> = {};
+  const profileUpdates: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(updates)) {
+    if (value === undefined) continue;
+    if (PLAYERS_COLUMNS.has(key)) playerUpdates[key] = value;
+    if (PROFILES_COLUMNS.has(key)) profileUpdates[key] = value;
+  }
+  return { playerUpdates, profileUpdates };
+}
+
 export function usePlayerProfile() {
   const { user } = useAuth();
   const [player, setPlayer] = useState<PlayerProfile | null>(null);
@@ -40,11 +65,21 @@ export function usePlayerProfile() {
     setLoading(true);
     const [{ data: playerData }, { data: profileData }] = await Promise.all([
       supabase.from('players').select('*').eq('user_id', user.id).maybeSingle(),
-      supabase.from('profiles').select('profile_picture_url').eq('id', user.id).maybeSingle(),
+      supabase
+        .from('profiles')
+        .select('first_name, last_name, bio, networking_enabled, profile_picture_url')
+        .eq('id', user.id)
+        .maybeSingle(),
     ]);
     if (playerData) {
-      const picUrl = playerData.profile_picture_url || profileData?.profile_picture_url || null;
-      setPlayer({ ...playerData, profile_picture_url: picUrl });
+      setPlayer({
+        ...playerData,
+        first_name: profileData?.first_name ?? undefined,
+        last_name: profileData?.last_name ?? undefined,
+        bio: profileData?.bio ?? undefined,
+        networking_enabled: profileData?.networking_enabled ?? true,
+        profile_picture_url: profileData?.profile_picture_url || null,
+      });
     } else {
       setPlayer(null);
     }
@@ -55,27 +90,45 @@ export function usePlayerProfile() {
 
   const createPlayerProfile = async (profileData: Partial<PlayerProfile>) => {
     if (!user) throw new Error('Not authenticated');
+    const { playerUpdates, profileUpdates } = splitUpdates(profileData);
     const { data, error } = await supabase
       .from('players')
-      .insert({ ...profileData, user_id: user.id, email: user.email, wins: 0, losses: 0 })
+      .insert({ ...playerUpdates, user_id: user.id, email: user.email, wins: 0, losses: 0 })
       .select()
       .single();
     if (error) throw error;
-    setPlayer(data);
+
+    // Mirror identity fields and mark onboarding complete (same as web)
+    await supabase
+      .from('profiles')
+      .update({ ...profileUpdates, profile_completed: true })
+      .eq('id', user.id);
+
+    await fetchPlayer();
     return data;
   };
 
   const updatePlayerProfile = async (updates: Partial<PlayerProfile>) => {
-    if (!player) throw new Error('No player profile');
-    const { data, error } = await supabase
-      .from('players')
-      .update(updates)
-      .eq('id', player.id)
-      .select()
-      .single();
-    if (error) throw error;
-    setPlayer(data);
-    return data;
+    if (!player || !user) throw new Error('No player profile');
+    const { playerUpdates, profileUpdates } = splitUpdates(updates);
+
+    if (Object.keys(playerUpdates).length > 0) {
+      const { error } = await supabase
+        .from('players')
+        .update(playerUpdates)
+        .eq('id', player.id);
+      if (error) throw error;
+    }
+    if (Object.keys(profileUpdates).length > 0) {
+      const { error } = await supabase
+        .from('profiles')
+        .update(profileUpdates)
+        .eq('id', user.id);
+      if (error) throw error;
+    }
+
+    await fetchPlayer();
+    return { ...player, ...updates };
   };
 
   return { player, loading, refetch: fetchPlayer, createPlayerProfile, updatePlayerProfile };

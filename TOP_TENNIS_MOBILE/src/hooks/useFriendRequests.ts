@@ -20,12 +20,42 @@ export function useFriendRequests() {
   const fetchRequests = async () => {
     if (!user) { setLoading(false); return; }
     setLoading(true);
+    // friend_requests has no FK relationships, so embedded selects fail —
+    // fetch the requests plain and join players/profiles client-side.
     const { data } = await supabase
       .from('friend_requests')
-      .select(`*, sender:players!friend_requests_sender_id_fkey(id,name,skill_level,usta_rating,profile_picture_url), receiver:players!friend_requests_receiver_id_fkey(id,name,skill_level,usta_rating,profile_picture_url)`)
+      .select('*')
       .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
       .order('created_at', { ascending: false });
-    setRequests(data || []);
+
+    const rows = data || [];
+    const userIds = Array.from(new Set(rows.flatMap(r => [r.sender_id, r.receiver_id])));
+
+    let userMap = new Map<string, FriendRequest['sender']>();
+    if (userIds.length > 0) {
+      const [{ data: players }, { data: profiles }] = await Promise.all([
+        supabase.from('players').select('user_id, name, skill_level, usta_rating').in('user_id', userIds),
+        supabase.from('profiles').select('id, first_name, last_name, profile_picture_url').in('id', userIds),
+      ]);
+      const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+      userMap = new Map(userIds.map(id => {
+        const player = (players || []).find(p => p.user_id === id);
+        const profile = profileMap.get(id);
+        return [id, {
+          id,
+          name: player?.name || `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || 'Player',
+          skill_level: player?.skill_level ?? undefined,
+          usta_rating: player?.usta_rating ?? undefined,
+          profile_picture_url: profile?.profile_picture_url ?? undefined,
+        }];
+      }));
+    }
+
+    setRequests(rows.map(r => ({
+      ...r,
+      sender: userMap.get(r.sender_id),
+      receiver: userMap.get(r.receiver_id),
+    })));
     setLoading(false);
   };
 

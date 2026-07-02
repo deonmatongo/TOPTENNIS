@@ -35,6 +35,14 @@ const animations = createAnimations({
 export const tamaguiConfig = createTamagui({
   ...defaultConfig,
   animations,
+  settings: {
+    ...defaultConfig.settings,
+    // This codebase styles components with React Native longhand props
+    // (alignItems, backgroundColor, ...) and raw palette strings, which the
+    // v4 preset disallows by default.
+    onlyAllowShorthands: false,
+    allowedStyleValues: false,
+  },
 })
 
 export default tamaguiConfig

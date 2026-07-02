@@ -14,6 +14,7 @@ import { PlayerProfileSheet, PlayerSearchResult } from '@/components/ui/PlayerPr
 import { Palette, Colors, Shadow, FontSize, Font, FontWeight, Spacing, Radius } from '@/theme/colors';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/services/supabase';
+import { searchPlayersByName } from '@/services/playerSearch';
 
 type Mode = 'selection' | 'ai' | 'search';
 
@@ -41,13 +42,8 @@ export const CasualMatchScreen: React.FC<{ navigation: any }> = ({ navigation })
     setSearching(true);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
-      const { data } = await supabase
-        .from('players')
-        .select('id, user_id, name, skill_level, usta_rating, city, wins, losses, profile_picture_url')
-        .ilike('name', `%${q}%`)
-        .neq('id', player?.id || '')
-        .limit(15);
-      setSearchResults(data || []);
+      const rows = await searchPlayersByName(q, { excludePlayerId: player?.id, limit: 15 });
+      setSearchResults(rows);
       setSearching(false);
     }, 350);
   }, [player?.id]);

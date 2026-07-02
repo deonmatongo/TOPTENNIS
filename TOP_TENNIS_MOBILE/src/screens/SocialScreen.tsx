@@ -13,6 +13,7 @@ import { Palette, Colors, Shadow, FontSize, Font, FontWeight, Spacing, Radius } 
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/services/supabase';
+import { searchPlayersByName } from '@/services/playerSearch';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCallContext } from '@/contexts/CallContext';
 
@@ -75,13 +76,8 @@ export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     setSearching(true);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
-      const { data } = await supabase
-        .from('players')
-        .select('id, name, skill_level, usta_rating, city, profile_picture_url, user_id')
-        .ilike('name', `%${q}%`)
-        .neq('user_id', user?.id || '')
-        .limit(20);
-      setSearchResults(data || []);
+      const rows = await searchPlayersByName(q, { excludeUserId: user?.id, limit: 20 });
+      setSearchResults(rows);
       setSearching(false);
     }, 350);
   }, [user?.id]);

@@ -47,7 +47,7 @@ export const MatchesScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
   const handleProposeNewTime = async (id: string, date: string, start: string, end: string) => {
     const { error } = await supabase
       .from('match_invites')
-      .update({ proposed_date: date, proposed_start_time: start, proposed_end_time: end, status: 'pending' })
+      .update({ proposed_date: date, proposed_start_time: start, proposed_end_time: end, proposed_by_user_id: user?.id ?? null, proposed_at: new Date().toISOString(), status: 'pending' })
       .eq('id', id);
     if (error) throw error;
     await refetch();

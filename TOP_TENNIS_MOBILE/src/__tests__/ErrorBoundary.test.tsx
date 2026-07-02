@@ -32,9 +32,15 @@ describe('ErrorBoundary', () => {
   });
 
   it('resets after tapping Try Again', () => {
-    const { getByText, queryByText } = render(
+    const { getByText, queryByText, rerender } = render(
       <ErrorBoundary>
         <Boom />
+      </ErrorBoundary>
+    );
+    // Swap in a healthy child so the reset can succeed
+    rerender(
+      <ErrorBoundary>
+        <></>
       </ErrorBoundary>
     );
     fireEvent.press(getByText('Try Again'));
