@@ -53,7 +53,7 @@ const Header = () => {
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center group" aria-label="Top Tennis League Home">
-            <img src="/logo.png" alt="Top Tennis League Logo" className="h-32 w-48 md:h-36 md:w-56 lg:h-40 lg:w-64 object-contain" />
+            <img src="/logo.png" alt="Top Tennis League Logo" className="h-14 md:h-16 lg:h-[4.5rem] w-auto object-contain" />
           </Link>
           
           {/* Desktop Navigation */}
@@ -198,13 +198,13 @@ const Header = () => {
           </div>
 
           {/* Mobile Menu Button */}
-          <Button variant="ghost" size="sm" className="lg:hidden p-2 text-gray-700 hover:text-orange-600 hover:bg-orange-50" onClick={toggleMenu} aria-label="Toggle navigation menu">
-            {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          <Button variant="ghost" size="sm" className="lg:hidden h-11 w-11 p-0 text-gray-700 hover:text-orange-600 hover:bg-orange-50" onClick={toggleMenu} aria-label="Toggle navigation menu">
+            {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </Button>
         </div>
 
         {/* Mobile Navigation */}
-        <div className={`lg:hidden overflow-hidden transition-all duration-300 ${isMenuOpen ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'}`}>
+        <div className={`lg:hidden transition-all duration-300 ${isMenuOpen ? 'max-h-[calc(100dvh-4rem)] overflow-y-auto opacity-100' : 'max-h-0 overflow-hidden opacity-0'}`}>
           <nav className="py-4 border-t border-gray-200">
             <div className="space-y-1">
               <Link to="/" className="block px-3 py-3 text-base font-medium text-gray-700 hover:text-orange-600 hover:bg-orange-50/80 rounded-lg transition-all" onClick={() => setIsMenuOpen(false)}>

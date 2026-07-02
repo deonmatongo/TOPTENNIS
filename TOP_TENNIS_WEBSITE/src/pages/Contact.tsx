@@ -61,7 +61,7 @@ const Contact = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white overflow-x-hidden">
       <Header />
-      <div className="container mx-auto px-4 py-12 sm:py-16 lg:py-24">
+      <div className="container mx-auto px-4 pt-24 pb-12 sm:pt-28 sm:pb-16 lg:pt-32 lg:pb-24">
         {/* Header */}
         <div className="text-center mb-8 sm:mb-12">
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3 sm:mb-4 px-2">Contact Us</h1>

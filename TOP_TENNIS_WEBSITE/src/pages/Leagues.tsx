@@ -191,7 +191,7 @@ const Leagues = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-white overflow-x-hidden">
         <Header />
-        <div className="container mx-auto px-4 py-24 flex flex-col items-center justify-center text-center gap-4">
+        <div className="container mx-auto px-4 pt-32 pb-24 flex flex-col items-center justify-center text-center gap-4">
           <Trophy className="w-16 h-16 text-orange-300" />
           <h2 className="text-2xl font-bold text-gray-800">League Activities Unavailable</h2>
           <p className="text-gray-500 max-w-md">League activities are not available at this time.</p>
@@ -203,7 +203,7 @@ const Leagues = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-white overflow-x-hidden">
       <Header />
-      <div className="container mx-auto px-4 py-12 sm:py-16 lg:py-24">
+      <div className="container mx-auto px-4 pt-24 pb-12 sm:pt-28 sm:pb-16 lg:pt-32 lg:pb-24">
         {/* Header */}
         <div className="text-center mb-8 sm:mb-12">
           {(activeLeagueId || showCategoryView) && (
