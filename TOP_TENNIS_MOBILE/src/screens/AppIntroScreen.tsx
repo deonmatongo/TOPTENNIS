@@ -114,12 +114,12 @@ const BouncingBall: React.FC = () => {
 
   return (
     <View style={ball.stage}>
+      <Animated.View style={[ball.shadow, shadowStyle]} />
       <Animated.View style={[ball.ball, ballStyle]}>
         {/* felt seam */}
         <View style={ball.seamTop} />
         <View style={ball.seamBottom} />
       </Animated.View>
-      <Animated.View style={[ball.shadow, shadowStyle]} />
     </View>
   );
 };
@@ -130,9 +130,9 @@ const ball = StyleSheet.create({
     width: 104,
     height: 104,
     borderRadius: 52,
-    backgroundColor: Palette.optic400,
+    backgroundColor: Palette.orange500,
     overflow: 'hidden',
-    shadowColor: Palette.optic400,
+    shadowColor: Palette.orange500,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 30,
@@ -161,7 +161,8 @@ const ball = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   shadow: {
-    marginTop: 14,
+    position: 'absolute',
+    top: BOUNCE_HEIGHT + 112,
     width: 96,
     height: 16,
     borderRadius: 8,
@@ -196,7 +197,7 @@ const PulseRings: React.FC<{ icon: keyof typeof Ionicons.glyphMap }> = ({ icon }
       <Animated.View style={[rings.ring, r1]} />
       <Animated.View style={[rings.ring, r2]} />
       <View style={rings.medallion}>
-        <Ionicons name={icon} size={64} color={Palette.opticInk} />
+        <Ionicons name={icon} size={64} color="#fff" />
       </View>
     </View>
   );
@@ -210,16 +211,16 @@ const rings = StyleSheet.create({
     height: 150,
     borderRadius: 75,
     borderWidth: 2,
-    borderColor: Palette.optic400,
+    borderColor: Palette.orange400,
   },
   medallion: {
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: Palette.optic400,
+    backgroundColor: Palette.orange500,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: Palette.optic400,
+    shadowColor: Palette.orange500,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.45,
     shadowRadius: 26,
@@ -270,11 +271,11 @@ const TrophyPop: React.FC = () => {
     <View style={trophy.stage}>
       {[s1, s2, s3].map((s, i) => (
         <Animated.View key={i} style={[trophy.sparkle, s]}>
-          <Ionicons name="sparkles" size={i === 1 ? 26 : 18} color={Palette.optic300} />
+          <Ionicons name="sparkles" size={i === 1 ? 26 : 18} color="rgba(255,255,255,0.92)" />
         </Animated.View>
       ))}
       <Animated.View style={[trophy.medallion, cupStyle]}>
-        <Ionicons name="trophy" size={70} color={Palette.optic300} />
+        <Ionicons name="trophy" size={70} color="#fff" />
       </Animated.View>
     </View>
   );
@@ -369,7 +370,7 @@ export const AppIntroScreen: React.FC<Props> = ({ onDone }) => {
               onPressOut={() => { ctaScale.value = withSpring(1, { damping: 14, stiffness: 300 }); }}
               activeOpacity={0.9}
             >
-              <Ionicons name="tennisball" size={18} color={Palette.optic400} />
+              <Ionicons name="tennisball" size={18} color="#fff" />
               <Text style={styles.ctaText}>{isLast ? "Let's Play" : 'Next'}</Text>
               <Ionicons name={isLast ? 'arrow-forward' : 'chevron-forward'} size={18} color="#fff" />
             </TouchableOpacity>
@@ -421,7 +422,7 @@ const Slide: React.FC<{
           {/* Brand lockup */}
           <Animated.View entering={FadeInDown.duration(500)} style={styles.logoRow}>
             <View style={styles.logoBox}>
-              <Ionicons name="tennisball" size={20} color={Palette.opticInk} />
+              <Ionicons name="tennisball" size={20} color="#fff" />
             </View>
             <Text style={styles.logoName}>TopTennis</Text>
           </Animated.View>
@@ -481,7 +482,7 @@ const styles = StyleSheet.create({
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.lg },
   logoBox: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: Palette.optic400,
+    backgroundColor: Palette.orange500,
     alignItems: 'center', justifyContent: 'center',
   },
   logoName: { color: '#fff', fontSize: 24, fontFamily: Font.black, letterSpacing: -0.5 },
@@ -496,7 +497,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.14)',
   },
   eyebrow: {
-    color: Palette.optic300,
+    color: Palette.orange100,
     fontSize: FontSize.xxs,
     fontFamily: Font.extrabold,
     letterSpacing: 3,

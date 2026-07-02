@@ -31,11 +31,7 @@ export const Palette = {
   dark700:   '#1C1C2E',
   dark600:   '#24243A',
 
-  // Tennis — optic ball yellow, court + grass greens, clay
-  optic300:  '#EEFF6A',   // highlight
-  optic400:  '#DFF23D',   // tennis-ball felt
-  optic500:  '#C8E020',   // pressed / borders
-  opticInk:  '#2A3500',   // text on optic surfaces
+  // Tennis — court + grass greens, clay
   court600:  '#1F7A4D',   // grass court
   court700:  '#166139',   // grass court deep
   court800:  '#0E4A2A',   // night grass
@@ -124,8 +120,6 @@ export const Colors = {
   tabBarInactive:Palette.gray400,
 
   // Tennis accents
-  optic:         Palette.optic400,
-  opticInk:      Palette.opticInk,
   court:         Palette.court700,
   courtLine:     'rgba(255,255,255,0.28)',
 

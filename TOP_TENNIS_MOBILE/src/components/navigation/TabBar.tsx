@@ -277,7 +277,7 @@ const bt = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: Palette.optic500,
+    backgroundColor: Palette.orange500,
     marginTop: 3,
   },
 });
