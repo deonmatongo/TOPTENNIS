@@ -17,9 +17,7 @@ const schema = z.object({
   CHATWOOT_ACCOUNT_ID:   z.coerce.number().optional(),
   CHATWOOT_INBOX_ID:     z.coerce.number().optional(),
 
-  // Optional AI keys
-  OPENAI_API_KEY:        z.string().optional(),
-  ANTHROPIC_API_KEY:     z.string().optional(),
+  ANTHROPIC_API_KEY:     z.string().min(20, { message: 'Required — get one at console.anthropic.com' }),
 })
 
 const parsed = schema.safeParse(process.env)
