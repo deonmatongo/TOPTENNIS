@@ -98,7 +98,8 @@ const EnhancedRegistrationForm: React.FC<EnhancedRegistrationFormProps> = ({
     let processedValue = value;
     
     if (name === 'phone') {
-      processedValue = formatPhoneNumber(value);
+      // Allow E.164 ("+263771234567") or raw digits — don't apply US formatting
+      processedValue = value.startsWith('+') ? value : value.replace(/[^\d+]/g, '');
     }
     
     setFormData(prev => ({
@@ -238,7 +239,7 @@ const EnhancedRegistrationForm: React.FC<EnhancedRegistrationFormProps> = ({
           className={`h-12 border-gray-300 focus:border-primary focus:ring-primary ${
             validationErrors.phone ? 'border-red-500' : ''
           }`}
-          placeholder="(555) 123-4567"
+          placeholder="+263771234567 or 0771234567"
           disabled={isLoading}
           aria-invalid={!!validationErrors.phone}
         />

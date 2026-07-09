@@ -1,72 +1,63 @@
 /**
- * Phone validation utilities for US phone numbers
+ * Phone validation utilities — international (E.164 preferred).
+ * Accepts full E.164 (+263771234567) or local digits (0771234567).
  */
 
-export const formatPhoneNumber = (value: string): string => {
-  // Remove all non-digits
-  const phoneNumber = value.replace(/\D/g, '');
-  
-  // Format as (XXX) XXX-XXXX
-  if (phoneNumber.length >= 10) {
-    return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6, 10)}`;
-  } else if (phoneNumber.length >= 6) {
-    return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6)}`;
-  } else if (phoneNumber.length >= 3) {
-    return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3)}`;
-  } else {
-    return phoneNumber;
-  }
-};
+// Known dial codes ordered longest-first so +1 doesn't match before +263
+const DIAL_CODES = [
+  { dial: '+263', label: 'Zimbabwe'  },
+  { dial: '+48',  label: 'Poland'    },
+  { dial: '+27',  label: 'S. Africa' },
+  { dial: '+44',  label: 'UK'        },
+  { dial: '+1',   label: 'USA'       },
+] as const;
 
-export const validateUSPhoneNumber = (phoneNumber: string): boolean => {
-  // Remove all non-digits
-  const digits = phoneNumber.replace(/\D/g, '');
-  
-  // US phone numbers should have exactly 10 digits
-  if (digits.length !== 10) {
-    return false;
-  }
-  
-  // First digit should not be 0 or 1
-  if (digits[0] === '0' || digits[0] === '1') {
-    return false;
-  }
-  
-  // Area code (first 3 digits) should not start with 0 or 1
-  if (digits[1] === '0' || digits[1] === '1') {
-    return false;
-  }
-  
-  // Exchange code (digits 4-6) should not start with 0 or 1
-  if (digits[3] === '0' || digits[3] === '1') {
-    return false;
-  }
-  
-  return true;
+export type DialCode = typeof DIAL_CODES[number]['dial'];
+
+/**
+ * Lightly format while the user types — strips non-numeric chars except
+ * a leading '+'. Preserves E.164 input like "+263771234567" untouched.
+ */
+export const formatPhoneNumber = (value: string): string => {
+  // If it looks like E.164, don't reformat it
+  if (/^\+\d+/.test(value)) return value;
+  // Otherwise keep only digits
+  return value.replace(/\D/g, '');
 };
 
 export const getPhoneValidationError = (phoneNumber: string): string | null => {
-  if (!phoneNumber.trim()) {
-    return 'Phone number is required';
-  }
-  
+  if (!phoneNumber.trim()) return 'Phone number is required';
+
   const digits = phoneNumber.replace(/\D/g, '');
-  
-  if (digits.length === 0) {
-    return 'Please enter a valid phone number';
+
+  if (digits.length < 7)  return 'Phone number is too short';
+  if (digits.length > 15) return 'Phone number is too long';
+
+  return null;
+};
+
+/**
+ * Try to parse a phone string from the registration form into the
+ * { dialCode, local } shape expected by WhatsAppOTPVerification.
+ * Returns null when no known prefix can be detected.
+ */
+export const parsePhoneForPrefill = (
+  phone: string,
+): { dialCode: DialCode; local: string } | null => {
+  const cleaned = phone.trim();
+
+  // Match a known E.164 prefix
+  for (const { dial } of DIAL_CODES) {
+    if (cleaned.startsWith(dial)) {
+      return { dialCode: dial as DialCode, local: cleaned.slice(dial.length) };
+    }
   }
-  
-  if (digits.length < 10) {
-    return 'Please enter a valid 10-digit phone number';
+
+  // No prefix found — caller's digits only, default to Zimbabwe
+  const digits = cleaned.replace(/\D/g, '');
+  if (digits.length >= 7) {
+    return { dialCode: '+263', local: digits };
   }
-  
-  if (digits.length > 10) {
-    return 'Please enter a valid 10-digit phone number';
-  }
-  
-  if (!validateUSPhoneNumber(phoneNumber)) {
-    return 'Please enter a valid US phone number';
-  }
-  
+
   return null;
 };
