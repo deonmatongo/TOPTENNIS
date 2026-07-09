@@ -22,7 +22,6 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
-import Dashboard from "./pages/Dashboard";
 import NewDashboard from "./pages/NewDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProfileSetup from "./pages/ProfileSetup";
@@ -123,11 +122,6 @@ const App: React.FC = () => {
                   <Route path="/dashboard" element={
                     <ProtectedRoute>
                       <NewDashboard />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/dashboard-old" element={
-                    <ProtectedRoute>
-                      <Dashboard />
                     </ProtectedRoute>
                   } />
                   <Route path="/admin" element={
