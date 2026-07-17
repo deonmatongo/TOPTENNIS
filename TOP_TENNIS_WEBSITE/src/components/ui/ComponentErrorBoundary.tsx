@@ -90,7 +90,7 @@ export const ComponentErrorBoundary: React.FC<ComponentErrorBoundaryProps> = ({
             <p className="text-xs text-red-600 dark:text-red-300 mt-1">
               {error?.message || 'Something went wrong'}
             </p>
-            {process.env.NODE_ENV === 'development' && (
+            {import.meta.env.DEV && (
               <details className="mt-2 text-xs">
                 <summary className="cursor-pointer text-red-700">Error Details</summary>
                 <pre className="mt-1 whitespace-pre-wrap text-red-600">

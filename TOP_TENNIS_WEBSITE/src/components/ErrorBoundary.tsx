@@ -69,7 +69,7 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
   render() {
     if (this.state.hasError) {
       const { error, errorInfo } = this.state;
-      const isDevelopment = process.env.NODE_ENV === 'development';
+      const isDevelopment = import.meta.env.DEV;
       
       return (
         <div className="min-h-screen bg-background flex items-center justify-center p-6">

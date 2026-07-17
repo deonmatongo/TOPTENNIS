@@ -1,0 +1,12 @@
+{
+  "installCommand": "cd TOP_TENNIS_WEBSITE && npm install",
+  "buildCommand": "cd TOP_TENNIS_WEBSITE && npm run build",
+  "outputDirectory": "TOP_TENNIS_WEBSITE/dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
