@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Top Tennis Support · Agent Console</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --bg:#F4F3F7; --panel:#FFFFFF; --panel2:#FAFAFB; --raise:#FFFFFF;
+    --ink:#16161D; --ink2:#55555F; --muted:#9A9AB0;
+    --border:#EAEAF1; --borderStrong:#DEDEE8;
+    --accent:#FF5500; --accentDark:#C23800; --accentSoft:#FFEEE3;
+    --red:#e5484d; --redSoft:#FDE7E7; --green:#12a150; --greenSoft:#E1F5E8;
+    --amber:#d98207; --amberSoft:#FBEFD6; --blue:#3b74e5; --blueSoft:#E4ECFC;
+    --shadow:0 1px 2px rgba(20,20,40,.05), 0 8px 24px rgba(20,20,40,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0C0C13; --panel:#15151F; --panel2:#12121B; --raise:#1B1B27;
+      --ink:#F1F1F6; --ink2:#A6A6B6; --muted:#6E6E84;
+      --border:#242432; --borderStrong:#2E2E3E;
+      --accentSoft:#3A1E10;
+      --redSoft:#3A1B1C; --greenSoft:#12291C; --amberSoft:#332409; --blueSoft:#182238;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"]{ --bg:#F4F3F7; --panel:#FFFFFF; --panel2:#FAFAFB; --raise:#FFFFFF; --ink:#16161D; --ink2:#55555F; --muted:#9A9AB0; --border:#EAEAF1; --borderStrong:#DEDEE8; --accentSoft:#FFEEE3; --redSoft:#FDE7E7; --greenSoft:#E1F5E8; --amberSoft:#FBEFD6; --blueSoft:#E4ECFC; }
+  :root[data-theme="dark"]{ --bg:#0C0C13; --panel:#15151F; --panel2:#12121B; --raise:#1B1B27; --ink:#F1F1F6; --ink2:#A6A6B6; --muted:#6E6E84; --border:#242432; --borderStrong:#2E2E3E; --accentSoft:#3A1E10; --redSoft:#3A1B1C; --greenSoft:#12291C; --amberSoft:#332409; --blueSoft:#182238; }
+
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"SF Pro Rounded",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-size:14px; line-height:1.45;
+  }
+  .mono{ font-family:ui-monospace,"SF Mono",Menlo,monospace; font-variant-numeric:tabular-nums; }
+
+  /* ── top bar ── */
+  .top{ display:flex; align-items:center; gap:16px; padding:12px 22px; background:var(--panel); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:20; }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand .mark{ width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg,#FF7A3C,var(--accent)); display:flex; align-items:center; justify-content:center; font-size:18px; box-shadow:0 4px 12px rgba(255,85,0,.3); }
+  .brand b{ font-weight:800; letter-spacing:-.2px; }
+  .brand small{ display:block; color:var(--muted); font-size:11px; font-weight:600; margin-top:-2px; }
+  .top .spacer{ flex:1; }
+  .topsearch{ display:flex; align-items:center; gap:8px; background:var(--panel2); border:1px solid var(--border); border-radius:999px; padding:8px 14px; color:var(--muted); width:260px; max-width:34vw; }
+  .topsearch input{ border:0; background:transparent; outline:none; color:var(--ink); font:inherit; width:100%; }
+  .agent{ display:flex; align-items:center; gap:9px; }
+  .agent .who{ text-align:right; line-height:1.15; }
+  .agent .who b{ font-size:13px; }
+  .agent .who small{ color:var(--muted); font-size:11px; }
+  .agent .pic{ width:34px; height:34px; border-radius:50%; background:#2b2b3a; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; }
+
+  /* ── kpis ── */
+  .kpis{ display:grid; grid-template-columns:repeat(5,1fr); gap:14px; padding:20px 22px 6px; }
+  .kpi{ background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:15px 16px; box-shadow:var(--shadow); }
+  .kpi .lab{ font-size:11px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:6px; }
+  .kpi .val{ font-size:27px; font-weight:800; margin-top:8px; letter-spacing:-.5px; }
+  .kpi .sub{ font-size:12px; color:var(--ink2); margin-top:2px; }
+  .kpi .val.warn{ color:var(--amber); } .kpi .val.bad{ color:var(--red); } .kpi .val.good{ color:var(--green); }
+  .spark{ height:3px; border-radius:2px; margin-top:10px; background:var(--border); overflow:hidden; }
+  .spark i{ display:block; height:100%; border-radius:2px; }
+
+  /* ── main split ── */
+  .main{ display:grid; grid-template-columns:380px 1fr; gap:16px; padding:14px 22px 24px; align-items:start; }
+  .col{ background:var(--panel); border:1px solid var(--border); border-radius:18px; box-shadow:var(--shadow); overflow:hidden; }
+
+  .qhead{ display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--border); }
+  .qhead b{ font-size:14px; }
+  .qhead .count{ background:var(--accentSoft); color:var(--accent); font-weight:800; font-size:12px; padding:2px 9px; border-radius:999px; }
+  .filters{ margin-left:auto; display:flex; gap:6px; }
+  .chip{ font-size:12px; font-weight:700; padding:5px 11px; border-radius:999px; border:1px solid var(--border); color:var(--ink2); background:var(--panel2); cursor:pointer; }
+  .chip.on{ background:var(--ink); color:var(--panel); border-color:var(--ink); }
+
+  .queue{ max-height:calc(100vh - 300px); overflow-y:auto; }
+  .qitem{ display:flex; gap:12px; padding:14px 16px; border-bottom:1px solid var(--border); cursor:pointer; position:relative; }
+  .qitem:hover{ background:var(--panel2); }
+  .qitem.active{ background:var(--accentSoft); }
+  .qitem.active::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); }
+  .qav{ width:42px; height:42px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; font-size:14px; }
+  .qbody{ flex:1; min-width:0; }
+  .qtop{ display:flex; align-items:baseline; gap:8px; }
+  .qname{ font-weight:700; font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .qtime{ margin-left:auto; font-size:11px; color:var(--muted); flex-shrink:0; }
+  .qphone{ font-size:11px; color:var(--muted); }
+  .qmsg{ font-size:12.5px; color:var(--ink2); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .qtags{ display:flex; gap:6px; margin-top:7px; flex-wrap:wrap; }
+
+  .tag{ font-size:10.5px; font-weight:800; letter-spacing:.2px; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:4px; }
+  .t-esc{ background:var(--redSoft); color:var(--red); }
+  .t-ai{ background:var(--greenSoft); color:var(--green); }
+  .t-wait{ background:var(--amberSoft); color:var(--amber); }
+  .t-open{ background:var(--blueSoft); color:var(--blue); }
+  .t-closed{ background:var(--panel2); color:var(--muted); border:1px solid var(--border); }
+  .t-cat{ background:var(--panel2); color:var(--ink2); border:1px solid var(--border); }
+  .dot{ width:7px; height:7px; border-radius:50%; }
+
+  /* ── detail ── */
+  .detail{ display:flex; flex-direction:column; min-height:calc(100vh - 300px); }
+  .dhead{ display:flex; align-items:center; gap:12px; padding:16px 18px; border-bottom:1px solid var(--border); }
+  .dhead .qav{ width:44px; height:44px; }
+  .dhead h2{ font-size:16px; font-weight:800; margin:0; }
+  .dhead .sub{ font-size:12px; color:var(--muted); margin-top:1px; }
+  .dhead .acts{ margin-left:auto; display:flex; gap:8px; }
+  .btn{ font:inherit; font-weight:700; font-size:12.5px; padding:8px 13px; border-radius:10px; border:1px solid var(--border); background:var(--panel2); color:var(--ink); cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+  .btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn.ghost-red{ color:var(--red); border-color:var(--redSoft); background:var(--redSoft); }
+
+  .dbody{ display:grid; grid-template-columns:1fr 234px; gap:0; flex:1; min-height:0; }
+  .thread{ padding:18px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; background:var(--panel2); }
+  .daystamp{ align-self:center; font-size:11px; color:var(--muted); background:var(--panel); border:1px solid var(--border); padding:3px 10px; border-radius:999px; }
+  .bubble{ max-width:76%; padding:10px 13px; border-radius:16px; font-size:13.5px; line-height:1.5; box-shadow:var(--shadow); }
+  .b-in{ align-self:flex-start; background:var(--panel); border:1px solid var(--border); border-bottom-left-radius:5px; }
+  .b-ai{ align-self:flex-end; background:linear-gradient(135deg,#FF7A3C,var(--accent)); color:#fff; border-bottom-right-radius:5px; }
+  .b-agent{ align-self:flex-end; background:var(--ink); color:var(--panel); border-bottom-right-radius:5px; }
+  .bmeta{ font-size:10.5px; margin-top:5px; opacity:.7; display:flex; align-items:center; gap:5px; }
+  .b-in .bmeta{ color:var(--muted); }
+  .escnote{ align-self:center; max-width:88%; background:var(--redSoft); color:var(--red); border:1px dashed var(--red); border-radius:12px; padding:9px 13px; font-size:12.5px; font-weight:600; display:flex; gap:8px; align-items:flex-start; }
+
+  .triage{ border-left:1px solid var(--border); padding:16px; overflow-y:auto; }
+  .triage h4{ margin:0 0 4px; font-size:11px; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); }
+  .trow{ margin-bottom:16px; }
+  .kv{ font-size:13.5px; font-weight:700; margin-top:3px; }
+  .meter{ height:7px; border-radius:4px; background:var(--border); overflow:hidden; margin-top:7px; }
+  .meter i{ display:block; height:100%; border-radius:4px; }
+  .conf-note{ font-size:11px; color:var(--muted); margin-top:5px; }
+  .sla{ display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:700; }
+
+  .composer{ border-top:1px solid var(--border); padding:12px 14px; display:flex; gap:10px; align-items:flex-end; grid-column:1 / -1; background:var(--panel); }
+  .composer textarea{ flex:1; resize:none; border:1px solid var(--border); background:var(--panel2); border-radius:12px; padding:10px 12px; font:inherit; color:var(--ink); min-height:42px; max-height:120px; outline:none; }
+  .composer textarea:focus{ border-color:var(--accent); }
+
+  a{ color:inherit; }
+  @media (max-width:1080px){ .kpis{ grid-template-columns:repeat(2,1fr); } .main{ grid-template-columns:1fr; } .dbody{ grid-template-columns:1fr; } .triage{ border-left:0; border-top:1px solid var(--border); } }
+</style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <div class="mark">🎾</div>
+      <div><b>Top Tennis Support</b><small>Agent Console</small></div>
+    </div>
+    <div class="spacer"></div>
+    <label class="topsearch">🔎 <input placeholder="Search players, phone, keyword…" /></label>
+    <div class="agent">
+      <div class="who"><b>Nyasha (You)</b><small>2 active chats</small></div>
+      <div class="pic">NM</div>
+    </div>
+  </header>
+
+  <section class="kpis">
+    <div class="kpi"><div class="lab"><span class="dot" style="background:var(--blue)"></span>Open sessions</div><div class="val">14</div><div class="sub">within 24h window</div><div class="spark"><i style="width:64%;background:var(--blue)"></i></div></div>
+    <div class="kpi"><div class="lab"><span class="dot" style="background:var(--red)"></span>Awaiting agent</div><div class="val bad">3</div><div class="sub">escalated by AI</div><div class="spark"><i style="width:30%;background:var(--red)"></i></div></div>
+    <div class="kpi"><div class="lab"><span class="dot" style="background:var(--green)"></span>AI-resolved today</div><div class="val good">128</div><div class="sub">91% deflection rate</div><div class="spark"><i style="width:91%;background:var(--green)"></i></div></div>
+    <div class="kpi"><div class="lab"><span class="dot" style="background:var(--amber)"></span>Avg first reply</div><div class="val">1.2s</div><div class="sub">AI · median</div><div class="spark"><i style="width:22%;background:var(--amber)"></i></div></div>
+    <div class="kpi"><div class="lab"><span class="dot" style="background:var(--accent)"></span>CSAT</div><div class="val">4.7<span style="font-size:15px;color:var(--muted)">/5</span></div><div class="sub">last 7 days</div><div class="spark"><i style="width:94%;background:var(--accent)"></i></div></div>
+  </section>
+
+  <main class="main">
+    <!-- QUEUE -->
+    <div class="col">
+      <div class="qhead">
+        <b>Inbox</b><span class="count" id="qcount">6</span>
+        <div class="filters">
+          <span class="chip on">All</span>
+          <span class="chip">Needs agent</span>
+        </div>
+      </div>
+      <div class="queue" id="queue"></div>
+    </div>
+
+    <!-- DETAIL -->
+    <div class="col detail" id="detail"></div>
+  </main>
+
+<script>
+  const CONV = [
+    {
+      id:'c1', name:'Tendai Moyo', initials:'TM', color:'#e5484d',
+      phone:'+263 77 214 8890', flag:'🇿🇼', time:'2m',
+      status:'escalated', category:'Match dispute',
+      intent:'match_dispute', confidence:0.30, session:true,
+      preview:'My opponent never showed up for our league match…',
+      thread:[
+        {who:'in', t:'10:02', text:'Hi, my league opponent never showed up for our match yesterday. Do I get the win or does it get rescheduled?'},
+        {who:'ai', t:'10:02', text:'Sorry to hear that! No-shows are reviewed case by case — a live agent will confirm how your result is recorded.'},
+        {who:'esc', text:'ESCALATE: Player reporting a league no-show, needs match result adjudicated.'},
+      ],
+      sla:'Waiting 2m', slaState:'bad'
+    },
+    {
+      id:'c2', name:'Kasia Nowak', initials:'KN', color:'#12a150',
+      phone:'+48 512 664 021', flag:'🇵🇱', time:'6m',
+      status:'ai', category:'Registration',
+      intent:'league_registration', confidence:0.92, session:true,
+      preview:'How do I sign up for the autumn doubles league?',
+      thread:[
+        {who:'in', t:'09:56', text:'Cześć! How do I sign up for the autumn doubles league?'},
+        {who:'ai', t:'09:56', text:'Open the app → Leagues → “Join a League”, pick Autumn Doubles and tap Register. Registration closes Sept 20. 🎾'},
+        {who:'in', t:'09:57', text:'Perfect, thank you!'},
+        {who:'ai', t:'09:57', text:'Anytime — see you on court!'},
+      ],
+      sla:'AI resolved', slaState:'good'
+    },
+    {
+      id:'c3', name:'Farai Chikeya', initials:'FC', color:'#d98207',
+      phone:'+263 71 553 1002', flag:'🇿🇼', time:'11m',
+      status:'wait', category:'Billing',
+      intent:'billing_query', confidence:0.35, session:true,
+      preview:'I think I was charged twice for my subscription.',
+      thread:[
+        {who:'in', t:'09:51', text:'I was charged twice this month for my subscription. Can you refund one?'},
+        {who:'ai', t:'09:51', text:'I can’t process refunds myself, but I’m passing this to a billing agent who can sort it out for you.'},
+        {who:'esc', text:'ESCALATE: Duplicate subscription charge — needs billing review & possible refund.'},
+      ],
+      sla:'Waiting 11m', slaState:'bad'
+    },
+    {
+      id:'c4', name:'Piotr Zieliński', initials:'PZ', color:'#3b74e5',
+      phone:'+48 601 209 774', flag:'🇵🇱', time:'24m',
+      status:'ai', category:'Technical',
+      intent:'app_issue', confidence:0.78, session:true,
+      preview:'The app crashes when I open the standings tab.',
+      thread:[
+        {who:'in', t:'09:38', text:'The app crashes every time I open the standings tab.'},
+        {who:'ai', t:'09:38', text:'Thanks for flagging! Try updating to the latest version from the store — v1.0.2 fixed a standings crash. Let me know if it persists.'},
+        {who:'in', t:'09:40', text:'Updated and it works now 👍'},
+      ],
+      sla:'AI resolved', slaState:'good'
+    },
+    {
+      id:'c5', name:'Rutendo Sibanda', initials:'RS', color:'#8b5cf6',
+      phone:'+263 78 900 4417', flag:'🇿🇼', time:'38m',
+      status:'ai', category:'Scheduling',
+      intent:'match_reschedule', confidence:0.90, session:true,
+      preview:'Can I move my Thursday match to Saturday?',
+      thread:[
+        {who:'in', t:'09:24', text:'Can I reschedule my Thursday match to Saturday morning?'},
+        {who:'ai', t:'09:24', text:'Yes — in the app go to Schedule → your match → “Propose new time”, pick Saturday and your opponent gets a confirmation request.'},
+      ],
+      sla:'AI resolved', slaState:'good'
+    },
+    {
+      id:'c6', name:'Agnieszka Wójcik', initials:'AW', color:'#ec4899',
+      phone:'+48 693 118 205', flag:'🇵🇱', time:'52m',
+      status:'wait', category:'Escalation request',
+      intent:'escalation_request', confidence:1, session:false,
+      preview:'agent',
+      thread:[
+        {who:'in', t:'09:10', text:'agent'},
+        {who:'ai', t:'09:10', text:'Connecting you to a live agent now. 🎾 Someone will respond within 5 minutes.'},
+      ],
+      sla:'Session closed', slaState:'closed'
+    },
+  ];
+
+  const STATUS = {
+    escalated:{ cls:'t-esc',  label:'Escalated' },
+    wait:     { cls:'t-wait', label:'Awaiting agent' },
+    ai:       { cls:'t-ai',   label:'AI resolved' },
+  };
+
+  function statusTag(s){ const m = STATUS[s]; return `<span class="tag ${m.cls}">${m.label}</span>`; }
+
+  function renderQueue(){
+    const q = document.getElementById('queue');
+    q.innerHTML = CONV.map((c,i)=>`
+      <div class="qitem ${i===0?'active':''}" data-id="${c.id}">
+        <div class="qav" style="background:${c.color}">${c.initials}</div>
+        <div class="qbody">
+          <div class="qtop">
+            <span class="qname">${c.flag} ${c.name}</span>
+            <span class="qtime">${c.time}</span>
+          </div>
+          <div class="qphone mono">${c.phone}</div>
+          <div class="qmsg">${c.preview}</div>
+          <div class="qtags">
+            ${statusTag(c.status)}
+            <span class="tag t-cat">${c.category}</span>
+            ${c.session?'<span class="tag t-open">● session open</span>':'<span class="tag t-closed">session closed</span>'}
+          </div>
+        </div>
+      </div>`).join('');
+    q.querySelectorAll('.qitem').forEach(el=>el.addEventListener('click',()=>{
+      q.querySelectorAll('.qitem').forEach(x=>x.classList.remove('active'));
+      el.classList.add('active');
+      renderDetail(el.dataset.id);
+    }));
+    document.getElementById('qcount').textContent = CONV.length;
+  }
+
+  function bubble(m){
+    if(m.who==='esc') return `<div class="escnote">⚠️ <span>${m.text}</span></div>`;
+    const cls = m.who==='in'?'b-in':(m.who==='agent'?'b-agent':'b-ai');
+    const who = m.who==='in'?'Player':(m.who==='agent'?'You · agent':'AI · Claude Haiku');
+    const meta = m.t?`<div class="bmeta">${who} · ${m.t}</div>`:'';
+    return `<div class="bubble ${cls}">${m.text}${meta}</div>`;
+  }
+
+  function confColor(v){ return v>=0.7?'var(--green)':v>=0.4?'var(--amber)':'var(--red)'; }
+
+  function renderDetail(id){
+    const c = CONV.find(x=>x.id===id) || CONV[0];
+    const slaCls = { good:'t-ai', bad:'t-esc', closed:'t-closed' }[c.slaState] || 't-wait';
+    document.getElementById('detail').innerHTML = `
+      <div class="dhead">
+        <div class="qav" style="background:${c.color}">${c.initials}</div>
+        <div>
+          <h2>${c.flag} ${c.name}</h2>
+          <div class="sub mono">${c.phone} · WhatsApp</div>
+        </div>
+        <div class="acts">
+          <button class="btn">Assign</button>
+          ${c.status==='ai'?'<button class="btn">Reopen</button>':'<button class="btn primary">✔ Resolve</button>'}
+          ${c.status==='ai'?'':'<button class="btn ghost-red">Escalate</button>'}
+        </div>
+      </div>
+      <div class="dbody">
+        <div class="thread">
+          <div class="daystamp">Today</div>
+          ${c.thread.map(bubble).join('')}
+        </div>
+        <aside class="triage">
+          <div class="trow"><h4>Status</h4><span class="tag ${slaCls}" style="margin-top:4px">${c.sla}</span></div>
+          <div class="trow"><h4>Detected intent</h4><div class="kv">${c.intent.replace(/_/g,' ')}</div></div>
+          <div class="trow">
+            <h4>AI confidence</h4>
+            <div class="kv">${Math.round(c.confidence*100)}%</div>
+            <div class="meter"><i style="width:${c.confidence*100}%;background:${confColor(c.confidence)}"></i></div>
+            <div class="conf-note">${c.confidence<0.4?'Low — routed to a human agent':c.confidence<0.7?'Medium — monitor':'High — auto-handled'}</div>
+          </div>
+          <div class="trow"><h4>Category</h4><div class="kv">${c.category}</div></div>
+          <div class="trow"><h4>Session window</h4><div class="sla">${c.session?'<span class="dot" style="background:var(--green)"></span> Open (free-form replies)':'<span class="dot" style="background:var(--muted)"></span> Closed (template only)'}</div></div>
+          <div class="trow"><h4>Channel</h4><div class="kv">WhatsApp · Twilio</div></div>
+        </aside>
+        <div class="composer">
+          <textarea placeholder="${c.session?'Reply to '+c.name.split(' ')[0]+'…':'Session closed — an approved template is required to reopen.'}"></textarea>
+          <button class="btn primary">Send ▸</button>
+        </div>
+      </div>`;
+  }
+
+  renderQueue();
+  renderDetail('c1');
+</script>
+</body>
+</html>
