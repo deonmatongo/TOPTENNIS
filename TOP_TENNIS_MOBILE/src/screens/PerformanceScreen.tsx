@@ -327,7 +327,7 @@ const s = StyleSheet.create({
   safe:        { flex: 1, backgroundColor: Colors.background },
   gradHeader:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md, gap: Spacing.md },
   gradBackBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  gradTitle:   { fontSize: FontSize.xxxl, fontFamily: Font.black, color: '#fff', letterSpacing: -1 },
+  gradTitle:   { fontSize: FontSize.xxl, fontFamily: Font.black, color: '#fff', letterSpacing: -1 },
   gradSub:     { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
   scroll: { padding: Spacing.lg, gap: Spacing.lg },
 

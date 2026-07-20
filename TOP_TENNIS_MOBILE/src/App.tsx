@@ -53,6 +53,12 @@ import { ManageBookingsScreen } from '@/screens/ManageBookingsScreen';
 import { CompetitionScreen } from '@/screens/CompetitionScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { ResetPasswordScreen } from '@/screens/ResetPasswordScreen';
+import { AccountSection } from '@/screens/settings/AccountSection';
+import { PrivacySection } from '@/screens/settings/PrivacySection';
+import { NotificationsSection } from '@/screens/settings/NotificationsSection';
+import { MatchPreferencesSection } from '@/screens/settings/MatchPreferencesSection';
+import { AppPreferencesSection } from '@/screens/settings/AppPreferencesSection';
+import { SupportSection } from '@/screens/settings/SupportSection';
 
 import { Colors, Font } from '@/theme/colors';
 import { NetworkBanner } from '@/components/ui/NetworkBanner';
@@ -122,6 +128,12 @@ function SettingsNavigator() {
     <SettingsStack.Navigator screenOptions={{ headerShown: false }}>
       <SettingsStack.Screen name="SettingsRoot" component={SettingsScreen} />
       <SettingsStack.Screen name="Profile" component={ProfileScreen} options={{ animation: 'slide_from_right' }} />
+      <SettingsStack.Screen name="AccountSection" component={AccountSection} options={{ animation: 'slide_from_right' }} />
+      <SettingsStack.Screen name="PrivacySection" component={PrivacySection} options={{ animation: 'slide_from_right' }} />
+      <SettingsStack.Screen name="NotificationsSection" component={NotificationsSection} options={{ animation: 'slide_from_right' }} />
+      <SettingsStack.Screen name="MatchPreferencesSection" component={MatchPreferencesSection} options={{ animation: 'slide_from_right' }} />
+      <SettingsStack.Screen name="AppPreferencesSection" component={AppPreferencesSection} options={{ animation: 'slide_from_right' }} />
+      <SettingsStack.Screen name="SupportSection" component={SupportSection} options={{ animation: 'slide_from_right' }} />
     </SettingsStack.Navigator>
   );
 }
@@ -167,27 +179,28 @@ function AppNavigator() {
     setIsLocked(false);
   };
 
-  if (loading || introSeen === null || (user && playerLoading)) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
-  }
+  // DEMO BYPASS — skip auth/intro/onboarding to preview UI
+  // if (loading || introSeen === null || (user && playerLoading)) {
+  //   return (
+  //     <View style={styles.loading}>
+  //       <ActivityIndicator size="large" color={Colors.primary} />
+  //     </View>
+  //   );
+  // }
 
   return (
     <>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!introSeen ? (
+        {false ? (
           <Stack.Screen name="AppIntro">
             {() => <AppIntroScreen onDone={markIntroDone} />}
           </Stack.Screen>
-        ) : !user ? (
+        ) : false ? (
           <>
             <Stack.Screen name="Auth" component={AuthScreen} />
             <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
           </>
-        ) : !player ? (
+        ) : false ? (
           <Stack.Screen name="Onboarding">
             {() => <OnboardingScreen onComplete={refetch} />}
           </Stack.Screen>

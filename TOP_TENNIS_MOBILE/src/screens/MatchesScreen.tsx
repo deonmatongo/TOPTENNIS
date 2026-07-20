@@ -428,7 +428,7 @@ const s = StyleSheet.create({
   // ── Header ────────────────────────────────────────────────────────────────
   header: { paddingBottom: Spacing.sm },
   headerInner: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xs },
-  headerTitle: { fontSize: FontSize.xxxl, fontFamily: Font.black, color: '#fff', letterSpacing: -1 },
+  headerTitle: { fontSize: FontSize.xxl, fontFamily: Font.black, color: '#fff', letterSpacing: -1 },
   headerSub: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.65)', marginTop: 2, fontFamily: Font.medium },
 
   // ── Tabs ─────────────────────────────────────────────────────────────────

@@ -345,7 +345,7 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
       <LinearGradient
         colors={[Palette.dark900, Palette.dark700]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={[s.header, { paddingTop: insets.top + Spacing.md }]}
+        style={[s.header, { paddingTop: insets.top + Spacing.lg }]}
       >
         {selectMode ? (
           <TouchableOpacity style={s.backBtn} onPress={exitSelectMode} activeOpacity={0.7}>
@@ -353,7 +353,7 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
           </TouchableOpacity>
         ) : (
           <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color="#fff" />
+            <Ionicons name="chevron-back" size={24} color="#fff" />
           </TouchableOpacity>
         )}
         <View style={{ flex: 1 }}>
@@ -483,21 +483,21 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
 
-  // Header
+  // Header — matches the app-wide gradient header (Performance, Manage Bookings, section pages)
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
-    gap: Spacing.sm,
+    paddingBottom: Spacing.lg,
+    gap: Spacing.md,
   },
   backBtn: {
     width: 38, height: 38, borderRadius: 19,
     backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center', justifyContent: 'center',
   },
-  headerTitle: { fontSize: FontSize.xxxl, fontFamily: Font.black, color: '#fff', letterSpacing: -1 },
-  headerSub:   { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)', fontFamily: Font.semibold, marginTop: 1 },
+  headerTitle: { fontSize: FontSize.xxl, fontFamily: Font.black, color: '#fff', letterSpacing: -1 },
+  headerSub:   { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   markAllBtn:  {
     paddingHorizontal: Spacing.md, paddingVertical: 7,
@@ -518,6 +518,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
     marginHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
     marginBottom: Spacing.sm,
     backgroundColor: Colors.surface,
     borderRadius: Radius.full,

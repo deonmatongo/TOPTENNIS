@@ -1590,7 +1590,7 @@ const ls = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   header: { paddingBottom: 8 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: 8 },
-  title: { fontSize: 28, fontFamily: Font.black, color: '#fff' },
+  title: { fontSize: FontSize.xxl, fontFamily: Font.black, color: '#fff', letterSpacing: -1 },
   headerSub: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
   headerActions: { flexDirection: 'row', gap: Spacing.sm },
   hBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },

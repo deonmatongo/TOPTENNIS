@@ -882,7 +882,7 @@ const s = StyleSheet.create({
   // Header
   header:       { paddingBottom: Spacing.sm },
   headerRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingBottom: 6 },
-  headerTitle:  { flex: 1, fontSize: FontSize.xxxl, fontFamily: Font.black, color: '#fff', letterSpacing: -1 },
+  headerTitle:  { flex: 1, fontSize: FontSize.xxl, fontFamily: Font.black, color: '#fff', letterSpacing: -1 },
   headerActions:{ flexDirection: 'row', gap: Spacing.sm },
   hBtn:         { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
 

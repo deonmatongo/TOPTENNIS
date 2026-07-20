@@ -376,7 +376,7 @@ const s = StyleSheet.create({
   },
   headerTitle: {
     flex: 1,
-    fontSize: FontSize.xxxl,
+    fontSize: FontSize.xxl,
     fontFamily: Font.black,
     color: '#fff',
     letterSpacing: -1,
