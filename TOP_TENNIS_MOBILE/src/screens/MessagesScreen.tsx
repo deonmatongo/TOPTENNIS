@@ -1090,6 +1090,8 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
             keyExtractor={i => i.key}
             contentContainerStyle={th.listContent}
             showsVerticalScrollIndicator={false}
+            keyboardDismissMode="interactive"
+            keyboardShouldPersistTaps="handled"
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
             renderItem={({ item, index }) => {
               if (item.type === 'divider') {

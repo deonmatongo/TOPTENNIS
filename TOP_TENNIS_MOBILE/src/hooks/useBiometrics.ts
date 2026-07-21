@@ -26,11 +26,7 @@ export const useBiometrics = () => {
       const enrolled = await LA.isEnrolledAsync();
       if (!compatible || !enrolled) return;
 
-      setAvailable(true);
-
       const types = await LA.supportedAuthenticationTypesAsync();
-      // On iOS, default to Face ID — covers Face ID devices and ensures
-      // the correct prompt message is shown even on Touch ID devices.
       if (Platform.OS === 'ios') {
         setBiometricType('faceid');
       } else if (types.includes(LA.AuthenticationType.FACIAL_RECOGNITION)) {
@@ -40,6 +36,8 @@ export const useBiometrics = () => {
       } else {
         setBiometricType('fingerprint');
       }
+
+      setAvailable(true);
 
       const stored = await SecureStore.getItemAsync(CREDS_KEY);
       setCredentialsStored(!!stored);

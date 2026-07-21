@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import {
   StyleSheet, RefreshControl, TextInput, ActivityIndicator, TouchableOpacity, View, ScrollView,
   Modal, KeyboardAvoidingView, Platform,
@@ -58,6 +58,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const { query: scheduleQuery, results: scheduleResults, searching: scheduleSearching, search: scheduleSearch, clear: clearScheduleSearch } = usePlayerSearch()
   const [refreshing, setRefreshing] = useState(false)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const scheduleSearchRef = useRef<TextInput>(null)
 
   const onRefresh = async () => {
     setRefreshing(true)
@@ -574,6 +575,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         animationType="slide"
         transparent
         onRequestClose={() => { setShowScheduleModal(false); clearScheduleSearch(); }}
+        onShow={() => setTimeout(() => scheduleSearchRef.current?.focus(), 150)}
       >
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -620,12 +622,12 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
             >
               <Ionicons name="search-outline" size={18} color={Colors.textMuted} />
               <TextInput
+                ref={scheduleSearchRef}
                 style={s.modalSearchInput}
                 placeholder="Search players by name, city..."
                 placeholderTextColor={Colors.textMuted}
                 value={scheduleQuery}
                 onChangeText={scheduleSearch}
-                autoFocus
                 returnKeyType="search"
                 autoCorrect={false}
                 autoCapitalize="none"

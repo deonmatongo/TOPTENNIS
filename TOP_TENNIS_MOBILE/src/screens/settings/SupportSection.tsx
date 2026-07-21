@@ -23,9 +23,10 @@ const openURL = (url: string) =>
 const openDeviceSettings = () =>
   Linking.openSettings().catch(() => Alert.alert('Error', 'Could not open device settings.'));
 
-// Lazily require optional native modules so Expo Go / tests stay safe.
-function optional<T>(name: string): T | null {
-  try { return require(name) as T; } catch { return null; }
+// Lazily load optional native modules so Expo Go / tests stay safe. The loader
+// must use a *static* require literal — Metro can't bundle a dynamic require(var).
+function optional<T>(loader: () => T): T | null {
+  try { return loader(); } catch { return null; }
 }
 
 export const SupportSection: React.FC<{ navigation: any }> = ({ navigation }) => {
@@ -34,14 +35,6 @@ export const SupportSection: React.FC<{ navigation: any }> = ({ navigation }) =>
 
   // ── Rate the app ──────────────────────────────────────────────────────────
   const handleRate = async () => {
-    const StoreReview = optional<any>('expo-store-review');
-    try {
-      if (StoreReview && (await StoreReview.hasAction?.())) {
-        await StoreReview.requestReview();
-        return;
-      }
-    } catch { /* fall through to store link */ }
-
     const deepLink = Platform.OS === 'ios'
       ? (IOS_APP_ID
           ? `itms-apps://itunes.apple.com/app/id${IOS_APP_ID}?action=write-review`
@@ -81,7 +74,7 @@ export const SupportSection: React.FC<{ navigation: any }> = ({ navigation }) =>
         onPress: async () => {
           setBusy('cache');
           try {
-            const ImageMod = optional<any>('expo-image');
+            const ImageMod = optional<any>(() => require('expo-image'));
             const Image = ImageMod?.Image ?? ImageMod;
             await Image?.clearMemoryCache?.();
             await Image?.clearDiskCache?.();
@@ -126,8 +119,8 @@ export const SupportSection: React.FC<{ navigation: any }> = ({ navigation }) =>
       // Prefer sharing a real .json file; fall back to sharing the raw text.
       let sharedAsFile = false;
       try {
-        const FS = optional<any>('expo-file-system/legacy') ?? optional<any>('expo-file-system');
-        const Sharing = optional<any>('expo-sharing');
+        const FS = optional<any>(() => require('expo-file-system/legacy')) ?? optional<any>(() => require('expo-file-system'));
+        const Sharing = optional<any>(() => require('expo-sharing'));
         if (FS?.writeAsStringAsync && FS?.cacheDirectory && Sharing?.shareAsync && (await Sharing.isAvailableAsync?.())) {
           const uri = `${FS.cacheDirectory}toptennis-data-${Date.now()}.json`;
           await FS.writeAsStringAsync(uri, json);
