@@ -143,6 +143,64 @@ export const Colors = {
   shadowOrange:  'rgba(255,85,0,0.30)',
 };
 
+// ─── Theme palettes ────────────────────────────────────────────────────────────
+// `Colors` above stays the light theme and the default import used app-wide.
+// Dark mode is being rolled out in stages: screens migrate to `useThemeColors()`
+// (from ThemeContext), which returns one of these two palettes. Both share the
+// exact same keys, so a screen reads the same token names either way.
+
+export type AppColors = typeof Colors;
+
+export const LightColors: AppColors = Colors;
+
+export const DarkColors: AppColors = {
+  ...Colors,
+
+  primaryLight:  'rgba(255,85,0,0.16)',
+  primaryMuted:  'rgba(255,85,0,0.30)',
+
+  accent:        Palette.blue400,
+  accentLight:   'rgba(59,130,246,0.16)',
+  secondaryLight:'rgba(255,85,0,0.16)',
+
+  background:      '#0D0D18',
+  backgroundAlt:   '#16161F',
+  surface:         '#1A1A28',
+  surfaceWarm:     '#20202E',
+  surfaceDark:     '#0A0A12',
+  surfaceElevated: '#22222F',
+
+  text:          '#F4F4F8',
+  textSecondary: '#A6A6BC',
+  textMuted:     '#7A7A90',
+  textInverse:   Palette.gray900,
+
+  border:      '#2A2A3C',
+  borderLight: '#22222F',
+  separator:   '#22222F',
+
+  success:      Palette.green400,
+  successLight: 'rgba(16,185,129,0.16)',
+  warning:      Palette.yellow400,
+  warningLight: 'rgba(245,158,11,0.16)',
+  error:        Palette.red400,
+  errorLight:   'rgba(239,68,68,0.16)',
+  info:         Palette.blue400,
+  infoLight:    'rgba(59,130,246,0.16)',
+
+  tabBar:         '#12121C',
+  tabBarBorder:   '#22222F',
+  tabBarInactive: Palette.gray500,
+
+  gradientSubtle: [Palette.dark800, Palette.dark900] as [string, string],
+
+  overlay:      'rgba(0,0,0,0.60)',
+  overlayLight: 'rgba(0,0,0,0.30)',
+  shadow:       'rgba(0,0,0,0.40)',
+  shadowMd:     'rgba(0,0,0,0.50)',
+  shadowLg:     'rgba(0,0,0,0.60)',
+};
+
 // ─── Spacing ─────────────────────────────────────────────────────────────────
 
 export const Spacing = {

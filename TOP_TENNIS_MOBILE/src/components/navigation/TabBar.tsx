@@ -61,6 +61,9 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             onPress={onPress}
             activeOpacity={0.7}
             style={[sb.item, !showLabel && sb.itemCenter]}
+            accessibilityRole="tab"
+            accessibilityLabel={meta.label}
+            accessibilityState={{ selected: isFocused }}
           >
             <View style={[sb.iconBox, isFocused && sb.iconBoxActive]}>
               <Ionicons
@@ -99,7 +102,15 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
       },
     ]}>
       {items.map(({ key, isFocused, meta, badge, onPress }) => (
-        <TouchableOpacity key={key} onPress={onPress} activeOpacity={0.8} style={bt.tab}>
+        <TouchableOpacity
+          key={key}
+          onPress={onPress}
+          activeOpacity={0.8}
+          style={bt.tab}
+          accessibilityRole="tab"
+          accessibilityLabel={meta.label}
+          accessibilityState={{ selected: isFocused }}
+        >
           <Animated.View
             key={`${key}-${isFocused}`}
             entering={isFocused ? ZoomIn.springify().damping(12).stiffness(260) : FadeIn.duration(150)}

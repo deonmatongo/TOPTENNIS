@@ -22,7 +22,14 @@ export function SectionPageHeader({
       end={{ x: 1, y: 1 }}
       style={[ph.wrap, { paddingTop: insets.top + Spacing.md }]}
     >
-      <TouchableOpacity style={ph.back} onPress={onBack} activeOpacity={0.7}>
+      <TouchableOpacity
+        style={ph.back}
+        onPress={onBack}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
         <Ionicons name="chevron-back" size={24} color="#fff" />
       </TouchableOpacity>
       <View style={{ flex: 1 }}>
@@ -55,7 +62,13 @@ export function NavRow({
   icon, label, desc, color, onPress, danger = false, last = false,
 }: { icon: keyof typeof Ionicons.glyphMap; label: string; desc?: string; color: string; onPress: () => void; danger?: boolean; last?: boolean }) {
   return (
-    <TouchableOpacity style={[nr.row, !last && nr.border]} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={[nr.row, !last && nr.border]}
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={desc ? `${label}. ${desc}` : label}
+    >
       <View style={[nr.icon, { backgroundColor: (danger ? Colors.error : color) + '18' }]}>
         <Ionicons name={icon} size={18} color={danger ? Colors.error : color} />
       </View>
@@ -88,6 +101,7 @@ export function SettingRow({
         value={value}
         onValueChange={(v) => { hapticSelection(); onValueChange(v); }}
         disabled={disabled}
+        accessibilityLabel={label}
         trackColor={{ false: Colors.borderLight, true: Colors.primaryMuted }}
         thumbColor={value && !disabled ? Colors.primary : Colors.textMuted}
       />
@@ -112,6 +126,9 @@ export function ChipRow<T extends string | number>({
           key={String(o.value)}
           style={[cr.chip, value === o.value && cr.chipActive]}
           onPress={() => { hapticSelection(); onSelect(o.value); }}
+          accessibilityRole="button"
+          accessibilityState={{ selected: value === o.value }}
+          accessibilityLabel={o.label}
         >
           <Text style={[cr.chipText, value === o.value && cr.chipTextActive]}>{o.label}</Text>
         </TouchableOpacity>

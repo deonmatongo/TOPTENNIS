@@ -61,6 +61,7 @@ export const PressableScale: React.FC<PressableScaleProps> = ({
   return (
     <Animated.View style={[anim, style]}>
       <Pressable
+        accessibilityRole="button"
         onPressIn={(e) => { scale.value = withSpring(scaleTo, { damping: 20, stiffness: 420 }); onPressIn?.(e) }}
         onPressOut={(e) => { scale.value = withSpring(1, { damping: 14, stiffness: 320 }); onPressOut?.(e) }}
         {...rest}

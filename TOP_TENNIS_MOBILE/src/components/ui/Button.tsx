@@ -15,7 +15,8 @@ const PressScale: React.FC<{
   disabled: boolean
   style?: any
   children: React.ReactNode
-}> = ({ onPress, disabled, style, children }) => {
+  accessibilityLabel?: string
+}> = ({ onPress, disabled, style, children, accessibilityLabel }) => {
   const scale = useSharedValue(1)
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] as any }))
   return (
@@ -26,6 +27,9 @@ const PressScale: React.FC<{
         onPressOut={() => { scale.value = withSpring(1, { damping: 14, stiffness: 320 }) }}
         disabled={disabled}
         activeOpacity={0.9}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityState={{ disabled }}
       >
         {children}
       </TouchableOpacity>
@@ -92,6 +96,7 @@ export const Button: React.FC<ButtonProps> = ({
         onPress={onPress}
         disabled={isDisabled}
         style={[fullWidth ? { width: '100%' } : {}, isDisabled ? { opacity: 0.45 } : {}, style]}
+        accessibilityLabel={label}
       >
         <LinearGradient
           colors={[Palette.orange500, Palette.orange700]}
@@ -119,6 +124,7 @@ export const Button: React.FC<ButtonProps> = ({
         onPress={onPress}
         disabled={isDisabled}
         style={[fullWidth ? { width: '100%' } : {}, isDisabled ? { opacity: 0.45 } : {}, style]}
+        accessibilityLabel={label}
       >
         <LinearGradient
           colors={[Palette.dark800, Palette.dark700]}
@@ -145,6 +151,9 @@ export const Button: React.FC<ButtonProps> = ({
     <XStack
       onPress={onPress}
       disabled={isDisabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: isDisabled }}
       pressStyle={{ opacity: 0.72, scale: 0.97 }}
       animation="fast"
       alignItems="center"

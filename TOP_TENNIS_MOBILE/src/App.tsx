@@ -22,6 +22,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { CallProvider, useCallContext } from '@/contexts/CallContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import { CallScreen } from '@/screens/CallScreen';
 import { IncomingCallOverlay } from '@/components/ui/IncomingCallOverlay';
 import { useMatches } from '@/hooks/useMatches';
@@ -301,20 +302,22 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <TamaguiProvider config={tamaguiConfig} defaultTheme="light">
-        <SafeAreaProvider>
-          <AuthProvider>
-            <CallProvider>
-              <NavigationContainer ref={navigationRef} linking={linking}>
-                <StatusBar style="dark" />
-                <AppNavigator />
-                <NetworkBanner />
-                <CallOverlayManager />
-              </NavigationContainer>
-            </CallProvider>
-          </AuthProvider>
-        </SafeAreaProvider>
-      </TamaguiProvider>
+      <ThemeProvider>
+        <TamaguiProvider config={tamaguiConfig} defaultTheme="light">
+          <SafeAreaProvider>
+            <AuthProvider>
+              <CallProvider>
+                <NavigationContainer ref={navigationRef} linking={linking}>
+                  <StatusBar style="dark" />
+                  <AppNavigator />
+                  <NetworkBanner />
+                  <CallOverlayManager />
+                </NavigationContainer>
+              </CallProvider>
+            </AuthProvider>
+          </SafeAreaProvider>
+        </TamaguiProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }
