@@ -996,7 +996,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
           end={{ x: 1, y: 0 }}
           style={[th.header, { paddingTop: insets.top + 8 }]}
         >
-          <TouchableOpacity style={th.backBtn} onPress={() => { setSelectedConvId(null); setReplyTo(null); }}>
+          <TouchableOpacity style={th.backBtn} onPress={() => { setSelectedConvId(null); setReplyTo(null); }} accessibilityRole="button" accessibilityLabel="Back to conversations" hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
             <Ionicons name="chevron-back" size={26} color="#fff" />
           </TouchableOpacity>
           <TouchableOpacity
@@ -1038,12 +1038,16 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
               style={th.iconBtn}
               activeOpacity={0.7}
               onPress={() => setShowBookingSheet(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Book a match"
             >
               <Ionicons name="tennisball-outline" size={20} color="rgba(255,255,255,0.8)" />
             </TouchableOpacity>
             <TouchableOpacity
               style={th.iconBtn}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Start video call"
               onPress={() => {
                 const targetId = selectedConv.is_group ? selectedConvId! : (otherId ?? '');
                 if (targetId) startCall(targetId, 'video', selectedConvId!, selectedConv.is_group).catch((e: any) => Alert.alert('Call failed', e?.message || 'Could not start the call.'));
@@ -1054,6 +1058,8 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
             <TouchableOpacity
               style={th.iconBtn}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Start voice call"
               onPress={() => {
                 const targetId = selectedConv.is_group ? selectedConvId! : (otherId ?? '');
                 if (targetId) startCall(targetId, 'audio', selectedConvId!, selectedConv.is_group).catch((e: any) => Alert.alert('Call failed', e?.message || 'Could not start the call.'));
@@ -1062,7 +1068,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
               <Ionicons name="call-outline" size={20} color="rgba(255,255,255,0.8)" />
             </TouchableOpacity>
             {selectedConv.is_group && (
-              <TouchableOpacity style={th.iconBtn} onPress={() => setShowGroupInfo(true)}>
+              <TouchableOpacity style={th.iconBtn} onPress={() => setShowGroupInfo(true)} accessibilityRole="button" accessibilityLabel="Group info">
                 <Ionicons name="ellipsis-vertical" size={18} color="rgba(255,255,255,0.8)" />
               </TouchableOpacity>
             )}
@@ -1217,6 +1223,8 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
                 style={[th.sendBtn, th.sendBtnActive]}
                 onPress={handleSend}
                 disabled={sending}
+                accessibilityRole="button"
+                accessibilityLabel="Send message"
               >
                 {sending
                   ? <ActivityIndicator size="small" color="#fff" />
@@ -1287,10 +1295,10 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
             </Text>
           </View>
           <View style={ls.headerActions}>
-            <TouchableOpacity style={ls.hBtn} onPress={() => setShowSearch(v => !v)}>
+            <TouchableOpacity style={ls.hBtn} onPress={() => setShowSearch(v => !v)} accessibilityRole="button" accessibilityLabel={showSearch ? 'Close search' : 'Search conversations'}>
               <Ionicons name={showSearch ? 'close' : 'search-outline'} size={19} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity style={ls.hBtn} onPress={() => setShowGroupCreate(true)}>
+            <TouchableOpacity style={ls.hBtn} onPress={() => setShowGroupCreate(true)} accessibilityRole="button" accessibilityLabel="New group chat">
               <Ionicons name="create-outline" size={19} color="#fff" />
             </TouchableOpacity>
           </View>

@@ -131,7 +131,7 @@ export const MatchesScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
           returnKeyType="search"
         />
         {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
+          <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityRole="button" accessibilityLabel="Clear search">
             <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
           </TouchableOpacity>
         )}
