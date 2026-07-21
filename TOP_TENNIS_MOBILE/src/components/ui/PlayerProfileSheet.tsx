@@ -12,6 +12,7 @@ import { usePlayerAvailability } from '@/hooks/usePlayerAvailability';
 import { useSendMatchInvite } from '@/hooks/useSendMatchInvite';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { useBlockedUsers } from '@/hooks/useBlockedUsers';
+import { ReportSheet } from '@/components/ui/ReportSheet';
 import { useAuth } from '@/contexts/AuthContext';
 
 function getLocation() {
@@ -86,6 +87,7 @@ export const PlayerProfileSheet: React.FC<Props> = ({ player, visible, onClose, 
   const { blockUser } = useBlockedUsers();
   const [addingFriend, setAddingFriend] = useState(false);
   const [blocking, setBlocking] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   if (!player) return null;
 
@@ -409,11 +411,22 @@ export const PlayerProfileSheet: React.FC<Props> = ({ player, visible, onClose, 
                 </TouchableOpacity>
               )}
 
-              {/* Block button */}
+              {/* Report + Block */}
+              <TouchableOpacity
+                style={styles.blockBtn}
+                onPress={() => setShowReport(true)}
+                accessibilityRole="button"
+                accessibilityLabel={`Report ${player?.name || 'player'}`}
+              >
+                <Ionicons name="flag-outline" size={16} color={Colors.error} />
+                <Text style={styles.blockBtnText}>Report Player</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.blockBtn}
                 onPress={handleBlock}
                 disabled={blocking}
+                accessibilityRole="button"
+                accessibilityLabel={`Block ${player?.name || 'player'}`}
               >
                 {blocking
                   ? <ActivityIndicator size="small" color={Colors.error} />
@@ -559,6 +572,15 @@ export const PlayerProfileSheet: React.FC<Props> = ({ player, visible, onClose, 
             </SafeAreaView>
           </KeyboardAvoidingView>
         </Modal>
+
+        <ReportSheet
+          visible={showReport}
+          onClose={() => setShowReport(false)}
+          context="profile"
+          targetUserId={player?.user_id}
+          refId={player?.user_id}
+          subjectLabel={player?.name}
+        />
       </SafeAreaView>
     </Modal>
   );

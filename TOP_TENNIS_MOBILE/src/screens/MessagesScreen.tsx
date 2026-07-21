@@ -20,6 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCallContext } from '@/contexts/CallContext';
 import { Avatar } from '@/components/ui/Avatar';
 import { PlayerProfileSheet, PlayerSearchResult } from '@/components/ui/PlayerProfileSheet';
+import { ReportSheet } from '@/components/ui/ReportSheet';
 import { MatchInviteCard, MatchBookingSheet, BookingMember } from '@/components/chat/MatchBooking';
 import { useMatchInvites, MatchInviteRecord } from '@/hooks/useMatchInvites';
 import { Palette, Colors, Shadow, FontSize, Font, FontWeight, Spacing, Radius } from '@/theme/colors';
@@ -296,10 +297,11 @@ const Bubble: React.FC<{
   onReply: () => void;
   onDelete: () => void;
   onCopy: () => void;
+  onReport: () => void;
   onDismiss: () => void;
   onSenderPress?: (senderId: string) => void;
   recentInvites?: Map<string, MatchInviteRecord>;
-}> = ({ item, replySource, isMine, isGroup, prevSameSender, isLongPressed, onLongPress, onReply, onDelete, onCopy, onDismiss, onSenderPress, recentInvites, myId, onReact, onOpenImage }) => {
+}> = ({ item, replySource, isMine, isGroup, prevSameSender, isLongPressed, onLongPress, onReply, onDelete, onCopy, onReport, onDismiss, onSenderPress, recentInvites, myId, onReact, onOpenImage }) => {
   const imageMsg = isImageMessage(item.content);
   const voiceUrl = parseVoiceMessage(item.content);
   const senderName = getSenderName(item);
@@ -401,12 +403,20 @@ const Bubble: React.FC<{
               <Ionicons name="copy-outline" size={14} color={Colors.text} />
               <Text style={bub.menuTxt}>Copy</Text>
             </TouchableOpacity>
-            {isMine && (
+            {isMine ? (
               <>
                 <View style={bub.menuSep} />
                 <TouchableOpacity style={bub.menuItem} onPress={onDelete}>
                   <Ionicons name="trash-outline" size={14} color={Colors.error} />
                   <Text style={[bub.menuTxt, { color: Colors.error }]}>Delete</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <View style={bub.menuSep} />
+                <TouchableOpacity style={bub.menuItem} onPress={onReport}>
+                  <Ionicons name="flag-outline" size={14} color={Colors.error} />
+                  <Text style={[bub.menuTxt, { color: Colors.error }]}>Report</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -763,6 +773,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
   const [profilePlayer, setProfilePlayer] = useState<PlayerSearchResult | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [longPressMsg, setLongPressMsg] = useState<string | null>(null);
+  const [reportMsg, setReportMsg] = useState<ConversationMessage | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [viewerImage, setViewerImage] = useState<string | null>(null);
@@ -1140,6 +1151,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
                     }},
                   ])}
                   onCopy={() => { Clipboard.setString(msg.content); setLongPressMsg(null); }}
+                  onReport={() => { setReportMsg(msg); setLongPressMsg(null); }}
                   onDismiss={() => setLongPressMsg(null)}
                   onSenderPress={uid => {
                     const m = selectedConv.members.find(mb => mb.user_id === uid);
@@ -1251,6 +1263,15 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
             const convId = await getOrCreateDM(uid);
             if (convId) setSelectedConvId(convId);
           }}
+        />
+
+        <ReportSheet
+          visible={!!reportMsg}
+          onClose={() => setReportMsg(null)}
+          context="message"
+          targetUserId={reportMsg?.sender_id}
+          refId={reportMsg?.id}
+          subjectLabel="message"
         />
 
         {selectedConv.is_group && (

@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
-  StyleSheet, Dimensions,
+  StyleSheet, Dimensions, Linking,
 } from 'react-native'
 import * as AppleAuthentication from 'expo-apple-authentication'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -366,9 +366,10 @@ export const AuthScreen: React.FC = () => {
                     </View>
                     <Text style={s.termsText}>
                       {'I agree to the '}
-                      <Text style={s.termsLink}>Terms</Text>
+                      <Text style={s.termsLink} onPress={() => Linking.openURL('https://toptennis.app/terms').catch(() => {})}>Terms</Text>
                       {' and '}
-                      <Text style={s.termsLink}>Privacy Policy</Text>
+                      <Text style={s.termsLink} onPress={() => Linking.openURL('https://toptennis.app/privacy').catch(() => {})}>Privacy Policy</Text>
+                      {', including a zero-tolerance policy for objectionable content and abusive behavior.'}
                     </Text>
                   </TouchableOpacity>
                   {!!errors.agreeToTerms && <Text style={s.fieldError}>{errors.agreeToTerms}</Text>}

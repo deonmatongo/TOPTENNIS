@@ -156,7 +156,7 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
   const renderMatches = () => {
     const allMatches: any[] = (!isDemoLeague && !matchesLoading && allDivisionMatches.length > 0)
       ? allDivisionMatches
-      : DUMMY_MATCHES;
+      : (isDemoLeague || __DEV__) ? DUMMY_MATCHES : [];
     const isTournamentActive = !isDemoLeague && divisionInfo?.tournament_status === 'active';
 
     // Group by week for round-robin display
@@ -402,7 +402,7 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
 
   const renderDivision = () => {
     const realBoard = leaderboard.filter(p => p.name && p.name !== 'Unknown');
-    const displayBoard = (!leaderboardLoading && realBoard.length > 0) ? realBoard : DUMMY_DIVISION_LEADERBOARD;
+    const displayBoard = (!leaderboardLoading && realBoard.length > 0) ? realBoard : (isDemoLeague || __DEV__) ? DUMMY_DIVISION_LEADERBOARD : [];
     const meStats = displayBoard.find(p => p.isCurrentUser);
     const myRank  = displayBoard.findIndex(p => p.isCurrentUser) + 1;
     const currentAssignment = assignments.find(a => a.league_registration_id === registration.id);
@@ -574,7 +574,7 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
 
   const renderLeagueStandings = () => {
     const realLeagueBoard = leagueLeaderboard.filter(p => p.name && p.name !== 'Unknown');
-    const displayLeagueBoard = (!leagueLeaderboardLoading && realLeagueBoard.length > 0) ? realLeagueBoard : DUMMY_LEAGUE_LEADERBOARD;
+    const displayLeagueBoard = (!leagueLeaderboardLoading && realLeagueBoard.length > 0) ? realLeagueBoard : (isDemoLeague || __DEV__) ? DUMMY_LEAGUE_LEADERBOARD : [];
     const leagueCurrentUserDisplay = displayLeagueBoard.find(p => p.isCurrentUser) ?? leagueCurrentUser;
     const myRank = leagueCurrentUserDisplay?.rank;
     const myPoints = leagueCurrentUserDisplay?.points ?? 0;
@@ -706,7 +706,7 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
   };
 
   const renderPlayoffs = () => {
-    const displayPlayoffs = (!matchesLoading && playoffMatches.length > 0) ? playoffMatches : DUMMY_PLAYOFF_MATCHES;
+    const displayPlayoffs = (!matchesLoading && playoffMatches.length > 0) ? playoffMatches : (isDemoLeague || __DEV__) ? DUMMY_PLAYOFF_MATCHES : [];
 
     // Group by round
     const rounds = displayPlayoffs.reduce((acc: Record<number, any[]>, m: any) => {
