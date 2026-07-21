@@ -348,11 +348,11 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
         style={[s.header, { paddingTop: insets.top + Spacing.lg }]}
       >
         {selectMode ? (
-          <TouchableOpacity style={s.backBtn} onPress={exitSelectMode} activeOpacity={0.7}>
+          <TouchableOpacity style={s.backBtn} onPress={exitSelectMode} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Cancel selection" hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
             <Ionicons name="close" size={20} color="#fff" />
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Go back" hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
             <Ionicons name="chevron-back" size={24} color="#fff" />
           </TouchableOpacity>
         )}

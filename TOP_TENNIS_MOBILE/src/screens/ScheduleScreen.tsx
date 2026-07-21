@@ -353,7 +353,7 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
         <View style={s.headerRow}>
           <Text style={s.headerTitle}>Schedule</Text>
           <View style={s.headerActions}>
-            <TouchableOpacity style={s.hBtn} onPress={handleExportAll} disabled={exporting}>
+            <TouchableOpacity style={s.hBtn} onPress={handleExportAll} disabled={exporting} accessibilityRole="button" accessibilityLabel="Export matches to calendar">
               {exporting
                 ? <ActivityIndicator size="small" color="#fff" />
                 : <Ionicons name="calendar-outline" size={20} color="#fff" />}
@@ -364,13 +364,13 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
         {/* Month + nav + view toggle */}
         <View style={s.subRow}>
           <View style={s.monthNav}>
-            <TouchableOpacity style={s.navArrow} onPress={goBack}>
+            <TouchableOpacity style={s.navArrow} onPress={goBack} accessibilityRole="button" accessibilityLabel="Previous period" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="chevron-back" size={15} color="rgba(255,255,255,0.85)" />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setCurrentDate(new Date())} activeOpacity={0.7}>
               <Text style={s.monthLabel}>{headerLabel}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.navArrow} onPress={goForward}>
+            <TouchableOpacity style={s.navArrow} onPress={goForward} accessibilityRole="button" accessibilityLabel="Next period" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="chevron-forward" size={15} color="rgba(255,255,255,0.85)" />
             </TouchableOpacity>
           </View>
@@ -560,10 +560,10 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                         </View>
                       </View>
                       <View style={s.inviteActions}>
-                        <TouchableOpacity style={s.acceptBtn} onPress={() => handleRespond(inv.id, 'accepted')}>
+                        <TouchableOpacity style={s.acceptBtn} onPress={() => handleRespond(inv.id, 'accepted')} accessibilityRole="button" accessibilityLabel={`Accept match invite from ${name}`}>
                           <Ionicons name="checkmark" size={16} color="#fff" />
                         </TouchableOpacity>
-                        <TouchableOpacity style={s.declineBtn} onPress={() => handleRespond(inv.id, 'declined')}>
+                        <TouchableOpacity style={s.declineBtn} onPress={() => handleRespond(inv.id, 'declined')} accessibilityRole="button" accessibilityLabel={`Decline match invite from ${name}`}>
                           <Ionicons name="close" size={16} color="#fff" />
                         </TouchableOpacity>
                       </View>
@@ -579,7 +579,7 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
       </ScrollView>
 
       {/* ── FAB ────────────────────────────────────────────────────────────── */}
-      <TouchableOpacity style={[s.fab, { bottom: insets.bottom + 16 }]} onPress={() => openAdd(currentDate)} activeOpacity={0.85}>
+      <TouchableOpacity style={[s.fab, { bottom: insets.bottom + 16 }]} onPress={() => openAdd(currentDate)} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Add availability">
         <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
 
@@ -587,7 +587,7 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
       <Modal visible={showAddModal} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={s.modal} edges={['top', 'bottom']}>
           <View style={s.modalHeader}>
-            <TouchableOpacity onPress={closeAddModal} style={s.modalCloseBtn}>
+            <TouchableOpacity onPress={closeAddModal} style={s.modalCloseBtn} accessibilityRole="button" accessibilityLabel="Close">
               <Ionicons name="close" size={20} color={Colors.textSecondary} />
             </TouchableOpacity>
             <Text style={s.modalTitle}>Add Availability</Text>

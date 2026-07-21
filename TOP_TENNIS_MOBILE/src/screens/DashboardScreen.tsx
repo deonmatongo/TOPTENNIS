@@ -139,6 +139,8 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                 <TouchableOpacity
                   style={s.notifBtn}
                   onPress={() => navigation.navigate('Notifications')}
+                  accessibilityRole="button"
+                  accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
                 >
                   <Ionicons name="notifications-outline" size={22} color="#fff" />
                   {unreadCount > 0 && (
@@ -161,7 +163,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                     </YStack>
                   )}
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => navigation.navigate('Profile')} activeOpacity={0.8}>
+                <TouchableOpacity onPress={() => navigation.navigate('Profile')} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Your profile">
                   <Avatar name={fullName} size={44} imageUrl={avatarUrl} style={{ borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)' }} />
                 </TouchableOpacity>
               </XStack>
@@ -221,7 +223,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
               />
               {searching && <ActivityIndicator size="small" color="rgba(255,255,255,0.6)" />}
               {searchQuery.length > 0 && !searching && (
-                <TouchableOpacity onPress={clearSearch}>
+                <TouchableOpacity onPress={clearSearch} accessibilityRole="button" accessibilityLabel="Clear search">
                   <Ionicons name="close-circle" size={17} color="rgba(255,255,255,0.5)" />
                 </TouchableOpacity>
               )}
@@ -598,7 +600,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
             {/* Header */}
             <XStack alignItems="center" justifyContent="space-between" paddingHorizontal={Spacing.lg} marginBottom={Spacing.md}>
               <Text style={s.modalTitle}>Schedule a Match</Text>
-              <TouchableOpacity onPress={() => { setShowScheduleModal(false); clearScheduleSearch(); }}>
+              <TouchableOpacity onPress={() => { setShowScheduleModal(false); clearScheduleSearch(); }} accessibilityRole="button" accessibilityLabel="Close">
                 <Ionicons name="close" size={24} color={Colors.text} />
               </TouchableOpacity>
             </XStack>
@@ -630,7 +632,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
               />
               {scheduleSearching && <ActivityIndicator size="small" color={Colors.primary} />}
               {scheduleQuery.length > 0 && !scheduleSearching && (
-                <TouchableOpacity onPress={clearScheduleSearch}>
+                <TouchableOpacity onPress={clearScheduleSearch} accessibilityRole="button" accessibilityLabel="Clear search">
                   <Ionicons name="close-circle" size={17} color={Colors.textMuted} />
                 </TouchableOpacity>
               )}

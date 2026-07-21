@@ -73,6 +73,8 @@ function SectionRow({
       style={[s.sectionRow, !last && s.rowBorder]}
       onPress={onPress}
       activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={desc ? `${label}. ${desc}` : label}
     >
       <View style={[s.iconBox, { backgroundColor: color }]}>
         <Ionicons name={icon} size={20} color="#fff" />

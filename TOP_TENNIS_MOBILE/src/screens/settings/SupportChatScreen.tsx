@@ -217,6 +217,9 @@ export const SupportChatScreen: React.FC<{ navigation: any }> = ({ navigation })
             onPress={() => send(input)}
             disabled={!input.trim()}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
+            accessibilityState={{ disabled: !input.trim() }}
           >
             <Ionicons name="arrow-up" size={20} color="#fff" />
           </TouchableOpacity>
