@@ -128,7 +128,7 @@ export const PerformanceScreen: React.FC<{ navigation: any }> = ({ navigation })
               </TouchableOpacity>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
-              {['all', ...registrations.map(r => r.league_id)].map((id, idx) => {
+              {['all', ...Array.from(new Set(registrations.map(r => r.league_id)))].map((id, idx) => {
                 const reg = registrations.find(r => r.league_id === id);
                 return (
                   <TouchableOpacity

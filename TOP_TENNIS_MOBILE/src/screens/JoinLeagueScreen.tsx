@@ -3,13 +3,13 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, ActivityIndicator,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLeagueRegistrations } from '@/hooks/useLeagueRegistrations';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { Palette, Colors, FontSize, Font, FontWeight, Spacing, Radius } from '@/theme/colors';
-import { LeagueRegistrationModal } from '@/components/ui/LeagueRegistrationModal';
 import type { League } from '@/hooks/useLeagueRegistrations';
 import { StatusBar } from 'expo-status-bar';
 
@@ -17,11 +17,9 @@ import { StatusBar } from 'expo-status-bar';
 const LEAGUE_ACTIVITIES_AVAILABLE = true;
 
 export const JoinLeagueScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { allLeagues, registrations, loading, registerForLeague, isRegistered, refetch } = useLeagueRegistrations();
+  const { allLeagues, registrations, loading, isRegistered, refetch } = useLeagueRegistrations();
   const { player } = usePlayerProfile();
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedLeague, setSelectedLeague] = useState<League | null>(null);
-  const [showModal, setShowModal] = useState(false);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -30,13 +28,7 @@ export const JoinLeagueScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   };
 
   const handleOpenRegistration = (league: League) => {
-    setSelectedLeague(league);
-    setShowModal(true);
-  };
-
-  const handleRegister = async (leagueId: string) => {
-    await registerForLeague(leagueId);
-    await refetch();
+    WebBrowser.openBrowserAsync('https://www.toptennis.app/leagues');
   };
 
   const getStatusColor = (status?: string) => {
@@ -273,12 +265,6 @@ export const JoinLeagueScreen: React.FC<{ navigation: any }> = ({ navigation }) 
         </View>
       </ScrollView>
 
-      <LeagueRegistrationModal
-        visible={showModal}
-        league={selectedLeague}
-        onClose={() => { setShowModal(false); setSelectedLeague(null); }}
-        onRegister={handleRegister}
-      />
     </SafeAreaView>
   );
 };

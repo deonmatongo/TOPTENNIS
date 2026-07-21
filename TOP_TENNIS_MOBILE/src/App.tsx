@@ -21,10 +21,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import { CallProvider, useCallContext } from '@/contexts/CallContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
-import { CallScreen } from '@/screens/CallScreen';
-import { IncomingCallOverlay } from '@/components/ui/IncomingCallOverlay';
 import { useMatches } from '@/hooks/useMatches';
 import { useConversations } from '@/hooks/useConversations';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
@@ -182,28 +179,27 @@ function AppNavigator() {
     setIsLocked(false);
   };
 
-  // DEMO BYPASS — skip auth/intro/onboarding to preview UI
-  // if (loading || introSeen === null || (user && playerLoading)) {
-  //   return (
-  //     <View style={styles.loading}>
-  //       <ActivityIndicator size="large" color={Colors.primary} />
-  //     </View>
-  //   );
-  // }
+  if (loading || introSeen === null || (user && playerLoading)) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {false ? (
+        {!introSeen ? (
           <Stack.Screen name="AppIntro">
             {() => <AppIntroScreen onDone={markIntroDone} />}
           </Stack.Screen>
-        ) : false ? (
+        ) : !user ? (
           <>
             <Stack.Screen name="Auth" component={AuthScreen} />
             <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
           </>
-        ) : false ? (
+        ) : !player ? (
           <Stack.Screen name="Onboarding">
             {() => <OnboardingScreen onComplete={refetch} />}
           </Stack.Screen>
@@ -237,29 +233,6 @@ const TextAny = Text as any;
 TextAny.defaultProps = TextAny.defaultProps ?? {};
 TextAny.defaultProps.style = { fontFamily: Font.regular };
 
-// Renders incoming call banner + full CallScreen modal on top of all navigation
-function CallOverlayManager() {
-  const { incomingCall, activeCall, livekitToken, answerCall, declineCall, endCall } = useCallContext();
-
-  return (
-    <>
-      {activeCall && livekitToken && (
-        <CallScreen
-          call={activeCall}
-          token={livekitToken}
-          onEnd={() => endCall(activeCall.id)}
-        />
-      )}
-      {incomingCall && !activeCall && (
-        <IncomingCallOverlay
-          call={incomingCall}
-          onAnswer={() => answerCall(incomingCall).catch(() => {})}
-          onDecline={() => declineCall(incomingCall.id)}
-        />
-      )}
-    </>
-  );
-}
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -306,14 +279,11 @@ export default function App() {
         <TamaguiProvider config={tamaguiConfig} defaultTheme="light">
           <SafeAreaProvider>
             <AuthProvider>
-              <CallProvider>
-                <NavigationContainer ref={navigationRef} linking={linking}>
-                  <StatusBar style="dark" />
-                  <AppNavigator />
-                  <NetworkBanner />
-                  <CallOverlayManager />
-                </NavigationContainer>
-              </CallProvider>
+              <NavigationContainer ref={navigationRef} linking={linking}>
+                <StatusBar style="dark" />
+                <AppNavigator />
+                <NetworkBanner />
+              </NavigationContainer>
             </AuthProvider>
           </SafeAreaProvider>
         </TamaguiProvider>

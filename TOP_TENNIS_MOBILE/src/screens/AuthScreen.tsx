@@ -2,9 +2,9 @@ import React, { useState, useCallback, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
-  StyleSheet, Dimensions, Linking,
+  StyleSheet, Dimensions,
 } from 'react-native'
-import * as AppleAuthentication from 'expo-apple-authentication'
+import * as WebBrowser from 'expo-web-browser'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
@@ -84,7 +84,7 @@ export const AuthScreen: React.FC = () => {
   const [googleLoading, setGoogleLoading] = useState(false)
   const [focusedField, setFocusedField] = useState<string | null>(null)
   const [biometricLoading, setBiometricLoading] = useState(false)
-  const { signIn, signUp, signInWithGoogle, signInWithApple } = useAuth()
+  const { signIn, signUp, signInWithGoogle } = useAuth()
   const { available, biometricType, biometricLabel, credentialsStored, authenticate, saveCredentials } = useBiometrics()
 
   const handleGoogleAuth = async () => {
@@ -92,15 +92,6 @@ export const AuthScreen: React.FC = () => {
     try { await signInWithGoogle() }
     catch (e: any) { Alert.alert('Google Sign-In Failed', e?.message || 'Could not sign in with Google.') }
     finally { setGoogleLoading(false) }
-  }
-
-  const handleAppleAuth = async () => {
-    try { await signInWithApple() }
-    catch (e: any) {
-      if ((e as any).code !== 'ERR_REQUEST_CANCELED') {
-        Alert.alert('Apple Sign-In Failed', e?.message || 'Could not sign in with Apple.')
-      }
-    }
   }
 
   const handleBiometricSignIn = useCallback(async () => {
@@ -366,9 +357,9 @@ export const AuthScreen: React.FC = () => {
                     </View>
                     <Text style={s.termsText}>
                       {'I agree to the '}
-                      <Text style={s.termsLink} onPress={() => Linking.openURL('https://toptennis.app/terms').catch(() => {})}>Terms</Text>
+                      <Text style={s.termsLink} onPress={() => WebBrowser.openBrowserAsync('https://toptennis.app/terms')}>Terms of Service</Text>
                       {' and '}
-                      <Text style={s.termsLink} onPress={() => Linking.openURL('https://toptennis.app/privacy').catch(() => {})}>Privacy Policy</Text>
+                      <Text style={s.termsLink} onPress={() => WebBrowser.openBrowserAsync('https://toptennis.app/privacy')}>Privacy Policy</Text>
                       {', including a zero-tolerance policy for objectionable content and abusive behavior.'}
                     </Text>
                   </TouchableOpacity>
@@ -417,19 +408,6 @@ export const AuthScreen: React.FC = () => {
                   </>
                 )}
               </TouchableOpacity>
-
-              {/* Apple */}
-              {Platform.OS === 'ios' && (
-                <AppleAuthentication.AppleAuthenticationButton
-                  buttonType={mode === 'signin'
-                    ? AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
-                    : AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP}
-                  buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-                  cornerRadius={12}
-                  style={s.appleBtn}
-                  onPress={handleAppleAuth}
-                />
-              )}
 
               {/* Biometric */}
               {mode === 'signin' && available && credentialsStored && (
@@ -581,9 +559,6 @@ const s = StyleSheet.create({
     width: 22, height: 22, borderRadius: 11,
     backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
   },
-
-  // Apple
-  appleBtn: { width: '100%', height: 52, borderRadius: Radius.full, overflow: 'hidden' },
 
   // Biometric
   biometricBtn: {

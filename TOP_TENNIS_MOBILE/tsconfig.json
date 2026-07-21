@@ -1,18 +1,7 @@
 {
+  "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
-    "jsx": "react-native",
-    "lib": [
-      "dom",
-      "esnext"
-    ],
-    "moduleResolution": "bundler",
-    "noEmit": true,
-    "resolveJsonModule": true,
-    "skipLibCheck": true,
     "strict": false,
-    "target": "esnext",
     "baseUrl": "./",
     "paths": {
       "@/*": [
@@ -26,6 +15,5 @@
   "exclude": [
     "node_modules",
     "supabase/functions"
-  ],
-  "extends": "expo/tsconfig.base"
+  ]
 }

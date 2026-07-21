@@ -17,7 +17,6 @@ import { useBlockedUsers } from '@/hooks/useBlockedUsers';
 import { useOnlinePresence } from '@/hooks/useOnlinePresence';
 import { useTypingIndicator, TypingUser } from '@/hooks/useTypingIndicator';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCallContext } from '@/contexts/CallContext';
 import { Avatar } from '@/components/ui/Avatar';
 import { PlayerProfileSheet, PlayerSearchResult } from '@/components/ui/PlayerProfileSheet';
 import { ReportSheet } from '@/components/ui/ReportSheet';
@@ -730,7 +729,6 @@ const LIST_TABS: { key: ActiveTab; label: string }[] = [
 
 export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ navigation, route }) => {
   const { user } = useAuth();
-  const { startCall } = useCallContext();
   const insets = useSafeAreaInsets();
   const {
     conversations, loading, sendMessage, getOrCreateDM, createGroupChat,
@@ -1053,30 +1051,6 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
               accessibilityLabel="Book a match"
             >
               <Ionicons name="tennisball-outline" size={20} color="rgba(255,255,255,0.8)" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={th.iconBtn}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel="Start video call"
-              onPress={() => {
-                const targetId = selectedConv.is_group ? selectedConvId! : (otherId ?? '');
-                if (targetId) startCall(targetId, 'video', selectedConvId!, selectedConv.is_group).catch((e: any) => Alert.alert('Call failed', e?.message || 'Could not start the call.'));
-              }}
-            >
-              <Ionicons name="videocam-outline" size={22} color="rgba(255,255,255,0.8)" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={th.iconBtn}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel="Start voice call"
-              onPress={() => {
-                const targetId = selectedConv.is_group ? selectedConvId! : (otherId ?? '');
-                if (targetId) startCall(targetId, 'audio', selectedConvId!, selectedConv.is_group).catch((e: any) => Alert.alert('Call failed', e?.message || 'Could not start the call.'));
-              }}
-            >
-              <Ionicons name="call-outline" size={20} color="rgba(255,255,255,0.8)" />
             </TouchableOpacity>
             {selectedConv.is_group && (
               <TouchableOpacity style={th.iconBtn} onPress={() => setShowGroupInfo(true)} accessibilityRole="button" accessibilityLabel="Group info">

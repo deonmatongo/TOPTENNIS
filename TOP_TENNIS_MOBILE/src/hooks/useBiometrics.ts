@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 function getLocalAuth() {
@@ -28,7 +29,11 @@ export const useBiometrics = () => {
       setAvailable(true);
 
       const types = await LA.supportedAuthenticationTypesAsync();
-      if (types.includes(LA.AuthenticationType.FACIAL_RECOGNITION)) {
+      // On iOS, default to Face ID — covers Face ID devices and ensures
+      // the correct prompt message is shown even on Touch ID devices.
+      if (Platform.OS === 'ios') {
+        setBiometricType('faceid');
+      } else if (types.includes(LA.AuthenticationType.FACIAL_RECOGNITION)) {
         setBiometricType('faceid');
       } else if (types.includes(LA.AuthenticationType.IRIS)) {
         setBiometricType('iris');

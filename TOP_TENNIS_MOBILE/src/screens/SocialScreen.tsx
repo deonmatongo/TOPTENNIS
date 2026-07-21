@@ -15,7 +15,6 @@ import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/services/supabase';
 import { searchPlayersByName } from '@/services/playerSearch';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCallContext } from '@/contexts/CallContext';
 
 type Tab = 'requests' | 'friends' | 'find';
 
@@ -49,7 +48,6 @@ const EmptyState: React.FC<{ icon: string; title: string; sub: string; btnLabel?
 export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { startCall } = useCallContext();
   const {
     pendingReceived, pendingSent, friends, loading,
     updateRequestStatus, cancelRequest, sendFriendRequest, refetch,
@@ -323,18 +321,6 @@ export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                       <Ionicons name="chatbubble-outline" size={16} color={Colors.primary} />
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={s.callBtn}
-                      onPress={() => startCall(friendUserId, 'audio').catch((e: any) => Alert.alert('Call failed', e?.message || 'Could not start the call.'))}
-                    >
-                      <Ionicons name="call-outline" size={16} color={Colors.success} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={s.callBtn}
-                      onPress={() => startCall(friendUserId, 'video').catch((e: any) => Alert.alert('Call failed', e?.message || 'Could not start the call.'))}
-                    >
-                      <Ionicons name="videocam-outline" size={16} color={Colors.accent} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
                       style={s.unfriendBtn}
                       onPress={() => handleUnfriend(friendUserId, friendName)}
                     >
@@ -460,7 +446,6 @@ const s = StyleSheet.create({
   declineBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.errorLight, alignItems: 'center', justifyContent: 'center' },
   cancelBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.errorLight, alignItems: 'center', justifyContent: 'center' },
   msgBtn:  { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  callBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.successLight, alignItems: 'center', justifyContent: 'center' },
   unfriendBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.backgroundAlt, alignItems: 'center', justifyContent: 'center' },
   blockBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.errorLight, alignItems: 'center', justifyContent: 'center' },
   addBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
