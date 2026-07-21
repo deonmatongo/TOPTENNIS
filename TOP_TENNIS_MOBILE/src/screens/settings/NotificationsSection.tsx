@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, ActivityIndicator } from 'react-native';
+import { ScrollView, ActivityIndicator, Alert, Linking } from 'react-native';
 import { Colors } from '@/theme/colors';
 import { useAppSettings } from '@/hooks/useAppSettings';
 import {
@@ -7,8 +7,40 @@ import {
   SettingRow, LabelRow, sharedContent,
 } from './_shared';
 
+// Lazily require expo-notifications so Expo Go builds without the module stay safe.
+function getNotifs() {
+  try { return require('expo-notifications') as typeof import('expo-notifications'); } catch { return null; }
+}
+
 export const NotificationsSection: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { settings, update, loading, saving } = useAppSettings();
+
+  // Turning push ON must actually hold an OS permission, or the toggle is a lie.
+  const handlePushToggle = async (v: boolean) => {
+    if (!v) { update({ push_enabled: false }); return; }
+    const N = getNotifs();
+    if (!N) { update({ push_enabled: true }); return; }
+    try {
+      const current = await N.getPermissionsAsync();
+      let status = current.status;
+      if (status !== 'granted') {
+        const req = await N.requestPermissionsAsync();
+        status = req.status;
+      }
+      if (status === 'granted') {
+        update({ push_enabled: true });
+      } else {
+        Alert.alert(
+          'Notifications are turned off',
+          'To receive push alerts, enable notifications for Top Tennis in your device settings.',
+          [{ text: 'Not now', style: 'cancel' }, { text: 'Open Settings', onPress: () => Linking.openSettings().catch(() => {}) }],
+        );
+        // leave push_enabled false — the switch snaps back on next render
+      }
+    } catch {
+      update({ push_enabled: true });
+    }
+  };
 
   if (loading) {
     return (
@@ -31,7 +63,7 @@ export const NotificationsSection: React.FC<{ navigation: any }> = ({ navigation
             label="Push Notifications"
             desc="Receive alerts on this device"
             value={settings.push_enabled}
-            onValueChange={v => update({ push_enabled: v })}
+            onValueChange={handlePushToggle}
           />
           <SettingRow
             label="Email Notifications"

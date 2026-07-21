@@ -6,6 +6,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
+import Constants from 'expo-constants';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { supabase } from '@/services/supabase';
@@ -13,6 +14,9 @@ import { Palette, Colors, FontSize, Font, FontWeight, Spacing, Radius } from '@/
 
 // ─── Admin config ─────────────────────────────────────────────────────────────
 const ADMIN_EMAILS = ['admin@toptennis.app', 'deon@toptennis.app'];
+
+// App version from the build config (falls back for safety).
+const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 
 // ─── Section menu config ──────────────────────────────────────────────────────
 const SECTIONS = [
@@ -230,7 +234,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
         <View style={s.card}>
           <View style={s.aboutRow}>
             <Text style={s.aboutLabel}>Version</Text>
-            <Text style={s.aboutValue}>1.0.0</Text>
+            <Text style={s.aboutValue}>{APP_VERSION}</Text>
           </View>
           <View style={s.aboutRow}>
             <Text style={s.aboutLabel}>Platform</Text>

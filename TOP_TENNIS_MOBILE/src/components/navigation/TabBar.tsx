@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { selection as hapticSelection } from '@/utils/haptics';
 import Animated, { ZoomIn, FadeIn } from 'react-native-reanimated';
 import { Palette, Font } from '@/theme/colors';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -28,7 +28,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     const onPress = () => {
       const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
       if (!isFocused && !event.defaultPrevented) {
-        Haptics.selectionAsync().catch(() => {});
+        hapticSelection();
         navigation.navigate({ name: route.name, merge: true } as any);
       }
     };

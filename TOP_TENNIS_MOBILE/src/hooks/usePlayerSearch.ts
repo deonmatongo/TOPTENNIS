@@ -43,7 +43,7 @@ export const usePlayerSearch = () => {
           .order('name'),
         supabase
           .from('profiles')
-          .select('id, networking_enabled, first_name, last_name, profile_picture_url'),
+          .select('id, networking_enabled, show_win_loss, show_usta_rating, show_location, first_name, last_name, profile_picture_url'),
         supabase
           .from('blocked_users')
           .select('blocker_id')
@@ -64,8 +64,16 @@ export const usePlayerSearch = () => {
         })
         .map(p => {
           const profile = profileMap.get(p.user_id);
+          // Respect the player's privacy flags — hide fields they've chosen not to show.
+          const showWinLoss = profile?.show_win_loss !== false;
+          const showUsta    = profile?.show_usta_rating !== false;
+          const showLocation = profile?.show_location !== false;
           return {
             ...p,
+            wins: showWinLoss ? p.wins : undefined,
+            losses: showWinLoss ? p.losses : undefined,
+            usta_rating: showUsta ? p.usta_rating : undefined,
+            city: showLocation ? p.city : undefined,
             first_name: profile?.first_name ?? undefined,
             last_name: profile?.last_name ?? undefined,
             profile_picture_url: profile?.profile_picture_url ?? null,

@@ -59,6 +59,7 @@ import { NotificationsSection } from '@/screens/settings/NotificationsSection';
 import { MatchPreferencesSection } from '@/screens/settings/MatchPreferencesSection';
 import { AppPreferencesSection } from '@/screens/settings/AppPreferencesSection';
 import { SupportSection } from '@/screens/settings/SupportSection';
+import { SupportChatScreen } from '@/screens/settings/SupportChatScreen';
 
 import { Colors, Font } from '@/theme/colors';
 import { NetworkBanner } from '@/components/ui/NetworkBanner';
@@ -134,6 +135,7 @@ function SettingsNavigator() {
       <SettingsStack.Screen name="MatchPreferencesSection" component={MatchPreferencesSection} options={{ animation: 'slide_from_right' }} />
       <SettingsStack.Screen name="AppPreferencesSection" component={AppPreferencesSection} options={{ animation: 'slide_from_right' }} />
       <SettingsStack.Screen name="SupportSection" component={SupportSection} options={{ animation: 'slide_from_right' }} />
+      <SettingsStack.Screen name="SupportChat" component={SupportChatScreen} options={{ animation: 'slide_from_right' }} />
     </SettingsStack.Navigator>
   );
 }

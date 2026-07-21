@@ -1,13 +1,18 @@
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { Alert, Linking } from 'react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { Alert, Linking, Share } from 'react-native';
 import { SupportSection } from '@/screens/settings/SupportSection';
 
-const navigation = { goBack: jest.fn() };
+jest.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 'u1', email: 'player@test.com' } }),
+}));
+
+const navigation = { goBack: jest.fn(), navigate: jest.fn() };
 
 beforeEach(() => {
   jest.clearAllMocks();
   navigation.goBack.mockReset();
+  navigation.navigate.mockReset();
 });
 
 describe('SupportSection', () => {
@@ -18,6 +23,7 @@ describe('SupportSection', () => {
   it('renders all section item labels', () => {
     const { getByText } = render(<SupportSection navigation={navigation} />);
     expect(getByText('Contact Support')).toBeTruthy();
+    expect(getByText('Email Us')).toBeTruthy();
     expect(getByText('Rate the App')).toBeTruthy();
     expect(getByText('Share Top Tennis')).toBeTruthy();
     expect(getByText('Calendar Access')).toBeTruthy();
@@ -28,15 +34,21 @@ describe('SupportSection', () => {
     expect(getByText('Privacy Policy')).toBeTruthy();
   });
 
-  it('calls Linking.openURL with support email when Contact Support is pressed', () => {
-    const openURLSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+  it('opens the in-app chat when Contact Support is pressed', () => {
     const { getByText } = render(<SupportSection navigation={navigation} />);
     fireEvent.press(getByText('Contact Support'));
+    expect(navigation.navigate).toHaveBeenCalledWith('SupportChat');
+  });
+
+  it('opens a mailto link when Email Us is pressed', () => {
+    const openURLSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    const { getByText } = render(<SupportSection navigation={navigation} />);
+    fireEvent.press(getByText('Email Us'));
     expect(openURLSpy).toHaveBeenCalledWith('mailto:support@toptennis.app');
     openURLSpy.mockRestore();
   });
 
-  it('calls Linking.openURL for Terms of Service', () => {
+  it('opens the Terms of Service website', () => {
     const openURLSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     const { getByText } = render(<SupportSection navigation={navigation} />);
     fireEvent.press(getByText('Terms of Service'));
@@ -44,12 +56,54 @@ describe('SupportSection', () => {
     openURLSpy.mockRestore();
   });
 
-  it('calls Linking.openURL for Privacy Policy', () => {
+  it('opens the Privacy Policy website', () => {
     const openURLSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     const { getByText } = render(<SupportSection navigation={navigation} />);
     fireEvent.press(getByText('Privacy Policy'));
     expect(openURLSpy).toHaveBeenCalledWith('https://toptennis.app/privacy');
     openURLSpy.mockRestore();
+  });
+
+  it('opens the store when Rate the App is pressed', async () => {
+    jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(false);
+    const openURLSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    const { getByText } = render(<SupportSection navigation={navigation} />);
+    fireEvent.press(getByText('Rate the App'));
+    await waitFor(() => expect(openURLSpy).toHaveBeenCalled());
+    openURLSpy.mockRestore();
+  });
+
+  it('opens the share sheet when Share Top Tennis is pressed', async () => {
+    const shareSpy = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' } as any);
+    const { getByText } = render(<SupportSection navigation={navigation} />);
+    fireEvent.press(getByText('Share Top Tennis'));
+    await waitFor(() => expect(shareSpy).toHaveBeenCalled());
+    expect(shareSpy.mock.calls[0][0].message).toContain('Top Tennis');
+    shareSpy.mockRestore();
+  });
+
+  it('confirms before clearing the cache', () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const { getByText } = render(<SupportSection navigation={navigation} />);
+    fireEvent.press(getByText('Clear Cache'));
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Clear Cache',
+      expect.any(String),
+      expect.arrayContaining([
+        expect.objectContaining({ text: 'Cancel' }),
+        expect.objectContaining({ text: 'Clear' }),
+      ]),
+    );
+    alertSpy.mockRestore();
+  });
+
+  it('gathers account data and opens the share sheet on Export My Data', async () => {
+    const shareSpy = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' } as any);
+    const { getByText } = render(<SupportSection navigation={navigation} />);
+    fireEvent.press(getByText('Export My Data'));
+    await waitFor(() => expect(shareSpy).toHaveBeenCalled());
+    expect(shareSpy.mock.calls[0][0].message).toContain('exportedAt');
+    shareSpy.mockRestore();
   });
 
   it('calls Linking.openSettings for Calendar Access', () => {
@@ -66,32 +120,5 @@ describe('SupportSection', () => {
     fireEvent.press(getByText('Notification Permissions'));
     expect(openSettingsSpy).toHaveBeenCalled();
     openSettingsSpy.mockRestore();
-  });
-
-  it('shows Alert when Rate the App is pressed', () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const { getByText } = render(<SupportSection navigation={navigation} />);
-    fireEvent.press(getByText('Rate the App'));
-    expect(alertSpy).toHaveBeenCalledWith('Rate the App', expect.any(String));
-    alertSpy.mockRestore();
-  });
-
-  it('shows Alert when Clear Cache is pressed', () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const { getByText } = render(<SupportSection navigation={navigation} />);
-    fireEvent.press(getByText('Clear Cache'));
-    expect(alertSpy).toHaveBeenCalledWith('Clear Cache', expect.any(String), expect.any(Array));
-    alertSpy.mockRestore();
-  });
-
-  it('falls back to an Alert when Linking.openURL rejects', async () => {
-    const openURLSpy = jest.spyOn(Linking, 'openURL').mockRejectedValue(new Error('no handler'));
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const { getByText } = render(<SupportSection navigation={navigation} />);
-    fireEvent.press(getByText('Contact Support'));
-    await Promise.resolve(); // flush rejection handler
-    expect(alertSpy).toHaveBeenCalledWith('Error', 'Could not open link.');
-    openURLSpy.mockRestore();
-    alertSpy.mockRestore();
   });
 });

@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Palette, Colors, FontSize, Font, Spacing, Radius } from '@/theme/colors';
+import { selection as hapticSelection } from '@/utils/haptics';
 
 // ─── Section page header ──────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ export function SettingRow({
       </View>
       <Switch
         value={value}
-        onValueChange={onValueChange}
+        onValueChange={(v) => { hapticSelection(); onValueChange(v); }}
         disabled={disabled}
         trackColor={{ false: Colors.borderLight, true: Colors.primaryMuted }}
         thumbColor={value && !disabled ? Colors.primary : Colors.textMuted}
@@ -110,7 +111,7 @@ export function ChipRow<T extends string | number>({
         <TouchableOpacity
           key={String(o.value)}
           style={[cr.chip, value === o.value && cr.chipActive]}
-          onPress={() => onSelect(o.value)}
+          onPress={() => { hapticSelection(); onSelect(o.value); }}
         >
           <Text style={[cr.chipText, value === o.value && cr.chipTextActive]}>{o.label}</Text>
         </TouchableOpacity>

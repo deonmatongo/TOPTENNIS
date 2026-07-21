@@ -7,6 +7,8 @@ jest.mock('@/services/supabase', () => ({
       signInWithPassword: jest.fn(),
       signUp: jest.fn(),
       signOut: jest.fn(),
+      updateUser: jest.fn().mockResolvedValue({ data: {}, error: null }),
+      resetPasswordForEmail: jest.fn().mockResolvedValue({ data: {}, error: null }),
     },
     from: jest.fn().mockReturnValue({
       select: jest.fn().mockReturnThis(),
@@ -16,13 +18,15 @@ jest.mock('@/services/supabase', () => ({
       delete: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
       neq: jest.fn().mockReturnThis(),
+      or: jest.fn().mockReturnThis(),
       in: jest.fn().mockReturnThis(),
       ilike: jest.fn().mockReturnThis(),
       order: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
       single: jest.fn().mockResolvedValue({ data: null, error: null }),
       maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
-      then: jest.fn().mockResolvedValue({ data: [], error: null }),
+      // Proper thenable so `await supabase.from(...).select().eq(...)` resolves.
+      then: jest.fn((resolve: any, reject: any) => Promise.resolve({ data: [], error: null }).then(resolve, reject)),
     }),
     functions: {
       invoke: jest.fn().mockResolvedValue({ data: null, error: null }),
@@ -53,6 +57,27 @@ jest.mock('expo-secure-store', () => ({
 
 // Mock expo-font
 jest.mock('expo-font', () => ({ isLoaded: jest.fn(() => true), loadAsync: jest.fn() }));
+
+// Mock expo-notifications
+jest.mock('expo-notifications', () => ({
+  getPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  requestPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  setNotificationChannelAsync: jest.fn().mockResolvedValue(undefined),
+  getExpoPushTokenAsync: jest.fn().mockResolvedValue({ data: 'ExponentPushToken[test]' }),
+  setBadgeCountAsync: jest.fn().mockResolvedValue(undefined),
+  setNotificationHandler: jest.fn(),
+  addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  AndroidImportance: { MAX: 5 },
+}), { virtual: true });
+
+// Mock expo-haptics
+jest.mock('expo-haptics', () => ({
+  impactAsync: jest.fn().mockResolvedValue(undefined),
+  selectionAsync: jest.fn().mockResolvedValue(undefined),
+  notificationAsync: jest.fn().mockResolvedValue(undefined),
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },
+  NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
+}));
 
 // Mock safe area
 jest.mock('react-native-safe-area-context', () => {

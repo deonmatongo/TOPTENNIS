@@ -3,7 +3,7 @@ import {
   TouchableOpacity, ActivityIndicator, ViewStyle, TextStyle,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import * as Haptics from 'expo-haptics'
+import { impact as hapticImpact } from '@/utils/haptics'
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated'
 import { XStack, Text } from 'tamagui'
 import { Colors, Radius, FontSize, FontWeight, Shadow, Palette } from '@/theme/colors'
@@ -20,7 +20,7 @@ const PressScale: React.FC<{
   return (
     <Animated.View style={[animStyle, style]}>
       <TouchableOpacity
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); onPress() }}
+        onPress={() => { hapticImpact(); onPress() }}
         onPressIn={() => { scale.value = withSpring(0.96, { damping: 20, stiffness: 420 }) }}
         onPressOut={() => { scale.value = withSpring(1, { damping: 14, stiffness: 320 }) }}
         disabled={disabled}

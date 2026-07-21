@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Alert } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/services/supabase';
+import { setHapticsEnabled } from '@/utils/haptics';
 
 export interface AppSettings {
   profile_visibility: 'public' | 'friends_only' | 'private';
@@ -91,6 +92,9 @@ export function useAppSettings() {
     })();
   }, [user]);
 
+  // Keep the global haptics switch in sync with the persisted preference.
+  useEffect(() => { setHapticsEnabled(settings.haptics_enabled); }, [settings.haptics_enabled]);
+
   const update = useCallback(async (patch: Partial<AppSettings>) => {
     const next = { ...settings, ...patch };
     setSettings(next);
@@ -100,6 +104,26 @@ export function useAppSettings() {
         { user_id: user!.id, ...next, updated_at: new Date().toISOString() },
         { onConflict: 'user_id' },
       );
+
+      // app_settings is private (RLS: owner-only), but the public profiles table is
+      // what player search, match suggestions and the profile sheet read. Mirror the
+      // privacy choices there so they actually take effect. Discoverability = networking
+      // on AND not private; the show_* flags let other clients mask sensitive fields.
+      // Best-effort: never block saving the preference if the mirror write fails.
+      const MIRROR_KEYS: (keyof AppSettings)[] = [
+        'networking_enabled', 'profile_visibility', 'show_win_loss', 'show_usta_rating', 'show_location',
+      ];
+      if (MIRROR_KEYS.some(k => k in patch)) {
+        const discoverable = next.networking_enabled && next.profile_visibility !== 'private';
+        try {
+          await supabase.from('profiles').update({
+            networking_enabled: discoverable,
+            show_win_loss: next.show_win_loss,
+            show_usta_rating: next.show_usta_rating,
+            show_location: next.show_location,
+          }).eq('id', user!.id);
+        } catch { /* enforcement mirror is best-effort; app_settings remains source of truth */ }
+      }
     } catch {
       setSettings(settings);
       Alert.alert('Error', 'Could not save setting. Please try again.');

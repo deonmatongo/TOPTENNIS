@@ -117,4 +117,46 @@ describe('useAppSettings', () => {
     await act(async () => { resolveFn!({ error: null }); });
     await waitFor(() => expect(result.current.saving).toBe(false));
   });
+
+  it('mirrors networking_enabled to the public profiles row so search enforces it', async () => {
+    getDB().single.mockResolvedValueOnce({ data: null, error: null });
+    const { result } = renderHook(() => useAppSettings());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => { await result.current.update({ networking_enabled: false }); });
+
+    expect(getDB().update).toHaveBeenCalledWith(expect.objectContaining({ networking_enabled: false }));
+    expect(getDB().eq).toHaveBeenCalledWith('id', mockUser.id);
+  });
+
+  it('mirrors the show_* display flags to the public profiles row', async () => {
+    getDB().single.mockResolvedValueOnce({ data: null, error: null });
+    const { result } = renderHook(() => useAppSettings());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => { await result.current.update({ show_usta_rating: false }); });
+
+    expect(getDB().update).toHaveBeenCalledWith(expect.objectContaining({ show_usta_rating: false }));
+  });
+
+  it('marks the player undiscoverable when visibility is set to private', async () => {
+    getDB().single.mockResolvedValueOnce({ data: null, error: null });
+    const { result } = renderHook(() => useAppSettings());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => { await result.current.update({ profile_visibility: 'private' }); });
+
+    // networking defaults to true, but private visibility overrides discoverability
+    expect(getDB().update).toHaveBeenCalledWith(expect.objectContaining({ networking_enabled: false }));
+  });
+
+  it('does NOT touch profiles for non-privacy settings', async () => {
+    getDB().single.mockResolvedValueOnce({ data: null, error: null });
+    const { result } = renderHook(() => useAppSettings());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => { await result.current.update({ haptics_enabled: false }); });
+
+    expect(getDB().update).not.toHaveBeenCalled();
+  });
 });
