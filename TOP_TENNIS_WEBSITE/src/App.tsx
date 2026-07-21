@@ -32,6 +32,8 @@ import League from "./pages/League";
 import Courts from "./pages/Courts";
 import Contact from "./pages/Contact";
 import Rules from "./pages/Rules";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
 import ScrollToTop from "@/components/ScrollToTop";
 
 const queryClient = new QueryClient({
@@ -114,6 +116,8 @@ const App: React.FC = () => {
                   <Route path="/courts" element={<Courts />} />
                   <Route path="/contact" element={<Contact />} />
                   <Route path="/rules" element={<Rules />} />
+                  <Route path="/terms" element={<Terms />} />
+                  <Route path="/privacy" element={<Privacy />} />
                   <Route path="/profile-setup" element={
                     <ProtectedRoute>
                       <ProfileSetup />

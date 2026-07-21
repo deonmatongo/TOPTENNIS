@@ -1,5 +1,6 @@
 
 import { Facebook, Instagram, Linkedin, Twitter, Youtube } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Footer = () => {
   return (
@@ -30,8 +31,8 @@ const Footer = () => {
             <ul className="space-y-1 sm:space-y-2">
               <li><a href="#" className="text-gray-400 hover:text-white transition-colors text-sm sm:text-base">Help Center</a></li>
               <li><a href="#" className="text-gray-400 hover:text-white transition-colors text-sm sm:text-base">Contact Us</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors text-sm sm:text-base">Privacy Policy</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors text-sm sm:text-base">Terms of Service</a></li>
+              <li><Link to="/privacy" className="text-gray-400 hover:text-white transition-colors text-sm sm:text-base">Privacy Policy</Link></li>
+              <li><Link to="/terms" className="text-gray-400 hover:text-white transition-colors text-sm sm:text-base">Terms of Service</Link></li>
             </ul>
           </div>
 
@@ -68,9 +69,8 @@ const Footer = () => {
               © 2024 TennisMatch. All rights reserved.
             </p>
             <div className="flex items-center space-x-4 sm:space-x-6">
-              <a href="#" className="text-gray-400 hover:text-white text-xs sm:text-sm transition-colors">Privacy</a>
-              <a href="#" className="text-gray-400 hover:text-white text-xs sm:text-sm transition-colors">Terms</a>
-              <a href="#" className="text-gray-400 hover:text-white text-xs sm:text-sm transition-colors">Cookies</a>
+              <Link to="/privacy" className="text-gray-400 hover:text-white text-xs sm:text-sm transition-colors">Privacy</Link>
+              <Link to="/terms" className="text-gray-400 hover:text-white text-xs sm:text-sm transition-colors">Terms</Link>
             </div>
           </div>
         </div>

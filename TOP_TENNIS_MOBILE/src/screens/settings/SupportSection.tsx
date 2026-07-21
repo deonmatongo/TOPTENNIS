@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ScrollView, Alert, Linking, Share, Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { Colors } from '@/theme/colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/services/supabase';
@@ -9,9 +10,12 @@ import {
 
 const SUPPORT_EMAIL = 'support@toptennis.app';
 const SHARE_URL = 'https://toptennis.app';
-// TODO: replace with the real store IDs once the app is published.
-const IOS_APP_ID = '0000000000';
-const ANDROID_PACKAGE = 'app.toptennis';
+const APP_NAME = 'Top Tennis';
+// Android package comes straight from the app config. The iOS App Store numeric
+// ID only exists once the app is published — until then IOS_APP_ID stays null and
+// the rate action falls back to an App Store search.
+const ANDROID_PACKAGE = Constants.expoConfig?.android?.package ?? 'com.top.tennis';
+const IOS_APP_ID: string | null = null; // e.g. '1234567890' after App Store release
 
 const openURL = (url: string) =>
   Linking.openURL(url).catch(() => Alert.alert('Error', 'Could not open link.'));
@@ -39,10 +43,14 @@ export const SupportSection: React.FC<{ navigation: any }> = ({ navigation }) =>
     } catch { /* fall through to store link */ }
 
     const deepLink = Platform.OS === 'ios'
-      ? `itms-apps://itunes.apple.com/app/id${IOS_APP_ID}?action=write-review`
+      ? (IOS_APP_ID
+          ? `itms-apps://itunes.apple.com/app/id${IOS_APP_ID}?action=write-review`
+          : `itms-apps://itunes.apple.com/search?term=${encodeURIComponent(APP_NAME)}`)
       : `market://details?id=${ANDROID_PACKAGE}`;
     const webLink = Platform.OS === 'ios'
-      ? `https://apps.apple.com/app/id${IOS_APP_ID}`
+      ? (IOS_APP_ID
+          ? `https://apps.apple.com/app/id${IOS_APP_ID}`
+          : `https://apps.apple.com/search?term=${encodeURIComponent(APP_NAME)}`)
       : `https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE}`;
     try {
       const canDeep = await Linking.canOpenURL(deepLink);
@@ -113,11 +121,28 @@ export const SupportSection: React.FC<{ navigation: any }> = ({ navigation }) =>
         leagueRegistrations: leagues.data ?? [],
         matches: matches.data ?? [],
       };
+      const json = JSON.stringify(payload, null, 2);
 
-      await Share.share({
-        title: 'My Top Tennis data',
-        message: JSON.stringify(payload, null, 2),
-      });
+      // Prefer sharing a real .json file; fall back to sharing the raw text.
+      let sharedAsFile = false;
+      try {
+        const FS = optional<any>('expo-file-system/legacy') ?? optional<any>('expo-file-system');
+        const Sharing = optional<any>('expo-sharing');
+        if (FS?.writeAsStringAsync && FS?.cacheDirectory && Sharing?.shareAsync && (await Sharing.isAvailableAsync?.())) {
+          const uri = `${FS.cacheDirectory}toptennis-data-${Date.now()}.json`;
+          await FS.writeAsStringAsync(uri, json);
+          await Sharing.shareAsync(uri, {
+            mimeType: 'application/json',
+            dialogTitle: 'My Top Tennis data',
+            UTI: 'public.json',
+          });
+          sharedAsFile = true;
+        }
+      } catch { /* fall back to text share below */ }
+
+      if (!sharedAsFile) {
+        await Share.share({ title: 'My Top Tennis data', message: json });
+      }
     } catch (e: any) {
       Alert.alert('Export failed', e?.message ?? `Please try again, or email ${SUPPORT_EMAIL}.`);
     } finally {

@@ -35,7 +35,7 @@ export const usePlayerSearch = () => {
     if (!user) return;
 
     const load = async () => {
-      const [playersRes, profilesRes, blockedByRes] = await Promise.all([
+      const [playersRes, profilesRes, blockedByRes, friendsRes] = await Promise.all([
         supabase
           .from('players')
           .select('id, user_id, name, email, skill_level, wins, losses, usta_rating, competitiveness, age_range, city, gender')
@@ -43,21 +43,32 @@ export const usePlayerSearch = () => {
           .order('name'),
         supabase
           .from('profiles')
-          .select('id, networking_enabled, show_win_loss, show_usta_rating, show_location, first_name, last_name, profile_picture_url'),
+          .select('id, networking_enabled, profile_visibility, show_win_loss, show_usta_rating, show_location, first_name, last_name, profile_picture_url'),
         supabase
           .from('blocked_users')
           .select('blocker_id')
           .eq('blocked_user_id', user.id),
+        supabase
+          .from('friend_requests')
+          .select('sender_id, receiver_id')
+          .eq('status', 'accepted')
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`),
       ]);
 
       const profileMap = new Map((profilesRes.data || []).map(p => [p.id, p]));
       const blockedBySet = new Set((blockedByRes.data || []).map((b: any) => b.blocker_id));
       const outboundBlocked = new Set(blockedUsers.map(b => b.blocked_user_id));
+      // Set of user_ids the current user is friends with.
+      const friendSet = new Set(
+        (friendsRes.data || []).map((r: any) => (r.sender_id === user.id ? r.receiver_id : r.sender_id)),
+      );
 
       const eligible = (playersRes.data || [])
         .filter(p => {
           const profile = profileMap.get(p.user_id);
-          if (profile?.networking_enabled === false) return false;
+          if (profile?.networking_enabled === false) return false; // networking off or private
+          // friends-only profiles are only discoverable to the player's friends
+          if (profile?.profile_visibility === 'friends_only' && !friendSet.has(p.user_id)) return false;
           if (blockedBySet.has(p.user_id)) return false;
           if (outboundBlocked.has(p.user_id)) return false;
           return true;

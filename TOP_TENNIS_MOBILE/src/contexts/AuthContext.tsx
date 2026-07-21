@@ -80,6 +80,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const signOut = async () => {
+    // Clear this device's push token first so a signed-out device stops
+    // receiving notifications. Best-effort — never block sign-out on it.
+    if (user?.id) {
+      try {
+        await supabase.from('profiles').update({ push_token: null }).eq('id', user.id);
+      } catch { /* ignore — proceed with sign-out regardless */ }
+    }
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   };

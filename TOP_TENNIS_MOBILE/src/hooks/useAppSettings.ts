@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/services/supabase';
 import { setHapticsEnabled } from '@/utils/haptics';
+import { setSoundEnabled } from '@/utils/sounds';
 
 export interface AppSettings {
   profile_visibility: 'public' | 'friends_only' | 'private';
@@ -92,8 +93,9 @@ export function useAppSettings() {
     })();
   }, [user]);
 
-  // Keep the global haptics switch in sync with the persisted preference.
+  // Keep the global haptics + sound switches in sync with the persisted preferences.
   useEffect(() => { setHapticsEnabled(settings.haptics_enabled); }, [settings.haptics_enabled]);
+  useEffect(() => { setSoundEnabled(settings.sound_effects); }, [settings.sound_effects]);
 
   const update = useCallback(async (patch: Partial<AppSettings>) => {
     const next = { ...settings, ...patch };
@@ -114,10 +116,15 @@ export function useAppSettings() {
         'networking_enabled', 'profile_visibility', 'show_win_loss', 'show_usta_rating', 'show_location',
       ];
       if (MIRROR_KEYS.some(k => k in patch)) {
+        // networking_enabled stays the effective discoverability gate (off when
+        // networking is off OR the profile is private) so existing filters + the
+        // server suggestions RPC exclude private/opted-out players. profile_visibility
+        // is mirrored too so clients can additionally enforce friends-only.
         const discoverable = next.networking_enabled && next.profile_visibility !== 'private';
         try {
           await supabase.from('profiles').update({
             networking_enabled: discoverable,
+            profile_visibility: next.profile_visibility,
             show_win_loss: next.show_win_loss,
             show_usta_rating: next.show_usta_rating,
             show_location: next.show_location,

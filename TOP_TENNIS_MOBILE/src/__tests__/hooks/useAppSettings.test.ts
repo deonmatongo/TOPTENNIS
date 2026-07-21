@@ -150,6 +150,19 @@ describe('useAppSettings', () => {
     expect(getDB().update).toHaveBeenCalledWith(expect.objectContaining({ networking_enabled: false }));
   });
 
+  it('mirrors profile_visibility (e.g. friends_only stays discoverable) to profiles', async () => {
+    getDB().single.mockResolvedValueOnce({ data: null, error: null });
+    const { result } = renderHook(() => useAppSettings());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => { await result.current.update({ profile_visibility: 'friends_only' }); });
+
+    // friends_only keeps networking_enabled true (discoverable) but records the visibility
+    expect(getDB().update).toHaveBeenCalledWith(
+      expect.objectContaining({ profile_visibility: 'friends_only', networking_enabled: true }),
+    );
+  });
+
   it('does NOT touch profiles for non-privacy settings', async () => {
     getDB().single.mockResolvedValueOnce({ data: null, error: null });
     const { result } = renderHook(() => useAppSettings());

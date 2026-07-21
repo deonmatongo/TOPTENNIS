@@ -9,4 +9,7 @@
 alter table public.profiles
   add column if not exists show_win_loss    boolean not null default true,
   add column if not exists show_usta_rating boolean not null default true,
-  add column if not exists show_location    boolean not null default true;
+  add column if not exists show_location    boolean not null default true,
+  -- Mirrored so player search / suggestions can enforce friends-only + private.
+  add column if not exists profile_visibility text not null default 'public'
+    check (profile_visibility in ('public', 'friends_only', 'private'));

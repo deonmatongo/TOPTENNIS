@@ -38,16 +38,31 @@ export function useMatchSuggestions() {
 
       const candidates = data || [];
       const userIds = candidates.map(p => p.user_id).filter(Boolean);
-      const { data: profiles } = userIds.length > 0
-        ? await supabase
-            .from('profiles')
-            .select('id, networking_enabled, show_win_loss, show_usta_rating, show_location, profile_picture_url')
-            .in('id', userIds)
-        : { data: [] as any[] };
+      const [{ data: profiles }, { data: friends }] = await Promise.all([
+        userIds.length > 0
+          ? supabase
+              .from('profiles')
+              .select('id, networking_enabled, profile_visibility, show_win_loss, show_usta_rating, show_location, profile_picture_url')
+              .in('id', userIds)
+          : Promise.resolve({ data: [] as any[] }),
+        supabase
+          .from('friend_requests')
+          .select('sender_id, receiver_id')
+          .eq('status', 'accepted')
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`),
+      ]);
       const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+      const friendSet = new Set(
+        (friends || []).map((r: any) => (r.sender_id === user.id ? r.receiver_id : r.sender_id)),
+      );
 
       const scored = candidates
-        .filter(p => profileMap.get(p.user_id)?.networking_enabled !== false)
+        .filter(p => {
+          const prof = profileMap.get(p.user_id);
+          if (prof?.networking_enabled === false) return false;
+          if (prof?.profile_visibility === 'friends_only' && !friendSet.has(p.user_id)) return false;
+          return true;
+        })
         .slice(0, 20)
         .map(p => {
           const prof = profileMap.get(p.user_id);

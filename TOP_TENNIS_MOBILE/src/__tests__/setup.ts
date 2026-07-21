@@ -70,6 +70,28 @@ jest.mock('expo-notifications', () => ({
   AndroidImportance: { MAX: 5 },
 }), { virtual: true });
 
+// Mock expo-file-system (legacy API) + expo-sharing for data export
+jest.mock('expo-file-system/legacy', () => ({
+  cacheDirectory: 'file:///cache/',
+  writeAsStringAsync: jest.fn().mockResolvedValue(undefined),
+}), { virtual: true });
+jest.mock('expo-sharing', () => ({
+  isAvailableAsync: jest.fn().mockResolvedValue(true),
+  shareAsync: jest.fn().mockResolvedValue(undefined),
+}), { virtual: true });
+
+// Mock expo-av (sound effects)
+jest.mock('expo-av', () => ({
+  Audio: {
+    setAudioModeAsync: jest.fn().mockResolvedValue(undefined),
+    Sound: {
+      createAsync: jest.fn().mockResolvedValue({
+        sound: { replayAsync: jest.fn().mockResolvedValue(undefined), unloadAsync: jest.fn().mockResolvedValue(undefined) },
+      }),
+    },
+  },
+}));
+
 // Mock expo-haptics
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn().mockResolvedValue(undefined),

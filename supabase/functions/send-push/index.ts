@@ -38,6 +38,51 @@ Deno.serve(async (req: Request) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   )
 
+  // ── Respect the user's notification preferences ─────────────────────────────
+  // app_settings is RLS-private to its owner, but the service-role client here can
+  // read it. Skip delivery when the master push switch is off, or when the toggle
+  // for this notification's category is off. Unknown types are always allowed.
+  const CATEGORY_COLUMN: Record<string, string> = {
+    friend_request:   'friend_requests',
+    friend_accepted:  'friend_requests',
+    match_invite:     'match_invites',
+    match_accepted:   'match_accepted',
+    match_confirmed:  'match_accepted',
+    match_declined:   'match_declined',
+    match_cancelled:  'match_declined',
+    match_rescheduled:'match_reminders',
+    match_scheduled:  'match_reminders',
+    match_reminder:   'match_reminders',
+    score_reminder:   'match_reminders',
+    match_result:     'score_confirmed',
+    message_received: 'messages',
+    league_update:    'league_updates',
+    achievement:      'achievements',
+    score_submitted:  'score_submitted',
+    score_confirmed:  'score_confirmed',
+  }
+
+  const { data: settings } = await supabase
+    .from('app_settings')
+    .select('push_enabled, match_invites, match_reminders, match_accepted, match_declined, league_updates, score_submitted, score_confirmed, friend_requests, messages, achievements')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  // Opt-out model: if there's no settings row yet, default to sending.
+  if (settings) {
+    if (settings.push_enabled === false) {
+      return new Response(JSON.stringify({ skipped: 'push disabled' }), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+    const column = CATEGORY_COLUMN[type]
+    if (column && (settings as Record<string, unknown>)[column] === false) {
+      return new Response(JSON.stringify({ skipped: `category '${type}' disabled` }), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+  }
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('push_token')

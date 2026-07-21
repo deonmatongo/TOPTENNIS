@@ -97,13 +97,12 @@ describe('SupportSection', () => {
     alertSpy.mockRestore();
   });
 
-  it('gathers account data and opens the share sheet on Export My Data', async () => {
-    const shareSpy = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' } as any);
+  it('gathers account data and shares it as a .json file on Export My Data', async () => {
+    const Sharing = jest.requireMock('expo-sharing');
     const { getByText } = render(<SupportSection navigation={navigation} />);
     fireEvent.press(getByText('Export My Data'));
-    await waitFor(() => expect(shareSpy).toHaveBeenCalled());
-    expect(shareSpy.mock.calls[0][0].message).toContain('exportedAt');
-    shareSpy.mockRestore();
+    await waitFor(() => expect(Sharing.shareAsync).toHaveBeenCalled());
+    expect(Sharing.shareAsync.mock.calls[0][0]).toMatch(/\.json$/);
   });
 
   it('calls Linking.openSettings for Calendar Access', () => {

@@ -3,6 +3,10 @@ import { render, fireEvent, act } from '@testing-library/react-native';
 import { Linking } from 'react-native';
 import { SupportChatScreen } from '@/screens/settings/SupportChatScreen';
 
+jest.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 'u1', email: 'player@test.com' } }),
+}));
+
 const navigation = { goBack: jest.fn() };
 
 beforeEach(() => {

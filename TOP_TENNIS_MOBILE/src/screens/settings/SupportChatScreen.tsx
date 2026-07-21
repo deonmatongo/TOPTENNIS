@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
   KeyboardAvoidingView, Platform, Linking, Alert,
@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Palette, FontSize, Font, Spacing, Radius, Shadow } from '@/theme/colors';
 import { SettingsSafeScreen, SectionPageHeader } from './_shared';
 import { selection as hapticSelection } from '@/utils/haptics';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/services/supabase';
 
 const SUPPORT_EMAIL = 'support@toptennis.app';
 
@@ -74,6 +76,7 @@ let seq = 0;
 const nextId = () => `m${++seq}`;
 
 export const SupportChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMsg[]>([GREETING]);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
@@ -82,6 +85,40 @@ export const SupportChatScreen: React.FC<{ navigation: any }> = ({ navigation })
   const scrollDown = useCallback(() => {
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
   }, []);
+
+  // Persist a message so the conversation survives and surfaces to agents. Best-effort.
+  const persist = useCallback((sender: 'user' | 'assistant' | 'agent', body: string, escalated = false) => {
+    if (!user?.id) return;
+    supabase.from('support_messages').insert({ user_id: user.id, sender, body, escalated }).then?.(() => {}, () => {});
+  }, [user?.id]);
+
+  // Load any prior conversation on open.
+  useEffect(() => {
+    if (!user?.id) return;
+    let active = true;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('support_messages')
+          .select('id, sender, body, escalated')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: true });
+        if (active && data && data.length > 0) {
+          setMessages([
+            GREETING,
+            ...data.map((m: any) => ({
+              id: `db-${m.id}`,
+              from: (m.sender === 'user' ? 'user' : 'bot') as Sender,
+              text: m.body,
+              escalate: !!m.escalated,
+            })),
+          ]);
+          scrollDown();
+        }
+      } catch { /* start fresh on error */ }
+    })();
+    return () => { active = false; };
+  }, [user?.id, scrollDown]);
 
   const emailAgent = useCallback((history: ChatMsg[]) => {
     const transcript = history.map(m => `${m.from === 'user' ? 'You' : 'Assistant'}: ${m.text}`).join('\n');
@@ -100,14 +137,16 @@ export const SupportChatScreen: React.FC<{ navigation: any }> = ({ navigation })
     setInput('');
     setTyping(true);
     scrollDown();
+    persist('user', text);
 
     const answer = respond(text);
     setTimeout(() => {
       setTyping(false);
       setMessages(prev => [...prev, { id: nextId(), from: 'bot', text: answer.text, escalate: answer.escalate }]);
       scrollDown();
+      persist('assistant', answer.text, !!answer.escalate);
     }, 650);
-  }, [scrollDown]);
+  }, [scrollDown, persist]);
 
   return (
     <SettingsSafeScreen>
