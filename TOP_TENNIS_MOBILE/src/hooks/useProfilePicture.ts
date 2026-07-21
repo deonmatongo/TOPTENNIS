@@ -48,7 +48,7 @@ export function useProfilePicture() {
         .upload(fileName, blob, {
           contentType: asset.mimeType || `image/${ext}`,
           cacheControl: '3600',
-          upsert: false,
+          upsert: true,
         });
 
       if (error) throw error;
@@ -58,7 +58,6 @@ export function useProfilePicture() {
         .getPublicUrl(data.path);
 
       await updatePlayerProfile({ profile_picture_url: publicUrl });
-      await supabase.from('profiles').update({ profile_picture_url: publicUrl }).eq('id', user.id);
 
       return publicUrl;
     } catch (e: any) {
@@ -100,7 +99,7 @@ export function useProfilePicture() {
         .upload(fileName, blob, {
           contentType: asset.mimeType || `image/${ext}`,
           cacheControl: '3600',
-          upsert: false,
+          upsert: true,
         });
 
       if (error) throw error;
@@ -110,7 +109,6 @@ export function useProfilePicture() {
         .getPublicUrl(data.path);
 
       await updatePlayerProfile({ profile_picture_url: publicUrl });
-      await supabase.from('profiles').update({ profile_picture_url: publicUrl }).eq('id', user.id);
 
       return publicUrl;
     } catch (e: any) {

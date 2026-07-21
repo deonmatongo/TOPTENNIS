@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Text, Image, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Colors, FontWeight } from '@/theme/colors'
@@ -11,6 +11,11 @@ interface AvatarProps {
 }
 
 export const Avatar: React.FC<AvatarProps> = ({ name, size = 44, style, imageUrl }) => {
+  const [imgError, setImgError] = useState(false)
+
+  // Reset error state whenever the URL changes (e.g. after a new upload)
+  useEffect(() => { setImgError(false) }, [imageUrl])
+
   const initials = name
     .split(' ')
     .filter(Boolean)
@@ -19,7 +24,7 @@ export const Avatar: React.FC<AvatarProps> = ({ name, size = 44, style, imageUrl
     .join('')
     .toUpperCase()
 
-  if (imageUrl) {
+  if (imageUrl && !imgError) {
     return (
       <View
         style={[
@@ -31,6 +36,7 @@ export const Avatar: React.FC<AvatarProps> = ({ name, size = 44, style, imageUrl
           source={{ uri: imageUrl }}
           style={{ width: size, height: size, borderRadius: size / 2 }}
           resizeMode="cover"
+          onError={() => setImgError(true)}
         />
       </View>
     )

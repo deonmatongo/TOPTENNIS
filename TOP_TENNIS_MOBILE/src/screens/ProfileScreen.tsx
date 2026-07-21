@@ -25,7 +25,7 @@ const skillColor = (l?: number): string => !l ? Palette.gray400 : l <= 3 ? Palet
 export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { user, signOut } = useAuth();
-  const { player: profile, loading, updatePlayerProfile: updateProfile } = usePlayerProfile();
+  const { player: profile, loading, updatePlayerProfile: updateProfile, refetch: refetchProfile } = usePlayerProfile();
   const { uploading: uploadingPic, showPicker } = useProfilePicture();
 
   const fullName = profile?.name || user?.email?.split('@')[0] || 'Player';
@@ -133,7 +133,7 @@ export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
           {/* Avatar */}
           <TouchableOpacity
             style={s.avatarWrap}
-            onPress={() => showPicker(url => setLocalPicUrl(url))}
+            onPress={() => showPicker(url => { setLocalPicUrl(url); refetchProfile(); })}
             disabled={uploadingPic}
             activeOpacity={0.8}
           >
