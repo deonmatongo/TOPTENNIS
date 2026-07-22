@@ -239,7 +239,7 @@ const EnhancedRegistrationForm: React.FC<EnhancedRegistrationFormProps> = ({
           className={`h-12 border-gray-300 focus:border-primary focus:ring-primary ${
             validationErrors.phone ? 'border-red-500' : ''
           }`}
-          placeholder="+263771234567 or 0771234567"
+          placeholder="+12125551234 or 2125551234"
           disabled={isLoading}
           aria-invalid={!!validationErrors.phone}
         />

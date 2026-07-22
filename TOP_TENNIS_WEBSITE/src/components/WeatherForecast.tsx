@@ -162,8 +162,7 @@ const WeatherForecast = () => {
     }
   };
 
-  // Load Harare on mount — central city for ZW users
-  useEffect(() => { search('Harare'); }, []);
+  useEffect(() => { search('New York'); }, []);
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); search(query); };
 

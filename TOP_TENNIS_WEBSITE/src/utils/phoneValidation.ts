@@ -1,15 +1,10 @@
 /**
- * Phone validation utilities — international (E.164 preferred).
- * Accepts full E.164 (+263771234567) or local digits (0771234567).
+ * Phone validation utilities — US-focused (E.164 preferred).
+ * Accepts full E.164 (+12125551234) or local digits (2125551234).
  */
 
-// Known dial codes ordered longest-first so +1 doesn't match before +263
 const DIAL_CODES = [
-  { dial: '+263', label: 'Zimbabwe'  },
-  { dial: '+48',  label: 'Poland'    },
-  { dial: '+27',  label: 'S. Africa' },
-  { dial: '+44',  label: 'UK'        },
-  { dial: '+1',   label: 'USA'       },
+  { dial: '+1', label: 'USA / Canada' },
 ] as const;
 
 export type DialCode = typeof DIAL_CODES[number]['dial'];
@@ -53,10 +48,10 @@ export const parsePhoneForPrefill = (
     }
   }
 
-  // No prefix found — caller's digits only, default to Zimbabwe
+  // No prefix found — treat as local US digits
   const digits = cleaned.replace(/\D/g, '');
   if (digits.length >= 7) {
-    return { dialCode: '+263', local: digits };
+    return { dialCode: '+1', local: digits };
   }
 
   return null;

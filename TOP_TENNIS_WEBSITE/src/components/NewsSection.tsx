@@ -4,47 +4,47 @@ import { Clock, MapPin } from "lucide-react";
 const NewsSection = () => {
   const mainNews = {
     category: "QUOTE OF THE DAY",
-    title: "CARLOS TEES UP TOM HOLLAND GOLF DATE",
-    subtitle: "The defending champ will face Fritz in the semis, and Spider-Man on the green.",
+    title: "FRITZ: 'NEW YORK IS WHERE I WANT TO WIN THE MOST'",
+    subtitle: "The American No. 1 is laser-focused on lifting the US Open trophy in front of his home crowd.",
     image: "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?ixlib=rb-4.0.3&ixid=M3wxMJA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
     actions: [
       { label: "READ", primary: true },
-      { label: "FRITZ'S FIRST SF", primary: false }
+      { label: "US OPEN DRAW", primary: false }
     ]
   };
 
   const sideNews = [
     {
-      category: "WIMBLEDON",
-      title: "FRITZ FACES ALCARAZ CHALLENGE IN SEMIFINALS",
+      category: "US OPEN",
+      title: "FRITZ TARGETS FIRST US OPEN TITLE ON HOME SOIL",
       image: "https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80"
     },
     {
-      category: "STAT OF THE DAY", 
-      title: "ANISIMOVA BECOMES FIRST WOMAN BORN IN 2000S TO REACH",
+      category: "STAT OF THE DAY",
+      title: "GAUFF BECOMES YOUNGEST AMERICAN WOMAN TO REACH US OPEN FINAL",
       image: "https://images.unsplash.com/photo-1594736797933-d0d4bb847a8b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80"
     },
     {
-      category: "WIMBLEDON",
-      title: "SINNER CANCELS PRACTICE A DAY AFTER HURTING ELBOW", 
+      category: "US OPEN",
+      title: "ALCARAZ WITHDRAWS FROM PRACTICE SESSION CITING FATIGUE",
       image: "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80"
     }
   ];
 
   const tournament = {
-    status: "LIVE",
-    title: "Wimbledon",
-    location: "London, England",
-    day: "Day 17 of 21"
+    status: "UPCOMING",
+    title: "US Open",
+    location: "New York, USA",
+    day: "Aug 25 – Sep 7"
   };
 
   const headlines = [
-    "Adrian Mannarino Plays Newport Challenger Just Four Days After Third-Round Loss At Wimbledon",
-    "'Tee It Up!' Carlos Alcaraz Scores Semifinal Spot, And Tom Holland Golf Date, At Wimbledon", 
-    "PHOTOS: Mirra Andreeva Cheers On Coach Conchita Martinez At Wimbledon",
-    "Iga Swiatek Vs. Liudmila Samsonova: Wimbledon Betting Preview",
-    "Solana Sierra Donates Kit And Racquet To Wimbledon Museum",
-    "Taylor Fritz Goes Back Up The Hill With First Wimbledon Semifinal"
+    "Taylor Fritz Eyes Deep Run At US Open After Strong Hard-Court Swing",
+    "Coco Gauff Focused And Ready As US Open Approaches On Home Turf",
+    "Ben Shelton Primed For Breakout Run At Flushing Meadows",
+    "Serena Williams Honored In Special Ceremony Before US Open Begins",
+    "USTA Announces Record Prize Money For 2026 US Open",
+    "Madison Keys Returns To Form Ahead Of US Open With Cincinnati Title"
   ];
 
   return (

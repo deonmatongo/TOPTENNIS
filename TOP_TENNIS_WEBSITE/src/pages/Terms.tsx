@@ -93,7 +93,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: 'Governing law',
     body: [
-      'Top Tennis operates for players in Zimbabwe and Poland. These Terms are governed by the laws of the country in which you primarily use the Service, and any dispute will be handled by the competent courts of that country, without affecting mandatory consumer rights available to you locally.',
+      'Top Tennis operates for players in the United States. These Terms are governed by the laws of the State of Delaware, without regard to conflict of law principles. Any dispute that cannot be resolved informally will be handled by the competent courts of the State of Delaware, without affecting mandatory consumer rights available to you under applicable law.',
     ],
   },
   {

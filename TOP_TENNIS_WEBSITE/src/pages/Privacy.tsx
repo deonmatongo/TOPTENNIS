@@ -9,7 +9,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: 'Who we are',
     body: [
-      'This Privacy Policy explains how Top Tennis ("we", "us", "our") collects, uses and protects your personal information when you use the Top Tennis apps and services (the "Service"). It applies to players in Zimbabwe, Poland and anywhere else the Service is available.',
+      'This Privacy Policy explains how Top Tennis ("we", "us", "our") collects, uses and protects your personal information when you use the Top Tennis apps and services (the "Service"). It applies to players in the United States.',
     ],
   },
   {
@@ -31,7 +31,8 @@ const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: 'Legal bases for processing',
     body: [
-      'Where the EU/EEA General Data Protection Regulation (GDPR) applies (for example, for players in Poland), we rely on: performing our contract with you; your consent (for optional notifications and marketing); our legitimate interests (to secure and improve the Service); and compliance with legal obligations.',
+      'We process your information to perform our contract with you (to provide the Service); based on your consent for optional features such as notifications and marketing; to further our legitimate business interests (such as securing and improving the Service); and to comply with applicable US legal obligations.',
+      'California residents have additional rights under the California Consumer Privacy Act (CCPA/CPRA), including the right to know, delete, correct, and opt out of the sale or sharing of personal information. We do not sell your personal information.',
       'You can withdraw consent at any time, for example by turning off notification categories in Settings.',
     ],
   },
@@ -90,7 +91,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: 'Contact us',
     body: [
-      'For any privacy question or request, email support@toptennis.app. If you are in the EU/EEA and are not satisfied with our response, you may also lodge a complaint with your local data-protection authority.',
+      'For any privacy question or request, email support@toptennis.app. If you are a California resident and are not satisfied with our response, you may contact the California Privacy Protection Agency (CPPA) at cppa.ca.gov.',
     ],
   },
 ];
