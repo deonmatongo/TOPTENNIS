@@ -4,57 +4,33 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Phone, Mail, MapPin, Clock, Users, MessageCircle } from "lucide-react";
+import { Mail, Clock, Users, MessageCircle } from "lucide-react";
 
 const Contact = () => {
   const contactInfo = [
     {
-      icon: <Phone className="h-6 w-6" />,
-      title: "Phone",
-      details: "(555) 123-TENNIS",
-      subtitle: "Call us during business hours"
-    },
-    {
       icon: <Mail className="h-6 w-6" />,
-      title: "Email", 
-      details: "info@toptennisleague.com",
+      title: "Email",
+      details: "support@toptennisleague.com",
       subtitle: "We respond within 24 hours"
-    },
-    {
-      icon: <MapPin className="h-6 w-6" />,
-      title: "Address",
-      details: "123 Tennis Boulevard",
-      subtitle: "Sports District, TC 12345"
     },
     {
       icon: <Clock className="h-6 w-6" />,
       title: "Hours",
-      details: "Mon-Fri: 8AM-8PM",
-      subtitle: "Sat-Sun: 9AM-6PM"
-    }
-  ];
-
-  const team = [
-    {
-      name: "Sarah Johnson",
-      role: "League Director",
-      phone: "(555) 123-4567",
-      email: "sarah@toptennisleague.com",
-      specialization: "League Operations & Player Relations"
+      details: "Mon–Fri: 9AM–6PM ET",
+      subtitle: "Sat–Sun: 10AM–4PM ET"
     },
     {
-      name: "Mike Rodriguez", 
-      role: "Tournament Coordinator",
-      phone: "(555) 234-5678",
-      email: "mike@toptennisleague.com",
-      specialization: "Match Scheduling & Results"
+      icon: <MessageCircle className="h-6 w-6" />,
+      title: "In-App Support",
+      details: "Help & Feedback",
+      subtitle: "Available in the app settings"
     },
     {
-      name: "Emily Chen",
-      role: "Membership Manager",
-      phone: "(555) 345-6789", 
-      email: "emily@toptennisleague.com",
-      specialization: "New Member Registration & Support"
+      icon: <Users className="h-6 w-6" />,
+      title: "Community",
+      details: "Player Forums",
+      subtitle: "Connect with other players"
     }
   ];
 
@@ -154,38 +130,6 @@ const Contact = () => {
               </CardContent>
             </Card>
 
-            {/* Team Directory */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Users className="h-5 w-5" />
-                  <span>Our Team</span>
-                </CardTitle>
-                <CardDescription>
-                  Connect directly with our team members for specific needs.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {team.map((member, index) => (
-                  <div key={index} className="border-b border-gray-200 pb-4 last:border-b-0 last:pb-0">
-                    <h4 className="font-semibold text-gray-900">{member.name}</h4>
-                    <p className="text-orange-600 font-medium text-sm">{member.role}</p>
-                    <p className="text-gray-600 text-sm mt-1">{member.specialization}</p>
-                    <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-1 sm:space-y-0 mt-2 text-sm">
-                      <div className="flex items-center space-x-1">
-                        <Phone className="h-3 w-3 text-gray-400" />
-                        <span className="text-gray-600">{member.phone}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <Mail className="h-3 w-3 text-gray-400" />
-                        <span className="text-gray-600">{member.email}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
             {/* FAQ Quick Links */}
             <Card>
               <CardHeader>
@@ -226,20 +170,20 @@ const Contact = () => {
           </div>
         </div>
 
-        {/* Emergency Contact */}
+        {/* Support note */}
         <div className="mt-12">
-          <Card className="bg-red-50 border-red-200">
+          <Card className="bg-orange-50 border-orange-200">
             <CardContent className="pt-6">
               <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center text-red-600">
-                  <Phone className="h-5 w-5" />
+                <div className="flex-shrink-0 w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600">
+                  <Mail className="h-5 w-5" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-red-900">Emergency Contact</h4>
-                  <p className="text-red-700">
-                    For urgent matters during tournaments or events: <strong>(555) 911-TENNIS</strong>
+                  <h4 className="font-semibold text-orange-900">App Support</h4>
+                  <p className="text-orange-700">
+                    For help with the Top Tennis app, email <strong>support@toptennisleague.com</strong> or use the Help section inside the app.
                   </p>
-                  <p className="text-red-600 text-sm mt-1">Available during event hours only</p>
+                  <p className="text-orange-600 text-sm mt-1">We aim to respond within one business day.</p>
                 </div>
               </div>
             </CardContent>
