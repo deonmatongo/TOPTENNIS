@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertCircle, Mail, ArrowLeft, CheckCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+
+const NAVY = "#0B1526";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
@@ -14,87 +15,65 @@ const ForgotPassword = () => {
   const [validationError, setValidationError] = useState("");
   const { resetPassword } = useAuth();
 
-  const validateEmail = (email: string) => {
-    if (!email.trim()) {
-      return 'Email is required';
-    }
-    if (!/\S+@\S+\.\S+/.test(email)) {
-      return 'Please enter a valid email address';
-    }
-    return '';
+  const validate = (val: string) => {
+    if (!val.trim()) return "Email is required";
+    if (!/\S+@\S+\.\S+/.test(val)) return "Enter a valid email address";
+    return "";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const error = validateEmail(email);
-    if (error) {
-      setValidationError(error);
-      return;
-    }
-
+    const err = validate(email);
+    if (err) { setValidationError(err); return; }
     setLoading(true);
-
     try {
       const { error } = await resetPassword(email);
-      
-      if (error) {
-        toast.error(error.message || 'Failed to send reset email. Please try again.');
-      } else {
-        setEmailSent(true);
-        toast.success('Password reset email sent!');
-      }
-    } catch (err) {
-      toast.error('An unexpected error occurred. Please try again.');
+      if (error) toast.error(error.message || "Failed to send reset email. Please try again.");
+      else { setEmailSent(true); toast.success("Password reset email sent!"); }
+    } catch {
+      toast.error("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value);
-    if (validationError) {
-      setValidationError('');
-    }
+    if (validationError) setValidationError("");
   };
 
+  /* ── Success state ── */
   if (emailSent) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-6">
-            <img 
-              src="/app-icon.png" 
-              alt="Tennis League Logo" 
-              className="h-24 w-36 object-contain mx-auto mb-4" 
-            />
-          </div>
+      <div className="min-h-screen flex">
+        {/* Left panel */}
+        <LeftPanel
+          tag="Check your inbox"
+          heading={<>We sent the<br /><span className="text-orange-400">reset link.</span></>}
+          body="If an account exists for that email address you'll receive a password reset link shortly. Check your spam folder if it doesn't arrive within a minute."
+        />
 
-          <div className="bg-card rounded-2xl shadow-lg p-6 sm:p-8 text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-8 h-8 text-green-600" />
+        {/* Right */}
+        <div className="flex-1 flex items-center justify-center bg-white px-4 sm:px-8">
+          <div className="w-full max-w-[420px] text-center">
+            <div className="h-16 w-16 rounded-2xl flex items-center justify-center mx-auto mb-6" style={{ backgroundColor: "rgba(34,197,94,0.1)" }}>
+              <CheckCircle className="h-8 w-8 text-green-500" />
             </div>
-            
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Check your email</h2>
-            <p className="text-gray-600 mb-6">
-              We've sent a password reset link to <strong>{email}</strong>
+            <h1 className="text-2xl font-black text-gray-900 mb-2">Check your email</h1>
+            <p className="text-sm text-gray-500 leading-relaxed mb-2">
+              We've sent a reset link to <span className="font-semibold text-gray-700">{email}</span>
             </p>
-            
-            <p className="text-sm text-gray-500 mb-6">
-              Didn't receive the email? Check your spam folder or{" "}
-              <button 
-                onClick={() => setEmailSent(false)}
-                className="text-primary hover:text-primary/80 font-medium"
-              >
-                try again
+            <p className="text-sm text-gray-400 mb-8">
+              Didn't receive it?{" "}
+              <button onClick={() => setEmailSent(false)} className="text-orange-500 hover:text-orange-400 font-semibold transition-colors">
+                Try again
               </button>
             </p>
-
-            <Link to="/login">
-              <Button variant="outline" className="w-full h-12">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Sign In
-              </Button>
+            <Link
+              to="/login"
+              className="inline-flex items-center justify-center gap-2 w-full h-11 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" /> Back to Sign In
             </Link>
           </div>
         </div>
@@ -102,73 +81,65 @@ const ForgotPassword = () => {
     );
   }
 
+  /* ── Main form ── */
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-6">
-          <img 
-            src="/app-icon.png" 
-            alt="Tennis League Logo" 
-            className="h-24 w-36 object-contain mx-auto mb-4" 
-          />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Forgot Password?</h2>
-          <p className="text-gray-600">
-            No worries, we'll send you reset instructions.
-          </p>
-        </div>
+    <div className="min-h-screen flex">
+      {/* Left panel */}
+      <LeftPanel
+        tag="Password reset"
+        heading={<>Forgot your<br /><span className="text-orange-400">password?</span></>}
+        body="No worries — it happens to everyone. Enter your email and we'll send you a secure link to set a new one."
+      />
 
-        <div className="bg-card rounded-2xl shadow-lg p-6 sm:p-8">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium text-gray-700">
-                Email Address
-              </Label>
+      {/* Right */}
+      <div className="flex-1 flex items-center justify-center bg-white px-4 sm:px-8 py-12">
+        <div className="w-full max-w-[420px]">
+
+          {/* Mobile logo */}
+          <MobileLogo />
+
+          <h1 className="text-2xl font-black text-gray-900 mb-1">Reset your password</h1>
+          <p className="text-sm text-gray-400 mb-8">
+            Remember it?{" "}
+            <Link to="/login" className="text-orange-500 hover:text-orange-400 font-semibold transition-colors">
+              Sign in
+            </Link>
+          </p>
+
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-xs font-bold text-gray-500 uppercase tracking-widest">Email address</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={handleInputChange}
-                  className={`pl-11 h-12 border-gray-300 focus:border-primary focus:ring-primary ${
-                    validationError ? 'border-red-500' : ''
-                  }`}
-                  placeholder="Enter your email address"
-                  disabled={loading}
-                  aria-describedby={validationError ? "email-error" : undefined}
-                  aria-invalid={!!validationError}
+                  id="email" name="email" type="email" autoComplete="email" required
+                  value={email} onChange={handleChange} disabled={loading}
+                  placeholder="you@example.com"
+                  className={`pl-10 h-11 rounded-xl border-gray-200 focus:border-orange-400 focus:ring-orange-400/20 ${validationError ? "border-red-400" : ""}`}
                 />
               </div>
               {validationError && (
-                <div id="email-error" className="flex items-center text-red-500 text-xs mt-1" role="alert">
-                  <AlertCircle className="w-3 h-3 mr-1" aria-hidden="true" />
-                  {validationError}
-                </div>
+                <p className="flex items-center gap-1 text-xs text-red-500">
+                  <AlertCircle className="w-3 h-3" />{validationError}
+                </p>
               )}
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-base"
-              disabled={loading}
+            <button
+              type="submit" disabled={loading}
+              className="w-full h-11 rounded-xl bg-orange-500 hover:bg-orange-400 text-white text-sm font-black tracking-wide transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {loading ? (
-                <div className="flex items-center">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" aria-hidden="true"></div>
-                  SENDING...
-                </div>
-              ) : (
-                'RESET PASSWORD'
-              )}
-            </Button>
+              {loading
+                ? <><span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />Sending…</>
+                : "Send Reset Link"
+              }
+            </button>
 
-            <Link to="/login" className="block">
-              <Button variant="ghost" className="w-full h-12 text-gray-600">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Sign In
-              </Button>
+            <Link
+              to="/login"
+              className="flex items-center justify-center gap-2 w-full h-11 rounded-xl text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" /> Back to Sign In
             </Link>
           </form>
         </div>
@@ -176,5 +147,58 @@ const ForgotPassword = () => {
     </div>
   );
 };
+
+/* ── Shared sub-components ── */
+
+function LeftPanel({ tag, heading, body }: { tag: string; heading: React.ReactNode; body: string }) {
+  return (
+    <div className="hidden lg:flex lg:w-[48%] xl:w-[52%] relative overflow-hidden flex-col" style={{ backgroundColor: NAVY }}>
+      {/* Grid texture */}
+      <div
+        className="absolute inset-0 opacity-[0.04] pointer-events-none"
+        style={{
+          backgroundImage: "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+        }}
+      />
+      <div className="absolute top-0 right-0 w-96 h-96 rounded-full opacity-10 blur-3xl pointer-events-none" style={{ background: "radial-gradient(circle, #f97316, transparent)" }} />
+      <div className="absolute bottom-0 left-0 w-72 h-72 rounded-full opacity-10 blur-3xl pointer-events-none" style={{ background: "radial-gradient(circle, #f97316, transparent)" }} />
+
+      <div className="relative flex flex-col h-full px-12 py-12">
+        <Link to="/" className="flex items-center gap-3 w-fit">
+          <img src="/app-icon.png" alt="Top Tennis" className="h-11 w-11 rounded-xl object-cover" />
+          <span className="font-bold text-base leading-none">
+            <span className="text-white">Top</span>
+            <span className="text-orange-400"> Tennis</span>
+            <span className="block text-[10px] font-medium text-white/40 tracking-widest uppercase mt-0.5">League</span>
+          </span>
+        </Link>
+
+        <div className="flex-1 flex flex-col justify-center max-w-md">
+          <span className="inline-block text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full mb-6 w-fit" style={{ color: "#fb923c", backgroundColor: "rgba(249,115,22,0.12)" }}>
+            {tag}
+          </span>
+          <h2 className="text-4xl xl:text-5xl font-black text-white leading-tight mb-4">{heading}</h2>
+          <p className="text-base text-white/50 leading-relaxed">{body}</p>
+        </div>
+
+        <p className="text-xs text-white/20">© {new Date().getFullYear()} Top Tennis League</p>
+      </div>
+    </div>
+  );
+}
+
+function MobileLogo() {
+  return (
+    <div className="flex items-center gap-2.5 mb-8 lg:hidden">
+      <img src="/app-icon.png" alt="Top Tennis" className="h-10 w-10 rounded-xl object-cover" />
+      <span className="font-bold text-sm leading-none">
+        <span className="text-gray-900">Top</span>
+        <span className="text-orange-500"> Tennis</span>
+        <span className="block text-[10px] font-medium text-gray-400 tracking-widest uppercase mt-0.5">League</span>
+      </span>
+    </div>
+  );
+}
 
 export default ForgotPassword;
