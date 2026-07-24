@@ -56,7 +56,7 @@ const ProfileSetup = () => {
                 <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse"></div>
                 <div className="relative p-5 bg-gradient-to-br from-primary/10 to-accent/10 rounded-full border border-primary/20 shadow-lg">
                   <img 
-                    src="/logo.png" 
+                    src="/app-icon.png" 
                     alt="Top Tennis League Logo" 
                     className="h-24 w-36 object-contain"
                   />

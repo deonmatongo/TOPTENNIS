@@ -1,129 +1,118 @@
-import React from 'react';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
+import { ChevronDown } from "lucide-react";
+import { useState } from "react";
+
+const NAVY = "#0B1526";
+
+const rules = [
+  {
+    title: "About Top Tennis League",
+    body: "Top Tennis League is one of the largest community tennis programs in the country, with thousands of players competing across cities. The league has opportunities for everyone — Men's, Women's, and Mixed Doubles, Singles, Juniors, and a High School league for grades 9–12.",
+  },
+  {
+    title: "Levels of Play",
+    body: "Players register at a level that ensures fair and competitive matches. Placement is determined by past league results, USTA/Level ratings, or Ultimate Tennis levels. New players should register at their official rating or seek coach advice. Doubles levels are based on a combination of both partners' ratings.",
+  },
+  {
+    title: "Junior Divisions",
+    bullets: [
+      { label: "A", text: "Advanced players with significant tournament experience" },
+      { label: "B", text: "Intermediate players with league experience" },
+      { label: "C", text: "Beginners building skills and match experience" },
+    ],
+    body: "Junior players are grouped by age (10U, 12U, 14U) and by level. Players with high win percentages typically move up in age or skill level. Junior divisions do not include playoffs.",
+  },
+  {
+    title: "Scheduling Matches",
+    body: "Both teams are responsible for contacting each other by Wednesday of the match week to agree on a time. Each side must offer three valid options within league hours. If no agreement is reached, the match defaults to the play-by date. Matches can be rescheduled once with proper notice — repeated cancellations or forfeits may result in penalties.",
+  },
+  {
+    title: "Match Play Rules",
+    body: "Matches follow USTA rules, with Top Tennis League guidelines taking priority. Home teams provide courts and a new can of USTA-approved balls. Adults and high school players play best two of three sets, with an optional tiebreaker replacing the third set. Juniors always use a 7-point tiebreaker in the third set. Scores must be reported before the deadline.",
+  },
+  {
+    title: "Playoffs & Division Winners",
+    body: "Teams must opt in to qualify for playoffs. Division winners qualify automatically if they meet eligibility requirements (sufficient points, limited forfeits). Playoff scheduling is stricter and late passes are not permitted. Division winners are recognised with prizes such as bag tags and apparel.",
+  },
+  {
+    title: "Weather & Special Rules",
+    body: "In cases of rain, extreme heat, or freezing conditions, matches may be rescheduled. Lightning requires a 30-minute suspension before play can resume. The home team is responsible for safe courts, proper lighting, and restroom access. If a match is interrupted after it begins, play resumes from the exact score when it stopped.",
+  },
+  {
+    title: "Waiver & Player Responsibility",
+    body: "By registering, all participants accept the risks of competitive tennis and release Top Tennis League and its host facilities from liability for injuries or damages. Players are expected to honour their commitments, respect opponents, and maintain good sportsmanship both on and off the court.",
+  },
+];
 
 const Rules = () => {
+  const [open, setOpen] = useState<number | null>(0);
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-white">
       <Header />
-      
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 pt-24 sm:pt-28 lg:pt-32 pb-8 sm:pb-12 lg:pb-16">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-8 sm:mb-12">
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 sm:mb-4">League Rules</h1>
-            <p className="text-base sm:text-lg lg:text-xl text-muted-foreground px-4 sm:px-0">
-              Everything you need to know about Top Tennis League rules and regulations
-            </p>
-          </div>
 
-          <div className="space-y-4 sm:space-y-6 lg:space-y-8">
-            {/* About Top Tennis League */}
-            <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
-              <CardHeader className="pb-3 sm:pb-4">
-                <CardTitle className="text-lg sm:text-xl lg:text-2xl text-primary">About Top Tennis League</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <p className="text-sm sm:text-base lg:text-lg text-foreground leading-relaxed">
-                  Top Tennis League is one of the largest community tennis programs in the country, with thousands of players competing across cities like Atlanta, Charlotte, and Denver. The league has opportunities for everyone — Men's, Women's, and Mixed Doubles, Singles, Juniors, and even a brand-new High School league for grades 9–12.
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Levels of Play */}
-            <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
-              <CardHeader className="pb-3 sm:pb-4">
-                <CardTitle className="text-lg sm:text-xl lg:text-2xl text-primary">Levels of Play</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <p className="text-sm sm:text-base lg:text-lg text-foreground leading-relaxed">
-                  Players are expected to register at a level that ensures fair and competitive matches. Placement is determined by past league results, USTA/Level ratings, or Ultimate Tennis levels. New players should register at their official rating or seek advice from a coach if unsure. Doubles levels are based on a combination of both partners' ratings. Teams with partners more than two levels apart are discouraged. Returning players may move up or down based on past win percentages and overall performance.
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Junior Divisions */}
-            <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
-              <CardHeader className="pb-3 sm:pb-4">
-                <CardTitle className="text-lg sm:text-xl lg:text-2xl text-primary">Junior Divisions</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <p className="text-sm sm:text-base lg:text-lg text-foreground leading-relaxed mb-3 sm:mb-4">
-                  Junior players are grouped by age (10U, 12U, 14U) and by level:
-                </p>
-                <ul className="space-y-2 sm:space-y-3 ml-4 sm:ml-6">
-                  <li className="text-sm sm:text-base lg:text-lg text-foreground"><strong>A:</strong> Advanced players with significant tournament experience</li>
-                  <li className="text-sm sm:text-base lg:text-lg text-foreground"><strong>B:</strong> Intermediate players with league experience</li>
-                  <li className="text-sm sm:text-base lg:text-lg text-foreground"><strong>C:</strong> Beginners building skills and match experience</li>
-                </ul>
-                <p className="text-sm sm:text-base lg:text-lg text-foreground leading-relaxed mt-3 sm:mt-4">
-                  Players with high win percentages typically move up in age or skill level. Junior divisions do not include playoffs.
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Scheduling Matches */}
-            <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
-              <CardHeader className="pb-3 sm:pb-4">
-                <CardTitle className="text-lg sm:text-xl lg:text-2xl text-primary">Scheduling Matches</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <p className="text-sm sm:text-base lg:text-lg text-foreground leading-relaxed">
-                  Both teams are responsible for contacting each other by Wednesday of the match week to set a time. Each side must offer three valid options within league hours. If no agreement is reached, the match defaults to the "play by" date at the set time. Matches can be rescheduled once with proper notice, but repeated cancellations or forfeits may result in penalties. A one-time "late score pass" can be used to extend certain matches past the deadline (except the final match or playoffs).
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Match Play Rules */}
-            <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
-              <CardHeader className="pb-3 sm:pb-4">
-                <CardTitle className="text-lg sm:text-xl lg:text-2xl text-primary">Match Play Rules</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <p className="text-sm sm:text-base lg:text-lg text-foreground leading-relaxed">
-                  Matches follow USTA rules, with Top Tennis League guidelines taking priority. Home teams provide courts and a new can of USTA-approved balls. Adults and high school players usually play best two out of three sets, with the option to replace a third set with a tiebreaker if agreed. Juniors always use a 7-point tiebreaker in the third set. Standard rules apply for warm-ups, breaks, sportsmanship, and cell phone use. Spectators are welcome but may not interfere. Scores must be reported before the deadline.
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Playoffs & Division Winners */}
-            <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
-              <CardHeader className="pb-3 sm:pb-4">
-                <CardTitle className="text-lg sm:text-xl lg:text-2xl text-primary">Playoffs & Division Winners</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <p className="text-sm sm:text-base lg:text-lg text-foreground leading-relaxed">
-                  Teams must "opt in" to qualify for playoffs. Division winners qualify automatically if they meet eligibility requirements (sufficient points, limited forfeits). Playoff scheduling is stricter, and late passes are not permitted. Division winners are decided by points and game-winning percentage, with winners receiving recognition items such as bag tags and magnets.
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Weather & Special Rules */}
-            <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
-              <CardHeader className="pb-3 sm:pb-4">
-                <CardTitle className="text-lg sm:text-xl lg:text-2xl text-primary">Weather & Special Rules</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <p className="text-sm sm:text-base lg:text-lg text-foreground leading-relaxed">
-                  In cases of rain, extreme heat, or freezing conditions, matches may be rescheduled. Lightning requires a 30-minute suspension before play can resume. The home team is responsible for ensuring safe courts, proper lighting, and restroom access. If a match is interrupted after it begins, play resumes from the exact score when it stopped.
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Waiver & Player Responsibility */}
-            <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
-              <CardHeader className="pb-3 sm:pb-4">
-                <CardTitle className="text-lg sm:text-xl lg:text-2xl text-primary">Waiver & Player Responsibility</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <p className="text-sm sm:text-base lg:text-lg text-foreground leading-relaxed">
-                  By registering, all participants accept the risks of competitive tennis and release Top Tennis League and its host facilities from liability for injuries or damages. Players are expected to honor their commitments, respect opponents, and maintain good sportsmanship both on and off the court.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+      {/* Hero */}
+      <div className="pt-16 md:pt-[4.25rem]" style={{ backgroundColor: NAVY }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 text-center">
+          <span className="inline-block text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full mb-4" style={{ color: "#fb923c", backgroundColor: "rgba(249,115,22,0.12)" }}>
+            Official Rulebook
+          </span>
+          <h1 className="text-4xl sm:text-5xl font-black text-white mb-4">League Rules</h1>
+          <p className="text-base text-white/50 max-w-xl mx-auto">
+            Everything you need to know about Top Tennis League rules, regulations, and player expectations.
+          </p>
         </div>
-      </main>
+      </div>
+
+      {/* Accordion */}
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+        <div className="divide-y divide-gray-100 border border-gray-100 rounded-2xl overflow-hidden">
+          {rules.map((rule, i) => (
+            <div key={i}>
+              <button
+                onClick={() => setOpen(open === i ? null : i)}
+                className="w-full flex items-center justify-between gap-4 px-6 py-5 text-left hover:bg-orange-50/50 transition-colors"
+              >
+                <div className="flex items-center gap-4">
+                  <span className="shrink-0 h-7 w-7 rounded-lg flex items-center justify-center text-xs font-black text-white" style={{ backgroundColor: "#f97316" }}>
+                    {i + 1}
+                  </span>
+                  <span className="text-sm sm:text-base font-bold text-gray-900">{rule.title}</span>
+                </div>
+                <ChevronDown className={`h-4 w-4 shrink-0 text-gray-400 transition-transform duration-200 ${open === i ? "rotate-180 text-orange-400" : ""}`} />
+              </button>
+              <div className={`overflow-hidden transition-all duration-300 ${open === i ? "max-h-[600px]" : "max-h-0"}`}>
+                <div className="px-6 pb-6 pt-0 ml-11 space-y-3">
+                  {rule.bullets && (
+                    <ul className="space-y-2 mb-3">
+                      {rule.bullets.map(b => (
+                        <li key={b.label} className="flex items-start gap-2 text-sm text-gray-600">
+                          <span className="shrink-0 font-black text-orange-500 w-4">{b.label}:</span>
+                          {b.text}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="text-sm text-gray-600 leading-relaxed">{rule.body}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer CTA */}
+        <div className="mt-12 rounded-2xl p-8 text-center" style={{ backgroundColor: NAVY }}>
+          <h3 className="text-lg font-black text-white mb-2">Still have questions?</h3>
+          <p className="text-sm text-white/50 mb-5">Our team is happy to clarify any rule or help you get started.</p>
+          <a
+            href="mailto:support@toptennisleague.com"
+            className="inline-block px-6 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-400 text-white text-sm font-bold transition-colors"
+          >
+            Email Support
+          </a>
+        </div>
+      </div>
 
       <Footer />
     </div>

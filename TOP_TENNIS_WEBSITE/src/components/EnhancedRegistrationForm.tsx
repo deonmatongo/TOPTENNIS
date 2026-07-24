@@ -369,11 +369,11 @@ const EnhancedRegistrationForm: React.FC<EnhancedRegistrationFormProps> = ({
           />
           <Label htmlFor="agreeToTerms" className="text-sm text-gray-700 leading-tight">
             I agree to the{" "}
-            <Link to="/terms" className="text-primary hover:text-primary/80 font-medium">
+            <Link to="/terms" className="text-orange-500 hover:text-orange-400 font-medium">
               Terms and Conditions
             </Link>{" "}
             and{" "}
-            <Link to="/privacy" className="text-primary hover:text-primary/80 font-medium">
+            <Link to="/privacy" className="text-orange-500 hover:text-orange-400 font-medium">
               Privacy Policy
             </Link>
           </Label>
@@ -388,16 +388,16 @@ const EnhancedRegistrationForm: React.FC<EnhancedRegistrationFormProps> = ({
 
       <Button
         type="submit"
-        className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-base"
+        className="w-full h-11 rounded-xl bg-orange-500 hover:bg-orange-400 text-white font-black text-sm tracking-wide"
         disabled={isLoading}
       >
         {loading ? (
-          <div className="flex items-center">
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" aria-hidden="true"></div>
-            CREATING ACCOUNT...
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true"></div>
+            Creating account…
           </div>
         ) : (
-          'CREATE ACCOUNT'
+          'Create Account'
         )}
       </Button>
 
@@ -442,7 +442,7 @@ const EnhancedRegistrationForm: React.FC<EnhancedRegistrationFormProps> = ({
       <div className="text-center pt-4 border-t border-gray-200 mt-6">
         <p className="text-sm text-gray-600">
           Already have an account?{" "}
-          <Link to="/login" className="text-primary hover:text-primary/80 font-bold">
+          <Link to="/login" className="text-orange-500 hover:text-orange-400 font-bold">
             Sign in here
           </Link>
         </p>

@@ -64,7 +64,7 @@ const ForgotPassword = () => {
         <div className="w-full max-w-md">
           <div className="text-center mb-6">
             <img 
-              src="/logo.png" 
+              src="/app-icon.png" 
               alt="Tennis League Logo" 
               className="h-24 w-36 object-contain mx-auto mb-4" 
             />
@@ -107,7 +107,7 @@ const ForgotPassword = () => {
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
           <img 
-            src="/logo.png" 
+            src="/app-icon.png" 
             alt="Tennis League Logo" 
             className="h-24 w-36 object-contain mx-auto mb-4" 
           />

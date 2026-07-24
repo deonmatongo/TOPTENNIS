@@ -1,7 +1,6 @@
 
 import Hero from "@/components/Hero";
 import NewsSection from "@/components/NewsSection";
-import Players from "@/components/Players";
 import WeatherForecast from "@/components/WeatherForecast";
 import Locations from "@/components/Locations";
 import TennisLadder from "@/components/TennisLadder";
@@ -17,7 +16,6 @@ const Index = () => {
       <Header />
       <Hero />
       <NewsSection />
-      <Players />
       <WeatherForecast />
       <Locations />
       <TennisLadder />
