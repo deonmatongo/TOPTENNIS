@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 12.0.0"
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -34,7 +35,10 @@
       "ios": {
         "appleId": "dmatongo3@gmail.com",
         "ascAppId": "6793261285",
-        "appleTeamId": "79X5VR3NH3"
+        "appleTeamId": "79X5VR3NH3",
+        "ascApiKeyPath": "./AuthKey_3J8HM6286W.p8",
+        "ascApiKeyIssuerId": "4930b4fc-430b-46a2-bd7a-ae3e2316e5ce",
+        "ascApiKeyId": "3J8HM6286W"
       },
       "android": {
         "serviceAccountKeyPath": "./google-service-account.json",
