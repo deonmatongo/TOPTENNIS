@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Shield, TrendingUp, ArrowRight } from "lucide-react";
+import { Shield, Zap, TrendingUp, ArrowRight } from "lucide-react";
 
 const cards = [
   {
@@ -13,6 +13,18 @@ const cards = [
       "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?auto=format&fit=crop&w=900&q=80",
     accent: "from-orange-900/85 via-orange-800/60 to-black/70",
     Icon: Shield,
+  },
+  {
+    tag: "Scoring",
+    title: "Game, Set,\nMatch!",
+    description:
+      "Standard tennis scoring applies throughout. Best-of-three sets with a match tiebreak in lieu of a third set.",
+    cta: "Scoring Guide",
+    href: "/rules",
+    image:
+      "https://images.unsplash.com/photo-1606107557309-bde2cf5ec836?auto=format&fit=crop&w=900&q=80",
+    accent: "from-blue-900/85 via-blue-800/60 to-black/70",
+    Icon: Zap,
   },
 ];
 
@@ -42,8 +54,8 @@ const NewsSection = () => {
           </Link>
         </div>
 
-        {/* Image card */}
-        <div className="grid grid-cols-1 gap-5 mb-5">
+        {/* Two image cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
           {cards.map((card, i) => (
             <div key={i} className="group relative rounded-2xl overflow-hidden h-72 sm:h-80 lg:h-96">
               <img
