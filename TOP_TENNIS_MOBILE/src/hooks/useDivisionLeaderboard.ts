@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/services/supabase';
+import { logger } from '@/services/logger';
 
 export interface LeaderboardPlayer {
   id: string;
@@ -69,7 +70,7 @@ export const useDivisionLeaderboard = (divisionId?: string) => {
 
         setLeaderboard(sorted);
       } catch (e: any) {
-        console.error('[useDivisionLeaderboard]', e.message);
+        logger.error('useDivisionLeaderboard', 'fetch failed', e);
       } finally {
         setLoading(false);
       }

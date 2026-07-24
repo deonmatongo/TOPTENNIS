@@ -35,10 +35,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    // Always start logged out — clear any persisted session
+    supabase.auth.signOut().finally(() => {
+      setSession(null);
+      setUser(null);
       setLoading(false);
     });
 
@@ -48,7 +48,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(session?.user ?? null);
       setLoading(false);
       if (session?.user) {
-        setSentryUser(session.user.id, session.user.email);
+        setSentryUser(session.user.id);
       } else {
         clearSentryUser();
       }

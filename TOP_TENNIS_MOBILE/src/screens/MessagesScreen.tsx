@@ -53,7 +53,7 @@ function getConvName(conv: Conversation, uid: string): string {
   if (conv.is_group) return conv.name || 'Group Chat';
   const other = conv.members.find(m => m.user_id !== uid);
   if (!other?.profile) return 'Direct Message';
-  return `${other.profile.first_name || ''} ${other.profile.last_name || ''}`.trim() || other.profile.email;
+  return `${other.profile.first_name || ''} ${other.profile.last_name || ''}`.trim() || 'Player';
 }
 function getConvOtherId(conv: Conversation, uid: string): string | null {
   if (conv.is_group) return null;

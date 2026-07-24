@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { captureError } from '@/services/sentry';
+import { logger } from '@/services/logger';
 
 export interface League {
   id: string;
@@ -147,7 +148,7 @@ export function useLeagueRegistrations() {
       p_age_range: playerData.age_range || '30-39',
       p_gender_preference: playerData.gender_preference || 'no-preference',
     }).then(({ error: e }) => {
-      if (e) console.warn('[useLeagueRegistrations] division assignment:', e.message);
+      if (e) logger.warn('useLeagueRegistrations', 'division assignment failed', e);
     });
 
     await fetchRegistrations();

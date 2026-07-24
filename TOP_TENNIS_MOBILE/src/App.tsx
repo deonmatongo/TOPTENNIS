@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { initSentry, setUser, clearUser } from '@/services/sentry';
+import { initSentry, wrapApp } from '@/services/sentry';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 initSentry();
@@ -149,7 +149,7 @@ function AppNavigator() {
   const [isLocked, setIsLocked] = useState(false);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
-  // Load intro-seen flag once on mount
+  // Load persisted flags once on mount
   useEffect(() => {
     SecureStore.getItemAsync(INTRO_SEEN_KEY).then(val => setIntroSeen(!!val));
   }, []);
@@ -234,7 +234,7 @@ TextAny.defaultProps = TextAny.defaultProps ?? {};
 TextAny.defaultProps.style = { fontFamily: Font.regular };
 
 
-export default function App() {
+function App() {
   const [fontsLoaded] = useFonts({
     Nunito_400Regular,
     Nunito_500Medium,
@@ -291,6 +291,8 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
+export default wrapApp(App);
 
 // ─── Global styles ─────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({

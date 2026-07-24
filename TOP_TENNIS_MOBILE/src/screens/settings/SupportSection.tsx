@@ -129,6 +129,8 @@ export const SupportSection: React.FC<{ navigation: any }> = ({ navigation }) =>
             dialogTitle: 'My Top Tennis data',
             UTI: 'public.json',
           });
+          // Delete cache file after sharing so PII doesn't linger on disk
+          await FS.deleteAsync?.(uri, { idempotent: true }).catch(() => {});
           sharedAsFile = true;
         }
       } catch { /* fall back to text share below */ }

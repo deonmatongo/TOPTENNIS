@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { logger } from '@/services/logger';
 
 /**
  * Tracks online status using the user_presence postgres table + postgres_changes.
@@ -33,7 +34,7 @@ export const useOnlinePresence = () => {
       .select('user_id')
       .gte('last_seen_at', cutoff);
     if (error) {
-      console.warn('[presence] fetch error:', error.message);
+      logger.warn('presence', 'fetch online users failed', error);
       return;
     }
     setOnlineUserIds(new Set((data || []).map((r: any) => r.user_id)));
@@ -43,7 +44,7 @@ export const useOnlinePresence = () => {
     const { error } = await supabase
       .from('user_presence')
       .upsert({ user_id: userId, last_seen_at: new Date().toISOString() });
-    if (error) console.warn('[presence] upsert error:', error.message);
+    if (error) logger.warn('presence', 'upsert own presence failed', error);
   }, []);
 
   const removeOwnPresence = useCallback(async (userId: string) => {
@@ -78,7 +79,7 @@ export const useOnlinePresence = () => {
       .subscribe((status: string) => {
         if (status === 'SUBSCRIBED') fetchOnlineUsers();
         else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT')
-          console.warn('[presence] channel status:', status);
+          logger.warn('presence', `realtime channel ${status}`);
       });
 
     channelRef.current = channel;
