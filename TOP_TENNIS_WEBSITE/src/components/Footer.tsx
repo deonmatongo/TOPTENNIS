@@ -67,18 +67,20 @@ const Footer = () => {
               </a>
             </div>
 
-            {/* Social */}
+            {/* Social — update hrefs when accounts are live */}
             <div className="flex gap-2 mt-4">
               {[
-                { Icon: Facebook, label: "Facebook" },
-                { Icon: Instagram, label: "Instagram" },
-                { Icon: Twitter, label: "Twitter" },
-                { Icon: Youtube, label: "YouTube" },
-              ].map(({ Icon, label }) => (
+                { Icon: Facebook, label: "Facebook", href: "https://facebook.com/toptennisleague" },
+                { Icon: Instagram, label: "Instagram", href: "https://instagram.com/toptennisleague" },
+                { Icon: Twitter, label: "Twitter / X", href: "https://x.com/toptennisleague" },
+                { Icon: Youtube, label: "YouTube", href: "https://youtube.com/@toptennisleague" },
+              ].map(({ Icon, label, href }) => (
                 <a
                   key={label}
-                  href="#"
+                  href={href}
                   aria-label={label}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="h-8 w-8 rounded-lg bg-background/5 hover:bg-orange-500 flex items-center justify-center transition-colors"
                 >
                   <Icon className="w-4 h-4 text-background/60 group-hover:text-white" />

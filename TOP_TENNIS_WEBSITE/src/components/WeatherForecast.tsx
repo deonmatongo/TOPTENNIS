@@ -93,22 +93,22 @@ async function fetchWeather(lat: number, lon: number): Promise<WeatherData['curr
 function WeatherIcon({ type, className = "w-8 h-8" }: { type: WmoCategory; className?: string }) {
   switch (type) {
     case 'sunny': return <Sun className={`${className} text-yellow-400`} />;
-    case 'partly-cloudy': return <Cloud className={`${className} text-slate-400`} />;
-    case 'cloudy': return <Cloud className={`${className} text-slate-500`} />;
+    case 'partly-cloudy': return <Cloud className={`${className} text-slate-300`} />;
+    case 'cloudy': return <Cloud className={`${className} text-slate-400`} />;
     case 'rainy': return <CloudRain className={`${className} text-blue-400`} />;
     case 'snowy': return <CloudSnow className={`${className} text-blue-300`} />;
-    case 'stormy': return <Zap className={`${className} text-yellow-500`} />;
+    case 'stormy': return <Zap className={`${className} text-yellow-400`} />;
   }
 }
 
 const playTip = (icon: WmoCategory) => {
   switch (icon) {
-    case 'sunny': return { text: "Great day to play!", color: "text-yellow-600 dark:text-yellow-400" };
-    case 'partly-cloudy': return { text: "Ideal conditions.", color: "text-green-600 dark:text-green-400" };
-    case 'cloudy': return { text: "Comfortable for play.", color: "text-slate-600 dark:text-slate-300" };
-    case 'rainy': return { text: "Consider indoor courts.", color: "text-blue-600 dark:text-blue-400" };
-    case 'snowy': return { text: "Courts likely closed.", color: "text-indigo-600 dark:text-indigo-400" };
-    case 'stormy': return { text: "Do not play outdoors.", color: "text-red-600 dark:text-red-400" };
+    case 'sunny': return { text: "Great day to play!", color: "text-yellow-400" };
+    case 'partly-cloudy': return { text: "Ideal conditions.", color: "text-green-400" };
+    case 'cloudy': return { text: "Comfortable for play.", color: "text-slate-300" };
+    case 'rainy': return { text: "Consider indoor courts.", color: "text-blue-400" };
+    case 'snowy': return { text: "Courts likely closed.", color: "text-indigo-400" };
+    case 'stormy': return { text: "Do not play outdoors.", color: "text-red-400" };
   }
 };
 
@@ -143,19 +143,22 @@ const WeatherForecast = () => {
   const tip = weatherData ? playTip(weatherData.current.icon) : null;
 
   return (
-    <section className="py-16 sm:py-20 lg:py-28 bg-muted/30 dark:bg-muted/10">
+    <section className="py-16 sm:py-20 lg:py-28" style={{ backgroundColor: "#0B1526" }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Heading */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-10">
           <div>
-            <span className="inline-block text-xs font-bold tracking-widest uppercase text-orange-500 bg-orange-50 dark:bg-orange-950/30 px-3 py-1 rounded-full mb-3">
+            <span
+              className="inline-block text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full mb-3"
+              style={{ color: "#fb923c", backgroundColor: "rgba(249,115,22,0.12)" }}
+            >
               Court Conditions
             </span>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-foreground leading-tight">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-tight">
               Weather Forecast
             </h2>
-            <p className="mt-3 text-base text-muted-foreground max-w-md leading-relaxed">
+            <p className="mt-3 text-base max-w-md leading-relaxed" style={{ color: "rgba(255,255,255,0.5)" }}>
               Check before you head out — plan your match around the forecast.
             </p>
           </div>
@@ -163,13 +166,14 @@ const WeatherForecast = () => {
           {/* Search */}
           <form onSubmit={handleSubmit} className="flex gap-2 w-full sm:w-auto max-w-xs">
             <div className="relative flex-1">
-              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
               <Input
                 type="text"
                 placeholder="City name"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                className="pl-9 h-10 rounded-xl bg-background"
+                className="pl-9 h-10 rounded-xl text-white placeholder:text-white/30 focus:border-orange-500/60"
+                style={{ backgroundColor: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)" }}
               />
             </div>
             <Button type="submit" disabled={isLoading} size="sm" className="h-10 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white">
@@ -179,7 +183,7 @@ const WeatherForecast = () => {
         </div>
 
         {error && (
-          <div className="flex items-center gap-2 mb-6 text-sm text-red-500 bg-red-50 dark:bg-red-950/20 px-4 py-3 rounded-xl">
+          <div className="flex items-center gap-2 mb-6 text-sm text-red-400 px-4 py-3 rounded-xl" style={{ backgroundColor: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.20)" }}>
             <AlertCircle className="w-4 h-4 shrink-0" /> {error}
           </div>
         )}
@@ -188,34 +192,34 @@ const WeatherForecast = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
             {/* Current conditions */}
-            <div className="bg-card border border-border/60 rounded-2xl p-6 flex flex-col gap-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <MapPin className="w-4 h-4 text-orange-500" />
+            <div className="rounded-2xl p-6 flex flex-col gap-4" style={{ backgroundColor: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <div className="flex items-center gap-2 text-sm" style={{ color: "rgba(255,255,255,0.5)" }}>
+                <MapPin className="w-4 h-4 text-orange-400" />
                 <span className="truncate font-medium">{weatherData.location}</span>
               </div>
 
               <div className="flex items-center gap-5">
                 <WeatherIcon type={weatherData.current.icon} className="w-14 h-14" />
                 <div>
-                  <div className="text-5xl font-black text-foreground leading-none">
+                  <div className="text-5xl font-black text-white leading-none">
                     {weatherData.current.temp}°
                   </div>
-                  <div className="text-sm text-muted-foreground mt-1">{weatherData.current.condition}</div>
+                  <div className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.5)" }}>{weatherData.current.condition}</div>
                 </div>
               </div>
 
               {tip && (
-                <div className={`text-sm font-semibold ${tip.color} bg-muted/60 rounded-xl px-4 py-2.5`}>
+                <div className={`text-sm font-semibold ${tip.color} rounded-xl px-4 py-2.5`} style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>
                   {tip.text}
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
+              <div className="grid grid-cols-2 gap-3 text-sm" style={{ color: "rgba(255,255,255,0.5)" }}>
+                <div className="flex items-center gap-2">
                   <Wind className="w-4 h-4 text-orange-400" />
                   <span>{weatherData.current.windSpeed} mph</span>
                 </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
+                <div className="flex items-center gap-2">
                   <Thermometer className="w-4 h-4 text-orange-400" />
                   <span>{weatherData.current.humidity}% humid</span>
                 </div>
@@ -223,14 +227,14 @@ const WeatherForecast = () => {
             </div>
 
             {/* 5-day forecast */}
-            <div className="lg:col-span-2 bg-card border border-border/60 rounded-2xl p-6">
+            <div className="lg:col-span-2 rounded-2xl p-6" style={{ backgroundColor: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
               <div className="flex items-center justify-between mb-5">
-                <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">5-Day Forecast</h3>
+                <h3 className="text-sm font-bold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>5-Day Forecast</h3>
                 <div className="flex gap-1">
-                  <button onClick={scrollLeft} className="h-8 w-8 rounded-lg border border-border flex items-center justify-center hover:bg-muted transition-colors">
+                  <button onClick={scrollLeft} className="h-8 w-8 rounded-lg flex items-center justify-center transition-colors" style={{ border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.5)" }} onMouseOver={e => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.08)")} onMouseOut={e => (e.currentTarget.style.backgroundColor = "transparent")}>
                     <ChevronLeft className="w-4 h-4" />
                   </button>
-                  <button onClick={scrollRight} className="h-8 w-8 rounded-lg border border-border flex items-center justify-center hover:bg-muted transition-colors">
+                  <button onClick={scrollRight} className="h-8 w-8 rounded-lg flex items-center justify-center transition-colors" style={{ border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.5)" }} onMouseOver={e => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.08)")} onMouseOut={e => (e.currentTarget.style.backgroundColor = "transparent")}>
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -244,15 +248,18 @@ const WeatherForecast = () => {
                 {weatherData.forecast.map((day, i) => (
                   <div
                     key={i}
-                    className="flex-shrink-0 w-28 flex flex-col items-center gap-2 bg-muted/50 rounded-xl p-3 hover:bg-orange-50/60 dark:hover:bg-orange-950/20 transition-colors"
+                    className="flex-shrink-0 w-28 flex flex-col items-center gap-2 rounded-xl p-3 transition-colors"
+                    style={{ backgroundColor: "rgba(255,255,255,0.05)" }}
+                    onMouseOver={e => (e.currentTarget.style.backgroundColor = "rgba(249,115,22,0.10)")}
+                    onMouseOut={e => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)")}
                   >
-                    <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{day.date}</span>
+                    <span className="text-xs font-bold uppercase tracking-wide" style={{ color: "rgba(255,255,255,0.4)" }}>{day.date}</span>
                     <WeatherIcon type={day.icon} className="w-8 h-8" />
                     <div className="text-center">
-                      <div className="text-lg font-black text-foreground leading-none">{day.high}°</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{day.low}°</div>
+                      <div className="text-lg font-black text-white leading-none">{day.high}°</div>
+                      <div className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>{day.low}°</div>
                     </div>
-                    <span className="text-[10px] text-muted-foreground text-center leading-tight">{day.condition}</span>
+                    <span className="text-[10px] text-center leading-tight" style={{ color: "rgba(255,255,255,0.35)" }}>{day.condition}</span>
                   </div>
                 ))}
               </div>

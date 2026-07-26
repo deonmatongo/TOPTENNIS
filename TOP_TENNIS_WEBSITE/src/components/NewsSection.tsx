@@ -41,21 +41,21 @@ const stats = [
 
 const NewsSection = () => {
   return (
-    <section className="py-16 sm:py-20 lg:py-28" style={{ backgroundColor: "#0B1526" }}>
+    <section className="py-16 sm:py-20 lg:py-28 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Heading */}
         <div className="text-center mb-14 lg:mb-20">
           <span
             className="inline-block text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full mb-4"
-            style={{ color: "#fb923c", backgroundColor: "rgba(249,115,22,0.12)" }}
+            style={{ color: "#f97316", backgroundColor: "rgba(249,115,22,0.10)" }}
           >
             How It Works
           </span>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-tight">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gray-900 leading-tight">
             From Sign-Up to<br className="hidden sm:block" /> Match Point
           </h2>
-          <p className="mt-4 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed" style={{ color: "rgba(255,255,255,0.5)" }}>
+          <p className="mt-4 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed text-gray-500">
             Getting on the court is simple. Four steps and you're competing in a structured, fun league that fits your schedule.
           </p>
         </div>
@@ -65,27 +65,21 @@ const NewsSection = () => {
           {steps.map((s, i) => (
             <div
               key={i}
-              className="group relative rounded-2xl p-6 transition-all duration-300"
-              style={{
-                backgroundColor: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.07)",
-              }}
-              onMouseOver={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(249,115,22,0.35)"; (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(255,255,255,0.06)"; }}
-              onMouseOut={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.07)"; (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(255,255,255,0.04)"; }}
+              className="group relative rounded-2xl p-6 bg-gray-50 border border-gray-100 transition-all duration-300 hover:border-orange-200 hover:bg-white hover:shadow-md hover:shadow-orange-500/5"
             >
-              <span className="absolute top-5 right-5 text-5xl font-black leading-none select-none" style={{ color: "rgba(255,255,255,0.04)" }}>
+              <span className="absolute top-5 right-5 text-5xl font-black leading-none select-none text-gray-900/[0.05]">
                 {s.step}
               </span>
 
               <div
                 className="mb-4 inline-flex items-center justify-center h-12 w-12 rounded-xl"
-                style={{ backgroundColor: "rgba(249,115,22,0.15)" }}
+                style={{ backgroundColor: "rgba(249,115,22,0.12)" }}
               >
-                <s.icon className="h-6 w-6 text-orange-400" />
+                <s.icon className="h-6 w-6 text-orange-500" />
               </div>
 
-              <h3 className="text-base font-bold text-white mb-2">{s.title}</h3>
-              <p className="text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.45)" }}>{s.description}</p>
+              <h3 className="text-base font-bold text-gray-900 mb-2">{s.title}</h3>
+              <p className="text-sm leading-relaxed text-gray-500">{s.description}</p>
             </div>
           ))}
         </div>
@@ -112,10 +106,7 @@ const NewsSection = () => {
           </Link>
           <Link
             to="/leagues"
-            className="inline-flex items-center justify-center px-8 py-3.5 rounded-xl font-semibold text-sm transition-all"
-            style={{ border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.65)" }}
-            onMouseOver={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(249,115,22,0.4)"; (e.currentTarget as HTMLElement).style.color = "#fb923c"; }}
-            onMouseOut={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.12)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.65)"; }}
+            className="inline-flex items-center justify-center px-8 py-3.5 rounded-xl font-semibold text-sm border border-gray-200 text-gray-600 hover:border-orange-300 hover:text-orange-500 transition-all"
           >
             View All Leagues
           </Link>

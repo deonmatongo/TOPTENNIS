@@ -30,25 +30,31 @@ const cards = [
 
 const NewsSection = () => {
   return (
-    <section className="py-16 sm:py-20 lg:py-28 bg-background">
+    <section className="py-16 sm:py-20 lg:py-28" style={{ backgroundColor: "#0B1526" }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Heading */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-10 lg:mb-14">
           <div>
-            <span className="inline-block text-xs font-bold tracking-widest uppercase text-orange-500 bg-orange-50 dark:bg-orange-950/30 px-3 py-1 rounded-full mb-3">
+            <span
+              className="inline-block text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full mb-3"
+              style={{ color: "#fb923c", backgroundColor: "rgba(249,115,22,0.12)" }}
+            >
               Compete
             </span>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-foreground leading-tight">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-tight">
               Every Game Matters
             </h2>
-            <p className="mt-3 text-base text-muted-foreground max-w-xl leading-relaxed">
+            <p className="mt-3 text-base max-w-xl leading-relaxed" style={{ color: "rgba(255,255,255,0.5)" }}>
               Your results update your ladder ranking in real time. Play more, climb higher.
             </p>
           </div>
           <Link
             to="/dashboard"
-            className="shrink-0 inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-border hover:border-orange-400 text-foreground hover:text-orange-500 font-semibold text-sm transition-all"
+            className="shrink-0 inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm transition-all"
+            style={{ border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.65)" }}
+            onMouseOver={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(249,115,22,0.4)"; (e.currentTarget as HTMLElement).style.color = "#fb923c"; }}
+            onMouseOut={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.12)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.65)"; }}
           >
             View Rankings <ArrowRight className="h-4 w-4" />
           </Link>

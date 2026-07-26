@@ -1,5 +1,6 @@
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import PageMeta from "@/components/PageMeta";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,6 +57,10 @@ const Contact = () => {
 
   return (
     <div className="min-h-screen bg-white">
+      <PageMeta
+        title="Contact Us | Top Tennis League"
+        description="Get in touch with the Top Tennis League team. We typically respond within 24 hours. Questions about leagues, membership, or scheduling — we're here to help."
+      />
       <Header />
 
       {/* Hero */}

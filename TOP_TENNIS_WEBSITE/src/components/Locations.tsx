@@ -49,19 +49,19 @@ const Locations = () => {
   const scrollRight = () => scrollRef.current?.scrollBy({ left: 300, behavior: 'smooth' });
 
   return (
-    <section id="locations" className="py-16 sm:py-20 lg:py-28 overflow-hidden" style={{ backgroundColor: "#0B1526" }}>
+    <section id="locations" className="py-16 sm:py-20 lg:py-28 overflow-hidden bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Heading row */}
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 mb-10 lg:mb-14">
           <div>
-            <span className="inline-block text-xs font-bold tracking-widest uppercase text-orange-400 bg-orange-500/10 px-3 py-1 rounded-full mb-4">
+            <span className="inline-block text-xs font-bold tracking-widest uppercase text-orange-500 bg-orange-50 px-3 py-1 rounded-full mb-4">
               Courts
             </span>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black leading-tight mb-3 text-white">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black leading-tight mb-3 text-gray-900">
               Find a Court Near You
             </h2>
-            <p className="text-base text-background/60 max-w-md leading-relaxed">
+            <p className="text-base text-gray-500 max-w-md leading-relaxed">
               Enter your ZIP code or use your current location to find tennis courts on Google Maps.
             </p>
           </div>
@@ -72,18 +72,18 @@ const Locations = () => {
               onClick={handleUseCurrentLocation}
               disabled={isLocating}
               variant="outline"
-              className="w-full border-background/10 bg-background/5 hover:bg-background/10 text-background hover:text-background justify-center rounded-xl"
+              className="w-full border-gray-200 bg-white hover:bg-gray-50 text-gray-700 justify-center rounded-xl"
             >
               {isLocating
-                ? <span className="animate-spin rounded-full h-4 w-4 border-2 border-background border-t-transparent mr-2" />
-                : <Crosshair className="w-4 h-4 mr-2 text-orange-400" />
+                ? <span className="animate-spin rounded-full h-4 w-4 border-2 border-gray-400 border-t-transparent mr-2" />
+                : <Crosshair className="w-4 h-4 mr-2 text-orange-500" />
               }
               Use My Location
             </Button>
 
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-background/30" />
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
                   type="text"
                   placeholder="ZIP code"
@@ -91,7 +91,7 @@ const Locations = () => {
                   onChange={e => setZipCode(e.target.value)}
                   onKeyPress={e => e.key === 'Enter' && handleSearch()}
                   maxLength={5}
-                  className="pl-9 bg-background/5 border-background/10 text-background placeholder:text-background/30 focus:border-orange-500/60 rounded-xl"
+                  className="pl-9 bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 focus:border-orange-400 rounded-xl"
                 />
               </div>
               <Button
@@ -111,13 +111,13 @@ const Locations = () => {
         {/* Courts carousel */}
         <div className="relative">
           <div className="absolute -left-4 top-1/2 -translate-y-1/2 z-10 hidden sm:block">
-            <button onClick={scrollLeft} className="h-10 w-10 rounded-xl bg-background/5 hover:bg-background/10 border border-background/10 flex items-center justify-center transition-colors">
-              <ChevronLeft className="w-5 h-5 text-background/60" />
+            <button onClick={scrollLeft} className="h-10 w-10 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 flex items-center justify-center transition-colors shadow-sm">
+              <ChevronLeft className="w-5 h-5 text-gray-500" />
             </button>
           </div>
           <div className="absolute -right-4 top-1/2 -translate-y-1/2 z-10 hidden sm:block">
-            <button onClick={scrollRight} className="h-10 w-10 rounded-xl bg-background/5 hover:bg-background/10 border border-background/10 flex items-center justify-center transition-colors">
-              <ChevronRight className="w-5 h-5 text-background/60" />
+            <button onClick={scrollRight} className="h-10 w-10 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 flex items-center justify-center transition-colors shadow-sm">
+              <ChevronRight className="w-5 h-5 text-gray-500" />
             </button>
           </div>
 
@@ -130,7 +130,7 @@ const Locations = () => {
               <div
                 key={i}
                 onClick={() => { setSelectedCourt(loc); setIsModalOpen(true); }}
-                className="group flex-shrink-0 w-64 sm:w-72 cursor-pointer rounded-2xl overflow-hidden border border-background/10 hover:border-orange-500/40 bg-background/5 hover:bg-background/10 transition-all duration-300"
+                className="group flex-shrink-0 w-64 sm:w-72 cursor-pointer rounded-2xl overflow-hidden border border-gray-100 hover:border-orange-200 bg-white hover:shadow-md hover:shadow-orange-500/5 transition-all duration-300"
               >
                 <div className="relative h-36 overflow-hidden">
                   <img
@@ -139,17 +139,17 @@ const Locations = () => {
                     loading="lazy"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                 </div>
                 <div className="p-4">
-                  <h3 className="font-bold text-sm text-background leading-snug mb-1 line-clamp-2">
+                  <h3 className="font-bold text-sm text-gray-900 leading-snug mb-1 line-clamp-2">
                     {loc.name}
                   </h3>
-                  <p className="text-xs text-background/50 flex items-center gap-1.5">
+                  <p className="text-xs text-gray-500 flex items-center gap-1.5">
                     <MapPin className="w-3 h-3 text-orange-400 shrink-0" />
                     {loc.address}
                   </p>
-                  <p className="text-[10px] text-orange-400/60 mt-2 flex items-center gap-1">
+                  <p className="text-[10px] text-orange-500 mt-2 flex items-center gap-1">
                     <ExternalLink className="w-3 h-3" /> Click for details
                   </p>
                 </div>

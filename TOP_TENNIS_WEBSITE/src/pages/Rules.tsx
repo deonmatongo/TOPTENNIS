@@ -1,5 +1,6 @@
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import PageMeta from "@/components/PageMeta";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
@@ -50,6 +51,10 @@ const Rules = () => {
 
   return (
     <div className="min-h-screen bg-white">
+      <PageMeta
+        title="Tennis League Rules & Format | Top Tennis League"
+        description="Official match rules, scoring format, player levels, and code of conduct for Top Tennis League. Everything you need to compete with confidence."
+      />
       <Header />
 
       {/* Hero */}

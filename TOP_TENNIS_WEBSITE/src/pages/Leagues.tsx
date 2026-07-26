@@ -1,5 +1,6 @@
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import PageMeta from "@/components/PageMeta";
 import { Button } from "@/components/ui/button";
 import { Users, Trophy, Calendar, MapPin, ArrowRight, Clock } from "lucide-react";
 import { useState } from "react";
@@ -134,32 +135,153 @@ const Leagues = () => {
   if (!LEAGUE_ACTIVITIES_AVAILABLE) {
     return (
       <div className="min-h-screen bg-white">
+        <PageMeta
+          title="Join a Tennis League | Men's, Women's & Mixed Doubles | Top Tennis League"
+          description="Browse competitive tennis league divisions — Men's Singles, Women's Singles, Men's Doubles, Women's Doubles, and Mixed Doubles. All skill levels welcome. Registration opening soon."
+        />
         <Header />
+
         {/* Page hero */}
         <div className="pt-16 md:pt-[4.25rem]" style={{ backgroundColor: "#0B1526" }}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 text-center">
-            <span className="inline-block text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full mb-4" style={{ color: "#fb923c", backgroundColor: "rgba(249,115,22,0.12)" }}>
-              Leagues
-            </span>
-            <h1 className="text-4xl sm:text-5xl font-black text-white mb-4">Tennis Leagues</h1>
-            <p className="text-base text-white/50 max-w-xl mx-auto">
-              Competitive leagues for every format and skill level. Singles, Doubles, Mixed — all in one place.
-            </p>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
+            <div className="max-w-2xl">
+              <span className="inline-block text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full mb-4" style={{ color: "#fb923c", backgroundColor: "rgba(249,115,22,0.12)" }}>
+                Leagues
+              </span>
+              <h1 className="text-4xl sm:text-5xl font-black text-white mb-4 leading-tight">
+                Competitive Tennis Leagues for Every Skill Level
+              </h1>
+              <p className="text-base text-white/60 leading-relaxed max-w-xl">
+                Singles, Doubles, and Mixed Doubles divisions for men, women, and all abilities. Next season registration opens soon — get on the list and be first in.
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="max-w-2xl mx-auto px-4 py-24 flex flex-col items-center text-center gap-4">
-          <div className="h-16 w-16 rounded-2xl flex items-center justify-center mb-2" style={{ backgroundColor: "rgba(249,115,22,0.1)" }}>
-            <Trophy className="w-8 h-8 text-orange-500" />
+        {/* Coming soon notice */}
+        <div className="border-b border-amber-100 bg-amber-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+              <p className="text-sm font-semibold text-amber-800">Next season registration is opening soon.</p>
+            </div>
+            <Button
+              onClick={() => navigate("/#newsletter")}
+              size="sm"
+              className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl px-5 text-xs font-bold shrink-0"
+            >
+              Get Notified
+            </Button>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900">League Season Coming Soon</h2>
-          <p className="text-gray-500 leading-relaxed">
-            We're preparing the next season of leagues. Sign up for our newsletter to be the first to know when registration opens.
-          </p>
-          <Button onClick={() => navigate("/#newsletter")} className="mt-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl px-8">
-            Get Notified
-          </Button>
         </div>
+
+        {/* League divisions preview */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+          <div className="mb-10">
+            <h2 className="text-xl font-black text-gray-900 mb-1">Singles</h2>
+            <p className="text-sm text-gray-500 mb-6">Head-to-head ladder format. Flexible scheduling around your availability.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {leagues.filter(l => l.category === "Singles").map(league => (
+                <div key={league.id} id={league.id} className="flex flex-col bg-white border border-gray-100 rounded-2xl overflow-hidden scroll-mt-24">
+                  <div className="h-1 w-full bg-orange-500" />
+                  <div className="p-6 flex flex-col gap-3">
+                    <div>
+                      <span className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1 block">{league.category}</span>
+                      <h3 className="text-lg font-black text-gray-900">{league.title}</h3>
+                    </div>
+                    <p className="text-sm text-gray-500 leading-relaxed">{league.description}</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { Icon: Users, text: `${league.players}+ players per season` },
+                        { Icon: Trophy, text: league.level },
+                        { Icon: Calendar, text: "Seasonal format" },
+                        { Icon: MapPin, text: "Multiple locations" },
+                      ].map(({ Icon, text }) => (
+                        <div key={text} className="flex items-center gap-2 text-sm text-gray-600">
+                          <Icon className="h-3.5 w-3.5 text-orange-400 shrink-0" />
+                          <span className="truncate">{text}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="pt-2 border-t border-gray-50 flex items-center justify-between">
+                      <span className="text-sm font-bold text-orange-500">{league.prize}</span>
+                      <Button
+                        onClick={() => navigate("/#newsletter")}
+                        size="sm"
+                        className="bg-gray-900 hover:bg-gray-800 text-white rounded-xl px-4 text-xs font-bold"
+                      >
+                        Notify Me
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-xl font-black text-gray-900 mb-1">Doubles</h2>
+            <p className="text-sm text-gray-500 mb-6">Partner or solo registration. We'll match you with a partner if needed.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {leagues.filter(l => l.category === "Doubles").map(league => (
+                <div key={league.id} id={league.id} className="flex flex-col bg-white border border-gray-100 rounded-2xl overflow-hidden scroll-mt-24">
+                  <div className="h-1 w-full bg-blue-500" />
+                  <div className="p-6 flex flex-col gap-3">
+                    <div>
+                      <span className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1 block">{league.category}</span>
+                      <h3 className="text-lg font-black text-gray-900">{league.title}</h3>
+                    </div>
+                    <p className="text-sm text-gray-500 leading-relaxed">{league.description}</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { Icon: Users, text: `${league.players}+ players per season` },
+                        { Icon: Trophy, text: league.level },
+                      ].map(({ Icon, text }) => (
+                        <div key={text} className="flex items-center gap-2 text-sm text-gray-600">
+                          <Icon className="h-3.5 w-3.5 text-orange-400 shrink-0" />
+                          <span className="truncate">{text}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="pt-2 border-t border-gray-50 flex items-center justify-between">
+                      <span className="text-sm font-bold text-orange-500">{league.prize}</span>
+                      <Button
+                        onClick={() => navigate("/#newsletter")}
+                        size="sm"
+                        className="bg-gray-900 hover:bg-gray-800 text-white rounded-xl px-4 text-xs font-bold"
+                      >
+                        Notify Me
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* How it works */}
+        <div style={{ backgroundColor: "#0B1526" }} className="py-16 sm:py-20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 className="text-3xl font-black text-white mb-10">How It Works</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+              {[
+                { step: "1", title: "Choose Your Division", body: "Pick the format and skill level that suits you — singles, doubles, or mixed. New players receive a free placement assessment." },
+                { step: "2", title: "Get Matched & Schedule", body: "We place you in a division of similarly-rated players. Use the dashboard to send match invites and agree on a time and court." },
+                { step: "3", title: "Play & Climb the Ladder", body: "Submit scores after each match. Rankings update in real time. Win consistently and you'll move up; tournament entries are open to all members." },
+              ].map(({ step, title, body }) => (
+                <div key={step} className="flex gap-4">
+                  <div className="w-9 h-9 rounded-xl bg-orange-500 text-white font-black flex items-center justify-center shrink-0 text-sm">{step}</div>
+                  <div>
+                    <h3 className="font-bold text-white mb-2">{title}</h3>
+                    <p className="text-sm text-white/50 leading-relaxed">{body}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <Footer />
       </div>
     );
@@ -167,6 +289,10 @@ const Leagues = () => {
 
   return (
     <div className="min-h-screen bg-white">
+      <PageMeta
+        title="Join a Tennis League | Men's, Women's & Mixed Doubles | Top Tennis League"
+        description="Browse open tennis league divisions — Men's Singles, Women's Singles, Men's Doubles, Women's Doubles, and Mixed Doubles. All skill levels welcome. Register today."
+      />
       <Header />
 
       {/* ── Page hero ── */}
