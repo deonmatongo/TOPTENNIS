@@ -33,8 +33,7 @@
         "NSFaceIDUsageDescription": "Top Tennis uses Face ID to quickly and securely unlock the app.",
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": [
-          "remote-notification",
-          "audio"
+          "remote-notification"
         ]
       },
       "bitcode": false

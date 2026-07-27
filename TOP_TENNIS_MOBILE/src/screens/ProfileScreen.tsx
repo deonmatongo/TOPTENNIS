@@ -81,7 +81,7 @@ export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
     return (
       <SafeAreaView style={s.safe} edges={[]}>
         <StatusBar style="light" />
-        <LinearGradient colors={[Palette.dark900, Palette.dark700]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.header, { paddingTop: insets.top + Spacing.md }]}>
+        <LinearGradient colors={[Palette.navy, '#0f1e38']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.header, { paddingTop: insets.top + Spacing.md }]}>
           {navigation?.canGoBack?.() && (
             <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
               <Ionicons name="chevron-back" size={24} color="#fff" />
@@ -99,7 +99,7 @@ export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
       <StatusBar style="light" />
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <LinearGradient
-        colors={[Palette.dark900, Palette.dark700]}
+        colors={[Palette.navy, '#0f1e38']}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={[s.header, { paddingTop: insets.top + Spacing.md }]}
       >
@@ -126,7 +126,7 @@ export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
 
         {/* ── Hero ──────────────────────────────────────────────────────── */}
         <LinearGradient
-          colors={[Palette.dark900, Palette.dark700, Palette.dark600]}
+          colors={[Palette.navy, '#0f1e38', '#132a4e']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={s.hero}
         >
@@ -278,7 +278,7 @@ export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
         {/* ── Actions ────────────────────────────────────────────────────── */}
         <View style={s.actionsSection}>
           {navigation && (
-            <TouchableOpacity style={s.actionRow} onPress={() => navigation.navigate('Settings')} activeOpacity={0.75}>
+            <TouchableOpacity style={s.actionRow} onPress={() => navigation.getParent()?.navigate('Settings')} activeOpacity={0.75}>
               <View style={[s.actionIcon, { backgroundColor: Palette.gray100 }]}>
                 <Ionicons name="settings-outline" size={18} color={Palette.gray500} />
               </View>

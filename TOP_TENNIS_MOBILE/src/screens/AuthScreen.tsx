@@ -5,6 +5,7 @@ import {
   StyleSheet, Dimensions,
 } from 'react-native'
 import * as WebBrowser from 'expo-web-browser'
+import * as AppleAuthentication from 'expo-apple-authentication'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
@@ -82,10 +83,28 @@ export const AuthScreen: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [appleLoading, setAppleLoading] = useState(false)
+  const [appleAvailable, setAppleAvailable] = useState(false)
   const [focusedField, setFocusedField] = useState<string | null>(null)
   const [biometricLoading, setBiometricLoading] = useState(false)
-  const { signIn, signUp, signInWithGoogle } = useAuth()
+  const { signIn, signUp, signInWithGoogle, signInWithApple } = useAuth()
   const { available, biometricType, biometricLabel, credentialsStored, authenticate, saveCredentials } = useBiometrics()
+
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      AppleAuthentication.isAvailableAsync().then(setAppleAvailable).catch(() => setAppleAvailable(false))
+    }
+  }, [])
+
+  const handleAppleAuth = async () => {
+    setAppleLoading(true)
+    try { await signInWithApple() }
+    catch (e: any) {
+      if ((e as any)?.code === 'ERR_REQUEST_CANCELED') return
+      Alert.alert('Apple Sign-In Failed', e?.message || 'Could not sign in with Apple.')
+    }
+    finally { setAppleLoading(false) }
+  }
 
   const handleGoogleAuth = async () => {
     setGoogleLoading(true)
@@ -174,10 +193,10 @@ export const AuthScreen: React.FC = () => {
     setMode(next); setErrors({}); setPassword(''); setConfirmPassword(''); setPhone(''); setAgreeToTerms(false)
   }
 
-  const isAnyLoading = loading || googleLoading
+  const isAnyLoading = loading || googleLoading || appleLoading
 
   return (
-    <LinearGradient colors={['#0d0d18', '#111827']} style={{ flex: 1 }}>
+    <LinearGradient colors={[Palette.navy, '#0f1e38', '#112240']} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
@@ -395,6 +414,19 @@ export const AuthScreen: React.FC = () => {
                 <View style={s.dividerLine} />
               </View>
 
+              {/* Apple — must appear with equal or greater prominence than Google (Guideline 4.8) */}
+              {appleAvailable && Platform.OS === 'ios' && (
+                <View style={{ opacity: isAnyLoading ? 0.6 : 1 }} pointerEvents={isAnyLoading ? 'none' : 'auto'}>
+                  <AppleAuthentication.AppleAuthenticationButton
+                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                    buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                    cornerRadius={26}
+                    style={s.appleBtn}
+                    onPress={handleAppleAuth}
+                  />
+                </View>
+              )}
+
               {/* Google */}
               <TouchableOpacity style={[s.socialBtn, { opacity: isAnyLoading ? 0.6 : 1 }]} onPress={handleGoogleAuth} disabled={isAnyLoading} activeOpacity={0.85}>
                 {googleLoading ? (
@@ -546,6 +578,9 @@ const s = StyleSheet.create({
   divider: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   dividerLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.08)' },
   dividerText: { color: 'rgba(255,255,255,0.3)', fontSize: 13 },
+
+  // Apple
+  appleBtn: { width: '100%', height: 52 },
 
   // Social
   socialBtn: {
