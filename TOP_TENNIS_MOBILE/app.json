@@ -21,7 +21,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.top.tennis",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "infoPlist": {
         "NSCameraUsageDescription": "Top Tennis uses your camera for video calls and profile photos.",
         "NSMicrophoneUsageDescription": "Top Tennis uses your microphone for voice and video calls.",
