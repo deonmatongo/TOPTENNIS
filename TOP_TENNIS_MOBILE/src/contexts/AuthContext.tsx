@@ -129,6 +129,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       token: credential.identityToken,
     });
     if (error) throw error;
+    // Apple only provides the user's name on the very first sign-in.
+    // Save it immediately before it disappears on subsequent logins.
+    const given  = credential.fullName?.givenName?.trim();
+    const family = credential.fullName?.familyName?.trim();
+    if (given || family) {
+      const { data: { user: appleUser } } = await supabase.auth.getUser();
+      if (appleUser) {
+        await Promise.allSettled([
+          supabase.auth.updateUser({
+            data: { first_name: given ?? '', last_name: family ?? '' },
+          }),
+          supabase.from('profiles').upsert({
+            id: appleUser.id,
+            first_name: given ?? '',
+            last_name: family ?? '',
+            name: [given, family].filter(Boolean).join(' '),
+          }, { onConflict: 'id' }),
+        ]);
+      }
+    }
   };
 
   const value = {

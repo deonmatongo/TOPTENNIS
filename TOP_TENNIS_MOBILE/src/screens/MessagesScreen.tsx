@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, KeyboardAvoidingView, Platform, RefreshControl,
   ActivityIndicator, Alert, ScrollView, Clipboard, Modal,
-  Keyboard, Image, Dimensions, useWindowDimensions, Animated, PanResponder,
+  Keyboard, Image, Dimensions, useWindowDimensions,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/services/supabase';
@@ -11,7 +11,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useConversations, Conversation, ConversationMember, ConversationMessage } from '@/hooks/useConversations';
-import { uploadChatMedia, isImageMessage, parseVoiceMessage } from '@/services/chatMedia';
+import { uploadChatMedia, isImageMessage } from '@/services/chatMedia';
 import { useFriendRequests } from '@/hooks/useFriendRequests';
 import { useBlockedUsers } from '@/hooks/useBlockedUsers';
 import { useOnlinePresence } from '@/hooks/useOnlinePresence';
@@ -26,10 +26,6 @@ import { Palette, Colors, Shadow, FontSize, Font, FontWeight, Spacing, Radius } 
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
-
-function getAudio() {
-  try { return require('expo-av').Audio; } catch { return null; }
-}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -104,57 +100,6 @@ const ImageContent: React.FC<{ url: string; onOpen: (url: string) => void }> = (
   </TouchableOpacity>
 );
 
-const VoiceContent: React.FC<{ url: string; isMine: boolean }> = ({ url, isMine }) => {
-  const [playing, setPlaying] = useState(false);
-  const [loadingSnd, setLoadingSnd] = useState(false);
-  const soundRef = useRef<any>(null);
-
-  useEffect(() => () => { soundRef.current?.unloadAsync?.().catch(() => {}); }, []);
-
-  const toggle = async () => {
-    const Audio = getAudio();
-    if (!Audio) { Alert.alert('Not supported', 'Voice playback requires a development build.'); return; }
-    try {
-      if (playing) {
-        await soundRef.current?.pauseAsync();
-        setPlaying(false);
-        return;
-      }
-      if (!soundRef.current) {
-        setLoadingSnd(true);
-        await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
-        const { sound } = await Audio.Sound.createAsync({ uri: url }, { shouldPlay: false });
-        sound.setOnPlaybackStatusUpdate((st: any) => {
-          if (st.didJustFinish) { setPlaying(false); sound.setPositionAsync(0).catch(() => {}); }
-        });
-        soundRef.current = sound;
-        setLoadingSnd(false);
-      }
-      await soundRef.current.playAsync();
-      setPlaying(true);
-    } catch {
-      setLoadingSnd(false);
-      Alert.alert('Error', 'Could not play voice message.');
-    }
-  };
-
-  return (
-    <TouchableOpacity style={mb.voiceRow} onPress={toggle} activeOpacity={0.8}>
-      <View style={[mb.voiceBtn, isMine && mb.voiceBtnMine]}>
-        {loadingSnd
-          ? <ActivityIndicator size="small" color="#fff" />
-          : <Ionicons name={playing ? 'pause' : 'play'} size={16} color="#fff" />}
-      </View>
-      <View style={mb.voiceWave}>
-        {[10, 16, 8, 18, 12, 20, 9, 15, 11, 17, 8, 13].map((h, i) => (
-          <View key={i} style={[mb.voiceBar, { height: h }, playing && mb.voiceBarActive]} />
-        ))}
-      </View>
-      <Ionicons name="mic" size={13} color={CHAT.muted} />
-    </TouchableOpacity>
-  );
-};
-
 const ReactionChips: React.FC<{
   reactions: { emoji: string; user_id: string }[];
   myId: string;
@@ -188,12 +133,6 @@ const ReactionChips: React.FC<{
 
 const mb = StyleSheet.create({
   image: { width: 210, height: 210, borderRadius: 10, backgroundColor: Colors.borderLight },
-  voiceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4, minWidth: 170 },
-  voiceBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
-  voiceBtnMine: { backgroundColor: Colors.primaryDark },
-  voiceWave: { flexDirection: 'row', alignItems: 'center', gap: 2, flex: 1 },
-  voiceBar: { width: 3, borderRadius: 1.5, backgroundColor: Colors.primaryMuted },
-  voiceBarActive: { backgroundColor: Colors.primary },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 3 },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
@@ -302,7 +241,6 @@ const Bubble: React.FC<{
   recentInvites?: Map<string, MatchInviteRecord>;
 }> = ({ item, replySource, isMine, isGroup, prevSameSender, isLongPressed, onLongPress, onReply, onDelete, onCopy, onReport, onDismiss, onSenderPress, recentInvites, myId, onReact, onOpenImage }) => {
   const imageMsg = isImageMessage(item.content);
-  const voiceUrl = parseVoiceMessage(item.content);
   const senderName = getSenderName(item);
   const showAvatar = isGroup && !isMine && !prevSameSender;
   const showName = isGroup && !isMine && !prevSameSender;
@@ -364,8 +302,6 @@ const Bubble: React.FC<{
             )}
             {imageMsg ? (
               <ImageContent url={item.content.trim()} onOpen={onOpenImage} />
-            ) : voiceUrl ? (
-              <VoiceContent url={voiceUrl} isMine={isMine} />
             ) : (
               <Text style={[bub.text, isMine ? bub.textR : bub.textL]}>{item.content}</Text>
             )}
@@ -777,12 +713,6 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
   const [viewerImage, setViewerImage] = useState<string | null>(null);
   const [showBookingSheet, setShowBookingSheet] = useState(false);
   const [recentInvites, setRecentInvites] = useState<Map<string, MatchInviteRecord>>(new Map());
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingCancelled, setRecordingCancelled] = useState(false);
-  const [recordSecs, setRecordSecs] = useState(0);
-  const recordingRef = useRef<any>(null);
-  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const recordingPulse = useRef(new Animated.Value(1)).current;
   const flatListRef = useRef<FlatList>(null);
 
   const { typingUsers, broadcastTyping } = useTypingIndicator(selectedConvId);
@@ -831,7 +761,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
     setSending(true);
     try {
       if (imageUri) {
-        const publicUrl = await uploadChatMedia(user!.id, imageUri, 'image');
+        const publicUrl = await uploadChatMedia(user!.id, imageUri);
         await sendMessage(selectedConvId, publicUrl, replyId);
       }
       if (text) await sendMessage(selectedConvId, text, replyId);
@@ -884,64 +814,6 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
-
-  const startRecording = async () => {
-    try {
-      const Audio = getAudio();
-      if (!Audio) { Alert.alert('Not supported', 'Voice messages require a dev build — run eas build --profile development.'); return; }
-      const perm = await Audio.requestPermissionsAsync();
-      if (!perm.granted) { Alert.alert('Permission needed', 'Allow microphone access to send voice messages.'); return; }
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      recordingRef.current = recording;
-      setIsRecording(true);
-      setRecordingCancelled(false);
-      setRecordSecs(0);
-      recordTimerRef.current = setInterval(() => setRecordSecs(s => s + 1), 1000);
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(recordingPulse, { toValue: 1.4, duration: 600, useNativeDriver: true }),
-          Animated.timing(recordingPulse, { toValue: 1, duration: 600, useNativeDriver: true }),
-        ]),
-      ).start();
-    } catch { Alert.alert('Error', 'Could not start recording.'); }
-  };
-
-  const stopRecording = async (cancel = false) => {
-    if (!recordingRef.current) return;
-    if (recordTimerRef.current) { clearInterval(recordTimerRef.current); recordTimerRef.current = null; }
-    recordingPulse.stopAnimation();
-    recordingPulse.setValue(1);
-    setIsRecording(false);
-    const rec = recordingRef.current;
-    recordingRef.current = null;
-    try {
-      await rec.stopAndUnloadAsync();
-      getAudio()?.setAudioModeAsync({ allowsRecordingIOS: false });
-      if (cancel || recordSecs < 1) return;
-      const uri = rec.getURI();
-      if (!uri || !selectedConvId) return;
-      setSending(true);
-      const publicUrl = await uploadChatMedia(user!.id, uri, 'voice', 'm4a');
-      await sendMessage(selectedConvId, `🎤 ${publicUrl}`, undefined);
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
-    } catch { Alert.alert('Error', 'Failed to send voice message.'); }
-    finally { setSending(false); setRecordSecs(0); }
-  };
-
-  const micPanResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => { startRecording(); },
-    onPanResponderMove: (_, gs) => {
-      if (gs.dx < -60) setRecordingCancelled(true);
-      else setRecordingCancelled(false);
-    },
-    onPanResponderRelease: (_, gs) => { stopRecording(gs.dx < -60); },
-    onPanResponderTerminate: () => { stopRecording(true); },
-  });
-
-  const fmtRecordTime = (secs: number) => `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`;
 
   const handleTyping = useCallback((text: string) => {
     setMsgInput(text);
@@ -1000,7 +872,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
       <View style={{ flex: 1, backgroundColor: CHAT.bg }}>
         {/* Thread header */}
         <LinearGradient
-          colors={[Palette.dark900, Palette.dark800]}
+          colors={[Palette.navy, '#0f1e38']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={[th.header, { paddingTop: insets.top + 8 }]}
@@ -1083,7 +955,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
           );
         })()}
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? (Platform.isPad ? 'height' : 'padding') : undefined}>
           <FlatList
             ref={flatListRef}
             data={items}
@@ -1171,62 +1043,38 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
             <EmojiPanel onSelect={e => setMsgInput(v => v + e)} />
           )}
 
-          {/* Recording overlay bar */}
-          {isRecording && (
-            <View style={th.recBar}>
-              <Animated.View style={[th.recDot, { transform: [{ scale: recordingPulse }] }]} />
-              <Text style={th.recTimer}>{fmtRecordTime(recordSecs)}</Text>
-              <Text style={[th.recHint, recordingCancelled && th.recHintCancel]}>
-                {recordingCancelled ? '← Release to cancel' : '← Slide to cancel'}
-              </Text>
-            </View>
-          )}
-
           <View style={[th.inputBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-            {!isRecording && (
-              <View style={th.inputWrap}>
-                <TouchableOpacity style={th.emojiBtn} onPress={handleEmojiToggle}>
-                  <Ionicons name={showEmojiPicker ? 'happy' : 'happy-outline'} size={22} color={showEmojiPicker ? Colors.primary : CHAT.muted} />
-                </TouchableOpacity>
-                <TextInput
-                  style={th.input}
-                  value={msgInput}
-                  onChangeText={handleTyping}
-                  placeholder="Message"
-                  placeholderTextColor={CHAT.muted}
-                  multiline
-                  maxLength={2000}
-                  onFocus={() => { setShowEmojiPicker(false); setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 300); }}
-                />
-                <TouchableOpacity style={th.attachBtn} onPress={handlePickImage}>
-                  <Ionicons name="attach-outline" size={22} color={pendingImage ? Colors.primary : CHAT.muted} style={{ transform: [{ rotate: '45deg' }] }} />
-                </TouchableOpacity>
-              </View>
-            )}
-            {isRecording && <View style={{ flex: 1 }} />}
-
-            {/* Send / mic button */}
-            {(msgInput.trim() || pendingImage) ? (
-              <TouchableOpacity
-                style={[th.sendBtn, th.sendBtnActive]}
-                onPress={handleSend}
-                disabled={sending}
-                accessibilityRole="button"
-                accessibilityLabel="Send message"
-              >
-                {sending
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Ionicons name="send" size={17} color="#fff" style={{ marginLeft: 2 }} />
-                }
+            <View style={th.inputWrap}>
+              <TouchableOpacity style={th.emojiBtn} onPress={handleEmojiToggle}>
+                <Ionicons name={showEmojiPicker ? 'happy' : 'happy-outline'} size={22} color={showEmojiPicker ? Colors.primary : CHAT.muted} />
               </TouchableOpacity>
-            ) : (
-              <Animated.View
-                style={[th.sendBtn, th.sendBtnActive, isRecording && th.sendBtnRecording, { transform: [{ scale: isRecording ? recordingPulse : 1 }] }]}
-                {...micPanResponder.panHandlers}
-              >
-                <Ionicons name={isRecording ? 'mic' : 'mic-outline'} size={20} color="#fff" />
-              </Animated.View>
-            )}
+              <TextInput
+                style={th.input}
+                value={msgInput}
+                onChangeText={handleTyping}
+                placeholder="Message"
+                placeholderTextColor={CHAT.muted}
+                multiline
+                maxLength={2000}
+                onFocus={() => { setShowEmojiPicker(false); setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 300); }}
+              />
+              <TouchableOpacity style={th.attachBtn} onPress={handlePickImage}>
+                <Ionicons name="attach-outline" size={22} color={pendingImage ? Colors.primary : CHAT.muted} style={{ transform: [{ rotate: '45deg' }] }} />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[th.sendBtn, (msgInput.trim() || pendingImage) && th.sendBtnActive]}
+              onPress={handleSend}
+              disabled={sending || (!msgInput.trim() && !pendingImage)}
+              accessibilityRole="button"
+              accessibilityLabel="Send message"
+            >
+              {sending
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Ionicons name="send" size={17} color="#fff" style={{ marginLeft: 2 }} />
+              }
+            </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
 
@@ -1279,7 +1127,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
       <StatusBar style="light" />
       {/* Header */}
       <LinearGradient
-        colors={[Palette.dark900, Palette.dark700]}
+        colors={[Palette.navy, '#0f1e38']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[ls.header, { paddingTop: insets.top + Spacing.md }]}
@@ -1578,12 +1426,6 @@ const th = StyleSheet.create({
   attachBtn: { padding: 8 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: CHAT.muted, alignItems: 'center', justifyContent: 'center' },
   sendBtnActive: { backgroundColor: Colors.primary, ...Shadow.orange },
-  sendBtnRecording: { backgroundColor: Colors.error, shadowColor: Colors.error },
-  recBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#fff', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.borderLight, gap: 12 },
-  recDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: Colors.error },
-  recTimer: { fontSize: 16, fontFamily: Font.semibold, color: Colors.text, minWidth: 48 },
-  recHint: { flex: 1, fontSize: 13, color: Colors.textMuted, textAlign: 'right' },
-  recHintCancel: { color: Colors.error, fontFamily: Font.semibold },
   imgPreviewBar: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: CHAT.inputBg, borderTopWidth: 1, borderTopColor: Colors.borderLight },
   imgPreviewThumb: { width: 70, height: 70, borderRadius: 10, backgroundColor: Colors.surface },
   imgRemoveBtn: { marginLeft: -10, marginTop: -6 },
@@ -1604,7 +1446,7 @@ const ls = StyleSheet.create({
   tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, borderRadius: Radius.full, gap: 4, backgroundColor: 'rgba(255,255,255,0.12)' },
   tabActive: { backgroundColor: '#fff' },
   tabTxt: { fontSize: FontSize.xs, fontFamily: Font.semibold, color: 'rgba(255,255,255,0.75)' },
-  tabTxtActive: { color: Palette.dark900 },
+  tabTxtActive: { color: Palette.navy },
   tabBadge: { backgroundColor: Colors.error, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   tabBadgeTxt: { color: '#fff', fontSize: 9, fontFamily: Font.bold },
 
