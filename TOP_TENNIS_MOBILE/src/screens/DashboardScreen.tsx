@@ -117,7 +117,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       >
         {/* ── Hero ── */}
         <LinearGradient
-          colors={[Palette.dark900, Palette.dark700]}
+          colors={[Palette.navy, Palette.navy800, '#1a2d4e']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{ paddingTop: insets.top + Spacing.lg, paddingBottom: Spacing.lg, paddingHorizontal: Spacing.lg, gap: Spacing.lg }}
@@ -156,7 +156,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                       alignItems="center"
                       justifyContent="center"
                       borderWidth={1.5}
-                      borderColor={Palette.dark900}
+                      borderColor={Palette.navy}
                     >
                       <Text style={{ fontSize: 9, color: '#fff', fontFamily: Font.bold }}>
                         {unreadCount > 9 ? '9+' : unreadCount}
@@ -365,7 +365,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                 <PressableScale onPress={() => navigation.navigate('Schedule')}>
                   <View style={s.nextCard}>
                     <LinearGradient
-                      colors={[Palette.dark800, Palette.dark600]}
+                      colors={[Palette.navy, '#1a2d4e']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={s.nextCardGrad}

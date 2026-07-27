@@ -90,7 +90,7 @@ export const MatchesScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
       <StatusBar style="light" />
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <LinearGradient
-        colors={[Palette.dark900, Palette.dark700]}
+        colors={[Palette.navy, '#0f1e38']}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={[s.header, { paddingTop: insets.top + Spacing.md }]}
       >
@@ -451,7 +451,7 @@ const s = StyleSheet.create({
   },
   tabBtnActive: { backgroundColor: '#fff' },
   tabLabel: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.75)', fontFamily: Font.semibold },
-  tabLabelActive: { color: Palette.dark900 },
+  tabLabelActive: { color: Palette.navy },
   tabCount: {
     backgroundColor: 'rgba(255,255,255,0.25)',
     borderRadius: Radius.full,

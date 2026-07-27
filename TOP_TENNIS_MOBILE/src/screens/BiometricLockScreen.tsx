@@ -66,7 +66,7 @@ export const BiometricLockScreen: React.FC<Props> = ({ onUnlock, onSignOut }) =>
 
   return (
     <LinearGradient
-      colors={[Palette.dark900, Palette.dark800]}
+      colors={[Palette.navy, '#0f1e38']}
       style={StyleSheet.absoluteFill}
     >
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>

@@ -61,7 +61,7 @@ export const CompetitionScreen: React.FC<{ navigation: any }> = ({ navigation })
     <SafeAreaView style={styles.safe} edges={[]}>
       <StatusBar style="light" />
       <LinearGradient
-        colors={[Palette.dark900, Palette.dark700]}
+        colors={[Palette.navy, '#0f1e38']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.gradHeader, { paddingTop: insets.top + Spacing.md }]}

@@ -120,7 +120,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         {/* ── Player card ──────────────────────────────────────────────── */}
         <View style={s.heroWrap}>
           <LinearGradient
-            colors={[Palette.dark900, Palette.dark700, Palette.dark600]}
+            colors={[Palette.navy, '#0f1e38', '#132a4e']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={s.heroCard}
@@ -268,7 +268,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             </View>
 
             <LinearGradient
-              colors={[Palette.dark900, Palette.dark700]}
+              colors={[Palette.navy, '#0f1e38']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={s.matchCard}

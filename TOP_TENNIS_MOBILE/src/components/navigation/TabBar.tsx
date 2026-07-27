@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { selection as hapticSelection } from '@/utils/haptics';
 import Animated, { ZoomIn, FadeIn } from 'react-native-reanimated';
-import { Palette, Font } from '@/theme/colors';
+import { Palette, Colors, Font } from '@/theme/colors';
 import { useResponsive } from '@/hooks/useResponsive';
 
 const TAB_META: Record<string, { focused: string; unfocused: string; label: string }> = {
@@ -69,7 +69,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               <Ionicons
                 name={(isFocused ? meta.focused : meta.unfocused) as any}
                 size={22}
-                color={isFocused ? '#fff' : Palette.gray400}
+                color={isFocused ? '#fff' : 'rgba(255,255,255,0.45)'}
               />
               {!!badge && badge > 0 && (
                 <View style={sb.badge}>
@@ -119,7 +119,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             <Ionicons
               name={(isFocused ? meta.focused : meta.unfocused) as any}
               size={22}
-              color={isFocused ? '#fff' : Palette.gray400}
+              color={isFocused ? '#fff' : 'rgba(255,255,255,0.45)'}
             />
             {!!badge && badge > 0 && (
               <View style={bt.pip}>
@@ -143,14 +143,13 @@ const sb = StyleSheet.create({
     top: 0,
     left: 0,
     bottom: 0,
-    backgroundColor: '#fff',
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: '#E2E2EC',
+    backgroundColor: Palette.navy,
+    borderRightWidth: 0,
     shadowColor: '#000',
-    shadowOffset: { width: 2, height: 0 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 4, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 12,
     zIndex: 100,
     alignItems: 'stretch',
   },
@@ -164,13 +163,13 @@ const sb = StyleSheet.create({
   logoText: {
     fontSize: 15,
     fontFamily: Font.black,
-    color: '#0D0D18',
+    color: '#FFFFFF',
     letterSpacing: -0.4,
     flex: 1,
   },
   divider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: '#E2E2EC',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     marginHorizontal: 12,
     marginBottom: 8,
   },
@@ -198,18 +197,18 @@ const sb = StyleSheet.create({
     backgroundColor: Palette.orange500,
     shadowColor: Palette.orange500,
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 5,
   },
   label: {
     fontSize: 14,
     fontFamily: Font.medium,
-    color: '#9A9AB0',
+    color: 'rgba(255,255,255,0.45)',
     flex: 1,
   },
   labelActive: {
-    color: '#0D0D18',
+    color: '#FFFFFF',
     fontFamily: Font.semibold,
   },
   badge: {
@@ -224,7 +223,7 @@ const sb = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 3,
     borderWidth: 1.5,
-    borderColor: '#fff',
+    borderColor: Palette.navy,
   },
   badgeText: {
     color: '#fff',
@@ -237,13 +236,13 @@ const sb = StyleSheet.create({
 const bt = StyleSheet.create({
   bar: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: Palette.navy,
     borderTopWidth: 0,
-    shadowColor: 'rgba(13,13,24,0.12)',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 1,
-    shadowRadius: 16,
-    elevation: 18,
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 20,
   } as any,
   tab: {
     flex: 1,
@@ -261,9 +260,9 @@ const bt = StyleSheet.create({
     backgroundColor: Palette.orange500,
     shadowColor: Palette.orange500,
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 7,
   },
   pip: {
     position: 'absolute',
@@ -272,12 +271,12 @@ const bt = StyleSheet.create({
     minWidth: 14,
     height: 14,
     borderRadius: 7,
-    backgroundColor: Palette.orange500,
+    backgroundColor: '#ef4444',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 2,
     borderWidth: 1.5,
-    borderColor: '#fff',
+    borderColor: Palette.navy,
   },
   pipText: {
     color: '#fff',

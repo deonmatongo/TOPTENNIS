@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -74,6 +74,7 @@ function SelCard({ label, desc, icon, selected, onPress }: {
 export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
   const { user } = useAuth();
   const { createPlayerProfile } = usePlayerProfile();
+  const insets = useSafeAreaInsets();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -348,7 +349,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}>
         {/* Header: step indicator + progress */}
         <View style={styles.progressWrap}>
           <View style={styles.stepIndicatorRow}>
@@ -473,7 +474,7 @@ const styles = StyleSheet.create({
 
   // ── USTA chips ────────────────────────────────────────────────────────────
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  chip: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.surface },
+  chip: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.surface },
   chipActive: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary },
   chipText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.medium },
   chipTextActive: { color: Colors.primaryDark, fontWeight: FontWeight.semibold },
@@ -488,10 +489,10 @@ const styles = StyleSheet.create({
   reviewNoteText: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 18 },
 
   // ── Bottom bar ────────────────────────────────────────────────────────────
-  bottomBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: Colors.surface, gap: Spacing.md },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: Spacing.md, paddingHorizontal: Spacing.sm },
+  bottomBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.lg, borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: Colors.surface, gap: Spacing.md },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: Spacing.lg, paddingHorizontal: Spacing.sm },
   backBtnText: { fontSize: FontSize.md, color: Colors.textSecondary, fontWeight: FontWeight.medium },
-  nextBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: Spacing.md, gap: Spacing.sm },
+  nextBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: Spacing.lg, gap: Spacing.sm },
   nextBtnDisabled: { opacity: 0.4 },
   nextBtnText: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: '#fff' },
 

@@ -1,11 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { FontSize, FontWeight, Spacing } from '@/theme/colors';
 
 export const NetworkBanner: React.FC = () => {
   const { isOnline, wasOffline } = useNetworkStatus();
+  const insets = useSafeAreaInsets();
   const translateY = useRef(new Animated.Value(-60)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -40,7 +42,7 @@ export const NetworkBanner: React.FC = () => {
       style={[
         styles.banner,
         isOnline ? styles.bannerOnline : styles.bannerOffline,
-        { transform: [{ translateY }], opacity },
+        { transform: [{ translateY }], opacity, paddingTop: insets.top + Spacing.sm },
       ]}
       pointerEvents="none"
     >
@@ -69,7 +71,6 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.xl,
   },
   bannerOffline: { backgroundColor: '#374151' },
   bannerOnline: { backgroundColor: '#16a34a' },

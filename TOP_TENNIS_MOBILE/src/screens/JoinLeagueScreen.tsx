@@ -57,7 +57,7 @@ export const JoinLeagueScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   return (
     <SafeAreaView style={styles.safe} edges={[]}>
       <StatusBar style="light" />
-      <LinearGradient colors={[Palette.dark900, Palette.dark700]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.gradHeader, { paddingTop: insets.top + Spacing.lg }]}>
+      <LinearGradient colors={[Palette.navy, '#0f1e38']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.gradHeader, { paddingTop: insets.top + Spacing.lg }]}>
         <TouchableOpacity style={styles.gradBackBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>

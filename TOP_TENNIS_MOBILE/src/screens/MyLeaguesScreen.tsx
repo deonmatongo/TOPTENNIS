@@ -473,7 +473,7 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
         <View style={styles.leagueTable}>
             {/* ── Table header ── */}
             <LinearGradient
-              colors={[Palette.dark900, Palette.dark700]}
+              colors={[Palette.navy, '#0f1e38']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.tableHeader}
             >
@@ -610,7 +610,7 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
         <View style={styles.leagueTable}>
           {/* ── Table header ── */}
           <LinearGradient
-            colors={[Palette.dark900, Palette.dark700]}
+            colors={[Palette.navy, '#0f1e38']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={styles.tableHeader}
           >
@@ -799,7 +799,7 @@ const LeagueDetailView: React.FC<{ registration: any; onBack: () => void; naviga
       <StatusBar style="light" />
       {/* Dark gradient header — matches every other screen */}
       <LinearGradient
-        colors={[Palette.dark900, Palette.dark700]}
+        colors={[Palette.navy, '#0f1e38']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.gradHeader, { paddingTop: detailInsets.top + Spacing.md }]}
@@ -920,7 +920,7 @@ export const MyLeaguesScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       <StatusBar style="light" />
       {/* Dark gradient header */}
       <LinearGradient
-        colors={[Palette.dark900, Palette.dark700]}
+        colors={[Palette.navy, '#0f1e38']}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={[styles.gradHeader, { paddingTop: insets.top + Spacing.md }]}
       >

@@ -501,7 +501,7 @@ export const MatchBookingSheet: React.FC<MatchBookingSheetProps> = ({
 
             {/* Continue button */}
             {selectedHour !== null && (
-              <View style={bs.bottomBar}>
+              <View style={[bs.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
                 <View style={bs.selectedSummary}>
                   <Ionicons name="calendar" size={14} color={Colors.primary} />
                   <Text style={bs.selectedSummaryTxt}>
@@ -672,7 +672,7 @@ const bs = StyleSheet.create({
   slotBadgeTxt:{ fontSize: 11, fontFamily: Font.semibold },
   slotSelectedTxt: { fontSize: 12, color: 'rgba(255,255,255,0.85)', fontFamily: Font.medium },
 
-  bottomBar:   { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.borderLight, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  bottomBar:   { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.borderLight, paddingHorizontal: 12, paddingTop: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   selectedSummary: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
   selectedSummaryTxt: { fontSize: 13, fontFamily: Font.medium, color: Colors.text },
   continueBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.primary, paddingHorizontal: 18, paddingVertical: 10, borderRadius: Radius.full, ...Shadow.orange },

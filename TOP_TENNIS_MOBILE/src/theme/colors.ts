@@ -8,9 +8,14 @@ export const Palette = {
   orange100: '#FFEDD5',
   orange200: '#FED7AA',
   orange400: '#FB923C',
-  orange500: '#FF5500',   // primary
-  orange600: '#E04400',
-  orange700: '#C23800',
+  orange500: '#f97316',   // primary — matches website
+  orange600: '#ea580c',
+  orange700: '#c2410c',
+
+  // Navy — matches website header/sidebar
+  navy:      '#0B1526',
+  navy800:   '#0f1e38',
+  navy700:   '#132a4e',
 
   // Neutrals
   white:     '#FFFFFF',
@@ -113,11 +118,11 @@ export const Colors = {
   info:          Palette.blue500,
   infoLight:     Palette.blueBg,
 
-  // Tab bar
-  tabBar:        Palette.white,
-  tabBarBorder:  Palette.gray150,
+  // Tab bar — navy to match website navigation
+  tabBar:        '#0B1526',
+  tabBarBorder:  'rgba(255,255,255,0.08)',
   tabBarActive:  Palette.orange500,
-  tabBarInactive:Palette.gray400,
+  tabBarInactive:'rgba(255,255,255,0.45)',
 
   // Tennis accents
   court:         Palette.court700,
@@ -126,7 +131,7 @@ export const Colors = {
   // Gradients
   gradientPrimary:   [Palette.orange500, Palette.orange400] as [string, string],
   gradientWarm:      [Palette.orange700, Palette.orange500] as [string, string],
-  gradientHero:      [Palette.dark900, Palette.dark700, Palette.dark600] as [string, string, string],
+  gradientHero:      [Palette.navy, Palette.navy800, Palette.navy700] as [string, string, string],
   gradientCard:      [Palette.dark800, Palette.dark700] as [string, string],
   gradientNature:    [Palette.green600, Palette.green400] as [string, string],
   gradientCourt:     [Palette.court800, Palette.court600] as [string, string],
@@ -140,7 +145,7 @@ export const Colors = {
   shadow:        'rgba(13,13,24,0.06)',
   shadowMd:      'rgba(13,13,24,0.10)',
   shadowLg:      'rgba(13,13,24,0.18)',
-  shadowOrange:  'rgba(255,85,0,0.30)',
+  shadowOrange:  'rgba(249,115,22,0.30)',
 };
 
 // ─── Theme palettes ────────────────────────────────────────────────────────────
@@ -188,9 +193,9 @@ export const DarkColors: AppColors = {
   info:         Palette.blue400,
   infoLight:    'rgba(59,130,246,0.16)',
 
-  tabBar:         '#12121C',
-  tabBarBorder:   '#22222F',
-  tabBarInactive: Palette.gray500,
+  tabBar:         '#0B1526',
+  tabBarBorder:   'rgba(255,255,255,0.08)',
+  tabBarInactive: 'rgba(255,255,255,0.35)',
 
   gradientSubtle: [Palette.dark800, Palette.dark900] as [string, string],
 

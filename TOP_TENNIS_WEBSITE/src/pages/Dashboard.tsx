@@ -24,8 +24,6 @@ import { useLeaderboard } from "@/hooks/useLeaderboard";
 import { useLeagueRegistrations } from "@/hooks/useLeagueRegistrations";
 import Header from "@/components/Header";
 import ScheduleTab from "@/components/dashboard/ScheduleTab";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 
 const Dashboard = () => {
@@ -50,10 +48,13 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#0B1526" }}>
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading your profile...</p>
+          <div className="h-14 w-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style={{ backgroundColor: "rgba(249,115,22,0.15)" }}>
+            <div className="w-7 h-7 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+          <p className="text-white font-semibold text-sm">Loading your dashboard…</p>
+          <p className="text-white/40 text-xs mt-1">Just a moment</p>
         </div>
       </div>
     );
@@ -162,20 +163,20 @@ const Dashboard = () => {
 
       {/* Mobile sidebar toggle */}
       <div className="lg:hidden fixed top-[5.25rem] left-4 z-40">
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-10 w-10 bg-card shadow-md border-border"
+        <button
+          className="h-10 w-10 rounded-xl flex items-center justify-center shadow-lg transition-colors"
+          style={{ backgroundColor: "#0B1526" }}
           onClick={() => setSidebarOpen(true)}
+          aria-label="Open menu"
         >
-          <Menu className="h-5 w-5" />
-        </Button>
+          <Menu className="h-5 w-5 text-white" />
+        </button>
       </div>
 
-      {/* Mobile backdrop overlay */}
+      {/* Mobile backdrop */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -189,8 +190,6 @@ const Dashboard = () => {
           setSidebarOpen={setSidebarOpen}
         />
 
-        {/* Desktop: sidebar always visible, offset content */}
-        {/* Mobile: no offset, full width */}
         <div className="flex-1 lg:ml-64">
           <div className="p-4 sm:p-6 lg:p-8 pt-16 lg:pt-8">
             {renderTabContent()}
