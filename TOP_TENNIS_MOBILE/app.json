@@ -20,7 +20,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.top.tennis",
+      "bundleIdentifier": "com.toptennis.app",
       "buildNumber": "2",
       "infoPlist": {
         "NSCameraUsageDescription": "Top Tennis uses your camera for video calls and profile photos.",
@@ -43,7 +43,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#F97316"
       },
-      "package": "com.top.tennis",
+      "package": "com.toptennis.app",
       "versionCode": 1,
       "permissions": [
         "android.permission.CAMERA",
