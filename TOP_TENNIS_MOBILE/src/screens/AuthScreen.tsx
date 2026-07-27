@@ -414,7 +414,7 @@ export const AuthScreen: React.FC = () => {
                 <View style={s.dividerLine} />
               </View>
 
-              {/* Apple — must appear with equal or greater prominence than Google (Guideline 4.8) */}
+              {/* Apple — equal prominence to Google, required by Guideline 4.8 */}
               {appleAvailable && Platform.OS === 'ios' && (
                 <View style={{ opacity: isAnyLoading ? 0.6 : 1 }} pointerEvents={isAnyLoading ? 'none' : 'auto'}>
                   <AppleAuthentication.AppleAuthenticationButton
