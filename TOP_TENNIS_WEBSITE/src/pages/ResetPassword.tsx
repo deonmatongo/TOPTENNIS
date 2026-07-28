@@ -27,9 +27,13 @@ const ResetPassword = () => {
 
   useEffect(() => {
     const bootstrap = async () => {
-      const params = new URLSearchParams(window.location.search);
+      // Wait for Supabase _initialize() to finish — it auto-exchanges PKCE codes (?code=)
+      // and hash tokens (#access_token=) before this resolves. Reading URL params BEFORE
+      // this causes a double-exchange race that fails and shows a false "link expired" page.
+      const { data: { session } } = await supabase.auth.getSession();
 
-      // 1. token_hash flow — direct link from email (most reliable, no redirect chain)
+      // token_hash is NOT auto-processed by _initialize(); handle it explicitly.
+      const params = new URLSearchParams(window.location.search);
       const tokenHash = params.get("token_hash");
       if (tokenHash) {
         const { error } = await supabase.auth.verifyOtp({
@@ -41,35 +45,9 @@ const ResetPassword = () => {
         return;
       }
 
-      // 2. PKCE code exchange
-      const code = params.get("code");
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) { setPageState("error"); return; }
-        setPageState("ready");
-        return;
-      }
-
-      // 3. Legacy implicit tokens from URL hash
-      const hash = window.location.hash.slice(1);
-      const hashParams = Object.fromEntries(
-        hash.split("&").map(p => p.split("=").map(decodeURIComponent))
-      );
-      if (hashParams.access_token && hashParams.refresh_token) {
-        const { error } = await supabase.auth.setSession({
-          access_token: hashParams.access_token,
-          refresh_token: hashParams.refresh_token,
-        });
-        if (error) { setPageState("error"); return; }
-        setPageState("ready");
-        return;
-      }
-
-      // 4. Already have an active recovery session
-      const { data: { session } } = await supabase.auth.getSession();
+      // Session established by auto-detection (PKCE exchange, hash tokens, or existing login)
       if (session) { setPageState("ready"); return; }
 
-      // Nothing found — invalid link
       setPageState("error");
     };
 
