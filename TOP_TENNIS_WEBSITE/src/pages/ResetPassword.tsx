@@ -27,8 +27,21 @@ const ResetPassword = () => {
 
   useEffect(() => {
     const bootstrap = async () => {
-      // 1. Try PKCE code exchange (newer Supabase default)
       const params = new URLSearchParams(window.location.search);
+
+      // 1. token_hash flow — direct link from email (most reliable, no redirect chain)
+      const tokenHash = params.get("token_hash");
+      if (tokenHash) {
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: "recovery",
+        });
+        if (error) { setPageState("error"); return; }
+        setPageState("ready");
+        return;
+      }
+
+      // 2. PKCE code exchange
       const code = params.get("code");
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
@@ -37,7 +50,7 @@ const ResetPassword = () => {
         return;
       }
 
-      // 2. Try legacy implicit tokens from URL hash
+      // 3. Legacy implicit tokens from URL hash
       const hash = window.location.hash.slice(1);
       const hashParams = Object.fromEntries(
         hash.split("&").map(p => p.split("=").map(decodeURIComponent))
@@ -52,7 +65,7 @@ const ResetPassword = () => {
         return;
       }
 
-      // 3. Check if there's already an active recovery session
+      // 4. Already have an active recovery session
       const { data: { session } } = await supabase.auth.getSession();
       if (session) { setPageState("ready"); return; }
 
