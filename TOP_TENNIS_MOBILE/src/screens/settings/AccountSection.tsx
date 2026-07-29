@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import {
-  View, Text, Switch, Alert, ActivityIndicator, StyleSheet,
+  View, Text, Alert, ActivityIndicator, StyleSheet,
   ScrollView, Modal, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
-import { useBiometrics } from '@/hooks/useBiometrics';
 import { supabase } from '@/services/supabase';
 import { Colors, Radius, Spacing, FontSize, Font } from '@/theme/colors';
 import {
@@ -24,7 +23,6 @@ const nr = StyleSheet.create({
 
 export const AccountSection: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuth();
-  const { available, biometricLabel, credentialsStored, clearCredentials, authenticate } = useBiometrics();
   const [sendingReset, setSendingReset] = useState(false);
   const [emailModal, setEmailModal] = useState(false);
   const [newEmail, setNewEmail] = useState('');
@@ -89,25 +87,6 @@ export const AccountSection: React.FC<{ navigation: any }> = ({ navigation }) =>
     );
   };
 
-  const handleToggleBiometrics = () => {
-    if (credentialsStored) {
-      Alert.alert(
-        `Disable ${biometricLabel}`,
-        `You will no longer be able to sign in with ${biometricLabel}.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Disable', style: 'destructive', onPress: clearCredentials },
-        ],
-      );
-    } else {
-      Alert.alert(
-        `Enable ${biometricLabel}`,
-        `To enable ${biometricLabel} sign-in, please sign out and back in from the login screen.`,
-        [{ text: 'OK' }],
-      );
-    }
-  };
-
   return (
     <SettingsSafeScreen>
       <SectionPageHeader title="Account" subtitle="Profile & security" onBack={() => navigation.goBack()} />
@@ -134,23 +113,6 @@ export const AccountSection: React.FC<{ navigation: any }> = ({ navigation }) =>
             color="#8b5cf6"
             onPress={sendingReset ? () => {} : handlePasswordReset}
           />
-          {available && (
-            <View style={[nr.row, { borderBottomWidth: 1, borderBottomColor: Colors.borderLight }]}>
-              <View style={[nr.icon, { backgroundColor: '#EFF6FF' }]}>
-                <Ionicons name={biometricLabel === 'Face ID' ? 'scan-outline' : 'finger-print-outline'} size={18} color="#3b82f6" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={nr.label}>{biometricLabel} Sign-In</Text>
-                <Text style={nr.desc}>{credentialsStored ? `${biometricLabel} is enabled` : `Sign in faster with ${biometricLabel}`}</Text>
-              </View>
-              <Switch
-                value={credentialsStored}
-                onValueChange={handleToggleBiometrics}
-                trackColor={{ false: Colors.borderLight, true: '#93c5fd' }}
-                thumbColor={credentialsStored ? '#3b82f6' : Colors.textMuted}
-              />
-            </View>
-          )}
           <NavRow
             icon="mail-outline"
             label="Email Address"

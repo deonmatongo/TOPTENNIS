@@ -12,7 +12,6 @@ import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/services/supabase'
 import { Palette, Colors, FontSize, FontWeight, Radius, Spacing } from '@/theme/colors'
-import { useBiometrics } from '@/hooks/useBiometrics'
 
 const { width: W } = Dimensions.get('window')
 
@@ -86,9 +85,7 @@ export const AuthScreen: React.FC = () => {
   const [appleLoading, setAppleLoading] = useState(false)
   const [appleAvailable, setAppleAvailable] = useState(false)
   const [focusedField, setFocusedField] = useState<string | null>(null)
-  const [biometricLoading, setBiometricLoading] = useState(false)
   const { signIn, signUp, signInWithGoogle, signInWithApple } = useAuth()
-  const { available, biometricType, biometricLabel, credentialsStored, authenticate, saveCredentials } = useBiometrics()
 
   useEffect(() => {
     if (Platform.OS === 'ios') {
@@ -112,24 +109,6 @@ export const AuthScreen: React.FC = () => {
     catch (e: any) { Alert.alert('Google Sign-In Failed', e?.message || 'Could not sign in with Google.') }
     finally { setGoogleLoading(false) }
   }
-
-  const handleBiometricSignIn = useCallback(async () => {
-    setBiometricLoading(true)
-    try {
-      const creds = await authenticate()
-      if (!creds) return
-      await signIn(creds.email, creds.password)
-    } catch (e: any) {
-      Alert.alert('Sign In Failed', e?.message || 'Could not sign in. Please use your password.')
-    } finally { setBiometricLoading(false) }
-  }, [authenticate, signIn])
-
-  useEffect(() => {
-    if (available && credentialsStored && mode === 'signin') {
-      const t = setTimeout(() => handleBiometricSignIn(), 400)
-      return () => clearTimeout(t)
-    }
-  }, [available, credentialsStored])
 
   const pwStrength = mode === 'signup' ? getPasswordStrength(password) : null
   const clearError = (field: string) => {
@@ -178,12 +157,6 @@ export const AuthScreen: React.FC = () => {
       setLoading(true)
       try {
         await signIn(email.trim(), password)
-        if (available && !credentialsStored) {
-          Alert.alert(`Enable ${biometricLabel}`, `Sign in faster next time using ${biometricLabel}.`, [
-            { text: 'Not Now', style: 'cancel' },
-            { text: `Enable`, onPress: () => saveCredentials(email.trim(), password) },
-          ])
-        }
       } catch (e: any) { Alert.alert('Sign In Failed', e?.message || 'Incorrect email or password.') }
       finally { setLoading(false) }
     }
@@ -441,25 +414,6 @@ export const AuthScreen: React.FC = () => {
                 )}
               </TouchableOpacity>
 
-              {/* Biometric */}
-              {mode === 'signin' && available && credentialsStored && (
-                <TouchableOpacity
-                  style={[s.biometricBtn, { opacity: isAnyLoading || biometricLoading ? 0.6 : 1 }]}
-                  onPress={handleBiometricSignIn}
-                  disabled={isAnyLoading || biometricLoading}
-                  activeOpacity={0.85}
-                >
-                  {biometricLoading ? (
-                    <ActivityIndicator color={Palette.orange500} />
-                  ) : (
-                    <>
-                      <Ionicons name={biometricType === 'faceid' ? 'scan-outline' : 'finger-print-outline'} size={20} color={Palette.orange500} />
-                      <Text style={s.biometricBtnText}>Sign in with {biometricLabel}</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              )}
-
               {/* Switch mode */}
               <Text style={s.switchText}>
                 {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
@@ -594,15 +548,6 @@ const s = StyleSheet.create({
     width: 22, height: 22, borderRadius: 11,
     backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
   },
-
-  // Biometric
-  biometricBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    borderWidth: 1, borderColor: 'rgba(251,146,60,0.35)',
-    borderRadius: Radius.full, height: 52,
-    backgroundColor: 'rgba(251,146,60,0.08)',
-  },
-  biometricBtnText: { color: Palette.orange500, fontSize: 15, fontWeight: FontWeight.semibold },
 
   // Switch
   switchText: { fontSize: 14, color: 'rgba(255,255,255,0.4)', textAlign: 'center' },

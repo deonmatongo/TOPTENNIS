@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { captureError } from '@/services/sentry';
@@ -284,29 +285,62 @@ export const useConversations = () => {
     const msgChannel = (supabase as any)
       .channel(`${msgTopic}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversation_messages' },
-        () => fetchConversations())
+        (payload: any) => {
+          if (__DEV__) console.log('[conv:messages] INSERT event', payload);
+          fetchConversations();
+        })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' },
-        () => fetchConversations())
-      .subscribe();
+        (payload: any) => {
+          if (__DEV__) console.log('[conv:reactions] * event', payload);
+          fetchConversations();
+        })
+      .subscribe((status: string) => {
+        if (__DEV__) console.log('[conv:messages] channel status', status);
+      });
 
     const memChannel = (supabase as any)
       .channel(`${memTopic}`)
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'conversation_members',
         filter: `user_id=eq.${user.id}`,
-      }, () => fetchConversations())
-      .subscribe();
+      }, (payload: any) => {
+        if (__DEV__) console.log('[conv:members] * event', payload);
+        fetchConversations();
+      })
+      .subscribe((status: string) => {
+        if (__DEV__) console.log('[conv:members] channel status', status);
+      });
 
     const convChannel = (supabase as any)
       .channel(`${convTopic}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations' }, () => fetchConversations())
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, () => fetchConversations())
-      .subscribe();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations' }, (payload: any) => {
+        if (__DEV__) console.log('[conv:conversations] INSERT event', payload);
+        fetchConversations();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, (payload: any) => {
+        if (__DEV__) console.log('[conv:conversations] UPDATE event', payload);
+        fetchConversations();
+      })
+      .subscribe((status: string) => {
+        if (__DEV__) console.log('[conv:conversations] channel status', status);
+      });
+
+    // Step 5: Recover from WebSocket drop when app returns to foreground.
+    // The WS is killed by iOS/Android after ~30 s in the background; channels
+    // don't self-heal reliably, so a refetch on 'active' closes the gap.
+    const handleAppState = (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        if (__DEV__) console.log('[conv] app foregrounded — refetching');
+        fetchConversations();
+      }
+    };
+    const appStateSub = AppState.addEventListener('change', handleAppState);
 
     return () => {
       supabase.removeChannel(msgChannel);
       supabase.removeChannel(memChannel);
       supabase.removeChannel(convChannel);
+      appStateSub.remove();
     };
   }, [user, fetchConversations]);
 

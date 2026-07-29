@@ -105,6 +105,9 @@
       "color": "#F97316",
       "iosDisplayInForeground": true
     },
+    "updates": {
+      "url": "https://u.expo.dev/4219d217-f2a1-4f6f-a40b-4e85742eb6c8"
+    },
     "extra": {
       "eas": {
         "projectId": "4219d217-f2a1-4f6f-a40b-4e85742eb6c8"

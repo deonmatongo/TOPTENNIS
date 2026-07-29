@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/services/supabase';
 import { logger } from '@/services/logger';
+import { useUniqueChannel } from '@/hooks/useUniqueChannel';
 
 export interface LeaderboardPlayer {
   id: string;
@@ -22,6 +23,7 @@ export interface LeaderboardPlayer {
 
 export const useDivisionLeaderboard = (divisionId?: string) => {
   const { user } = useAuth();
+  const channelTopic = useUniqueChannel('division-leaderboard');
   const [leaderboard, setLeaderboard] = useState<LeaderboardPlayer[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -79,10 +81,12 @@ export const useDivisionLeaderboard = (divisionId?: string) => {
     fetch();
 
     const channel = supabase
-      .channel(`division-leaderboard-${divisionId}`)
+      .channel(`${channelTopic}-${divisionId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'league_matches', filter: `division_id=eq.${divisionId}` }, fetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'division_assignments', filter: `division_id=eq.${divisionId}` }, fetch)
-      .subscribe();
+      .subscribe((status: string) => {
+        if (__DEV__) console.log('[division-leaderboard] channel status', status);
+      });
 
     return () => { supabase.removeChannel(channel); };
   }, [divisionId, user?.id]);

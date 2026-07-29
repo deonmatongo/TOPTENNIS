@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/services/supabase';
 import { captureError } from '@/services/sentry';
+import { useUniqueChannel } from '@/hooks/useUniqueChannel';
 
 export interface LeagueMatch {
   id: string;
@@ -32,6 +33,7 @@ export interface LeagueMatch {
 
 export const useLeagueMatches = (divisionId?: string) => {
   const { user } = useAuth();
+  const channelTopic = useUniqueChannel('league-matches');
   const [matches, setMatches] = useState<LeagueMatch[]>([]);
   const [allDivisionMatches, setAllDivisionMatches] = useState<LeagueMatch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,9 +143,11 @@ export const useLeagueMatches = (divisionId?: string) => {
     fetchMatches();
 
     const channel = supabase
-      .channel(`league-matches-${divisionId}`)
+      .channel(`${channelTopic}-${divisionId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'league_matches', filter: `division_id=eq.${divisionId}` }, fetchMatches)
-      .subscribe();
+      .subscribe((status: string) => {
+        if (__DEV__) console.log('[league-matches] channel status', status);
+      });
 
     return () => { supabase.removeChannel(channel); };
   }, [divisionId, user?.id]);

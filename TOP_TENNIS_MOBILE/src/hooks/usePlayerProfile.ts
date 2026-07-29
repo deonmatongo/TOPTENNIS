@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUniqueChannel } from '@/hooks/useUniqueChannel';
 
 export interface PlayerProfile {
   id: string;
@@ -57,6 +59,7 @@ function splitUpdates(updates: Partial<PlayerProfile>) {
 
 export function usePlayerProfile() {
   const { user } = useAuth();
+  const channelTopic = useUniqueChannel('player-profile');
   const [player, setPlayer] = useState<PlayerProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -86,7 +89,40 @@ export function usePlayerProfile() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchPlayer(); }, [user?.id]);
+  useEffect(() => {
+    if (!user) { setLoading(false); return; }
+    fetchPlayer();
+
+    // Bug fix: usePlayerProfile previously had no realtime subscription.
+    // recordMatchResult() directly UPDATEs the players row (wins, losses,
+    // total_matches), but the Dashboard and PerformanceScreen never saw it
+    // until re-mount. Subscribe to UPDATE on the current user's players row
+    // so stats refresh the moment the score lands.
+    const channel = supabase
+      .channel(channelTopic)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'players',
+        filter: `user_id=eq.${user.id}`,
+      }, (payload: any) => {
+        if (__DEV__) console.log('[player-profile] players UPDATE', payload);
+        fetchPlayer();
+      })
+      .subscribe((status: string) => {
+        if (__DEV__) console.log('[player-profile] channel status', status);
+      });
+
+    const handleAppState = (nextState: AppStateStatus) => {
+      if (nextState === 'active') fetchPlayer();
+    };
+    const appStateSub = AppState.addEventListener('change', handleAppState);
+
+    return () => {
+      supabase.removeChannel(channel);
+      appStateSub.remove();
+    };
+  }, [user?.id]);
 
   const createPlayerProfile = async (profileData: Partial<PlayerProfile>) => {
     if (!user) throw new Error('Not authenticated');

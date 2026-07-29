@@ -22,18 +22,21 @@ const wrapper = ({ children }: { children: React.ReactNode }) =>
 describe('AuthContext', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // AuthProvider calls signOut on mount — must return a Promise
+    // auth.signOut needs to return a Promise for the manual sign-out tests
     supabase.auth.signOut.mockResolvedValue({ error: null });
     supabase.auth.onAuthStateChange.mockReturnValue({
       data: { subscription: { unsubscribe: jest.fn() } },
     });
   });
 
-  it('always starts logged out — calls signOut on mount to clear any persisted session', async () => {
+  it('restores a persisted session on mount without signing out', async () => {
     const { result } = renderHook(() => useAuth(), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    expect(supabase.auth.signOut).toHaveBeenCalledTimes(1);
+    // getSession is called to restore the session; signOut is NOT called on mount
+    expect(supabase.auth.getSession).toHaveBeenCalledTimes(1);
+    expect(supabase.auth.signOut).not.toHaveBeenCalled();
+    // Default mock returns null session, so user starts as null
     expect(result.current.user).toBeNull();
     expect(result.current.session).toBeNull();
   });

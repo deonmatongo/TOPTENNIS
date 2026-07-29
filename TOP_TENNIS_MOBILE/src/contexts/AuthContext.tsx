@@ -35,14 +35,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Always start logged out — clear any persisted session
-    supabase.auth.signOut().finally(() => {
-      setSession(null);
-      setUser(null);
+    // Restore any persisted session on mount — users stay signed in until they
+    // manually sign out. getSession() reads from SecureStore and resolves
+    // before the first auth-dependent render.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) setSentryUser(session.user.id);
+      else clearSentryUser();
       setLoading(false);
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);

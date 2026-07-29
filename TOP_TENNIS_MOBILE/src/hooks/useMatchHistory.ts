@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/services/supabase';
 import { captureError } from '@/services/sentry';
+import { useUniqueChannel } from '@/hooks/useUniqueChannel';
 
 export interface MatchHistoryEntry {
   id: string;
@@ -25,6 +27,7 @@ export interface MatchHistoryEntry {
 
 export const useMatchHistory = (limit = 20) => {
   const { user } = useAuth();
+  const channelTopic = useUniqueChannel('match-history');
   const [history, setHistory] = useState<MatchHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -155,6 +158,54 @@ export const useMatchHistory = (limit = 20) => {
     };
 
     fetch();
+
+    // Bug fix: useMatchHistory previously had no realtime subscription.
+    // Subscribe to the two base tables whose changes alter the history list:
+    //   - league_matches: updated by submit_league_match_score (RPC); underlies
+    //     the user_league_matches view that this hook reads.
+    //   - match_invites (both sides): updated by recordMatchResult() when a
+    //     casual match score is recorded (winner_id / score columns are set).
+    const channel = supabase
+      .channel(channelTopic)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'league_matches',
+      }, (payload: any) => {
+        if (__DEV__) console.log('[match-history] league_matches UPDATE', payload);
+        fetch();
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'match_invites',
+        filter: `sender_id=eq.${user.id}`,
+      }, (payload: any) => {
+        if (__DEV__) console.log('[match-history] match_invites UPDATE (sender)', payload);
+        fetch();
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'match_invites',
+        filter: `receiver_id=eq.${user.id}`,
+      }, (payload: any) => {
+        if (__DEV__) console.log('[match-history] match_invites UPDATE (receiver)', payload);
+        fetch();
+      })
+      .subscribe((status: string) => {
+        if (__DEV__) console.log('[match-history] channel status', status);
+      });
+
+    const handleAppState = (nextState: AppStateStatus) => {
+      if (nextState === 'active') fetch();
+    };
+    const appStateSub = AppState.addEventListener('change', handleAppState);
+
+    return () => {
+      supabase.removeChannel(channel);
+      appStateSub.remove();
+    };
   }, [user?.id, limit]);
 
   return { history, loading };

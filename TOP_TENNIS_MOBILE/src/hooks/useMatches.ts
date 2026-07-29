@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { captureError } from '@/services/sentry';
@@ -274,7 +275,53 @@ export const useMatches = () => {
     i => i.status === 'accepted' && new Date(`${i.date}T${i.start_time}`) < new Date()
   );
 
-  useEffect(() => { fetchInvites(); }, [fetchInvites]);
+  useEffect(() => {
+    if (!user) { setLoading(false); return; }
+    fetchInvites();
+
+    // Bug fix: useMatches previously had no realtime subscription. When another
+    // user inserted a match_invites row (sending you an invite), this hook never
+    // heard about it — the invite only appeared on app re-open because the hook
+    // re-mounted. Adding two .on() listeners (one per FK column) covers both
+    // sender and receiver sides; Supabase doesn't support OR across columns in a
+    // single filter clause.
+    const channel = supabase
+      .channel(`matches-invites-${user.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'match_invites',
+        filter: `sender_id=eq.${user.id}`,
+      }, (payload: any) => {
+        if (__DEV__) console.log('[matches] invite event (sender)', payload);
+        fetchInvites();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'match_invites',
+        filter: `receiver_id=eq.${user.id}`,
+      }, (payload: any) => {
+        if (__DEV__) console.log('[matches] invite event (receiver)', payload);
+        fetchInvites();
+      })
+      .subscribe((status: string) => {
+        if (__DEV__) console.log('[matches] channel status', status);
+      });
+
+    const handleAppState = (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        if (__DEV__) console.log('[matches] app foregrounded — refetching');
+        fetchInvites();
+      }
+    };
+    const appStateSub = AppState.addEventListener('change', handleAppState);
+
+    return () => {
+      supabase.removeChannel(channel);
+      appStateSub.remove();
+    };
+  }, [user, fetchInvites]);
 
   return { invites, loading, pendingReceived, upcoming, history, respondToInvite, recordMatchResult, refetch: fetchInvites };
 };

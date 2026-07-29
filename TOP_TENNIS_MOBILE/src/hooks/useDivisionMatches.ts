@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/services/supabase';
 import { captureError } from '@/services/sentry';
+import { useUniqueChannel } from '@/hooks/useUniqueChannel';
 
 export interface DivisionMatch {
   id: string;
@@ -29,6 +30,7 @@ export interface DivisionMatch {
 
 export const useDivisionMatches = (divisionId?: string) => {
   const { user } = useAuth();
+  const channelTopic = useUniqueChannel('division-matches');
   const [matches, setMatches] = useState<DivisionMatch[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -114,9 +116,11 @@ export const useDivisionMatches = (divisionId?: string) => {
     fetch();
 
     const channel = supabase
-      .channel(`division-matches-${divisionId}`)
+      .channel(`${channelTopic}-${divisionId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, fetch)
-      .subscribe();
+      .subscribe((status: string) => {
+        if (__DEV__) console.log('[division-matches] channel status', status);
+      });
 
     return () => { supabase.removeChannel(channel); };
   }, [divisionId, user?.id]);

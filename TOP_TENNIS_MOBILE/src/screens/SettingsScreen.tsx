@@ -24,7 +24,7 @@ const SECTIONS = [
     screen: 'AccountSection',
     icon: 'person-circle-outline' as const,
     label: 'Account',
-    desc: 'Profile, security, biometrics',
+    desc: 'Profile & security',
     color: Colors.primary,
   },
   {

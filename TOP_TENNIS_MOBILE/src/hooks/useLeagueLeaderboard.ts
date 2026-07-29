@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/services/supabase';
 import { captureError } from '@/services/sentry';
+import { useUniqueChannel } from '@/hooks/useUniqueChannel';
 
 export interface LeagueLeaderboardPlayer {
   id: string;
@@ -25,6 +26,7 @@ export interface LeagueLeaderboardPlayer {
 
 export const useLeagueLeaderboard = (leagueId?: string) => {
   const { user } = useAuth();
+  const channelTopic = useUniqueChannel('league-leaderboard');
   const [leaderboard, setLeaderboard] = useState<LeagueLeaderboardPlayer[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -85,10 +87,22 @@ export const useLeagueLeaderboard = (leagueId?: string) => {
     fetch();
 
     const channel = supabase
-      .channel(`league-leaderboard-${leagueId}`)
+      .channel(`${channelTopic}-${leagueId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'division_assignments' }, fetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, fetch)
-      .subscribe();
+      // Bug fix: league scores go through submit_league_match_score (RPC) which
+      // writes to league_matches, not directly to players. Without this listener
+      // the league-wide leaderboard missed every league score submission — only
+      // division-level (useDivisionLeaderboard) caught it. No column filter here
+      // because league_matches has no league_id column; the re-fetch is already
+      // scoped by leagueId via the league_standings query.
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'league_matches' }, (payload: any) => {
+        if (__DEV__) console.log('[league-leaderboard] league_matches UPDATE', payload);
+        fetch();
+      })
+      .subscribe((status: string) => {
+        if (__DEV__) console.log('[league-leaderboard] channel status', status);
+      });
 
     return () => { supabase.removeChannel(channel); };
   }, [leagueId, user?.id]);

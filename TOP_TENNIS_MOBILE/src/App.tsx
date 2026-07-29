@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { initSentry, wrapApp } from '@/services/sentry';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 initSentry();
 import { TamaguiProvider } from 'tamagui';
 import tamaguiConfig from '../tamagui.config';
-import { View, Text, ActivityIndicator, StyleSheet, Platform, Linking, AppState, AppStateStatus } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, Platform, Linking } from 'react-native';
 import {
   useFonts,
   Nunito_400Regular,
@@ -34,7 +34,6 @@ import { navigationRef } from '@/navigation/navigationRef';
 import { AuthScreen } from '@/screens/AuthScreen';
 import { AppIntroScreen } from '@/screens/AppIntroScreen';
 import { OnboardingScreen } from '@/screens/OnboardingScreen';
-import { BiometricLockScreen } from '@/screens/BiometricLockScreen';
 import { ScheduleScreen } from '@/screens/ScheduleScreen';
 import { MatchesScreen } from '@/screens/MatchesScreen';
 import { MessagesScreen } from '@/screens/MessagesScreen';
@@ -63,7 +62,6 @@ import { Colors, Font } from '@/theme/colors';
 import { NetworkBanner } from '@/components/ui/NetworkBanner';
 import { supabase } from '@/services/supabase';
 import * as SecureStore from 'expo-secure-store';
-import { useBiometrics } from '@/hooks/useBiometrics';
 
 const INTRO_SEEN_KEY = 'toptennis_intro_seen';
 
@@ -140,43 +138,20 @@ function SettingsNavigator() {
 
 
 function AppNavigator() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading } = useAuth();
   const { player, loading: playerLoading, refetch } = usePlayerProfile();
-  const { available } = useBiometrics();
 
   // null = still loading from SecureStore
   const [introSeen, setIntroSeen] = useState<boolean | null>(null);
-  const [isLocked, setIsLocked] = useState(false);
-  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   // Load persisted flags once on mount
   useEffect(() => {
     SecureStore.getItemAsync(INTRO_SEEN_KEY).then(val => setIntroSeen(!!val));
   }, []);
 
-  // Lock when app returns from background (only if user is logged in + biometrics available)
-  useEffect(() => {
-    if (!user) return;
-    const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
-      const prev = appStateRef.current;
-      appStateRef.current = nextState;
-      if (prev === 'background' && nextState === 'active' && available) {
-        setIsLocked(true);
-      }
-    });
-    return () => sub.remove();
-  }, [user, available]);
-
   const markIntroDone = async () => {
     await SecureStore.setItemAsync(INTRO_SEEN_KEY, 'true');
     setIntroSeen(true);
-  };
-
-  const handleUnlock = () => setIsLocked(false);
-
-  const handleSignOut = async () => {
-    await signOut();
-    setIsLocked(false);
   };
 
   if (loading || introSeen === null || (user && playerLoading)) {
@@ -188,34 +163,27 @@ function AppNavigator() {
   }
 
   return (
-    <>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!introSeen ? (
-          <Stack.Screen name="AppIntro">
-            {() => <AppIntroScreen onDone={markIntroDone} />}
-          </Stack.Screen>
-        ) : !user ? (
-          <>
-            <Stack.Screen name="Auth" component={AuthScreen} />
-            <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-          </>
-        ) : !player ? (
-          <Stack.Screen name="Onboarding">
-            {() => <OnboardingScreen onComplete={refetch} />}
-          </Stack.Screen>
-        ) : (
-          <>
-            <Stack.Screen name="Main" component={TabNavigator} />
-            <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-          </>
-        )}
-      </Stack.Navigator>
-
-      {/* Biometric lock overlay — sits above all navigation */}
-      {isLocked && user && (
-        <BiometricLockScreen onUnlock={handleUnlock} onSignOut={handleSignOut} />
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {!introSeen ? (
+        <Stack.Screen name="AppIntro">
+          {() => <AppIntroScreen onDone={markIntroDone} />}
+        </Stack.Screen>
+      ) : !user ? (
+        <>
+          <Stack.Screen name="Auth" component={AuthScreen} />
+          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+        </>
+      ) : !player ? (
+        <Stack.Screen name="Onboarding">
+          {() => <OnboardingScreen onComplete={refetch} />}
+        </Stack.Screen>
+      ) : (
+        <>
+          <Stack.Screen name="Main" component={TabNavigator} />
+          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+        </>
       )}
-    </>
+    </Stack.Navigator>
   );
 }
 
