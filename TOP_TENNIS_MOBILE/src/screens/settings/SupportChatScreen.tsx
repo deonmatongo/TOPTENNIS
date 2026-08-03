@@ -152,7 +152,7 @@ export const SupportChatScreen: React.FC<{ navigation: any }> = ({ navigation })
     <SettingsSafeScreen>
       <SectionPageHeader title="Support" subtitle="We usually reply instantly" onBack={() => navigation.goBack()} />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.isPad ? 0 : 8}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={(Platform as any).isPad ? 0 : 8}>
         <ScrollView
           ref={scrollRef}
           style={{ flex: 1 }}

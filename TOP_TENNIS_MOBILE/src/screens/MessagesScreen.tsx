@@ -61,11 +61,11 @@ function getConvAvatar(conv: Conversation, uid: string): string | undefined {
 }
 function getMemberName(m: ConversationMember): string {
   if (!m.profile) return 'Unknown';
-  return `${m.profile.first_name || ''} ${m.profile.last_name || ''}`.trim() || m.profile.email;
+  return `${m.profile.first_name || ''} ${m.profile.last_name || ''}`.trim() || 'Player';
 }
 function getSenderName(msg: ConversationMessage): string {
   if (!msg.sender) return '';
-  return `${msg.sender.first_name || ''} ${msg.sender.last_name || ''}`.trim() || msg.sender.email;
+  return `${msg.sender.first_name || ''} ${msg.sender.last_name || ''}`.trim() || '';
 }
 
 type ListItem =
@@ -891,7 +891,6 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
                   user_id: otherId,
                   name: convName,
                   profile_picture_url: convAvatar ?? null,
-                  email: m?.profile?.email,
                 });
               }
             }}
@@ -1009,7 +1008,6 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
                       user_id: uid,
                       name: getMemberName(m),
                       profile_picture_url: m.profile?.profile_picture_url ?? null,
-                      email: m.profile?.email,
                     });
                   }}
                   recentInvites={recentInvites}

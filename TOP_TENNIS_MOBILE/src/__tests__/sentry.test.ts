@@ -10,7 +10,7 @@ describe('Sentry service', () => {
   });
 
   it('setUser and clearUser do not throw', () => {
-    expect(() => setUser('user-123', 'test@example.com')).not.toThrow();
+    expect(() => setUser('user-123')).not.toThrow();
     expect(() => clearUser()).not.toThrow();
   });
 });
