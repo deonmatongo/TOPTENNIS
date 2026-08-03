@@ -27,6 +27,7 @@ import { useConversations } from '@/hooks/useConversations';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 import { useNotifications } from '@/hooks/useNotifications';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useOTAUpdate } from '@/hooks/useOTAUpdate';
 import { useResponsive } from '@/hooks/useResponsive';
 import { TabBar } from '@/components/navigation/TabBar';
 import { navigationRef } from '@/navigation/navigationRef';
@@ -203,6 +204,7 @@ TextAny.defaultProps.style = { fontFamily: Font.regular };
 
 
 function App() {
+  useOTAUpdate();
   const [fontsLoaded] = useFonts({
     Nunito_400Regular,
     Nunito_500Medium,
