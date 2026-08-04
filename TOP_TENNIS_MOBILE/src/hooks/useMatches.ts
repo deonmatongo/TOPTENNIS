@@ -3,6 +3,7 @@ import { AppState, AppStateStatus } from 'react-native';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { captureError } from '@/services/sentry';
+import { useUniqueChannel } from '@/hooks/useUniqueChannel';
 
 export interface MatchInvite {
   id: string;
@@ -66,6 +67,7 @@ async function notify(userId: string, type: string, title: string, message: stri
 
 export const useMatches = () => {
   const { user } = useAuth();
+  const channelName = useUniqueChannel('matches-invites');
   const [invites, setInvites] = useState<MatchInvite[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -286,7 +288,7 @@ export const useMatches = () => {
     // sender and receiver sides; Supabase doesn't support OR across columns in a
     // single filter clause.
     const channel = supabase
-      .channel(`matches-invites-${user.id}`)
+      .channel(channelName)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
