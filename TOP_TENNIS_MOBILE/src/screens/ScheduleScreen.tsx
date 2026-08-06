@@ -103,7 +103,7 @@ const EVENT_ICON: Record<string, any> = {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
+export const ScheduleScreen: React.FC<{ navigation?: any; route?: any }> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { availability, loading, fetchAvailability, createAvailability, deleteAvailability } = useUserAvailability();
@@ -155,6 +155,33 @@ export const ScheduleScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
   const [selectedEvent, setSelectedEvent] = useState<CalEvent | null>(null);
   const [showEventSheet, setShowEventSheet] = useState(false);
   const [scoreMatch, setScoreMatch] = useState<any>(null);
+
+  // Deep-link from push notification: auto-open a specific invite by ID.
+  // Use a ref so we only auto-open once per mount even if invites re-renders.
+  const autoOpenHandled = React.useRef(false);
+  React.useEffect(() => {
+    const openId = route?.params?.openInviteId as string | undefined;
+    if (!openId || autoOpenHandled.current || !invites?.length || !user) return;
+    const inv = invites.find(i => i.id === openId);
+    if (!inv) return;
+    autoOpenHandled.current = true;
+    const isSender = inv.sender_id === user.id;
+    const other = isSender ? inv.receiver : inv.sender;
+    const name = other ? `${other.first_name || ''} ${other.last_name || ''}`.trim() : 'Player';
+    setSelectedEvent({
+      id: inv.id,
+      type: isSender ? 'sent_invite' : 'invite',
+      date: inv.date,
+      start_time: inv.start_time,
+      end_time: inv.end_time,
+      title: isSender ? `Sent to ${name}` : `From ${name}`,
+      bgColor: isSender ? EV.sent_invite.bg : EV.invite.bg,
+      borderColor: isSender ? EV.sent_invite.border : EV.invite.border,
+      textColor: isSender ? EV.sent_invite.text : EV.invite.text,
+      data: inv,
+    });
+    setShowEventSheet(true);
+  }, [invites, route?.params?.openInviteId, user]);
 
   const goBack = () => {
     if (viewMode === 'agenda') setCurrentDate(d => subWeeks(d, 1));

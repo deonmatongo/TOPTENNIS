@@ -33,7 +33,8 @@
         "NSFaceIDUsageDescription": "Top Tennis uses Face ID to quickly and securely unlock the app.",
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": [
-          "remote-notification"
+          "remote-notification",
+          "fetch"
         ]
       },
       "bitcode": false
@@ -95,6 +96,8 @@
           "calendarPermission": "Top Tennis adds your matches to your calendar."
         }
       ],
+      "expo-background-fetch",
+      "expo-task-manager",
       "expo-web-browser",
       "@config-plugins/react-native-webrtc",
       "@sentry/react-native/expo",

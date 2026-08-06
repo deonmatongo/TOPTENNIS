@@ -22,7 +22,7 @@ type Tab = 'pending' | 'upcoming' | 'history';
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const MatchesScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
+export const MatchesScreen: React.FC<{ navigation?: any; route?: any }> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { pendingReceived, upcoming, history, loading, respondToInvite, recordMatchResult, refetch } = useMatches();
@@ -33,6 +33,23 @@ export const MatchesScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
   const [selectedInvite, setSelectedInvite] = useState<any>(null);
   const [scoreMatch, setScoreMatch] = useState<any>(null);
   const [rescheduleInvite, setRescheduleInvite] = useState<any>(null);
+
+  // Deep-link from push notification: auto-open a specific match by ID.
+  const autoOpenHandled = React.useRef(false);
+  React.useEffect(() => {
+    const openId = route?.params?.openMatchId as string | undefined;
+    if (!openId || autoOpenHandled.current) return;
+    const allInvites = [...pendingReceived, ...upcoming, ...history];
+    if (!allInvites.length) return;
+    const inv = allInvites.find(i => i.id === openId);
+    if (!inv) return;
+    autoOpenHandled.current = true;
+    // Switch to the tab where this invite lives
+    if (pendingReceived.some(i => i.id === openId)) setTab('pending');
+    else if (upcoming.some(i => i.id === openId)) setTab('upcoming');
+    else setTab('history');
+    setSelectedInvite(inv);
+  }, [pendingReceived, upcoming, history, route?.params?.openMatchId]);
   const { exportEvent, exporting: calExporting } = useCalendarExport();
 
   const onRefresh = async () => { setRefreshing(true); await refetch(); setRefreshing(false); };

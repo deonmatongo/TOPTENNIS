@@ -74,24 +74,46 @@ export function usePushNotifications(unreadCount: number) {
     if (!Notifs) return;
 
     const sub = Notifs.addNotificationResponseReceivedListener(response => {
-      const type = response.notification.request.content.data?.type as string | undefined;
+      const data = response.notification.request.content.data ?? {};
+      const type = data.type as string | undefined;
       if (!navigationRef.isReady()) return;
+
+      // navigationRef is untyped at the RootNavigator level; cast to any
+      // so we can pass screen-specific params without fighting the generic.
+      const nav = navigationRef as any;
       switch (type) {
         case 'match_invite':
         case 'match_rescheduled':
-        case 'score_reminder':
-          navigationRef.navigate('Schedule' as never);
+        case 'score_reminder': {
+          const matchId = data.match_id as string | undefined;
+          nav.navigate('Schedule', matchId ? { openInviteId: matchId } : undefined);
           break;
+        }
         case 'match_accepted':
         case 'match_declined':
-        case 'match_result':
-          navigationRef.navigate('Matches' as never);
+        case 'match_confirmed':
+        case 'match_result': {
+          const matchId = data.match_id as string | undefined;
+          nav.navigate('Matches', matchId ? { openMatchId: matchId } : undefined);
           break;
-        case 'message_received':
-          navigationRef.navigate('Messages' as never);
+        }
+        case 'message_received': {
+          const convId   = data.conversation_id as string | undefined;
+          const senderId = data.sender_id       as string | undefined;
+          const params = convId
+            ? { openConvId: convId }
+            : senderId
+            ? { openDMUserId: senderId }
+            : undefined;
+          nav.navigate('Messages', params);
+          break;
+        }
+        case 'friend_request':
+        case 'friend_accepted':
+          nav.navigate('Home');
           break;
         default:
-          navigationRef.navigate('Home' as never);
+          nav.navigate('Home');
           break;
       }
     });
