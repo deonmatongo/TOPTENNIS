@@ -122,8 +122,15 @@ Deno.serve(async (req: Request) => {
     detail: { fn: 'verify-reset-code', purpose: 'password_reset' },
   })
 
+  // Only the two tokens setSession needs — returning verified.session wholesale
+  // would ship a nested user object carrying the phone number we just went to the
+  // trouble of resolving server-side. See the note in login-with-username about
+  // the JWT's own `phone` claim.
   return await respondUniform(startedAt, {
-    session: verified.session,
+    session: {
+      access_token: verified.session.access_token,
+      refresh_token: verified.session.refresh_token,
+    },
     user: { id: verified.user?.id },
   })
 })

@@ -162,9 +162,22 @@ Deno.serve(async (req: Request) => {
     detail: { kind: parsed.kind },
   })
 
-  // The response carries the session only. No phone number, ever.
+  // Return ONLY the two tokens setSession needs.
+  //
+  // Returning `signIn.session` wholesale ships a nested `user` object containing
+  // phone, email, metadata and weak_password — which defeats the point of doing
+  // the username -> phone resolution server-side.
+  //
+  // Caveat worth knowing: the access_token is a GoTrue JWT and its claims include
+  // `phone`, so an authenticated caller can always read the number on their OWN
+  // account. That is unavoidable without a custom token, and is not the leak this
+  // design guards against: resolving SOMEONE ELSE'S username to a phone number
+  // still requires their password, and failing that returns an identical 401.
   return await respondUniform(startedAt, {
-    session: signIn.session,
+    session: {
+      access_token: signIn.session.access_token,
+      refresh_token: signIn.session.refresh_token,
+    },
     user: { id: signIn.user?.id },
   })
 })

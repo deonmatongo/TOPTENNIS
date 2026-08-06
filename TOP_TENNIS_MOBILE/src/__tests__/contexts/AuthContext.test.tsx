@@ -76,6 +76,38 @@ describe('AuthContext — phone + username auth', () => {
     expect(supabase.auth.setSession).toHaveBeenCalledWith(SESSION);
   });
 
+  it('signIn: forwards only the two tokens, even if the server returns a fat session', async () => {
+    // Regression guard. login-with-username originally returned GoTrue's session
+    // object wholesale, whose nested `user` carries phone, email and metadata —
+    // defeating the point of resolving the username server-side. The server was
+    // fixed to trim it; this asserts the client never relays the extra fields
+    // even if something upstream starts sending them again.
+    supabase.functions.invoke.mockResolvedValueOnce({
+      data: {
+        session: {
+          access_token: 'at',
+          refresh_token: 'rt',
+          token_type: 'bearer',
+          expires_in: 3600,
+          weak_password: null,
+          user: { id: 'u1', phone: '14155550100', email: 'leak@example.com' },
+        },
+      },
+      error: null,
+    });
+    const result = await mount();
+
+    await act(async () => { await result.current.signIn('rallyking', 'hunter2xx'); });
+
+    expect(supabase.auth.setSession).toHaveBeenCalledWith({
+      access_token: 'at',
+      refresh_token: 'rt',
+    });
+    const forwarded = JSON.stringify(supabase.auth.setSession.mock.calls[0][0]);
+    expect(forwarded).not.toContain('14155550100');
+    expect(forwarded).not.toContain('leak@example.com');
+  });
+
   it('signIn: a phone number identifier also goes through the Edge Function', async () => {
     supabase.functions.invoke.mockResolvedValueOnce({ data: { session: SESSION }, error: null });
     const result = await mount();
