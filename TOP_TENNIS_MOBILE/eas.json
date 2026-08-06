@@ -10,9 +10,6 @@
       "channel": "development",
       "ios": {
         "simulator": true
-      },
-      "android": {
-        "googleServicesFile": "./google-services.json"
       }
     },
     "development-device": {
@@ -21,9 +18,6 @@
       "channel": "development",
       "ios": {
         "simulator": false
-      },
-      "android": {
-        "googleServicesFile": "./google-services.json"
       }
     },
     "preview": {
@@ -33,8 +27,7 @@
         "simulator": false
       },
       "android": {
-        "buildType": "apk",
-        "googleServicesFile": "./google-services.json"
+        "buildType": "apk"
       }
     },
     "production": {
@@ -44,8 +37,7 @@
         "simulator": false
       },
       "android": {
-        "buildType": "app-bundle",
-        "googleServicesFile": "./google-services.json"
+        "buildType": "app-bundle"
       }
     }
   },
