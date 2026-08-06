@@ -35,11 +35,15 @@ export const SignUpScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   // the unique constraint after verification, which is what closes the race.
   const [checking, setChecking] = useState(false)
   const [availableFor, setAvailableFor] = useState<string | null>(null)
+  // Tracks WHY the handle is not confirmed available, so submit can say
+  // "couldn't verify" instead of falsely asserting "taken".
+  const [checkFailed, setCheckFailed] = useState(false)
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (debounce.current) clearTimeout(debounce.current)
     setAvailableFor(null)
+    setCheckFailed(false)
 
     const candidate = username.trim()
     if (!USERNAME_RE.test(candidate)) {
@@ -51,6 +55,7 @@ export const SignUpScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     debounce.current = setTimeout(async () => {
       const result = await checkUsername(candidate)
       setChecking(false)
+      setCheckFailed(!!result.failed)
       if (result.available) {
         setAvailableFor(candidate)
         setErrors((p) => ({ ...p, username: '' }))
@@ -70,7 +75,13 @@ export const SignUpScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     else if (!USERNAME_RE.test(handle)) {
       e.username = '3–20 characters, letters, numbers and underscores only.'
     } else if (availableFor !== handle) {
-      e.username = checking ? 'Still checking that username…' : 'That username is taken.'
+      // Three genuinely different states. Reporting "taken" for the other two
+      // was the bug: it blamed the user for a lookup that never completed.
+      e.username = checking
+        ? 'Still checking that username…'
+        : checkFailed
+          ? "Couldn't check that username. Check your connection and try again."
+          : 'That username is taken.'
     }
 
     if (!phone.replace(/\D/g, '')) e.phone = 'Enter your mobile number'
@@ -85,7 +96,7 @@ export const SignUpScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
     setErrors(e)
     return Object.keys(e).length === 0
-  }, [username, availableFor, checking, phone, password, confirm, agree])
+  }, [username, availableFor, checking, checkFailed, phone, password, confirm, agree])
 
   const handleSubmit = async () => {
     if (!validate()) return

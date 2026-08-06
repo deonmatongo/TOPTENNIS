@@ -34,7 +34,12 @@ import { setUser as setSentryUser, clearUser as clearSentryUser } from '@/servic
 
 type PendingSignup = { phone: string; username: string; password: string };
 
-type UsernameCheck = { available: boolean; reason?: string };
+/**
+ * `failed` distinguishes "we could not check" from "it is taken". Collapsing the
+ * two tells the user their handle is unavailable when the truth is that the
+ * lookup errored — which is both wrong and unactionable.
+ */
+type UsernameCheck = { available: boolean; reason?: string; failed?: boolean };
 
 type AuthContextType = {
   user: User | null;
@@ -174,8 +179,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const { data, message } = await invokeJson<UsernameCheck>('check-username', { username });
     if (!data) {
       // Never claim a name is free when the check failed — claim_identity would
-      // reject it later, after the user has already verified their number.
-      return { available: false, reason: message ?? 'Could not check that username.' };
+      // reject it later, after the user has already verified their number. But
+      // flag it as a failure so the UI does not say "taken".
+      return {
+        available: false,
+        failed: true,
+        reason: message ?? "Couldn't check that username. Check your connection and try again.",
+      };
     }
     return data;
   };

@@ -28,7 +28,12 @@ import { logger } from '@/utils/logger';
 type PendingSignup = { phone: string; username: string; password: string };
 
 type Result = { error: { message: string; field?: string } | null };
-type UsernameCheck = { available: boolean; reason?: string };
+/**
+ * `failed` distinguishes "we could not check" from "it is taken". Collapsing the
+ * two tells the user their handle is unavailable when the truth is that the
+ * lookup errored.
+ */
+type UsernameCheck = { available: boolean; reason?: string; failed?: boolean };
 
 interface AuthContextType {
   user: User | null;
@@ -176,8 +181,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data, message } = await invokeJson<UsernameCheck>('check-username', { username });
     if (!data) {
       // Never report "available" on a failed check — claim_identity would reject
-      // it later, after the user had already verified their number.
-      return { available: false, reason: message ?? 'Could not check that username.' };
+      // it later, after the user had already verified their number. Flag it as a
+      // failure so the UI does not say "taken".
+      return {
+        available: false,
+        failed: true,
+        reason: message ?? "Couldn't check that username. Check your connection and try again.",
+      };
     }
     return data;
   }, []);
