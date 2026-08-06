@@ -1,10 +1,22 @@
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 
 const mockSignOut = jest.fn().mockResolvedValue(undefined);
-let mockUser: any = { id: 'u1', email: 'player@test.com' };
+// Phone-only user: there is no email on the account any more.
+let mockUser: any = { id: 'u1', phone: '15551230001' };
+
+/**
+ * Admin status now comes from the has_role() RPC rather than an email allowlist,
+ * so these tests drive the RPC. The old allowlist would have stripped admin from
+ * everyone the moment accounts stopped having email addresses.
+ */
+const setAdmin = (isAdmin: boolean) => {
+  jest
+    .requireMock('@/services/supabase')
+    .supabase.rpc.mockResolvedValue({ data: isAdmin, error: null });
+};
 
 jest.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: mockUser, signOut: mockSignOut }),
@@ -21,9 +33,10 @@ const getSupabase = () => jest.requireMock('@/services/supabase').supabase;
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockUser = { id: 'u1', email: 'player@test.com' };
+  mockUser = { id: 'u1', phone: '15551230001' };
   mockPlayer = { first_name: 'Alex', last_name: 'Smith' };
   navigation.navigate.mockReset();
+  setAdmin(false);
 });
 
 describe('SettingsScreen', () => {
@@ -51,22 +64,36 @@ describe('SettingsScreen', () => {
   });
 
   describe('Admin panel', () => {
-    it('is hidden for non-admin users', () => {
-      mockUser = { id: 'u1', email: 'regular@example.com' };
+    it('is hidden when has_role returns false', async () => {
+      setAdmin(false);
       const { queryByText } = render(<SettingsScreen navigation={navigation} />);
+      await waitFor(() => expect(getSupabase().rpc).toHaveBeenCalled());
       expect(queryByText('Admin Panel')).toBeNull();
     });
 
-    it('is visible for admin@toptennis.app', () => {
-      mockUser = { id: 'u1', email: 'admin@toptennis.app' };
-      const { getByText } = render(<SettingsScreen navigation={navigation} />);
-      expect(getByText('Admin Panel')).toBeTruthy();
+    it('is visible when has_role returns true', async () => {
+      setAdmin(true);
+      const { findByText } = render(<SettingsScreen navigation={navigation} />);
+      expect(await findByText('Admin Panel')).toBeTruthy();
     });
 
-    it('is visible for deon@toptennis.app', () => {
-      mockUser = { id: 'u1', email: 'deon@toptennis.app' };
-      const { getByText } = render(<SettingsScreen navigation={navigation} />);
-      expect(getByText('Admin Panel')).toBeTruthy();
+    it('queries has_role with the signed-in user id and the admin role', async () => {
+      setAdmin(true);
+      render(<SettingsScreen navigation={navigation} />);
+      await waitFor(() =>
+        expect(getSupabase().rpc).toHaveBeenCalledWith('has_role', {
+          _user_id: 'u1',
+          _role: 'admin',
+        }),
+      );
+    });
+
+    it('fails closed when the has_role lookup errors', async () => {
+      // A lookup failure must never grant admin.
+      getSupabase().rpc.mockResolvedValue({ data: null, error: new Error('boom') });
+      const { queryByText } = render(<SettingsScreen navigation={navigation} />);
+      await waitFor(() => expect(getSupabase().rpc).toHaveBeenCalled());
+      expect(queryByText('Admin Panel')).toBeNull();
     });
   });
 
@@ -148,11 +175,11 @@ describe('SettingsScreen', () => {
   });
 
   describe('handleAdminReset()', () => {
-    it('shows first confirmation alert when admin presses Admin Panel', () => {
-      mockUser = { id: 'u1', email: 'admin@toptennis.app' };
+    it('shows first confirmation alert when admin presses Admin Panel', async () => {
+      setAdmin(true);
       const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-      const { getByText } = render(<SettingsScreen navigation={navigation} />);
-      fireEvent.press(getByText('Admin Panel'));
+      const { findByText } = render(<SettingsScreen navigation={navigation} />);
+      fireEvent.press(await findByText('Admin Panel'));
       expect(alertSpy).toHaveBeenCalledWith(
         expect.stringContaining('Reset All User Data'),
         expect.any(String),

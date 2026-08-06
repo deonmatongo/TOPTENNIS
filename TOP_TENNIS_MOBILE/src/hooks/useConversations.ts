@@ -16,6 +16,7 @@ export interface ConversationMember {
     id: string;
     first_name?: string | null;
     last_name?: string | null;
+    username?: string | null;
     profile_picture_url?: string | null;
   };
 }
@@ -41,6 +42,7 @@ export interface ConversationMessage {
     id: string;
     first_name?: string | null;
     last_name?: string | null;
+    username?: string | null;
     profile_picture_url?: string | null;
   };
 }
@@ -103,7 +105,7 @@ export const useConversations = () => {
       const userIds = Array.from(new Set((allMembers || []).map((m: any) => m.user_id)));
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, profile_picture_url')
+        .select('id, first_name, last_name, username, profile_picture_url')
         .in('id', userIds as string[]);
       const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
@@ -132,7 +134,7 @@ export const useConversations = () => {
       const senderIds = Array.from(new Set((allMessages || []).map((m: any) => m.sender_id)));
       const { data: senderProfiles } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, profile_picture_url')
+        .select('id, first_name, last_name, username, profile_picture_url')
         .in('id', senderIds as string[]);
       const senderMap = new Map((senderProfiles || []).map((p: any) => [p.id, p]));
 

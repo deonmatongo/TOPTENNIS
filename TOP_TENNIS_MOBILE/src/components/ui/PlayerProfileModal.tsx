@@ -13,7 +13,8 @@ export interface PlayerSearchResult {
   id: string;
   first_name: string;
   last_name: string;
-  email?: string;
+  /** Phone-only accounts have no email. */
+  email?: string | null;
   skill_level?: number;
   usta_rating?: string;
   wins: number;
@@ -190,12 +191,14 @@ export const PlayerProfileModal: React.FC<Props> = ({ visible, player, onClose, 
               <Text style={styles.detailLabel}>Age Group</Text>
               <Text style={styles.detailValue}>{getAgeRangeLabel(player.age_range)}</Text>
             </View>
-            {player.email && (
+            {/* Phone-only accounts have no email — hide the row entirely rather
+                than rendering a dead mailto: link. */}
+            {!!player.email?.trim() && (
               <View style={styles.detailRow}>
                 <Ionicons name="mail-outline" size={16} color={Colors.textMuted} />
                 <Text style={styles.detailLabel}>Email</Text>
-                <TouchableOpacity onPress={() => Linking.openURL(`mailto:${player.email}`)}>
-                  <Text style={[styles.detailValue, styles.detailLink]}>{player.email}</Text>
+                <TouchableOpacity onPress={() => Linking.openURL(`mailto:${player.email!.trim()}`)}>
+                  <Text style={[styles.detailValue, styles.detailLink]}>{player.email.trim()}</Text>
                 </TouchableOpacity>
               </View>
             )}

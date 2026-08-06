@@ -168,15 +168,23 @@ enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
 enable_manual_linking = false
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
-minimum_password_length = 6
-# Passwords that do not meet the following requirements will be rejected as weak. Supported values
-# are: `letters_digits`, `lower_upper_letters_digits`, `lower_upper_letters_digits_symbols`
+minimum_password_length = 8
+# Deliberately left empty. Composition rules ("must contain a symbol") push users
+# toward shorter, more predictable passwords and are not required by the spec:
+# length is the only rule, and full Unicode plus paste must keep working so
+# password managers are not broken.
 password_requirements = ""
 
 [auth.rate_limit]
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
 email_sent = 2
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
+#
+# Project-wide hourly ceiling on outbound SMS — a backstop, not the primary
+# control. Every OTP send in this app is proxied through an Edge Function
+# (start-signup for signup, resolve-for-reset for recovery), so the per-phone and
+# per-IP counters in public.auth_rate_limits bind first. This figure is what
+# stops a bug in those functions from running up a Twilio bill.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
 anonymous_users = 30
@@ -190,10 +198,19 @@ token_verifications = 30
 web3 = 30
 
 # Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
+#
+# Deliberately DISABLED. Supabase captcha is project-wide, so enabling it would
+# require the Expo app to produce a token too, and Turnstile has no React Native
+# SDK — it would mean a WebView challenge inside signup.
+#
+# The reason a captcha was wanted (bounding signup OTP sends) is instead handled
+# properly: the client never calls auth.signUp. Signup goes through the
+# start-signup Edge Function, which rate-limits per phone AND per IP against
+# public.auth_rate_limits before any SMS is sent.
 # [auth.captcha]
 # enabled = true
-# provider = "hcaptcha"
-# secret = ""
+# provider = "turnstile"
+# secret = "env(SUPABASE_AUTH_CAPTCHA_SECRET)"
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
@@ -235,13 +252,18 @@ otp_expiry = 3600
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
-enable_signup = false
-# If enabled, users need to confirm their phone number before signing in.
-enable_confirmations = false
-# Template for sending OTP to users
+enable_signup = true
+# Phone must be confirmed before the account can sign in. Required: without it a
+# user could sign up with someone else's number and never prove control of it,
+# and claim_identity() would have no phone_confirmed_at to trust.
+enable_confirmations = true
+# Ignored when the provider is twilio_verify — Twilio Verify owns the message
+# template and the code itself. Left in place for reference only.
 template = "Your code is {{ .Code }}"
-# Controls the minimum amount of time that must pass before sending another sms otp.
-max_frequency = "5s"
+# Server-side floor between OTP sends. This is what actually enforces the 30s
+# resend cooldown; the client's countdown timer is only a hint and can be
+# bypassed by anyone talking to the API directly.
+max_frequency = "30s"
 
 # Use pre-defined map of phone number to OTP for testing.
 # [auth.sms.test_otp]
@@ -265,11 +287,26 @@ max_frequency = "5s"
 # uri = "pg-functions://<database>/<schema>/<hook_name>"
 
 # Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.
+#
+# Plain `twilio` stays disabled. We use `twilio_verify` below so that Twilio owns
+# code generation, the 10-minute TTL, single-use invalidation and the max-check
+# attempt cap. Rolling our own OTP store would mean reimplementing all four.
 [auth.sms.twilio]
 enabled = false
 account_sid = ""
 message_service_sid = ""
 # DO NOT commit your Twilio auth token to git. Use environment variable substitution instead:
+auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
+
+# Twilio Verify — the active SMS provider.
+#
+# `message_service_sid` is the Verify *Service* SID (starts with VA...), not a
+# Messaging Service SID. Set the token with:
+#   supabase secrets set SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN=...
+[auth.sms.twilio_verify]
+enabled = true
+account_sid = "env(TWILIO_ACCOUNT_SID)"
+message_service_sid = "env(TWILIO_VERIFY_SERVICE_SID)"
 auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
 
 # Multi-factor-authentication is available to Supabase Pro plan.
@@ -349,6 +386,27 @@ enabled = false
 authorization_url_path = "/oauth/consent"
 # Allow dynamic client registration
 allow_dynamic_registration = false
+
+# Pre-login Edge Functions. These are called before a session exists, so JWT
+# verification must be off — with it on, every one of them would 401 and the user
+# could never sign up or recover an account.
+#
+# Each does its own authorisation and rate limiting; see the header comment in
+# the corresponding index.ts.
+[functions.check-username]
+verify_jwt = false
+
+[functions.start-signup]
+verify_jwt = false
+
+[functions.login-with-username]
+verify_jwt = false
+
+[functions.resolve-for-reset]
+verify_jwt = false
+
+[functions.verify-reset-code]
+verify_jwt = false
 
 [edge_runtime]
 enabled = true

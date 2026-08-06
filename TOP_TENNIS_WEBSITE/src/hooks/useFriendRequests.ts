@@ -11,12 +11,15 @@ export interface FriendRequest {
   updated_at: string;
   sender?: {
     name: string;
-    email: string;
+    /** Phone-only accounts have no email — may be null. */
+    email?: string | null;
+    username?: string | null;
     profile_picture_url?: string;
   };
   receiver?: {
     name: string;
-    email: string;
+    email?: string | null;
+    username?: string | null;
     profile_picture_url?: string;
   };
 }
@@ -72,7 +75,7 @@ export const useFriendRequests = () => {
       if (userIds.size > 0) {
         const { data, error: profilesError } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, email, profile_picture_url')
+          .select('id, first_name, last_name, email, username, profile_picture_url')
           .in('id', Array.from(userIds));
 
         // If profile enrichment fails (often due to RLS), still show requests.
@@ -93,14 +96,22 @@ export const useFriendRequests = () => {
         
         return {
           ...req,
+          // Phone-only accounts have no first/last name yet and no email —
+          // fall back to the username before a neutral placeholder.
           sender: senderProfile ? {
-            name: `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim(),
+            name: `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim()
+              || senderProfile.username
+              || 'A player',
             email: senderProfile.email,
+            username: senderProfile.username,
             profile_picture_url: senderProfile.profile_picture_url
           } : undefined,
           receiver: receiverProfile ? {
-            name: `${receiverProfile.first_name || ''} ${receiverProfile.last_name || ''}`.trim(), 
+            name: `${receiverProfile.first_name || ''} ${receiverProfile.last_name || ''}`.trim()
+              || receiverProfile.username
+              || 'A player',
             email: receiverProfile.email,
+            username: receiverProfile.username,
             profile_picture_url: receiverProfile.profile_picture_url
           } : undefined
         };
@@ -131,12 +142,13 @@ export const useFriendRequests = () => {
       // Fetch sender name for the notification message
       const { data: senderProfile } = await supabase
         .from('profiles')
-        .select('first_name, last_name')
+        .select('first_name, last_name, username')
         .eq('id', user.id)
         .single();
-      const senderName = senderProfile
-        ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim()
-        : 'Someone';
+      const senderName =
+        `${senderProfile?.first_name || ''} ${senderProfile?.last_name || ''}`.trim()
+        || senderProfile?.username
+        || 'Someone';
 
       // Use insert_notification_safe (ON CONFLICT DO NOTHING) so that if the
       // notify_friend_request() DB trigger has not yet been dropped it will
@@ -179,12 +191,13 @@ export const useFriendRequests = () => {
         // Fetch receiver (current user) name
         const { data: receiverProfile } = await supabase
           .from('profiles')
-          .select('first_name, last_name')
+          .select('first_name, last_name, username')
           .eq('id', user.id)
           .single();
-        const receiverName = receiverProfile
-          ? `${receiverProfile.first_name || ''} ${receiverProfile.last_name || ''}`.trim()
-          : 'Someone';
+        const receiverName =
+          `${receiverProfile?.first_name || ''} ${receiverProfile?.last_name || ''}`.trim()
+          || receiverProfile?.username
+          || 'Someone';
 
         // Use insert_notification_safe (ON CONFLICT DO NOTHING) so that if a DB
         // trigger already inserted the same notification, the second insert is

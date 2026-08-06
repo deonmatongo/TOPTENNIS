@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform,
 } from 'react-native';
@@ -13,7 +13,9 @@ import { supabase } from '@/services/supabase';
 import { Palette, Colors, FontSize, Font, FontWeight, Spacing, Radius } from '@/theme/colors';
 
 // ─── Admin config ─────────────────────────────────────────────────────────────
-const ADMIN_EMAILS = ['admin@toptennis.app', 'deon@toptennis.app'];
+// Admin status comes from the has_role() function in the database, not from a
+// hardcoded email list. Phone-only accounts have no email at all, so the old
+// allowlist would have silently stripped every admin of their access.
 
 // App version from the build config (falls back for safety).
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
@@ -94,7 +96,20 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const { user, signOut } = useAuth();
   const { player } = usePlayerProfile();
 
-  const isAdmin = ADMIN_EMAILS.includes(user?.email || '');
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) { setIsAdmin(false); return; }
+    let cancelled = false;
+    supabase
+      .rpc('has_role', { _user_id: user.id, _role: 'admin' })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        // Fail closed — a lookup failure must not grant admin.
+        setIsAdmin(!error && data === true);
+      });
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [

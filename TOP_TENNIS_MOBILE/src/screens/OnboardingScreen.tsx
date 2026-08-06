@@ -17,6 +17,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
+import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, FontSize, FontWeight, Spacing, Radius } from '@/theme/colors';
 
@@ -73,6 +74,7 @@ function SelCard({ label, desc, icon, selected, onPress }: {
 
 export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
   const { user } = useAuth();
+  const { profile } = useProfile();
   const { createPlayerProfile } = usePlayerProfile();
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState(1);
@@ -112,12 +114,16 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
     setSaving(true);
     try {
       const skillMap: Record<string, number> = { beginner: 3, intermediate: 6, advanced: 9 };
-      const firstName = user?.user_metadata?.first_name || '';
-      const lastName = user?.user_metadata?.last_name || '';
-      const name = `${firstName} ${lastName}`.trim() || user?.email?.split('@')[0] || 'Player';
+      const firstName = profile?.first_name || user?.user_metadata?.first_name || '';
+      const lastName = profile?.last_name || user?.user_metadata?.last_name || '';
+      // Phone-only accounts have no email — never derive a name from it.
+      // name -> username -> neutral placeholder.
+      const name = `${firstName} ${lastName}`.trim() || profile?.username || 'Player';
       await createPlayerProfile({
         name,
-        email: user?.email || '',
+        // players.email is nullable; write NULL rather than '' so we do not
+        // poison uniqueness/search. createPlayerProfile also enforces this.
+        email: user?.email ?? null,
         skill_level: skillMap[form.skill_level] || 5,
         age_range: form.age_range,
         age_competition_preference: form.age_competition_preference,

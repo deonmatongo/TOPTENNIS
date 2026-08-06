@@ -12,7 +12,8 @@ interface PlayerProfileSetupProps {
   onProfileCreated: () => void;
   createPlayerProfile: (data: {
     name: string;
-    email: string;
+    /** players.email is nullable — phone-only accounts have none. */
+    email?: string | null;
     phone?: string;
     skill_level?: number;
     age_range?: string;

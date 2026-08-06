@@ -338,7 +338,9 @@ const PlayerProfileModal = ({
                 { icon: Calendar, label: 'Age Range',     value: ageRangeLabel(player.age_range) },
                 { icon: Flame,    label: 'Playing Style', value: `${competitivenessIcon(player.competitiveness)} ${competitivenessLabel(player.competitiveness)}` },
                 { icon: Trophy,   label: 'Record',        value: `${player.wins}W – ${player.losses}L` },
-              ].map(({ icon: Icon, label, value }) => (
+                // Phone-only accounts have no email — drop the row rather than
+                // rendering an "Email" label with a blank value.
+              ].filter(row => !!(typeof row.value === 'string' ? row.value.trim() : row.value)).map(({ icon: Icon, label, value }) => (
                 <div key={label} className="flex items-center gap-3 px-4 py-2.5">
                   <Icon className="w-4 h-4 text-muted-foreground shrink-0" />
                   <span className="text-sm text-muted-foreground w-24 shrink-0">{label}</span>

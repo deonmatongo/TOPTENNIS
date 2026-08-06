@@ -7,7 +7,10 @@ export interface UserProfile {
   user_id: string;
   first_name: string;
   last_name: string;
-  email: string;
+  /** Phone-only accounts have no email. */
+  email?: string | null;
+  /** Case-insensitive unique handle. Null for legacy email-only accounts. */
+  username?: string | null;
   phone?: string;
   city?: string;
   zip_code?: string;

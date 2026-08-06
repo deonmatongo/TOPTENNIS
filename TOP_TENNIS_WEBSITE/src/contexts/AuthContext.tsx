@@ -1,18 +1,66 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
+
+/**
+ * Phone + username authentication.
+ *
+ * Mirrors the mobile app exactly — both clients share one auth.users table, so a
+ * behavioural difference between them is a security difference. In particular:
+ *
+ *  * signIn always goes through the login-with-username Edge Function, for BOTH
+ *    usernames and phone numbers. Resolving a username to a phone number in the
+ *    browser would be a PII leak; handling the phone case locally while usernames
+ *    went server-side would give the two paths different response times and
+ *    reintroduce the account-enumeration signal.
+ *
+ *  * The signup password is never sent to start-signup. The account is created
+ *    without one and the password is applied on the session verifyOtp returns.
+ *
+ *  * Password reset verification also goes server-side, because on the username
+ *    path this client is never told which number the code was sent to.
+ *
+ * Errors are RETURNED, not thrown — the existing pages are written against that
+ * convention and it is preserved here deliberately.
+ */
+
+type PendingSignup = { phone: string; username: string; password: string };
+
+type Result = { error: { message: string; field?: string } | null };
+type UsernameCheck = { available: boolean; reason?: string };
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, firstName: string, lastName: string, phone?: string) => Promise<{ error: any }>;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signInWithGoogle: (redirectTo?: string) => Promise<{ error: any }>;
+
+  /** In-memory only. Non-null between startSignup and completeSignup. */
+  pendingSignup: PendingSignup | null;
+  /** True between a verified reset code and the new password being saved. */
+  resetPending: boolean;
+
+  checkUsername: (username: string) => Promise<UsernameCheck>;
+
+  startSignup: (args: {
+    phone: string;
+    username: string;
+    password: string;
+    defaultCountry?: string;
+  }) => Promise<Result>;
+  resendSignupCode: () => Promise<Result>;
+  verifyPhoneOtp: (token: string) => Promise<Result>;
+  completeSignup: (usernameOverride?: string) => Promise<Result>;
+  cancelSignup: () => void;
+
+  signIn: (identifier: string, password: string, defaultCountry?: string) => Promise<Result>;
+
+  requestPasswordReset: (identifier: string, defaultCountry?: string) => Promise<Result>;
+  verifyResetOtp: (token: string) => Promise<Result>;
+  resendResetCode: () => Promise<Result>;
+  setNewPassword: (password: string) => Promise<Result>;
+
   signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<{ error: any }>;
-  updatePassword: (newPassword: string) => Promise<{ error: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,53 +73,76 @@ export const useAuth = () => {
   return context;
 };
 
+/** The only message shown for a failed sign-in, whatever actually went wrong. */
+export const GENERIC_SIGNIN_ERROR = 'Incorrect username or password.';
+
+/**
+ * supabase.functions.invoke puts the response body on error.context for any
+ * non-2xx, so the server's own message is unreachable without reading it back.
+ */
+async function invokeJson<T>(
+  fn: string,
+  body: Record<string, unknown>,
+): Promise<{ data: T | null; status: number; message?: string; field?: string }> {
+  const { data, error } = await supabase.functions.invoke(fn, { body });
+  if (!error) return { data: data as T, status: 200 };
+
+  let message: string | undefined;
+  let field: string | undefined;
+  let status = 500;
+  const context = (error as { context?: Response }).context;
+  if (context && typeof context.json === 'function') {
+    status = context.status ?? 500;
+    try {
+      const parsed = await context.json();
+      message = parsed?.error;
+      field = parsed?.field;
+    } catch {
+      /* non-JSON body — fall through to the caller's default message */
+    }
+  }
+  return { data: null, status, message, field };
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  logger.debug('AuthProvider: Component initializing');
-  
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pendingSignup, setPendingSignup] = useState<PendingSignup | null>(null);
+  const [resetPending, setResetPending] = useState(false);
+
+  // What the user typed on the forgot-password screen — NOT a phone number. On
+  // the username path the number is never disclosed to this client.
+  const resetIdentifier = useRef<string | null>(null);
+  const resetCountry = useRef<string>('US');
 
   useEffect(() => {
-    logger.debug('AuthProvider: Setting up auth state listener');
-    
     let mounted = true;
-    
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (!mounted) return;
-        
-        logger.info('Auth state changed', { event });
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
 
-        // Log authentication activity - deferred to avoid deadlock
-        if (event === 'SIGNED_IN' && session?.user) {
-          setTimeout(() => {
-            logUserActivity('user_logged_in', {
-              provider: session.user.app_metadata?.provider || 'email',
-              timestamp: new Date().toISOString()
-            });
-          }, 0);
-        } else if (event === 'SIGNED_OUT') {
-          setTimeout(() => {
-            logUserActivity('user_logged_out', {
-              timestamp: new Date().toISOString()
-            });
-          }, 0);
-        } else if (event === 'PASSWORD_RECOVERY') {
-          logger.info('Password recovery mode active');
-        }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+
+      logger.info('Auth state changed', { event });
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        setTimeout(() => {
+          logUserActivity('user_logged_in', {
+            provider: session.user.app_metadata?.provider || 'phone',
+            timestamp: new Date().toISOString(),
+          });
+        }, 0);
+      } else if (event === 'SIGNED_OUT') {
+        setTimeout(() => {
+          logUserActivity('user_logged_out', { timestamp: new Date().toISOString() });
+        }, 0);
       }
-    );
+    });
 
-    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
-      
-      logger.debug('AuthProvider: Checking existing session', { hasSession: !!session });
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -82,232 +153,239 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => {
-      logger.debug('AuthProvider: Cleaning up auth state listener');
       mounted = false;
       subscription.unsubscribe();
     };
   }, []);
 
-  const logUserActivity = async (activityType: string, metadata?: any) => {
+  const logUserActivity = async (activityType: string, metadata?: Record<string, unknown>) => {
     try {
-      logger.debug('Logging user activity', { activityType });
-      await supabase
-        .from('user_activity_log')
-        .insert({
-          user_id: user?.id || null,
-          activity_type: activityType,
-          metadata: metadata || null
-        });
+      await supabase.from('user_activity_log').insert({
+        user_id: user?.id || null,
+        activity_type: activityType,
+        metadata: metadata || null,
+      });
     } catch (error) {
       logger.warn('Failed to log activity', { activityType, error });
     }
   };
 
-  const signUp = useCallback(async (email: string, password: string, firstName: string, lastName: string, phone?: string) => {
-    try {
-      logger.info('AuthProvider: Starting signup process');
-      
-      // Client-side validation
-      if (password.length < 8) {
-        return { 
-          error: { message: 'Password must be at least 8 characters long.' } 
+  // ── Username availability ───────────────────────────────────────────────────
+
+  const checkUsername = useCallback(async (username: string): Promise<UsernameCheck> => {
+    const { data, message } = await invokeJson<UsernameCheck>('check-username', { username });
+    if (!data) {
+      // Never report "available" on a failed check — claim_identity would reject
+      // it later, after the user had already verified their number.
+      return { available: false, reason: message ?? 'Could not check that username.' };
+    }
+    return data;
+  }, []);
+
+  // ── Signup ──────────────────────────────────────────────────────────────────
+
+  const startSignup = useCallback<AuthContextType['startSignup']>(async ({
+    phone, username, password, defaultCountry = 'US',
+  }) => {
+    if (password.length < 8) {
+      return { error: { message: 'Password must be at least 8 characters long.', field: 'password' } };
+    }
+
+    const { data, message, field } = await invokeJson<{ ok: boolean }>('start-signup', {
+      phone,
+      username,
+      defaultCountry,
+    });
+
+    if (!data?.ok) {
+      return { error: { message: message ?? 'Could not start signup. Please try again.', field } };
+    }
+
+    setPendingSignup({ phone, username, password });
+    setTimeout(() => {
+      logUserActivity('registration_attempt', { timestamp: new Date().toISOString() });
+    }, 0);
+    return { error: null };
+  }, []);
+
+  const resendSignupCode = useCallback(async (): Promise<Result> => {
+    if (!pendingSignup) return { error: { message: 'No signup in progress.' } };
+    const { data, message } = await invokeJson<{ ok: boolean }>('start-signup', {
+      phone: pendingSignup.phone,
+      username: pendingSignup.username,
+    });
+    if (!data?.ok) return { error: { message: message ?? 'Could not resend your code.' } };
+    return { error: null };
+  }, [pendingSignup]);
+
+  const verifyPhoneOtp = useCallback(async (token: string): Promise<Result> => {
+    // Signup only: the user typed this number, so the client legitimately knows
+    // it. The reset path cannot do this — see verifyResetOtp.
+    const phone = pendingSignup?.phone;
+    if (!phone) return { error: { message: 'No signup in progress.' } };
+
+    const { error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
+    if (error) {
+      // One message for wrong and expired alike: distinguishing them would tell
+      // an attacker whether a code was ever valid.
+      return { error: { message: 'That code is incorrect or has expired. Request a new one.' } };
+    }
+    return { error: null };
+  }, [pendingSignup]);
+
+  const completeSignup = useCallback(async (usernameOverride?: string): Promise<Result> => {
+    if (!pendingSignup) return { error: { message: 'No signup in progress.' } };
+    const username = (usernameOverride ?? pendingSignup.username).trim();
+
+    // Password first: if the handle turns out to be taken, the account is still
+    // usable and the user only has to pick another name.
+    const { error: pwError } = await supabase.auth.updateUser({ password: pendingSignup.password });
+    if (pwError) return { error: { message: pwError.message } };
+
+    const { error: claimError } = await supabase.rpc('claim_identity', { p_username: username });
+
+    if (claimError) {
+      const raw = claimError.message ?? '';
+      if (raw.includes('USERNAME_TAKEN')) {
+        // The verified session is left intact so the user can pick another handle
+        // without redoing SMS verification.
+        return { error: { message: 'That username was just taken. Try another.', field: 'username' } };
+      }
+      if (raw.includes('PHONE_TAKEN')) {
+        return { error: { message: 'That number is already linked to another account.', field: 'phone' } };
+      }
+      if (raw.includes('PHONE_NOT_VERIFIED')) {
+        return { error: { message: 'Your number is not verified yet. Enter the code we sent you.' } };
+      }
+      if (raw.includes('INVALID_USERNAME')) {
+        return {
+          error: {
+            message: '3–20 characters, letters, numbers and underscores only.',
+            field: 'username',
+          },
         };
       }
-
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
-          data: {
-            first_name: firstName,
-            last_name: lastName,
-            phone: phone
-          }
-        }
-      });
-      
-      if (error) {
-        logger.warn('Signup error details', { message: error.message });
-        
-        // Handle specific error cases
-        if (error.message.includes('User already registered') || 
-            error.message.includes('already registered') ||
-            error.message.includes('unique constraint') ||
-            error.message.includes('duplicate key value')) {
-          return { error: { message: 'An account with this email already exists. Please sign in instead.' } };
-        }
-        if (error.message.includes('Password should be at least')) {
-          return { error: { message: 'Password must be at least 8 characters long.' } };
-        }
-        if (error.message.includes('Invalid email')) {
-          return { error: { message: 'Please enter a valid email address.' } };
-        }
-        if (error.message.includes('Signup is disabled')) {
-          return { error: { message: 'Account registration is currently disabled.' } };
-        }
-        return { error };
-      }
-
-      logger.info('AuthProvider: Signup successful');
-
-      setTimeout(() => {
-        logUserActivity('registration_attempt', {
-          timestamp: new Date().toISOString()
-        });
-      }, 0);
-
-      return { error: null };
-    } catch (err: any) {
-      logger.error('Signup error', { err });
-      return { error: { message: 'An unexpected error occurred during registration' } };
+      return { error: { message: 'Could not finish setting up your account. Please try again.' } };
     }
+
+    setPendingSignup(null);
+    return { error: null };
+  }, [pendingSignup]);
+
+  const cancelSignup = useCallback(() => setPendingSignup(null), []);
+
+  // ── Login ───────────────────────────────────────────────────────────────────
+
+  const signIn = useCallback(async (
+    identifier: string,
+    password: string,
+    defaultCountry = 'US',
+  ): Promise<Result> => {
+    const { data, status, message } = await invokeJson<{
+      session: { access_token: string; refresh_token: string };
+    }>('login-with-username', { identifier, password, defaultCountry });
+
+    if (!data?.session) {
+      // 429 is about the caller's own behaviour and says nothing about whether
+      // the account exists, so it is the one case worth surfacing distinctly.
+      if (status === 429) {
+        return { error: { message: message ?? 'Too many attempts. Please try again shortly.' } };
+      }
+      return { error: { message: GENERIC_SIGNIN_ERROR } };
+    }
+
+    const { error } = await supabase.auth.setSession({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+    });
+    if (error) return { error: { message: GENERIC_SIGNIN_ERROR } };
+
+    return { error: null };
   }, []);
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    try {
-      logger.info('AuthProvider: Starting signin process');
-      
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      
-      if (error) {
-        logger.warn('Signin error details', { message: error.message });
-        
-        if (error.message.includes('Invalid login credentials') || 
-            error.message.includes('Invalid email or password')) {
-          return { error: { message: 'Email or password is incorrect. Please try again.' } };
-        }
-        if (error.message.includes('Too many requests') || error.message.includes('rate limit')) {
-          return { error: { message: 'Too many login attempts. Please wait a few minutes before trying again.' } };
-        }
-        if (error.message.includes('Email not confirmed')) {
-          return { error: { message: 'Please verify your email address before signing in.' } };
-        }
-        return { error };
-      }
+  // ── Password reset ──────────────────────────────────────────────────────────
 
-      logger.info('AuthProvider: Signin successful');
+  const requestPasswordReset = useCallback(async (
+    identifier: string,
+    defaultCountry = 'US',
+  ): Promise<Result> => {
+    const { data, status, message } = await invokeJson<{ ok: boolean }>('resolve-for-reset', {
+      identifier,
+      defaultCountry,
+    });
 
-      setTimeout(() => {
-        logUserActivity('login_attempt', {
-          success: true,
-          timestamp: new Date().toISOString()
-        });
-      }, 0);
-      
-      return { error: null };
-    } catch (err: any) {
-      logger.error('Signin error', { err });
-      return { error: { message: 'An unexpected error occurred during sign in' } };
+    if (status === 429) {
+      return { error: { message: message ?? 'Too many requests. Please try again later.' } };
     }
+    // Anything else non-ok is a genuine fault, not "no such user" — the function
+    // returns { ok: true } for unknown accounts on purpose.
+    if (!data?.ok) {
+      return { error: { message: message ?? 'Something went wrong. Please try again.' } };
+    }
+
+    resetIdentifier.current = identifier;
+    resetCountry.current = defaultCountry;
+    return { error: null };
   }, []);
 
-  const signInWithGoogle = useCallback(async (redirectTo?: string) => {
-    try {
-      logger.info('AuthProvider: Starting Google OAuth signin');
-      
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectTo || `${window.location.origin}/dashboard`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-          // Only request necessary scopes for GDPR/CCPA compliance
-          scopes: 'openid email profile'
-        }
-      });
+  const resendResetCode = useCallback(async (): Promise<Result> => {
+    if (!resetIdentifier.current) return { error: { message: 'No reset in progress.' } };
+    return requestPasswordReset(resetIdentifier.current, resetCountry.current);
+  }, [requestPasswordReset]);
 
-      if (error) {
-        logger.error('Google signin error', { message: error.message });
-        
-        if (error.message.includes('access_denied') || error.message.includes('denied')) {
-          return { error: { message: 'Google sign-in was cancelled or denied. Please try again.' } };
-        }
-        if (error.message.includes('popup_closed')) {
-          return { error: { message: 'Sign-in popup was closed. Please try again.' } };
-        }
-        if (error.message.includes('network')) {
-          return { error: { message: 'Network error. Please check your connection and try again.' } };
-        }
-        return { error };
+  const verifyResetOtp = useCallback(async (token: string): Promise<Result> => {
+    const identifier = resetIdentifier.current;
+    if (!identifier) return { error: { message: 'No reset in progress.' } };
+
+    const { data, status, message } = await invokeJson<{
+      session: { access_token: string; refresh_token: string };
+    }>('verify-reset-code', { identifier, token, defaultCountry: resetCountry.current });
+
+    if (!data?.session) {
+      if (status === 429) {
+        return { error: { message: message ?? 'Too many attempts. Please try again shortly.' } };
       }
-
-      logger.info('Google OAuth initiated successfully');
-      return { error: null };
-    } catch (err: any) {
-      logger.error('Google signin error', { err });
-      return { error: { message: 'An unexpected error occurred. Please try again.' } };
+      return {
+        error: { message: message ?? 'That code is incorrect or has expired. Request a new one.' },
+      };
     }
+
+    const { error } = await supabase.auth.setSession({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+    });
+    if (error) return { error: { message: 'Could not verify that code. Please try again.' } };
+
+    setResetPending(true);
+    return { error: null };
   }, []);
 
-  const resetPassword = useCallback(async (email: string) => {
-    try {
-      logger.info('AuthProvider: Starting password reset');
-      
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      
-      if (error) {
-        logger.warn('Password reset error', { message: error.message });
-        
-        if (error.message.includes('rate limit') || error.message.includes('Too many')) {
-          return { error: { message: 'Too many reset attempts. Please wait before trying again.' } };
-        }
-        return { error };
-      }
-
-      logger.info('Password reset email sent successfully');
-      return { error: null };
-    } catch (err: any) {
-      logger.error('Password reset error', { err });
-      return { error: { message: 'An unexpected error occurred. Please try again.' } };
+  const setNewPassword = useCallback(async (password: string): Promise<Result> => {
+    if (password.length < 8) {
+      return { error: { message: 'Password must be at least 8 characters long.', field: 'password' } };
     }
+
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) return { error: { message: error.message } };
+
+    setResetPending(false);
+    resetIdentifier.current = null;
+
+    // Revoke every session, this one included. A reset must invalidate whatever
+    // an attacker may already hold, and must not double as a way into the app.
+    await supabase.auth.signOut({ scope: 'global' });
+    return { error: null };
   }, []);
 
-  const updatePassword = useCallback(async (newPassword: string) => {
-    try {
-      logger.info('AuthProvider: Updating password');
-      
-      if (newPassword.length < 8) {
-        return { error: { message: 'Password must be at least 8 characters long.' } };
-      }
-
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
-      });
-      
-      if (error) {
-        logger.warn('Password update error', { message: error.message });
-        return { error };
-      }
-
-      logger.info('Password updated successfully');
-      return { error: null };
-    } catch (err: any) {
-      logger.error('Password update error', { err });
-      return { error: { message: 'An unexpected error occurred. Please try again.' } };
-    }
-  }, []);
+  // ── Sign out ────────────────────────────────────────────────────────────────
 
   const signOut = useCallback(async () => {
     try {
-      logger.info('AuthProvider: Starting signout process');
-      
       setUser(null);
       setSession(null);
-      
       localStorage.removeItem('supabase.auth.token');
       sessionStorage.clear();
-      
       await supabase.auth.signOut({ scope: 'global' });
-      
-      logger.info('AuthProvider: Signout successful');
     } catch (error) {
       logger.error('Signout error', { error });
       setUser(null);
@@ -317,19 +395,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const value = {
+  const value: AuthContextType = {
     user,
     session,
     loading,
-    signUp,
+    pendingSignup,
+    resetPending,
+    checkUsername,
+    startSignup,
+    resendSignupCode,
+    verifyPhoneOtp,
+    completeSignup,
+    cancelSignup,
     signIn,
-    signInWithGoogle,
+    requestPasswordReset,
+    verifyResetOtp,
+    resendResetCode,
+    setNewPassword,
     signOut,
-    resetPassword,
-    updatePassword
   };
 
-  logger.debug('AuthProvider: Rendering', { hasUser: !!user, loading });
- 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

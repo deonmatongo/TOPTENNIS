@@ -95,13 +95,15 @@ const Header = () => {
     }
   };
 
+  // Phone-only accounts have no email — never use it as a display name.
+  // Mirrors public.display_name(): name -> username -> neutral placeholder.
   const displayName = profile?.first_name
     ? `${profile.first_name} ${profile.last_name || ""}`.trim()
-    : user?.email;
+    : profile?.username || "Player";
 
   const initials =
     profile?.first_name?.charAt(0)?.toUpperCase() ||
-    user?.email?.charAt(0)?.toUpperCase() ||
+    profile?.username?.charAt(0)?.toUpperCase() ||
     "U";
 
   return (

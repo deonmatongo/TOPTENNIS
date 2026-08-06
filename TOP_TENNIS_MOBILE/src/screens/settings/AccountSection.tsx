@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, Alert, ActivityIndicator, StyleSheet,
   ScrollView, Modal, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/services/supabase';
 import { Colors, Radius, Spacing, FontSize, Font } from '@/theme/colors';
@@ -12,79 +11,123 @@ import {
   NavRow, sharedContent,
 } from './_shared';
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/**
+ * Account settings for phone + username auth.
+ *
+ * What changed and why:
+ *
+ *  * The change-email flow is gone. Email is no longer an identifier or a
+ *    recovery channel, so an email address on the account would be a dead field
+ *    that still looked authoritative.
+ *
+ *  * "Reset password" no longer mails a link. The user is signed in, so they can
+ *    set a password directly — and because the session already proves identity,
+ *    no code is needed. Current password is required so that a borrowed unlocked
+ *    phone cannot be used to take the account over.
+ *
+ *  * The phone number is shown masked to its last 4 digits. The full number is
+ *    never sent to a client: it lives in user_phone_identities, which is
+ *    service-role only.
+ *
+ *  * Changing the phone number is deliberately absent — it needs its own
+ *    verify-both-numbers flow and is tracked separately.
+ */
 
-const nr = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, gap: Spacing.md },
-  icon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  label: { fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.text },
-  desc: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
-});
+/** Mask to the last 4 digits, matching what the audit log is allowed to store. */
+const maskPhone = (phone: string | null | undefined): string => {
+  const digits = (phone ?? '').replace(/\D/g, '');
+  if (digits.length < 4) return '—';
+  return `••• ••• ${digits.slice(-4)}`;
+};
 
 export const AccountSection: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuth();
-  const [sendingReset, setSendingReset] = useState(false);
-  const [emailModal, setEmailModal] = useState(false);
-  const [newEmail, setNewEmail] = useState('');
-  const [savingEmail, setSavingEmail] = useState(false);
 
-  const openEmailModal = () => { setNewEmail(''); setEmailModal(true); };
+  const [username, setUsername] = useState<string | null>(null);
+  const [loadingIdentity, setLoadingIdentity] = useState(true);
 
-  const handleChangeEmail = async () => {
-    const email = newEmail.trim().toLowerCase();
-    if (!EMAIL_RE.test(email)) {
-      Alert.alert('Invalid email', 'Please enter a valid email address.');
-      return;
-    }
-    if (email === (user?.email || '').toLowerCase()) {
-      Alert.alert('Same email', 'That is already the email on your account.');
-      return;
-    }
-    setSavingEmail(true);
-    try {
-      const { error } = await supabase.auth.updateUser({ email });
-      if (error) throw error;
-      setEmailModal(false);
-      Alert.alert(
-        'Confirm your new email',
-        `We've sent a confirmation link to ${email}. Your email address changes once you tap that link. Until then, keep signing in with your current email.`,
-      );
-    } catch (e: any) {
-      Alert.alert('Could not change email', e?.message ?? 'Please try again, or contact support@toptennis.app.');
-    } finally {
-      setSavingEmail(false);
-    }
+  const [pwModal, setPwModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) { setLoadingIdentity(false); return; }
+    let cancelled = false;
+    supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setUsername(data?.username ?? null);
+        setLoadingIdentity(false);
+      });
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  const openPasswordModal = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPwModal(true);
   };
 
-  const handlePasswordReset = () => {
-    if (!user?.email) {
-      Alert.alert('No email on file', 'We could not find an email address for your account. Please contact support@toptennis.app.');
+  const handleChangePassword = async () => {
+    if (newPassword.length < 8) {
+      Alert.alert('Too short', 'Your new password must be at least 8 characters.');
       return;
     }
-    Alert.alert(
-      'Reset Password',
-      `We'll email a secure password-reset link to ${user.email}. Continue?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Send Link',
-          onPress: async () => {
-            setSendingReset(true);
-            try {
-              const { error } = await supabase.auth.resetPasswordForEmail(user.email!, {
-                redirectTo: 'toptennis://reset-password',
-              });
-              if (error) throw error;
-              Alert.alert('Check your inbox', `A password-reset link is on its way to ${user.email}. It expires in 1 hour.`);
-            } catch (e: any) {
-              Alert.alert('Could not send link', e?.message ?? 'Please try again, or contact support@toptennis.app.');
-            } finally {
-              setSendingReset(false);
-            }
-          },
-        },
-      ],
-    );
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Passwords do not match', 'Re-enter your new password.');
+      return;
+    }
+    if (!currentPassword) {
+      Alert.alert('Current password required', 'Enter your current password to confirm.');
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      // Re-authenticate first. updateUser({ password }) alone would let anyone
+      // holding an unlocked phone change the password without knowing the old
+      // one, which is an account-takeover path.
+      //
+      // Reauthentication goes through login-with-username because the phone
+      // number is not available client-side by design. It also means a wrong
+      // guess here counts against the same failure backoff as a login attempt.
+      if (!username) {
+        Alert.alert(
+          'Could not verify',
+          'We could not confirm your identity. Please sign out and use "Forgot password".',
+        );
+        return;
+      }
+
+      const { error: reauthError } = await supabase.functions
+        .invoke('login-with-username', {
+          body: { identifier: username, password: currentPassword },
+        });
+      if (reauthError) {
+        Alert.alert('Incorrect password', 'Your current password is not correct.');
+        return;
+      }
+
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+
+      setPwModal(false);
+      Alert.alert('Password updated', 'Your password has been changed.');
+    } catch (e: any) {
+      Alert.alert(
+        'Could not change password',
+        e?.message ?? 'Please try again, or contact support@toptennis.app.',
+      );
+    } finally {
+      setSavingPassword(false);
+    }
   };
 
   return (
@@ -107,48 +150,97 @@ export const AccountSection: React.FC<{ navigation: any }> = ({ navigation }) =>
             onPress={() => navigation.navigate('Profile')}
           />
           <NavRow
-            icon="shield-checkmark-outline"
-            label={sendingReset ? 'Sending reset link…' : 'Reset Password'}
-            desc="Email yourself a secure reset link"
-            color="#8b5cf6"
-            onPress={sendingReset ? () => {} : handlePasswordReset}
+            icon="at-outline"
+            label="Username"
+            desc={loadingIdentity ? 'Loading…' : (username ?? 'Not set')}
+            color={Colors.textSecondary}
+            onPress={() => navigation.navigate('Profile')}
           />
           <NavRow
-            icon="mail-outline"
-            label="Email Address"
-            desc={`${user?.email || '—'} · tap to change`}
+            icon="call-outline"
+            label="Phone Number"
+            desc={`${maskPhone(user?.phone)} · contact support to change`}
             color={Colors.textSecondary}
-            onPress={openEmailModal}
+            onPress={() =>
+              Alert.alert(
+                'Change phone number',
+                'For security, changing the number on your account has to be verified on both the old and new number. Contact support@toptennis.app and we will help.',
+              )
+            }
+          />
+          <NavRow
+            icon="shield-checkmark-outline"
+            label="Change Password"
+            desc="Requires your current password"
+            color="#8b5cf6"
+            onPress={openPasswordModal}
             last
           />
         </SectionCard>
       </ScrollView>
 
-      {/* Change email modal */}
-      <Modal visible={emailModal} transparent animationType="fade" onRequestClose={() => setEmailModal(false)}>
+      <Modal visible={pwModal} transparent animationType="fade" onRequestClose={() => setPwModal(false)}>
         <KeyboardAvoidingView style={em.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={em.card}>
-            <Text style={em.title}>Change Email</Text>
-            <Text style={em.sub}>Current: {user?.email || '—'}</Text>
+            <Text style={em.title}>Change Password</Text>
+            <Text style={em.sub}>Signed in as {username ?? '—'}</Text>
+
             <TextInput
               style={em.input}
-              value={newEmail}
-              onChangeText={setNewEmail}
-              placeholder="New email address"
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              placeholder="Current password"
               placeholderTextColor={Colors.textMuted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
+              secureTextEntry
+              autoComplete="current-password"
+              textContentType="password"
+              editable={!savingPassword}
               autoFocus
-              editable={!savingEmail}
             />
-            <Text style={em.hint}>We'll send a confirmation link to the new address. Your email changes only after you confirm it.</Text>
+            <TextInput
+              style={em.input}
+              value={newPassword}
+              onChangeText={setNewPassword}
+              placeholder="New password (at least 8 characters)"
+              placeholderTextColor={Colors.textMuted}
+              secureTextEntry
+              autoComplete="new-password"
+              textContentType="newPassword"
+              editable={!savingPassword}
+            />
+            <TextInput
+              style={em.input}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              placeholder="Confirm new password"
+              placeholderTextColor={Colors.textMuted}
+              secureTextEntry
+              autoComplete="new-password"
+              textContentType="newPassword"
+              editable={!savingPassword}
+            />
+
+            <Text style={em.hint}>
+              Your other devices stay signed in. Use “Forgot password” from the sign-in screen if
+              you want to sign out everywhere.
+            </Text>
+
             <View style={em.actions}>
-              <TouchableOpacity style={[em.btn, em.btnGhost]} onPress={() => setEmailModal(false)} disabled={savingEmail}>
+              <TouchableOpacity
+                style={[em.btn, em.btnGhost]}
+                onPress={() => setPwModal(false)}
+                disabled={savingPassword}
+              >
                 <Text style={em.btnGhostTxt}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[em.btn, em.btnPrimary, savingEmail && { opacity: 0.6 }]} onPress={handleChangeEmail} disabled={savingEmail}>
-                {savingEmail ? <ActivityIndicator size="small" color="#fff" /> : <Text style={em.btnPrimaryTxt}>Send Confirmation</Text>}
+              <TouchableOpacity
+                style={[em.btn, em.btnPrimary, savingPassword && { opacity: 0.6 }]}
+                onPress={handleChangePassword}
+                disabled={savingPassword}
+              >
+                {savingPassword
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={em.btnPrimaryTxt}>Save</Text>}
               </TouchableOpacity>
             </View>
           </View>

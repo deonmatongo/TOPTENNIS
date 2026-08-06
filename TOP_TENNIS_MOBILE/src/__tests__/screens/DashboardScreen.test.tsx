@@ -144,10 +144,19 @@ describe('DashboardScreen', () => {
       expect(getByText('Alex Smith')).toBeTruthy();
     });
 
-    it('falls back to email prefix when profile is null', () => {
-      mockProfile = null;
+    it('falls back to the username when no name is set', () => {
+      mockProfile = { username: 'rallyking' } as any;
       const { getByText } = renderScreen();
-      expect(getByText('player')).toBeTruthy();
+      expect(getByText('rallyking')).toBeTruthy();
+    });
+
+    it('falls back to a neutral placeholder, never to the email prefix', () => {
+      // A phone-only account has no email at all, so deriving a name from it
+      // produced either 'undefined' or a leak of the address into the UI.
+      mockProfile = null;
+      const { getByText, queryByText } = renderScreen();
+      expect(getByText('Player')).toBeTruthy();
+      expect(queryByText('player@test.com')).toBeNull();
     });
   });
 

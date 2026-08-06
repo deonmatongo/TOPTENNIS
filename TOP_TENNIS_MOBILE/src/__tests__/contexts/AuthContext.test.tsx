@@ -1,112 +1,303 @@
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-
-jest.mock('expo-web-browser', () => ({
-  maybeCompleteAuthSession: jest.fn(),
-  openAuthSessionAsync: jest.fn().mockResolvedValue({ type: 'cancel' }),
-}));
-jest.mock('expo-auth-session', () => ({
-  makeRedirectUri: jest.fn(() => 'toptennis://auth/callback'),
-}));
-jest.mock('expo-apple-authentication', () => ({
-  signInAsync: jest.fn(),
-  AppleAuthenticationScope: { FULL_NAME: 0, EMAIL: 1 },
-}));
+import { AuthProvider, useAuth, GENERIC_SIGNIN_ERROR } from '@/contexts/AuthContext';
 
 const { supabase } = jest.requireMock('@/services/supabase');
 
 const wrapper = ({ children }: { children: React.ReactNode }) =>
   React.createElement(AuthProvider, null, children);
 
-describe('AuthContext', () => {
+/**
+ * Builds the error shape supabase.functions.invoke produces for a non-2xx: the
+ * body is only reachable through error.context.json(), which is exactly the trap
+ * invokeJson exists to handle.
+ */
+const fnError = (status: number, body: Record<string, unknown>) => ({
+  data: null,
+  error: Object.assign(new Error('FunctionsHttpError'), {
+    context: { status, json: async () => body },
+  }),
+});
+
+const SESSION = { access_token: 'at', refresh_token: 'rt' };
+
+describe('AuthContext — phone + username auth', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // auth.signOut needs to return a Promise for the manual sign-out tests
     supabase.auth.signOut.mockResolvedValue({ error: null });
+    supabase.auth.updateUser.mockResolvedValue({ data: {}, error: null });
+    supabase.auth.verifyOtp.mockResolvedValue({ data: {}, error: null });
+    supabase.auth.setSession.mockResolvedValue({ data: {}, error: null });
+    supabase.rpc.mockResolvedValue({ data: null, error: null });
+    supabase.auth.getSession.mockResolvedValue({ data: { session: null } });
     supabase.auth.onAuthStateChange.mockReturnValue({
       data: { subscription: { unsubscribe: jest.fn() } },
     });
   });
 
-  it('restores a persisted session on mount without signing out', async () => {
+  const mount = async () => {
     const { result } = renderHook(() => useAuth(), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
+    return result;
+  };
 
-    // getSession is called to restore the session; signOut is NOT called on mount
+  /**
+   * Assert a rejection with the expect INSIDE act, not act inside expect.
+   * Wrapping a rejecting promise in act() opens an act scope that never closes
+   * cleanly, which unmounts the renderer and fails every later test in the file.
+   */
+  const expectReject = async (call: () => Promise<unknown>, matcher: RegExp | string) => {
+    await act(async () => {
+      await expect(call()).rejects.toThrow(matcher as never);
+    });
+  };
+
+  it('restores a persisted session on mount without signing out', async () => {
+    const result = await mount();
     expect(supabase.auth.getSession).toHaveBeenCalledTimes(1);
     expect(supabase.auth.signOut).not.toHaveBeenCalled();
-    // Default mock returns null session, so user starts as null
     expect(result.current.user).toBeNull();
-    expect(result.current.session).toBeNull();
   });
 
-  it('signIn: calls signInWithPassword with the provided credentials', async () => {
-    supabase.auth.signInWithPassword.mockResolvedValueOnce({ error: null });
-    const { result } = renderHook(() => useAuth(), { wrapper });
-    await waitFor(() => expect(result.current.loading).toBe(false));
+  // ── Login ────────────────────────────────────────────────────────────────────
 
-    await act(async () => {
-      await result.current.signIn('player@test.com', 'hunter2xx');
+  it('signIn: routes through the Edge Function and never resolves a username locally', async () => {
+    supabase.functions.invoke.mockResolvedValueOnce({ data: { session: SESSION }, error: null });
+    const result = await mount();
+
+    await act(async () => { await result.current.signIn('rallyking', 'hunter2xx'); });
+
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('login-with-username', {
+      body: { identifier: 'rallyking', password: 'hunter2xx', defaultCountry: 'US' },
     });
+    // The phone path must NOT shortcut to a direct client sign-in: that would
+    // give it a different latency profile and leak account existence by timing.
+    expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
+    expect(supabase.auth.setSession).toHaveBeenCalledWith(SESSION);
+  });
 
-    expect(supabase.auth.signInWithPassword).toHaveBeenCalledWith({
-      email: 'player@test.com',
+  it('signIn: a phone number identifier also goes through the Edge Function', async () => {
+    supabase.functions.invoke.mockResolvedValueOnce({ data: { session: SESSION }, error: null });
+    const result = await mount();
+
+    await act(async () => { await result.current.signIn('+15551230001', 'hunter2xx'); });
+
+    expect(supabase.functions.invoke).toHaveBeenCalledWith(
+      'login-with-username',
+      expect.objectContaining({ body: expect.objectContaining({ identifier: '+15551230001' }) }),
+    );
+    expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it('signIn: unknown account produces the same generic error as a wrong password', async () => {
+    supabase.functions.invoke.mockResolvedValueOnce(
+      fnError(401, { error: 'Incorrect username or password.' }),
+    );
+    const result = await mount();
+
+    await expectReject(() => result.current.signIn('ghost', 'whatever'), GENERIC_SIGNIN_ERROR);
+
+    supabase.functions.invoke.mockResolvedValueOnce(
+      fnError(401, { error: 'Incorrect username or password.' }),
+    );
+    await expectReject(() => result.current.signIn('rallyking', 'wrongpass'), GENERIC_SIGNIN_ERROR);
+  });
+
+  it('signIn: a rate-limit trip is surfaced distinctly from a credential failure', async () => {
+    supabase.functions.invoke.mockResolvedValueOnce(
+      fnError(429, { error: 'Too many attempts. Please try again shortly.' }),
+    );
+    const result = await mount();
+
+    // 429 is about the caller's own behaviour, so it reveals nothing about the
+    // account and should not be flattened into the generic message.
+    await expectReject(() => result.current.signIn('rallyking', 'hunter2xx'), 'Too many attempts. Please try again shortly.');
+  });
+
+  // ── Signup ───────────────────────────────────────────────────────────────────
+
+  const startSignup = async (result: any) => {
+    supabase.functions.invoke.mockResolvedValueOnce({ data: { ok: true }, error: null });
+    await act(async () => {
+      await result.current.startSignup({
+        phone: '5551230001',
+        username: 'rallyking',
+        password: 'hunter2xx',
+      });
+    });
+  };
+
+  it('startSignup: never sends the password to the pre-auth endpoint', async () => {
+    const result = await mount();
+    await startSignup(result);
+
+    const [fn, opts] = supabase.functions.invoke.mock.calls[0];
+    expect(fn).toBe('start-signup');
+    expect(opts.body).not.toHaveProperty('password');
+    expect(JSON.stringify(opts.body)).not.toContain('hunter2xx');
+    expect(result.current.pendingSignup).toEqual({
+      phone: '5551230001',
+      username: 'rallyking',
       password: 'hunter2xx',
     });
   });
 
-  it('signIn: throws when Supabase returns an error', async () => {
-    supabase.auth.signInWithPassword.mockResolvedValueOnce({
-      error: new Error('Invalid login credentials'),
+  it('startSignup: rejects a short password before any network call', async () => {
+    const result = await mount();
+    await expectReject(
+      () => result.current.startSignup({ phone: '5551230001', username: 'x_1', password: 'short' }),
+      /at least 8 characters/i,
+    );
+    expect(supabase.functions.invoke).not.toHaveBeenCalled();
+  });
+
+  it('verifyPhoneOtp: a wrong code does not distinguish itself from an expired one', async () => {
+    const result = await mount();
+    await startSignup(result);
+
+    supabase.auth.verifyOtp.mockResolvedValueOnce({
+      data: {},
+      error: { message: 'Token has expired or is invalid' },
     });
-    const { result } = renderHook(() => useAuth(), { wrapper });
-    await waitFor(() => expect(result.current.loading).toBe(false));
+    await expectReject(() => result.current.verifyPhoneOtp('000000'), 'That code is incorrect or has expired. Request a new one.');
 
-    await expect(
-      act(async () => result.current.signIn('bad@test.com', 'wrongpass'))
-    ).rejects.toThrow('Invalid login credentials');
-  });
-
-  it('signUp: rejects without calling Supabase when password is under 8 characters', async () => {
-    const { result } = renderHook(() => useAuth(), { wrapper });
-    await waitFor(() => expect(result.current.loading).toBe(false));
-
-    await expect(
-      act(async () => result.current.signUp('user@test.com', 'short', 'First', 'Last'))
-    ).rejects.toThrow('Password must be at least 8 characters');
-
-    expect(supabase.auth.signUp).not.toHaveBeenCalled();
-  });
-
-  it('signUp: converts "already registered" Supabase error into a user-readable message', async () => {
-    supabase.auth.signUp.mockResolvedValueOnce({
-      error: new Error('User already registered'),
+    // Same message for a plain wrong code — an attacker must not learn whether a
+    // code was ever valid.
+    supabase.auth.verifyOtp.mockResolvedValueOnce({
+      data: {},
+      error: { message: 'Invalid token' },
     });
-    const { result } = renderHook(() => useAuth(), { wrapper });
-    await waitFor(() => expect(result.current.loading).toBe(false));
-
-    await expect(
-      act(async () =>
-        result.current.signUp('dup@test.com', 'password123', 'First', 'Last')
-      )
-    ).rejects.toThrow('An account with this email already exists');
+    await expectReject(() => result.current.verifyPhoneOtp('111111'), 'That code is incorrect or has expired. Request a new one.');
   });
+
+  it('completeSignup: sets the password then claims the username', async () => {
+    const result = await mount();
+    await startSignup(result);
+
+    await act(async () => { await result.current.completeSignup(); });
+
+    expect(supabase.auth.updateUser).toHaveBeenCalledWith({ password: 'hunter2xx' });
+    expect(supabase.rpc).toHaveBeenCalledWith('claim_identity', { p_username: 'rallyking' });
+    expect(result.current.pendingSignup).toBeNull();
+  });
+
+  it('completeSignup: a lost username race keeps the verified session so a retry works', async () => {
+    const result = await mount();
+    await startSignup(result);
+
+    supabase.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'USERNAME_TAKEN' },
+    });
+
+    await expectReject(() => result.current.completeSignup(), /just taken/i);
+
+    // The pending signup survives, so the user picks another handle instead of
+    // redoing SMS verification for someone else's timing.
+    expect(result.current.pendingSignup).not.toBeNull();
+
+    supabase.rpc.mockResolvedValueOnce({ data: null, error: null });
+    await act(async () => { await result.current.completeSignup('rallyking2'); });
+
+    expect(supabase.rpc).toHaveBeenLastCalledWith('claim_identity', { p_username: 'rallyking2' });
+    expect(result.current.pendingSignup).toBeNull();
+  });
+
+  it('completeSignup: an unverified phone is rejected', async () => {
+    const result = await mount();
+    await startSignup(result);
+    supabase.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'PHONE_NOT_VERIFIED' },
+    });
+    await expectReject(() => result.current.completeSignup(), /not verified/i);
+  });
+
+  // ── Password reset ───────────────────────────────────────────────────────────
+
+  it('requestPasswordReset: resolves normally for an unknown account', async () => {
+    // The Edge Function answers { ok: true } either way, so the client must not
+    // invent a "no such user" branch — that would rebuild the enumeration oracle.
+    supabase.functions.invoke.mockResolvedValueOnce({ data: { ok: true }, error: null });
+    const result = await mount();
+
+    await act(async () => { await result.current.requestPasswordReset('ghost'); });
+
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('resolve-for-reset', {
+      body: { identifier: 'ghost', defaultCountry: 'US' },
+    });
+  });
+
+  it('verifyResetOtp: goes through the Edge Function, not a local verifyOtp', async () => {
+    const result = await mount();
+    supabase.functions.invoke.mockResolvedValueOnce({ data: { ok: true }, error: null });
+    await act(async () => { await result.current.requestPasswordReset('rallyking'); });
+
+    supabase.functions.invoke.mockResolvedValueOnce({ data: { session: SESSION }, error: null });
+    await act(async () => { await result.current.verifyResetOtp('123456'); });
+
+    // A local verifyOtp is impossible on the username path: the client is never
+    // told which number the code went to.
+    expect(supabase.auth.verifyOtp).not.toHaveBeenCalled();
+    expect(supabase.functions.invoke).toHaveBeenLastCalledWith('verify-reset-code', {
+      body: { identifier: 'rallyking', token: '123456', defaultCountry: 'US' },
+    });
+    expect(result.current.resetPending).toBe(true);
+  });
+
+  it('verifyResetOtp: refuses when no reset was requested', async () => {
+    const result = await mount();
+    await expectReject(() => result.current.verifyResetOtp('123456'), /no reset in progress/i);
+  });
+
+  it('setNewPassword: revokes every session so the user must sign in again', async () => {
+    const result = await mount();
+    supabase.functions.invoke.mockResolvedValueOnce({ data: { ok: true }, error: null });
+    await act(async () => { await result.current.requestPasswordReset('rallyking'); });
+    supabase.functions.invoke.mockResolvedValueOnce({ data: { session: SESSION }, error: null });
+    await act(async () => { await result.current.verifyResetOtp('123456'); });
+
+    await act(async () => { await result.current.setNewPassword('brandnewpass'); });
+
+    expect(supabase.auth.updateUser).toHaveBeenCalledWith({ password: 'brandnewpass' });
+    // scope 'global' invalidates this session too — a reset must not double as a
+    // way into the app, and must kill any session an attacker already holds.
+    expect(supabase.auth.signOut).toHaveBeenCalledWith({ scope: 'global' });
+    expect(result.current.resetPending).toBe(false);
+  });
+
+  it('setNewPassword: enforces the minimum length before calling out', async () => {
+    const result = await mount();
+    await expectReject(() => result.current.setNewPassword('short'), /at least 8 characters/i);
+    expect(supabase.auth.updateUser).not.toHaveBeenCalled();
+    expect(supabase.auth.signOut).not.toHaveBeenCalled();
+  });
+
+  // ── Username availability ────────────────────────────────────────────────────
+
+  it('checkUsername: a failed check reports unavailable rather than free', async () => {
+    supabase.functions.invoke.mockResolvedValueOnce(
+      fnError(500, { error: 'Could not check that username. Try again.' }),
+    );
+    const result = await mount();
+
+    // Reporting "available" on a failure would let the user get all the way
+    // through SMS verification before claim_identity rejected the handle.
+    const check = await result.current.checkUsername('rallyking');
+    expect(check.available).toBe(false);
+  });
+
+  // ── Sign out ─────────────────────────────────────────────────────────────────
 
   it('signOut: clears push_token from profiles then calls auth.signOut', async () => {
-    // Simulate a signed-in user arriving via onAuthStateChange
-    supabase.auth.onAuthStateChange.mockImplementationOnce((cb: any) => {
-      cb('SIGNED_IN', { user: { id: 'user-abc', email: 'player@test.com' } });
-      return { data: { subscription: { unsubscribe: jest.fn() } } };
+    supabase.auth.getSession.mockResolvedValueOnce({
+      data: { session: { user: { id: 'user-123' }, access_token: 'at' } },
     });
+    const result = await mount();
 
-    const { result } = renderHook(() => useAuth(), { wrapper });
-    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => { await result.current.signOut(); });
 
-    await act(async () => result.current.signOut());
-
-    const tablesAccessed = (supabase.from as jest.Mock).mock.calls.map((c: any[]) => c[0]);
-    expect(tablesAccessed).toContain('profiles');
+    expect(supabase.from).toHaveBeenCalledWith('profiles');
     expect(supabase.auth.signOut).toHaveBeenCalled();
   });
 });

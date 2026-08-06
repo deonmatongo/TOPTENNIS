@@ -8,7 +8,10 @@ export interface PlayerProfile {
   id: string;
   user_id: string;
   name: string;
-  email: string;
+  /** players.email is nullable — phone-only accounts have none. */
+  email?: string | null;
+  /** profiles.username — null for legacy email-only accounts. */
+  username?: string | null;
   phone?: string;
   city?: string;
   zip_code?: string;
@@ -70,7 +73,7 @@ export function usePlayerProfile() {
       supabase.from('players').select('*').eq('user_id', user.id).maybeSingle(),
       supabase
         .from('profiles')
-        .select('first_name, last_name, bio, networking_enabled, profile_picture_url')
+        .select('first_name, last_name, username, bio, networking_enabled, profile_picture_url')
         .eq('id', user.id)
         .maybeSingle(),
     ]);
@@ -79,6 +82,7 @@ export function usePlayerProfile() {
         ...playerData,
         first_name: profileData?.first_name ?? undefined,
         last_name: profileData?.last_name ?? undefined,
+        username: profileData?.username ?? null,
         bio: profileData?.bio ?? undefined,
         networking_enabled: profileData?.networking_enabled ?? true,
         profile_picture_url: profileData?.profile_picture_url || null,
@@ -129,7 +133,10 @@ export function usePlayerProfile() {
     const { playerUpdates, profileUpdates } = splitUpdates(profileData);
     const { data, error } = await supabase
       .from('players')
-      .insert({ ...playerUpdates, user_id: user.id, email: user.email, wins: 0, losses: 0 })
+      // email is nullable on players as of the phone-auth migration, but a
+      // phone-only user has no user.email at all — passing undefined would send
+      // no column and passing null is the honest value.
+      .insert({ ...playerUpdates, user_id: user.id, email: user.email ?? null, wins: 0, losses: 0 })
       .select()
       .single();
     if (error) throw error;

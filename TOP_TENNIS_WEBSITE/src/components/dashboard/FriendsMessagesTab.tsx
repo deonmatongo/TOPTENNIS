@@ -57,7 +57,9 @@ function getConvName(conv: Conversation, uid: string) {
   if (conv.is_group) return conv.name || 'Group Chat';
   const other = conv.members.find(m => m.user_id !== uid);
   if (!other?.profile) return 'Direct Message';
-  return `${other.profile.first_name || ''} ${other.profile.last_name || ''}`.trim() || other.profile.email;
+  return `${other.profile.first_name || ''} ${other.profile.last_name || ''}`.trim()
+    || other.profile.username
+    || 'A player';
 }
 function getConvAvatar(conv: Conversation, uid: string) {
   if (conv.is_group) return conv.avatar_url ?? undefined;
@@ -162,7 +164,9 @@ const GroupMatchRequestSheet: React.FC<GroupMatchRequestSheetProps> = ({
   }, [open]);
 
   const memberName = (m: Conversation['members'][0]) =>
-    m.profile ? `${m.profile.first_name || ''} ${m.profile.last_name || ''}`.trim() || m.profile.email : 'Unknown';
+    m.profile
+      ? (`${m.profile.first_name || ''} ${m.profile.last_name || ''}`.trim() || m.profile.username || 'A player')
+      : 'Unknown';
 
   const toggle = (uid: string) => setSelected(prev => {
     const n = new Set(prev); n.has(uid) ? n.delete(uid) : n.add(uid); return n;
@@ -681,7 +685,7 @@ const GroupInfoSheet: React.FC<GroupInfoSheetProps> = ({
 
   const memberName = (m: Conversation['members'][0]) => {
     if (!m.profile) return 'Unknown';
-    return `${m.profile.first_name || ''} ${m.profile.last_name || ''}`.trim() || m.profile.email;
+    return `${m.profile.first_name || ''} ${m.profile.last_name || ''}`.trim() || m.profile.username || 'A player';
   };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1596,7 +1600,9 @@ const FriendsMessagesTab = () => {
   const filteredFriends = (friends || []).filter(f => {
     const fd = f.sender_id === user?.id ? f.receiver : f.sender;
     const s  = friendSearch.toLowerCase();
-    return (fd?.name || '').toLowerCase().includes(s) || (fd?.email || '').toLowerCase().includes(s);
+    return (fd?.name || '').toLowerCase().includes(s)
+      || (fd?.username || '').toLowerCase().includes(s)
+      || (fd?.email || '').toLowerCase().includes(s);
   });
 
   const onlineFriends  = filteredFriends.filter(f => {
@@ -1659,11 +1665,23 @@ const FriendsMessagesTab = () => {
     return () => document.removeEventListener('click', handler);
   }, [emojiTrayOpen]);
 
+  // Our own display name for the typing indicator. Phone-only accounts have no
+  // email, so read the name off our own conversation member profile and fall
+  // back to username before a neutral placeholder.
+  const myDisplayName = () => {
+    const mine = (conversations || [])
+      .flatMap(c => c.members || [])
+      .find(m => m.user_id === user?.id)?.profile;
+    return `${mine?.first_name || user?.user_metadata?.first_name || ''} ${mine?.last_name || user?.user_metadata?.last_name || ''}`.trim()
+      || mine?.username
+      || 'Someone';
+  };
+
   // Auto-grow textarea
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (e.target.value.length > 1000) return;
     setMsgInput(e.target.value);
-    if (e.target.value.trim()) broadcastTyping(user?.email?.split('@')[0] || 'Someone');
+    if (e.target.value.trim()) broadcastTyping(myDisplayName());
     const ta = e.target;
     ta.style.height = 'auto';
     ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
@@ -1671,8 +1689,8 @@ const FriendsMessagesTab = () => {
 
   const buildProfile = (profile: NonNullable<Conversation['members'][0]['profile']>, uid: string) => ({
     id: uid, user_id: uid,
-    name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email,
-    email: profile.email, skill_level: 0, wins: 0, losses: 0,
+    name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.username || 'A player',
+    email: profile.email ?? '', skill_level: 0, wins: 0, losses: 0,
   });
 
   const handleStartDM = async (otherUserId: string, name?: string) => {
@@ -2070,7 +2088,9 @@ const FriendsMessagesTab = () => {
                   isCreator={selectedConv.created_by === user?.id}
                   inviterName={(() => {
                     const creator = selectedConv.members.find(m => m.user_id === selectedConv.created_by);
-                    return creator?.profile ? `${creator.profile.first_name || ''} ${creator.profile.last_name || ''}`.trim() || creator.profile.email : undefined;
+                    return creator?.profile
+                      ? (`${creator.profile.first_name || ''} ${creator.profile.last_name || ''}`.trim() || creator.profile.username || 'A player')
+                      : undefined;
                   })()}
                   memberCount={selectedConv.members.length}
                   onViewMembers={() => setShowGroupInfo(true)}
@@ -2094,7 +2114,7 @@ const FriendsMessagesTab = () => {
                   const isOwn    = msg.sender_id === user?.id;
                   const isSystem = msg.is_system;
                   const senderName = msg.sender
-                    ? `${msg.sender.first_name || ''} ${msg.sender.last_name || ''}`.trim() || msg.sender.email
+                    ? (`${msg.sender.first_name || ''} ${msg.sender.last_name || ''}`.trim() || msg.sender.username || 'A player')
                     : 'Unknown';
                   const canDel = isOwn || myRole === 'admin';
 

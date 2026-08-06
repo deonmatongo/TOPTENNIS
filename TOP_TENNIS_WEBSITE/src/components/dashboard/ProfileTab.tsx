@@ -95,11 +95,21 @@ const ProfileTab = ({
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">Full Name</label>
                 <div className="text-sm font-medium p-3 bg-muted/30 rounded-md text-muted-foreground/70 cursor-not-allowed">
-                  {profile?.first_name && profile?.last_name ? `${profile.first_name} ${profile.last_name}` : player?.name || 'Not provided'}
+                  {profile?.first_name && profile?.last_name ? `${profile.first_name} ${profile.last_name}` : player?.name || profile?.username || 'Not provided'}
                 </div>
               </div>
 
-              {/* Email - Non-editable */}
+              {/* Username - Non-editable. Present for phone-based accounts. */}
+              {profile?.username && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Username</label>
+                  <div className="text-sm font-medium p-3 bg-muted/30 rounded-md text-muted-foreground/70 cursor-not-allowed">
+                    @{profile.username}
+                  </div>
+                </div>
+              )}
+
+              {/* Email - Non-editable. Phone-only accounts have none. */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">Email</label>
                 <div className="flex items-center space-x-2 text-sm font-medium p-3 bg-muted/30 rounded-md text-muted-foreground/70 cursor-not-allowed">

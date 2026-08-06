@@ -14,7 +14,8 @@ export interface ConversationMember {
     id: string;
     first_name?: string | null;
     last_name?: string | null;
-    email: string;
+    email?: string | null;
+    username?: string | null;
     profile_picture_url?: string | null;
   };
 }
@@ -40,7 +41,8 @@ export interface ConversationMessage {
     id: string;
     first_name?: string | null;
     last_name?: string | null;
-    email: string;
+    email?: string | null;
+    username?: string | null;
     profile_picture_url?: string | null;
   };
   reactions?: MessageReaction[];
@@ -128,7 +130,7 @@ export const useConversations = () => {
       if (userIds.length > 0) {
         const { data: profileData, error: profileErr } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, email, profile_picture_url')
+          .select('id, first_name, last_name, email, username, profile_picture_url')
           .in('id', userIds as string[]);
         if (profileErr) throw profileErr;
         profiles = profileData || [];
@@ -151,7 +153,7 @@ export const useConversations = () => {
       if (senderIds.length > 0) {
         const { data: spData, error: senderErr } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, email, profile_picture_url')
+          .select('id, first_name, last_name, email, username, profile_picture_url')
           .in('id', senderIds as string[]);
         if (senderErr) throw senderErr;
         senderProfiles = spData || [];
@@ -519,8 +521,11 @@ export const useConversations = () => {
           // Capture info for toast when it's an incoming message from another user
           if (newMsg.sender_id !== user.id && !newMsg.is_system && newMsg.content) {
             const senderProfile = conv.members.find(m => m.user_id === newMsg.sender_id)?.profile;
+            // Phone-only accounts have no email — fall back to username.
             incomingToastName = senderProfile
-              ? (`${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim() || senderProfile.email)
+              ? (`${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim()
+                 || senderProfile.username
+                 || 'Someone')
               : 'Someone';
             incomingToastContent = newMsg.content.slice(0, 100);
           }
@@ -536,6 +541,7 @@ export const useConversations = () => {
                   first_name: senderProfile.first_name,
                   last_name: senderProfile.last_name,
                   email: senderProfile.email,
+                  username: senderProfile.username,
                   profile_picture_url: senderProfile.profile_picture_url,
                 }
               : undefined,
@@ -559,7 +565,7 @@ export const useConversations = () => {
           if (msg && !msg.sender && newMsg.sender_id) {
             supabase
               .from('profiles')
-              .select('id, first_name, last_name, email, profile_picture_url')
+              .select('id, first_name, last_name, email, username, profile_picture_url')
               .eq('id', newMsg.sender_id)
               .single()
               .then(({ data }) => {

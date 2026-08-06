@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Calendar, Clock, MapPin, User } from 'lucide-react';
@@ -35,6 +36,7 @@ export const QuickBookingModal: React.FC<QuickBookingModalProps> = ({
   selectedHour,
 }) => {
   const { user } = useAuth();
+  const { profile } = useUserProfile();
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [courtLocation, setCourtLocation] = useState('');
   const [message, setMessage] = useState('');
@@ -64,12 +66,21 @@ export const QuickBookingModal: React.FC<QuickBookingModalProps> = ({
 
       if (error) throw error;
 
+      // Display name for the notification body. Phone-only accounts have no
+      // email, so never interpolate user.email directly. Mirrors
+      // public.display_name(): name -> username -> neutral placeholder.
+      const meta = (user.user_metadata ?? {}) as Record<string, any>;
+      const senderName =
+        `${profile?.first_name || meta.first_name || ''} ${profile?.last_name || meta.last_name || ''}`.trim() ||
+        profile?.username ||
+        'A player';
+
       // Create notification
       await supabase.from('notifications').insert({
         user_id: selectedUser,
         type: 'match_invite',
         title: 'New Match Invitation',
-        message: `${user.email} has invited you to play on ${format(selectedDate, 'MMM d, yyyy')} at ${selectedHour}:00`,
+        message: `${senderName} has invited you to play on ${format(selectedDate, 'MMM d, yyyy')} at ${selectedHour}:00`,
         action_url: '/dashboard?tab=matches',
       });
 

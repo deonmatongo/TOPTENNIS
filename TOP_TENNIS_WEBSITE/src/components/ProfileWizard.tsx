@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Trophy, CheckCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import PersonalInfoStep from './wizard/PersonalInfoStep';
 import PlayingPreferencesStep from './wizard/PlayingPreferencesStep';
 import SkillLevelStep from './wizard/SkillLevelStep';
@@ -14,7 +15,8 @@ interface ProfileWizardProps {
   onStepChange?: (step: number) => void;
   createPlayerProfile: (data: {
     name: string;
-    email: string;
+    /** players.email is nullable — phone-only accounts have none. */
+    email?: string | null;
     phone?: string;
     skill_level?: number;
     age_range?: string;
@@ -53,6 +55,7 @@ const STEP_TITLES = [
 
 const ProfileWizard = ({ onProfileCreated, createPlayerProfile, onStepChange }: ProfileWizardProps) => {
   const { user } = useAuth();
+  const { profile } = useUserProfile();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -148,8 +151,14 @@ const ProfileWizard = ({ onProfileCreated, createPlayerProfile, onStepChange }: 
     try {
       const skillMap: Record<string, number> = { beginner: 3, intermediate: 6, advanced: 9 };
       await createPlayerProfile({
-        name: user?.user_metadata?.first_name || user?.email?.split('@')[0] || 'Player',
-        email: user?.email || '',
+        // Never derive a name from the email local part — phone-only accounts
+        // have no email. name -> username -> neutral placeholder.
+        name: `${profile?.first_name || user?.user_metadata?.first_name || ''} ${profile?.last_name || user?.user_metadata?.last_name || ''}`.trim()
+          || profile?.username
+          || 'Player',
+        // players.email is nullable now — phone-only accounts have no email.
+        // Write NULL rather than '' so we don't poison uniqueness or search.
+        email: user?.email ?? null,
         skill_level: skillMap[formData.skillLevel] ?? 5,
         age_range: formData.ageRange,
         age_competition_preference: formData.ageCompetitionPreference,

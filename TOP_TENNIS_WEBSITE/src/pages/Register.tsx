@@ -1,151 +1,312 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AlertCircle, AtSign, Check, Eye, EyeOff, Loader2, Lock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import EnhancedRegistrationForm from "@/components/EnhancedRegistrationForm";
+import AuthRedirect from "@/components/AuthRedirect";
+import AuthLayout, { fieldClass, submitClass, Spinner } from "@/components/auth/AuthLayout";
+import PhoneInput from "@/components/auth/PhoneInput";
 
-const NAVY = "#0B1526";
+const USERNAME_RE = /^[A-Za-z0-9_]{3,20}$/;
 
 const Register = () => {
-  const [loading, setLoading] = useState(false);
-  const { signUp } = useAuth();
   const navigate = useNavigate();
+  const { startSignup, checkUsername } = useAuth();
 
-  const handleFormSubmit = async (formData: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone: string;
-    password: string;
-    confirmPassword: string;
-    agreeToTerms: boolean;
-  }) => {
+  const [username, setUsername] = useState("");
+  const [country, setCountry] = useState("US");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [agree, setAgree] = useState(false);
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+
+  // Debounced availability check. Advisory only: claim_identity re-checks against
+  // the unique constraint after verification, which is what closes the race.
+  const [checking, setChecking] = useState(false);
+  const [availableFor, setAvailableFor] = useState<string | null>(null);
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (debounce.current) clearTimeout(debounce.current);
+    setAvailableFor(null);
+
+    const candidate = username.trim();
+    if (!USERNAME_RE.test(candidate)) {
+      setChecking(false);
+      return;
+    }
+
+    setChecking(true);
+    debounce.current = setTimeout(async () => {
+      const result = await checkUsername(candidate);
+      setChecking(false);
+      if (result.available) {
+        setAvailableFor(candidate);
+        setErrors((p) => ({ ...p, username: "" }));
+      } else {
+        setErrors((p) => ({ ...p, username: result.reason ?? "That username is taken." }));
+      }
+    }, 450);
+
+    return () => {
+      if (debounce.current) clearTimeout(debounce.current);
+    };
+  }, [username, checkUsername]);
+
+  const validate = (): boolean => {
+    const e: Record<string, string> = {};
+    const handle = username.trim();
+
+    if (!handle) e.username = "Pick a username";
+    else if (!USERNAME_RE.test(handle)) {
+      e.username = "3–20 characters, letters, numbers and underscores only.";
+    } else if (availableFor !== handle) {
+      e.username = checking ? "Still checking that username…" : "That username is taken.";
+    }
+
+    if (!phone.replace(/\D/g, "")) e.phone = "Enter your mobile number";
+
+    if (!password) e.password = "Choose a password";
+    else if (password.length < 8) e.password = "At least 8 characters";
+
+    if (!confirm) e.confirm = "Confirm your password";
+    else if (password !== confirm) e.confirm = "Passwords do not match";
+
+    if (!agree) e.agree = "You must agree to continue";
+
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    if (!validate()) return;
     setLoading(true);
     try {
-      const { error } = await signUp(
-        formData.email,
-        formData.password,
-        formData.firstName,
-        formData.lastName,
-        formData.phone,
-      );
-
+      const { error } = await startSignup({
+        phone: phone.replace(/\D/g, ""),
+        username: username.trim(),
+        password,
+        defaultCountry: country,
+      });
       if (error) {
-        if (
-          error.message?.includes("already registered") ||
-          error.message?.includes("already taken") ||
-          error.message?.includes("User already registered")
-        ) {
-          toast.error("Email already taken. Please sign in instead.", {
-            action: { label: "Go to Sign In", onClick: () => navigate("/login") },
-          });
-        } else {
-          toast.error(error.message || "Failed to create account. Please try again.");
-        }
+        if (error.field) setErrors((p) => ({ ...p, [error.field as string]: error.message }));
+        else toast.error(error.message);
         return;
       }
-
-      toast.success("Account created! Set up your player profile.");
-      navigate("/profile-setup");
-    } catch (err) {
-      console.error("Registration error:", err);
+      navigate("/verify-code");
+    } catch {
       toast.error("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
+  const handle = username.trim();
+  const usernameOk = availableFor === handle && handle.length > 0;
+
   return (
-    <div className="min-h-screen flex">
-
-      {/* ── Left panel ── */}
-      <div className="hidden lg:flex lg:w-[42%] xl:w-[46%] relative overflow-hidden flex-col" style={{ backgroundColor: NAVY }}>
-        {/* Grid texture */}
-        <div
-          className="absolute inset-0 opacity-[0.04] pointer-events-none"
-          style={{
-            backgroundImage: "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
-            backgroundSize: "48px 48px",
-          }}
-        />
-        {/* Orange glow blobs */}
-        <div className="absolute top-0 right-0 w-96 h-96 rounded-full opacity-10 blur-3xl pointer-events-none" style={{ background: "radial-gradient(circle, #f97316, transparent)" }} />
-        <div className="absolute bottom-0 left-0 w-72 h-72 rounded-full opacity-10 blur-3xl pointer-events-none" style={{ background: "radial-gradient(circle, #f97316, transparent)" }} />
-
-        <div className="relative flex flex-col h-full px-12 py-12">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-3 group w-fit">
-            <img src="/app-icon.png" alt="Top Tennis" className="h-11 w-11 rounded-xl object-cover" />
-            <span className="font-bold text-base leading-none">
-              <span className="text-white">Top</span>
-              <span className="text-orange-400"> Tennis</span>
-              <span className="block text-[10px] font-medium text-white/40 tracking-widest uppercase mt-0.5">League</span>
-            </span>
-          </Link>
-
-          {/* Centre copy */}
-          <div className="flex-1 flex flex-col justify-center max-w-md">
-            <span className="inline-block text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full mb-6 w-fit" style={{ color: "#fb923c", backgroundColor: "rgba(249,115,22,0.12)" }}>
-              Join the League
-            </span>
-            <h2 className="text-4xl xl:text-5xl font-black text-white leading-tight mb-4">
-              Start your<br />
-              <span className="text-orange-400">tennis journey.</span>
-            </h2>
-            <p className="text-base text-white/50 leading-relaxed mb-10">
-              Join hundreds of players competing in structured leagues across all skill levels. Create your free account and start climbing the ladder.
-            </p>
-
-            {/* Perks */}
-            <div className="space-y-3">
-              {[
-                "Match with players at your skill level",
-                "Flexible scheduling around your calendar",
-                "Real-time ladder rankings & stats",
-                "Singles, doubles, and mixed leagues",
-              ].map(perk => (
-                <div key={perk} className="flex items-center gap-3">
-                  <div className="h-5 w-5 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(249,115,22,0.18)" }}>
-                    <svg className="h-3 w-3 text-orange-400" fill="none" viewBox="0 0 12 12">
-                      <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
-                  <span className="text-sm text-white/60">{perk}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <p className="text-xs text-white/20">© {new Date().getFullYear()} Top Tennis League</p>
-        </div>
-      </div>
-
-      {/* ── Right panel — form ── */}
-      <div className="flex-1 flex items-start justify-center bg-white px-4 sm:px-8 py-10 overflow-y-auto">
-        <div className="w-full max-w-[440px]">
-
-          {/* Mobile logo */}
-          <div className="flex items-center gap-2.5 mb-8 lg:hidden">
-            <img src="/app-icon.png" alt="Top Tennis" className="h-10 w-10 rounded-xl object-cover" />
-            <span className="font-bold text-sm leading-none">
-              <span className="text-gray-900">Top</span>
-              <span className="text-orange-500"> Tennis</span>
-              <span className="block text-[10px] font-medium text-gray-400 tracking-widest uppercase mt-0.5">League</span>
-            </span>
-          </div>
-
-          <h1 className="text-2xl font-black text-gray-900 mb-1">Create your account</h1>
-          <p className="text-sm text-gray-400 mb-8">
+    <AuthRedirect>
+      <AuthLayout
+        eyebrow="Join The League"
+        headline={["Find your", "next match."]}
+        blurb="Create an account to join leagues, track your ranking, and get matched with players at your level."
+        title="Create account"
+        subtitle={
+          <>
             Already have an account?{" "}
-            <Link to="/login" className="text-orange-500 hover:text-orange-400 font-semibold transition-colors">
+            <Link
+              to="/login"
+              className="text-orange-500 hover:text-orange-400 font-semibold transition-colors"
+            >
               Sign in
             </Link>
-          </p>
+          </>
+        }
+      >
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          {/* Username */}
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="username"
+              className="text-xs font-bold text-gray-500 uppercase tracking-widest"
+            >
+              Username
+            </Label>
+            <div className="relative">
+              <AtSign className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                autoComplete="username"
+                required
+                maxLength={20}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                disabled={loading}
+                placeholder="rallyking"
+                className={`pl-10 pr-10 ${fieldClass(!!errors.username)}`}
+              />
+              {checking && (
+                <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />
+              )}
+              {!checking && usernameOk && (
+                <Check className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+              )}
+            </div>
+            {errors.username ? (
+              <p className="flex items-center gap-1 text-xs text-red-500">
+                <AlertCircle className="w-3 h-3" />
+                {errors.username}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-400">This is how other players will find you.</p>
+            )}
+          </div>
 
-          <EnhancedRegistrationForm onSubmit={handleFormSubmit} loading={loading} />
-        </div>
-      </div>
-    </div>
+          {/* Phone */}
+          <PhoneInput
+            country={country}
+            onCountryChange={setCountry}
+            value={phone}
+            onChange={(v) => {
+              setPhone(v);
+              setErrors((p) => ({ ...p, phone: "" }));
+            }}
+            error={errors.phone}
+            disabled={loading}
+          />
+
+          {/* Password */}
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="password"
+              className="text-xs font-bold text-gray-500 uppercase tracking-widest"
+            >
+              Password
+            </Label>
+            <div className="relative">
+              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                required
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setErrors((p) => ({ ...p, password: "" }));
+                }}
+                disabled={loading}
+                placeholder="At least 8 characters"
+                className={`pl-10 pr-11 ${fieldClass(!!errors.password)}`}
+                // No maxLength and no character filtering: long passphrases and
+                // pasted password-manager output must both keep working.
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((s) => !s)}
+                disabled={loading}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            {errors.password && (
+              <p className="flex items-center gap-1 text-xs text-red-500">
+                <AlertCircle className="w-3 h-3" />
+                {errors.password}
+              </p>
+            )}
+          </div>
+
+          {/* Confirm */}
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="confirm"
+              className="text-xs font-bold text-gray-500 uppercase tracking-widest"
+            >
+              Confirm password
+            </Label>
+            <div className="relative">
+              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                id="confirm"
+                name="confirm"
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                required
+                value={confirm}
+                onChange={(e) => {
+                  setConfirm(e.target.value);
+                  setErrors((p) => ({ ...p, confirm: "" }));
+                }}
+                disabled={loading}
+                placeholder="Re-enter your password"
+                className={`pl-10 ${fieldClass(!!errors.confirm)}`}
+              />
+            </div>
+            {errors.confirm && (
+              <p className="flex items-center gap-1 text-xs text-red-500">
+                <AlertCircle className="w-3 h-3" />
+                {errors.confirm}
+              </p>
+            )}
+          </div>
+
+          {/* Terms */}
+          <div className="flex items-start gap-2.5 pt-1">
+            <Checkbox
+              id="agree"
+              checked={agree}
+              onCheckedChange={(v) => {
+                setAgree(v === true);
+                setErrors((p) => ({ ...p, agree: "" }));
+              }}
+              disabled={loading}
+              className="mt-0.5"
+            />
+            <Label htmlFor="agree" className="text-xs text-gray-500 leading-relaxed font-normal">
+              I agree to the{" "}
+              <Link to="/terms" className="text-orange-500 hover:text-orange-400 font-semibold">
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link to="/privacy" className="text-orange-500 hover:text-orange-400 font-semibold">
+                Privacy Policy
+              </Link>
+              , including a zero-tolerance policy for objectionable content and abusive behavior.
+            </Label>
+          </div>
+          {errors.agree && (
+            <p className="flex items-center gap-1 text-xs text-red-500">
+              <AlertCircle className="w-3 h-3" />
+              {errors.agree}
+            </p>
+          )}
+
+          <button type="submit" disabled={loading} className={submitClass}>
+            {loading ? (
+              <>
+                <Spinner /> Sending code…
+              </>
+            ) : (
+              "Send verification code"
+            )}
+          </button>
+        </form>
+      </AuthLayout>
+    </AuthRedirect>
   );
 };
 

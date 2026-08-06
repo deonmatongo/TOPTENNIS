@@ -23,7 +23,8 @@ export interface PlayerSearchResult {
   id: string;
   user_id: string;
   name: string;
-  email?: string;
+  /** Phone-only accounts have no email. */
+  email?: string | null;
   skill_level?: number;
   wins?: number;
   losses?: number;
@@ -332,10 +333,11 @@ export const PlayerProfileSheet: React.FC<Props> = ({ player, visible, onClose, 
                   <Text style={styles.infoText}>{competitivenessLabel(player.competitiveness)}</Text>
                 </View>
               )}
-              {player.email && (
+              {/* Phone-only accounts have no email — hide the row entirely. */}
+              {!!player.email?.trim() && (
                 <View style={styles.infoRow}>
                   <Ionicons name="mail-outline" size={16} color={Colors.textMuted} />
-                  <Text style={styles.infoText}>{player.email}</Text>
+                  <Text style={styles.infoText}>{player.email.trim()}</Text>
                 </View>
               )}
 

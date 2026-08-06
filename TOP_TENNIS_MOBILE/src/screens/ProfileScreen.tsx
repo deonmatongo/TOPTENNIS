@@ -28,7 +28,9 @@ export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
   const { player: profile, loading, updatePlayerProfile: updateProfile, refetch: refetchProfile } = usePlayerProfile();
   const { uploading: uploadingPic, showPicker } = useProfilePicture();
 
-  const fullName = profile?.name || user?.email?.split('@')[0] || 'Player';
+  // Phone-only accounts have no email — never derive a name from it.
+  // Mirrors public.display_name(): name -> username -> neutral placeholder.
+  const fullName = profile?.name || profile?.username || 'Player';
   const wins   = profile?.wins   ?? 0;
   const losses = profile?.losses ?? 0;
   const total  = wins + losses;
@@ -147,7 +149,10 @@ export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
           </TouchableOpacity>
 
           <Text style={s.heroName}>{fullName}</Text>
-          <Text style={s.heroEmail}>{user?.email}</Text>
+          {/* Phone-only accounts have no email — show the handle instead. */}
+          {(user?.email || profile?.username) && (
+            <Text style={s.heroEmail}>{user?.email || `@${profile?.username}`}</Text>
+          )}
 
           <View style={s.heroBadges}>
             <View style={[s.levelBadge, { backgroundColor: skillColor(profile?.skill_level) }]}>
@@ -213,6 +218,9 @@ export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
           ) : (
             <>
               <InfoRow icon="person-outline"   label="Name"     value={fullName} />
+              {!!profile?.username && (
+                <InfoRow icon="at-outline"      label="Username" value={profile.username} />
+              )}
               <InfoRow icon="mail-outline"      label="Email"    value={user?.email || '—'} />
               <InfoRow icon="call-outline"      label="Phone"    value={profile?.phone || '—'} />
               <InfoRow icon="location-outline"  label="Location" value={profile?.city && profile?.zip_code ? `${profile.city}, ${profile.zip_code}` : profile?.city || '—'} last={!profile?.bio} />

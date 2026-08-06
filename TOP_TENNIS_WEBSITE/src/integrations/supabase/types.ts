@@ -1047,7 +1047,7 @@ export type Database = {
           competitiveness: string | null
           created_at: string | null
           current_streak: number | null
-          email: string
+          email: string | null
           gender: string | null
           gender_preference: string | null
           hours_played: number | null
@@ -1073,7 +1073,7 @@ export type Database = {
           competitiveness?: string | null
           created_at?: string | null
           current_streak?: number | null
-          email: string
+          email?: string | null
           gender?: string | null
           gender_preference?: string | null
           hours_played?: number | null
@@ -1099,7 +1099,7 @@ export type Database = {
           competitiveness?: string | null
           created_at?: string | null
           current_streak?: number | null
-          email?: string
+          email?: string | null
           gender?: string | null
           gender_preference?: string | null
           hours_played?: number | null
@@ -1139,6 +1139,7 @@ export type Database = {
           profile_completed: boolean
           profile_picture_url: string | null
           updated_at: string
+          username: string | null
           zip_code: string | null
         }
         Insert: {
@@ -1160,6 +1161,7 @@ export type Database = {
           profile_completed?: boolean
           profile_picture_url?: string | null
           updated_at?: string
+          username?: string | null
           zip_code?: string | null
         }
         Update: {
@@ -1181,6 +1183,7 @@ export type Database = {
           profile_completed?: boolean
           profile_picture_url?: string | null
           updated_at?: string
+          username?: string | null
           zip_code?: string | null
         }
         Relationships: []

@@ -7,7 +7,9 @@ export interface PlayerSearchResult {
   id: string;
   user_id: string;
   name: string;
-  email?: string;
+  /** players.email is nullable — phone-only accounts have none. */
+  email?: string | null;
+  username?: string | null;
   skill_level?: number;
   wins?: number;
   losses?: number;
@@ -43,7 +45,7 @@ export const usePlayerSearch = () => {
           .order('name'),
         supabase
           .from('profiles')
-          .select('id, networking_enabled, profile_visibility, show_win_loss, show_usta_rating, show_location, first_name, last_name, profile_picture_url'),
+          .select('id, networking_enabled, profile_visibility, show_win_loss, show_usta_rating, show_location, first_name, last_name, username, profile_picture_url'),
         supabase
           .from('blocked_users')
           .select('blocker_id')
@@ -87,6 +89,7 @@ export const usePlayerSearch = () => {
             city: showLocation ? p.city : undefined,
             first_name: profile?.first_name ?? undefined,
             last_name: profile?.last_name ?? undefined,
+            username: profile?.username ?? null,
             profile_picture_url: profile?.profile_picture_url ?? null,
           } as PlayerSearchResult;
         });
@@ -114,6 +117,7 @@ export const usePlayerSearch = () => {
       const scored = allPlayers
         .filter(p =>
           p.name?.toLowerCase().includes(lower) ||
+          p.username?.toLowerCase().includes(lower) ||
           p.email?.toLowerCase().includes(lower) ||
           p.first_name?.toLowerCase().includes(lower) ||
           p.last_name?.toLowerCase().includes(lower) ||
@@ -126,6 +130,7 @@ export const usePlayerSearch = () => {
           const fl = (p.first_name || '').toLowerCase();
           const ll = (p.last_name || '').toLowerCase();
           const nl = (p.name || '').toLowerCase();
+          const ul = (p.username || '').toLowerCase();
           const el = (p.email || '').toLowerCase();
           let score = 0;
           if (fl === lower)           score = 100;
@@ -134,10 +139,13 @@ export const usePlayerSearch = () => {
           else if (ll.startsWith(lower)) score = 70;
           else if (nl === lower)       score = 60;
           else if (nl.startsWith(lower)) score = 50;
+          // Username ranks above email — it is the phone-only account's handle.
+          else if (ul === lower)       score = 48;
+          else if (ul.startsWith(lower)) score = 45;
           else if (el.startsWith(lower)) score = 40;
           return { player: p, score };
         })
-        .sort((a, b) => b.score - a.score || a.player.name.localeCompare(b.player.name))
+        .sort((a, b) => b.score - a.score || (a.player.name || '').localeCompare(b.player.name || ''))
         .slice(0, 15)
         .map(({ player }) => player);
 

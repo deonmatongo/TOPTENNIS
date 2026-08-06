@@ -6,7 +6,9 @@ export interface SearchResult {
   id: string;
   user_id: string;
   name: string;
-  email: string;
+  /** players.email is nullable — phone-only accounts have none. */
+  email?: string | null;
+  username?: string | null;
   skill_level: number;
   wins: number;
   losses: number;
@@ -43,11 +45,11 @@ export const usePlayerSearch = (blockedUserIds: string[] = []) => {
         const userIds = playersData?.filter(p => p.user_id).map(p => p.user_id) || [];
 
         // Fetch networking prefs + names
-        let profilesData: { id: string; networking_enabled: boolean; first_name: string | null; last_name: string | null; profile_picture_url?: string | null }[] = [];
+        let profilesData: { id: string; networking_enabled: boolean; first_name: string | null; last_name: string | null; username?: string | null; profile_picture_url?: string | null }[] = [];
         if (userIds.length > 0) {
           const { data, error: profilesError } = await supabase
             .from('profiles')
-            .select('id, networking_enabled, first_name, last_name, profile_picture_url')
+            .select('id, networking_enabled, first_name, last_name, username, profile_picture_url')
             .in('id', userIds);
 
           if (profilesError) {
@@ -73,6 +75,7 @@ export const usePlayerSearch = (blockedUserIds: string[] = []) => {
             networking_enabled: profile?.networking_enabled ?? true,
             first_name: profile?.first_name,
             last_name: profile?.last_name,
+            username: profile?.username ?? null,
             profile_picture_url: profile?.profile_picture_url ?? null,
           };
         }).filter(player =>
@@ -125,8 +128,10 @@ export const usePlayerSearch = (blockedUserIds: string[] = []) => {
         
         // Enhanced search across multiple fields including first/last name
         const filtered = allPlayers.filter(player => {
-          const nameMatch = player.name.toLowerCase().includes(searchTerm);
-          const emailMatch = player.email.toLowerCase().includes(searchTerm);
+          const nameMatch = (player.name || '').toLowerCase().includes(searchTerm);
+          // Phone-only accounts have no email — guard the null and match on username.
+          const emailMatch = (player.email || '').toLowerCase().includes(searchTerm);
+          const usernameMatch = (player.username || '').toLowerCase().includes(searchTerm);
           const firstNameMatch = player.first_name && player.first_name.toLowerCase().includes(searchTerm);
           const lastNameMatch = player.last_name && player.last_name.toLowerCase().includes(searchTerm);
           const ustaMatch = player.usta_rating && player.usta_rating.toLowerCase().includes(searchTerm);
@@ -134,7 +139,7 @@ export const usePlayerSearch = (blockedUserIds: string[] = []) => {
           const competitivenessMatch = player.competitiveness && player.competitiveness.toLowerCase().includes(searchTerm);
           const ageRangeMatch = player.age_range && player.age_range.toLowerCase().includes(searchTerm);
           
-          return nameMatch || emailMatch || firstNameMatch || lastNameMatch || ustaMatch || skillMatch || competitivenessMatch || ageRangeMatch;
+          return nameMatch || usernameMatch || emailMatch || firstNameMatch || lastNameMatch || ustaMatch || skillMatch || competitivenessMatch || ageRangeMatch;
         });
 
         // Sort results by relevance (first/last name matches first, then full name, then email, then others)
@@ -143,10 +148,12 @@ export const usePlayerSearch = (blockedUserIds: string[] = []) => {
           const bFirstNameMatch = b.first_name && b.first_name.toLowerCase().includes(searchTerm);
           const aLastNameMatch = a.last_name && a.last_name.toLowerCase().includes(searchTerm);
           const bLastNameMatch = b.last_name && b.last_name.toLowerCase().includes(searchTerm);
-          const aNameMatch = a.name.toLowerCase().includes(searchTerm);
-          const bNameMatch = b.name.toLowerCase().includes(searchTerm);
-          const aEmailMatch = a.email.toLowerCase().includes(searchTerm);
-          const bEmailMatch = b.email.toLowerCase().includes(searchTerm);
+          const aNameMatch = (a.name || '').toLowerCase().includes(searchTerm);
+          const bNameMatch = (b.name || '').toLowerCase().includes(searchTerm);
+          const aUsernameMatch = (a.username || '').toLowerCase().includes(searchTerm);
+          const bUsernameMatch = (b.username || '').toLowerCase().includes(searchTerm);
+          const aEmailMatch = (a.email || '').toLowerCase().includes(searchTerm);
+          const bEmailMatch = (b.email || '').toLowerCase().includes(searchTerm);
           
           // Prioritize first name matches
           if (aFirstNameMatch && !bFirstNameMatch) return -1;
@@ -159,7 +166,11 @@ export const usePlayerSearch = (blockedUserIds: string[] = []) => {
           // Then full name matches
           if (aNameMatch && !bNameMatch) return -1;
           if (!aNameMatch && bNameMatch) return 1;
-          
+
+          // Then username matches
+          if (aUsernameMatch && !bUsernameMatch) return -1;
+          if (!aUsernameMatch && bUsernameMatch) return 1;
+
           // Then email matches
           if (aEmailMatch && !bEmailMatch) return -1;
           if (!aEmailMatch && bEmailMatch) return 1;

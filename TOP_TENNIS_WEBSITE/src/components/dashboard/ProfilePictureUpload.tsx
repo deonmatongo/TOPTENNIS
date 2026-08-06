@@ -19,7 +19,7 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
   size = 'lg'
 }) => {
   const { user } = useAuth();
-  const { updateProfile } = useUserProfile();
+  const { profile, updateProfile } = useUserProfile();
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -31,11 +31,17 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
   };
 
   const getUserInitials = () => {
-    if (user?.user_metadata?.first_name && user?.user_metadata?.last_name) {
-      return `${user.user_metadata.first_name[0]}${user.user_metadata.last_name[0]}`.toUpperCase();
+    const first = profile?.first_name || user?.user_metadata?.first_name;
+    const last = profile?.last_name || user?.user_metadata?.last_name;
+    if (first && last) {
+      return `${first[0]}${last[0]}`.toUpperCase();
     }
-    if (user?.email) {
-      return user.email.slice(0, 2).toUpperCase();
+    if (first) {
+      return first.slice(0, 2).toUpperCase();
+    }
+    // Phone-only accounts have no email — use the username instead.
+    if (profile?.username) {
+      return profile.username.slice(0, 2).toUpperCase();
     }
     return 'U';
   };

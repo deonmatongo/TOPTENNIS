@@ -13,7 +13,9 @@ import { Input } from '@/components/ui/input';
 interface Participant {
   id: string;
   name: string;
-  email: string;
+  /** Phone-only accounts have no email — may be null. */
+  email: string | null;
+  username?: string | null;
 }
 
 interface TimeSlot {
@@ -43,20 +45,29 @@ export const SmartSchedulingAssistant: React.FC<SmartSchedulingAssistantProps> =
     
     setSearching(true);
     try {
+      const term = searchEmail.trim();
+      // `or()` takes a comma-separated filter list, so strip characters that
+      // would break out of a single filter expression.
+      const safeTerm = term.replace(/[,()*\\"]/g, '');
+      // Phone-only accounts have no email, so match on username too.
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
-        .ilike('email', `%${searchEmail.trim()}%`)
+        .select('id, first_name, last_name, email, username')
+        .or(`email.ilike.%${safeTerm}%,username.ilike.%${safeTerm}%`)
         .limit(5);
 
       if (error) throw error;
 
       if (data && data.length > 0) {
-        const user = data[0];
-        const participant = {
-          id: user.id,
-          name: `${user.first_name} ${user.last_name}`,
-          email: user.email,
+        const found = data[0];
+        const participant: Participant = {
+          id: found.id,
+          name:
+            `${found.first_name || ''} ${found.last_name || ''}`.trim() ||
+            found.username ||
+            'A player',
+          email: found.email ?? null,
+          username: found.username ?? null,
         };
 
         if (!participants.some(p => p.id === participant.id)) {
@@ -67,7 +78,7 @@ export const SmartSchedulingAssistant: React.FC<SmartSchedulingAssistantProps> =
           toast.info('User already added');
         }
       } else {
-        toast.error('No user found with that email');
+        toast.error('No user found with that email or username');
       }
     } catch (error) {
       console.error('Error searching user:', error);
@@ -133,8 +144,8 @@ export const SmartSchedulingAssistant: React.FC<SmartSchedulingAssistantProps> =
           <Label>Add Players</Label>
           <div className="flex gap-2">
             <Input
-              type="email"
-              placeholder="Enter email address"
+              type="text"
+              placeholder="Enter email or username"
               value={searchEmail}
               onChange={(e) => setSearchEmail(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && searchUser()}
@@ -171,7 +182,11 @@ export const SmartSchedulingAssistant: React.FC<SmartSchedulingAssistantProps> =
                     </Avatar>
                     <div>
                       <div className="text-sm font-medium">{participant.name}</div>
-                      <div className="text-xs text-muted-foreground">{participant.email}</div>
+                      {(participant.email || participant.username) && (
+                        <div className="text-xs text-muted-foreground">
+                          {participant.email || `@${participant.username}`}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <Button

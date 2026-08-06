@@ -5,7 +5,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 initSentry();
 import { TamaguiProvider } from 'tamagui';
 import tamaguiConfig from '../tamagui.config';
-import { View, Text, ActivityIndicator, StyleSheet, Platform, Linking } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 import {
   useFonts,
   Nunito_400Regular,
@@ -34,7 +34,12 @@ import { useResponsive } from '@/hooks/useResponsive';
 import { TabBar } from '@/components/navigation/TabBar';
 import { navigationRef } from '@/navigation/navigationRef';
 
-import { AuthScreen } from '@/screens/AuthScreen';
+import { LoginScreen } from '@/screens/auth/LoginScreen';
+import { SignUpScreen } from '@/screens/auth/SignUpScreen';
+import { VerifyCodeScreen } from '@/screens/auth/VerifyCodeScreen';
+import { ForgotPasswordScreen } from '@/screens/auth/ForgotPasswordScreen';
+import { VerifyResetCodeScreen } from '@/screens/auth/VerifyResetCodeScreen';
+import { SetNewPasswordScreen } from '@/screens/auth/SetNewPasswordScreen';
 import { AppIntroScreen } from '@/screens/AppIntroScreen';
 import { OnboardingScreen } from '@/screens/OnboardingScreen';
 import { ScheduleScreen } from '@/screens/ScheduleScreen';
@@ -52,7 +57,6 @@ import { NotificationSettingsScreen } from '@/screens/NotificationSettingsScreen
 import { ManageBookingsScreen } from '@/screens/ManageBookingsScreen';
 import { CompetitionScreen } from '@/screens/CompetitionScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
-import { ResetPasswordScreen } from '@/screens/ResetPasswordScreen';
 import { AccountSection } from '@/screens/settings/AccountSection';
 import { PrivacySection } from '@/screens/settings/PrivacySection';
 import { NotificationsSection } from '@/screens/settings/NotificationsSection';
@@ -63,7 +67,6 @@ import { SupportChatScreen } from '@/screens/settings/SupportChatScreen';
 
 import { Colors, Font } from '@/theme/colors';
 import { NetworkBanner } from '@/components/ui/NetworkBanner';
-import { supabase } from '@/services/supabase';
 import * as SecureStore from 'expo-secure-store';
 
 const INTRO_SEEN_KEY = 'toptennis_intro_seen';
@@ -141,8 +144,14 @@ function SettingsNavigator() {
 
 
 function AppNavigator() {
-  const { user, loading } = useAuth();
+  const { user, loading, pendingSignup } = useAuth();
   const { player, loading: playerLoading, refetch } = usePlayerProfile();
+
+  // verifyOtp during signup creates a real session, which would otherwise flip
+  // this navigator into the app and unmount VerifyCodeScreen before it can claim
+  // the username. Keeping the auth stack mounted while a signup is pending is
+  // what makes that step reliable.
+  const inAuthFlow = !user || !!pendingSignup;
 
   // null = still loading from SecureStore
   const [introSeen, setIntroSeen] = useState<boolean | null>(null);
@@ -171,31 +180,33 @@ function AppNavigator() {
         <Stack.Screen name="AppIntro">
           {() => <AppIntroScreen onDone={markIntroDone} />}
         </Stack.Screen>
-      ) : !user ? (
+      ) : inAuthFlow ? (
         <>
-          <Stack.Screen name="Auth" component={AuthScreen} />
-          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="SignUp" component={SignUpScreen} />
+          <Stack.Screen name="VerifyCode" component={VerifyCodeScreen} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          <Stack.Screen name="VerifyResetCode" component={VerifyResetCodeScreen} />
+          <Stack.Screen name="SetNewPassword" component={SetNewPasswordScreen} />
         </>
       ) : !player ? (
         <Stack.Screen name="Onboarding">
           {() => <OnboardingScreen onComplete={refetch} />}
         </Stack.Screen>
       ) : (
-        <>
-          <Stack.Screen name="Main" component={TabNavigator} />
-          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-        </>
+        <Stack.Screen name="Main" component={TabNavigator} />
       )}
     </Stack.Navigator>
   );
 }
 
+// Password recovery is an in-app SMS code flow now, so there is no
+// reset-password deep link to route and no recovery tokens arriving by URL.
 const linking = {
   prefixes: ['toptennis://'],
   config: {
     screens: {
-      ResetPassword: 'reset-password',
-      Auth: 'auth',
+      Login: 'login',
     },
   },
 };
@@ -219,27 +230,6 @@ function App() {
     Nunito_800ExtraBold,
     Nunito_900Black,
   });
-
-  useEffect(() => {
-    const handleUrl = async (url: string) => {
-      if (url.includes('reset-password') || url.includes('type=recovery')) {
-        const hashParams = url.split('#')[1] || url.split('?')[1] || '';
-        const params = Object.fromEntries(
-          hashParams.split('&').map(p => p.split('=').map(decodeURIComponent))
-        );
-        if (params.access_token && params.refresh_token) {
-          await supabase.auth.setSession({
-            access_token: params.access_token,
-            refresh_token: params.refresh_token,
-          });
-        }
-      }
-    };
-
-    Linking.getInitialURL().then(url => { if (url) handleUrl(url); });
-    const sub = Linking.addEventListener('url', ({ url }) => handleUrl(url));
-    return () => sub.remove();
-  }, []);
 
   if (!fontsLoaded) {
     return (

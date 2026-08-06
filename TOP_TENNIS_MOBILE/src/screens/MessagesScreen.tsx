@@ -49,7 +49,7 @@ function getConvName(conv: Conversation, uid: string): string {
   if (conv.is_group) return conv.name || 'Group Chat';
   const other = conv.members.find(m => m.user_id !== uid);
   if (!other?.profile) return 'Direct Message';
-  return `${other.profile.first_name || ''} ${other.profile.last_name || ''}`.trim() || 'Player';
+  return `${other.profile.first_name || ''} ${other.profile.last_name || ''}`.trim() || other.profile.username || 'Player';
 }
 function getConvOtherId(conv: Conversation, uid: string): string | null {
   if (conv.is_group) return null;
@@ -61,7 +61,7 @@ function getConvAvatar(conv: Conversation, uid: string): string | undefined {
 }
 function getMemberName(m: ConversationMember): string {
   if (!m.profile) return 'Unknown';
-  return `${m.profile.first_name || ''} ${m.profile.last_name || ''}`.trim() || 'Player';
+  return `${m.profile.first_name || ''} ${m.profile.last_name || ''}`.trim() || m.profile.username || 'Player';
 }
 function getSenderName(msg: ConversationMessage): string {
   if (!msg.sender) return '';
@@ -818,10 +818,18 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
   const handleTyping = useCallback((text: string) => {
     setMsgInput(text);
     if (text.length > 0 && user) {
-      const name = `${(user as any).user_metadata?.first_name || ''}`.trim() || user.email || 'Someone';
+      // Phone-only accounts have no email — read our own member profile off the
+      // conversation list and fall back to username, then a neutral placeholder.
+      const mine = conversations
+        .flatMap(c => c.members || [])
+        .find(m => m.user_id === user.id)?.profile;
+      const name =
+        `${mine?.first_name || (user as any).user_metadata?.first_name || ''} ${mine?.last_name || ''}`.trim()
+        || mine?.username
+        || 'Someone';
       broadcastTyping(name);
     }
-  }, [broadcastTyping, user]);
+  }, [broadcastTyping, user, conversations]);
 
   const handleRespond = async (id: string, status: 'accepted' | 'declined') => {
     setResponding(id);
@@ -938,7 +946,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
                 .filter(m => m.user_id !== user?.id)
                 .map(m => ({
                   userId: m.user_id,
-                  name: [m.profile?.first_name, m.profile?.last_name].filter(Boolean).join(' ') || 'Player',
+                  name: [m.profile?.first_name, m.profile?.last_name].filter(Boolean).join(' ') || m.profile?.username || 'Player',
                   avatarUrl: m.profile?.profile_picture_url ?? undefined,
                 }))
             : otherId

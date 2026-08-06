@@ -20,9 +20,11 @@ interface DashboardHeaderProps {
 const DashboardHeader = ({ player, user, sidebarCollapsed, setSidebarCollapsed, isMobile = false, sidebarOpen = false, setSidebarOpen }: DashboardHeaderProps) => {
   const { unreadCount } = useNotificationsContext();
 
-  const userInitials = user?.user_metadata?.first_name && user?.user_metadata?.last_name 
+  // Phone-only accounts have no email — fall back to the player name before
+  // the neutral placeholder.
+  const userInitials = user?.user_metadata?.first_name && user?.user_metadata?.last_name
     ? `${user.user_metadata.first_name[0]}${user.user_metadata.last_name[0]}`
-    : user?.email?.[0]?.toUpperCase() || 'U';
+    : (player?.name?.[0] || 'U').toUpperCase();
 
   // Calculate match readiness score (AI metric)
   const calculateMatchReadiness = () => {

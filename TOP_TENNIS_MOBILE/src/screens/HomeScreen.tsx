@@ -65,9 +65,12 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     setRefreshing(false);
   };
 
-  const fullName = profile
-    ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
-    : user?.email?.split('@')[0] || 'Player';
+  // Phone-only accounts have no email — never derive a name from it.
+  // Mirrors public.display_name(): name -> username -> neutral placeholder.
+  const fullName =
+    `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim()
+    || profile?.username
+    || 'Player';
   const firstName = fullName.split(' ')[0];
 
   // Win/loss stats live on the players row, not profiles
