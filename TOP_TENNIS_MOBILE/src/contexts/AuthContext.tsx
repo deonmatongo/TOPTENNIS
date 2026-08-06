@@ -55,6 +55,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } else {
         clearSentryUser();
       }
+      // Forward the refreshed access token to the Realtime socket. Without
+      // this, postgres_changes subscriptions silently stop after token expiry
+      // because the socket authenticates independently from REST calls.
+      try {
+        supabase.realtime.setAuth(session?.access_token ?? null);
+      } catch { /* ignore if socket not yet connected */ }
     });
 
     return () => subscription.unsubscribe();

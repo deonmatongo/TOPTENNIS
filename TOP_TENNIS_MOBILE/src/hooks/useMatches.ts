@@ -4,6 +4,8 @@ import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { captureError } from '@/services/sentry';
 import { useUniqueChannel } from '@/hooks/useUniqueChannel';
+import { useRealtimeConnection } from '@/contexts/RealtimeConnectionContext';
+import { subscribeWithRetry } from '@/utils/realtimeRetry';
 
 export interface MatchInvite {
   id: string;
@@ -67,6 +69,7 @@ async function notify(userId: string, type: string, title: string, message: stri
 
 export const useMatches = () => {
   const { user } = useAuth();
+  const { connectionGeneration } = useRealtimeConnection();
   const channelName = useUniqueChannel('matches-invites');
   const [invites, setInvites] = useState<MatchInvite[]>([]);
   const [loading, setLoading] = useState(true);
@@ -287,29 +290,29 @@ export const useMatches = () => {
     // re-mounted. Adding two .on() listeners (one per FK column) covers both
     // sender and receiver sides; Supabase doesn't support OR across columns in a
     // single filter clause.
-    const channel = supabase
-      .channel(channelName)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'match_invites',
-        filter: `sender_id=eq.${user.id}`,
-      }, (payload: any) => {
-        if (__DEV__) console.log('[matches] invite event (sender)', payload);
-        fetchInvites();
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'match_invites',
-        filter: `receiver_id=eq.${user.id}`,
-      }, (payload: any) => {
-        if (__DEV__) console.log('[matches] invite event (receiver)', payload);
-        fetchInvites();
-      })
-      .subscribe((status: string) => {
-        if (__DEV__) console.log('[matches] channel status', status);
-      });
+    const cleanupChannel = subscribeWithRetry(() =>
+      supabase
+        .channel(channelName)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'match_invites',
+          filter: `sender_id=eq.${user.id}`,
+        }, (payload: any) => {
+          if (__DEV__) console.log('[matches] invite event (sender)', payload);
+          fetchInvites();
+        })
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'match_invites',
+          filter: `receiver_id=eq.${user.id}`,
+        }, (payload: any) => {
+          if (__DEV__) console.log('[matches] invite event (receiver)', payload);
+          fetchInvites();
+        }),
+      'matches',
+    );
 
     const handleAppState = (nextState: AppStateStatus) => {
       if (nextState === 'active') {
@@ -320,10 +323,10 @@ export const useMatches = () => {
     const appStateSub = AppState.addEventListener('change', handleAppState);
 
     return () => {
-      supabase.removeChannel(channel);
+      cleanupChannel();
       appStateSub.remove();
     };
-  }, [user, fetchInvites]);
+  }, [user, fetchInvites, connectionGeneration]);
 
   return { invites, loading, pendingReceived, upcoming, history, respondToInvite, recordMatchResult, refetch: fetchInvites };
 };

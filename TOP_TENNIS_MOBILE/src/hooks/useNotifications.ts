@@ -4,6 +4,8 @@ import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUniqueChannel } from '@/hooks/useUniqueChannel';
 import { captureError } from '@/services/sentry';
+import { useRealtimeConnection } from '@/contexts/RealtimeConnectionContext';
+import { subscribeWithRetry } from '@/utils/realtimeRetry';
 
 export type NotificationType =
   | 'message_received'
@@ -35,6 +37,7 @@ export interface Notification {
 
 export const useNotifications = () => {
   const { user } = useAuth();
+  const { connectionGeneration } = useRealtimeConnection();
   const notifTopic = useUniqueChannel('notifications');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -102,66 +105,50 @@ export const useNotifications = () => {
     pendingQueueRef.current = [];
     fetchNotifications();
 
-    const buildChannel = () => supabase
-      .channel(`${notifTopic}:${user.id}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${user.id}`,
-      }, (payload) => {
-        if (!payload.new) return;
-        if (hasLoadedRef.current) injectRow(payload.new);
-        else pendingQueueRef.current.push(payload.new);
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${user.id}`,
-      }, (payload) => {
-        if (!payload.new) return;
-        setNotifications(prev => {
-          const updated = prev.map(n =>
-            n.id === payload.new.id ? { ...n, read: payload.new.read } : n
-          );
-          updateUnreadCount(updated);
-          return updated;
-        });
-      })
-      .on('postgres_changes', {
-        event: 'DELETE',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${user.id}`,
-      }, (payload) => {
-        if (!payload.old?.id) return;
-        setNotifications(prev => {
-          const filtered = prev.filter(n => n.id !== payload.old.id);
-          updateUnreadCount(filtered);
-          return filtered;
-        });
-      });
+    const cleanupChannel = subscribeWithRetry(() =>
+      supabase
+        .channel(`${notifTopic}:${user.id}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        }, (payload) => {
+          if (!payload.new) return;
+          if (hasLoadedRef.current) injectRow(payload.new);
+          else pendingQueueRef.current.push(payload.new);
+        })
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        }, (payload) => {
+          if (!payload.new) return;
+          setNotifications(prev => {
+            const updated = prev.map(n =>
+              n.id === payload.new.id ? { ...n, read: payload.new.read } : n
+            );
+            updateUnreadCount(updated);
+            return updated;
+          });
+        })
+        .on('postgres_changes', {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        }, (payload) => {
+          if (!payload.old?.id) return;
+          setNotifications(prev => {
+            const filtered = prev.filter(n => n.id !== payload.old.id);
+            updateUnreadCount(filtered);
+            return filtered;
+          });
+        }),
+      'notifications',
+    );
 
-    let channel = buildChannel();
-    let retryTimeout: ReturnType<typeof setTimeout> | null = null;
-
-    const subscribe = () => {
-      channel.subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          // Rebuild and retry after 3s on failure
-          supabase.removeChannel(channel);
-          retryTimeout = setTimeout(() => {
-            channel = buildChannel();
-            subscribe();
-          }, 3000);
-        }
-      });
-    };
-    subscribe();
-
-    // When the app returns to foreground, refetch to catch any missed
-    // notifications (WebSocket may have dropped while backgrounded)
     const handleAppState = (nextState: AppStateStatus) => {
       if (nextState === 'active') {
         fetchNotifications();
@@ -170,11 +157,10 @@ export const useNotifications = () => {
     const appStateSub = AppState.addEventListener('change', handleAppState);
 
     return () => {
-      if (retryTimeout) clearTimeout(retryTimeout);
-      supabase.removeChannel(channel);
+      cleanupChannel();
       appStateSub.remove();
     };
-  }, [user, fetchNotifications, injectRow, updateUnreadCount]);
+  }, [user, fetchNotifications, injectRow, updateUnreadCount, connectionGeneration]);
 
   const markAsRead = useCallback(async (id: string) => {
     if (!user) return;

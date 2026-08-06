@@ -4,6 +4,8 @@ import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { captureError } from '@/services/sentry';
 import { useUniqueChannel } from '@/hooks/useUniqueChannel';
+import { useRealtimeConnection } from '@/contexts/RealtimeConnectionContext';
+import { subscribeWithRetry } from '@/utils/realtimeRetry';
 
 export interface ConversationMember {
   user_id: string;
@@ -60,6 +62,7 @@ export interface Conversation {
 
 export const useConversations = () => {
   const { user } = useAuth();
+  const { connectionGeneration } = useRealtimeConnection();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const db = supabase as any;
@@ -282,52 +285,49 @@ export const useConversations = () => {
     if (!user) { setLoading(false); return; }
     fetchConversations();
 
-    const msgChannel = (supabase as any)
-      .channel(`${msgTopic}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversation_messages' },
-        (payload: any) => {
-          if (__DEV__) console.log('[conv:messages] INSERT event', payload);
+    const cleanupMsg = subscribeWithRetry(() =>
+      (supabase as any)
+        .channel(`${msgTopic}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversation_messages' },
+          (payload: any) => {
+            if (__DEV__) console.log('[conv:messages] INSERT event', payload);
+            fetchConversations();
+          })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' },
+          (payload: any) => {
+            if (__DEV__) console.log('[conv:reactions] * event', payload);
+            fetchConversations();
+          }),
+      'conv:messages',
+    );
+
+    const cleanupMem = subscribeWithRetry(() =>
+      (supabase as any)
+        .channel(`${memTopic}`)
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'conversation_members',
+          filter: `user_id=eq.${user.id}`,
+        }, (payload: any) => {
+          if (__DEV__) console.log('[conv:members] * event', payload);
+          fetchConversations();
+        }),
+      'conv:members',
+    );
+
+    const cleanupConv = subscribeWithRetry(() =>
+      (supabase as any)
+        .channel(`${convTopic}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations' }, (payload: any) => {
+          if (__DEV__) console.log('[conv:conversations] INSERT event', payload);
           fetchConversations();
         })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' },
-        (payload: any) => {
-          if (__DEV__) console.log('[conv:reactions] * event', payload);
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, (payload: any) => {
+          if (__DEV__) console.log('[conv:conversations] UPDATE event', payload);
           fetchConversations();
-        })
-      .subscribe((status: string) => {
-        if (__DEV__) console.log('[conv:messages] channel status', status);
-      });
+        }),
+      'conv:conversations',
+    );
 
-    const memChannel = (supabase as any)
-      .channel(`${memTopic}`)
-      .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'conversation_members',
-        filter: `user_id=eq.${user.id}`,
-      }, (payload: any) => {
-        if (__DEV__) console.log('[conv:members] * event', payload);
-        fetchConversations();
-      })
-      .subscribe((status: string) => {
-        if (__DEV__) console.log('[conv:members] channel status', status);
-      });
-
-    const convChannel = (supabase as any)
-      .channel(`${convTopic}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations' }, (payload: any) => {
-        if (__DEV__) console.log('[conv:conversations] INSERT event', payload);
-        fetchConversations();
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, (payload: any) => {
-        if (__DEV__) console.log('[conv:conversations] UPDATE event', payload);
-        fetchConversations();
-      })
-      .subscribe((status: string) => {
-        if (__DEV__) console.log('[conv:conversations] channel status', status);
-      });
-
-    // Step 5: Recover from WebSocket drop when app returns to foreground.
-    // The WS is killed by iOS/Android after ~30 s in the background; channels
-    // don't self-heal reliably, so a refetch on 'active' closes the gap.
     const handleAppState = (nextState: AppStateStatus) => {
       if (nextState === 'active') {
         if (__DEV__) console.log('[conv] app foregrounded — refetching');
@@ -337,12 +337,12 @@ export const useConversations = () => {
     const appStateSub = AppState.addEventListener('change', handleAppState);
 
     return () => {
-      supabase.removeChannel(msgChannel);
-      supabase.removeChannel(memChannel);
-      supabase.removeChannel(convChannel);
+      cleanupMsg();
+      cleanupMem();
+      cleanupConv();
       appStateSub.remove();
     };
-  }, [user, fetchConversations]);
+  }, [user, fetchConversations, connectionGeneration]);
 
   return {
     conversations,

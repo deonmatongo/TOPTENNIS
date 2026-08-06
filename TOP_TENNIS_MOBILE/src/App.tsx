@@ -22,6 +22,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { RealtimeConnectionProvider } from '@/contexts/RealtimeConnectionContext';
 import { useMatches } from '@/hooks/useMatches';
 import { useConversations } from '@/hooks/useConversations';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
@@ -249,11 +250,13 @@ function App() {
         <TamaguiProvider config={tamaguiConfig} defaultTheme="light">
           <SafeAreaProvider>
             <AuthProvider>
-              <NavigationContainer ref={navigationRef} linking={linking}>
-                <StatusBar style="dark" />
-                <AppNavigator />
-                <NetworkBanner />
-              </NavigationContainer>
+              <RealtimeConnectionProvider>
+                <NavigationContainer ref={navigationRef} linking={linking}>
+                  <StatusBar style="dark" />
+                  <AppNavigator />
+                  <NetworkBanner />
+                </NavigationContainer>
+              </RealtimeConnectionProvider>
             </AuthProvider>
           </SafeAreaProvider>
         </TamaguiProvider>

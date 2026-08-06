@@ -103,6 +103,15 @@ Deno.serve(async (req: Request) => {
     data: { type, ...metadata },
     badge: 1,
     channelId: 'default',
+    // 'high' maps to apns-priority:10 (immediate delivery) on iOS and
+    // FCM high priority on Android. Without this, Apple/Google are allowed
+    // to batch and delay the notification — the main cause of "minutes late"
+    // delivery. Only omit for non-urgent background syncs.
+    priority: 'high',
+    // ttl:0 means deliver now-or-never rather than queuing for hours. Safe
+    // for match invites and chat messages; adjust per notification type if
+    // you add a background-sync category later.
+    ttl: 0,
   }
 
   const expoRes = await fetch(EXPO_PUSH_URL, {

@@ -3,6 +3,8 @@ import { AppState, AppStateStatus } from 'react-native';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUniqueChannel } from '@/hooks/useUniqueChannel';
+import { useRealtimeConnection } from '@/contexts/RealtimeConnectionContext';
+import { subscribeWithRetry } from '@/utils/realtimeRetry';
 
 export interface FriendRequest {
   id: string;
@@ -16,6 +18,7 @@ export interface FriendRequest {
 
 export function useFriendRequests() {
   const { user } = useAuth();
+  const { connectionGeneration } = useRealtimeConnection();
   const friendTopic = useUniqueChannel('friend-requests');
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,29 +72,29 @@ export function useFriendRequests() {
     // Bug fix: useFriendRequests had no realtime subscription — incoming friend
     // requests were invisible until re-mount. Two listeners (one per FK column)
     // cover both sender and receiver roles.
-    const channel = supabase
-      .channel(friendTopic)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'friend_requests',
-        filter: `sender_id=eq.${user.id}`,
-      }, (payload: any) => {
-        if (__DEV__) console.log('[friends] request event (sender)', payload);
-        fetchRequests();
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'friend_requests',
-        filter: `receiver_id=eq.${user.id}`,
-      }, (payload: any) => {
-        if (__DEV__) console.log('[friends] request event (receiver)', payload);
-        fetchRequests();
-      })
-      .subscribe((status: string) => {
-        if (__DEV__) console.log('[friends] channel status', status);
-      });
+    const cleanupChannel = subscribeWithRetry(() =>
+      supabase
+        .channel(friendTopic)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'friend_requests',
+          filter: `sender_id=eq.${user.id}`,
+        }, (payload: any) => {
+          if (__DEV__) console.log('[friends] request event (sender)', payload);
+          fetchRequests();
+        })
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'friend_requests',
+          filter: `receiver_id=eq.${user.id}`,
+        }, (payload: any) => {
+          if (__DEV__) console.log('[friends] request event (receiver)', payload);
+          fetchRequests();
+        }),
+      'friends',
+    );
 
     const handleAppState = (nextState: AppStateStatus) => {
       if (nextState === 'active') {
@@ -102,10 +105,10 @@ export function useFriendRequests() {
     const appStateSub = AppState.addEventListener('change', handleAppState);
 
     return () => {
-      supabase.removeChannel(channel);
+      cleanupChannel();
       appStateSub.remove();
     };
-  }, [user?.id]);
+  }, [user?.id, connectionGeneration]);
 
   const sendFriendRequest = async (receiverId: string) => {
     const { error } = await supabase.from('friend_requests').insert({ sender_id: user!.id, receiver_id: receiverId, status: 'pending' });
