@@ -167,11 +167,31 @@ describe('AuthContext — phone + username auth', () => {
     expect(fn).toBe('start-signup');
     expect(opts.body).not.toHaveProperty('password');
     expect(JSON.stringify(opts.body)).not.toContain('hunter2xx');
+    // The pending phone is normalised to E.164 so completeSignup's verifyOtp
+    // uses the same string GoTrue issued the OTP against. This response has no
+    // `phone`, so it comes from the local libphonenumber fallback.
     expect(result.current.pendingSignup).toEqual({
-      phone: '5551230001',
+      phone: '+15551230001',
       username: 'rallyking',
       password: 'hunter2xx',
     });
+  });
+
+  it('startSignup: prefers the canonical phone returned by start-signup', async () => {
+    const result = await mount();
+    supabase.functions.invoke.mockResolvedValueOnce({
+      data: { ok: true, phone: '+15551230001' },
+      error: null,
+    });
+    await act(async () => {
+      await result.current.startSignup({
+        phone: '(555) 123-0001',
+        username: 'rallyking',
+        password: 'hunter2xx',
+      });
+    });
+
+    expect(result.current.pendingSignup.phone).toBe('+15551230001');
   });
 
   it('startSignup: rejects a short password before any network call', async () => {
