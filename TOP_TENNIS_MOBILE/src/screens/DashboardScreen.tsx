@@ -1,12 +1,12 @@
 import React, { useState, useRef } from 'react'
 import {
-  StyleSheet, RefreshControl, TextInput, ActivityIndicator, TouchableOpacity, View, ScrollView,
+  StyleSheet, RefreshControl, TextInput, ActivityIndicator, TouchableOpacity, View, Text, ScrollView,
   Modal, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
-import { XStack, YStack, Text } from 'tamagui'
+import { XStack, YStack } from '@/components/ui/Stack'
 import { useAuth } from '@/contexts/AuthContext'
 import { useProfile } from '@/hooks/useProfile'
 import { usePlayerProfile } from '@/hooks/usePlayerProfile'

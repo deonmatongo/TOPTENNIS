@@ -3,8 +3,6 @@ import { initSentry, wrapApp } from '@/services/sentry';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 initSentry();
-import { TamaguiProvider } from 'tamagui';
-import tamaguiConfig from '../tamagui.config';
 import { View, Text, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 import {
   useFonts,
@@ -246,19 +244,17 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        <TamaguiProvider config={tamaguiConfig} defaultTheme="light">
-          <SafeAreaProvider>
-            <AuthProvider>
-              <RealtimeConnectionProvider>
-                <NavigationContainer ref={navigationRef} linking={linking}>
-                  <StatusBar style="dark" />
-                  <AppNavigator />
-                  <NetworkBanner />
-                </NavigationContainer>
-              </RealtimeConnectionProvider>
-            </AuthProvider>
-          </SafeAreaProvider>
-        </TamaguiProvider>
+        <SafeAreaProvider>
+          <AuthProvider>
+            <RealtimeConnectionProvider>
+              <NavigationContainer ref={navigationRef} linking={linking}>
+                <StatusBar style="dark" />
+                <AppNavigator />
+                <NetworkBanner />
+              </NavigationContainer>
+            </RealtimeConnectionProvider>
+          </AuthProvider>
+        </SafeAreaProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

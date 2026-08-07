@@ -1,8 +1,7 @@
 import React from 'react'
-import { View, TouchableOpacity } from 'react-native'
+import { View, Text, TouchableOpacity } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { XStack, YStack, Text } from 'tamagui'
 import { Colors, FontSize, FontWeight, Spacing, Radius, Shadow } from '@/theme/colors'
 
 interface ScreenHeaderProps {
@@ -26,16 +25,20 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
   const sub = dark ? Colors.textOnDarkMuted : Colors.textMuted
 
   return (
-    <YStack
-      backgroundColor={bg}
-      paddingHorizontal={Spacing.lg}
-      paddingBottom={Spacing.md}
-      paddingTop={insets.top + 4}
-      borderBottomWidth={1}
-      borderBottomColor={Colors.separator}
-      {...(Shadow.xs as any)}
+    <View
+      style={[
+        {
+          backgroundColor: bg,
+          paddingHorizontal: Spacing.lg,
+          paddingBottom: Spacing.md,
+          paddingTop: insets.top + 4,
+          borderBottomWidth: 1,
+          borderBottomColor: Colors.separator,
+        },
+        Shadow.xs as any,
+      ]}
     >
-      <XStack alignItems="center" minHeight={48} gap={Spacing.sm}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 48, gap: Spacing.sm }}>
 
         {showBack && navigation ? (
           <TouchableOpacity
@@ -57,38 +60,44 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
           <View style={{ width: 38 }} />
         )}
 
-        <YStack
-          flex={1}
-          paddingHorizontal={4}
-          alignItems={centered ? 'center' : 'flex-start'}
+        <View
+          style={{
+            flex: 1,
+            paddingHorizontal: 4,
+            alignItems: centered ? 'center' : 'flex-start',
+          }}
         >
           <Text
-            fontSize={FontSize.xl}
-            fontWeight={FontWeight.bold as any}
-            color={col}
-            letterSpacing={-0.4}
+            style={{
+              fontSize: FontSize.xl,
+              fontWeight: FontWeight.bold,
+              color: col,
+              letterSpacing: -0.4,
+            }}
             numberOfLines={1}
           >
             {title}
           </Text>
           {subtitle && (
             <Text
-              fontSize={FontSize.xs}
-              fontWeight={FontWeight.medium as any}
-              color={sub}
-              marginTop={1}
+              style={{
+                fontSize: FontSize.xs,
+                fontWeight: FontWeight.medium,
+                color: sub,
+                marginTop: 1,
+              }}
               numberOfLines={1}
             >
               {subtitle}
             </Text>
           )}
-        </YStack>
+        </View>
 
         <View style={{ width: 38, alignItems: 'flex-end', justifyContent: 'center' }}>
           {rightElement ?? null}
         </View>
 
-      </XStack>
-    </YStack>
+      </View>
+    </View>
   )
 }

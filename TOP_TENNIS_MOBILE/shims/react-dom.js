@@ -1,4 +1,6 @@
-// Shim for react-dom in React Native — only flushSync is used by @tamagui/popper
+// Shim for react-dom in React Native — for packages that import it in RN
+// builds. Originally added for @tamagui/popper; kept because removing the
+// metro alias would need an audit of every remaining dependency.
 'use strict'
 
 const ReactNative = require('react-native')

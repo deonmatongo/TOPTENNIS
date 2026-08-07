@@ -154,20 +154,3 @@ jest.mock('@expo/vector-icons', () => ({
   Ionicons: () => null,
 }));
 
-// Mock tamagui with RN primitives (plugin is excluded in test env via babel.config.js)
-jest.mock('tamagui', () => {
-  const React = require('react');
-  const { View, Text: RNText } = require('react-native');
-  const makeView = () => (props: any) => {
-    const { children, testID, style } = props;
-    return React.createElement(View, { testID, style }, children);
-  };
-  return {
-    XStack: makeView(),
-    YStack: makeView(),
-    Text: (props: any) => {
-      const { children, testID, style } = props;
-      return React.createElement(RNText, { testID, style }, children);
-    },
-  };
-});
