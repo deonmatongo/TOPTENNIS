@@ -158,11 +158,15 @@ function AppNavigator() {
 
   // Load persisted flags once on mount
   useEffect(() => {
-    SecureStore.getItemAsync(INTRO_SEEN_KEY).then(val => setIntroSeen(!!val));
+    SecureStore.getItemAsync(INTRO_SEEN_KEY)
+      .then(val => setIntroSeen(!!val))
+      .catch(() => setIntroSeen(false));
   }, []);
 
   const markIntroDone = async () => {
-    await SecureStore.setItemAsync(INTRO_SEEN_KEY, 'true');
+    try {
+      await SecureStore.setItemAsync(INTRO_SEEN_KEY, 'true');
+    } catch { /* storage failure — intro still marked done in memory */ }
     setIntroSeen(true);
   };
 

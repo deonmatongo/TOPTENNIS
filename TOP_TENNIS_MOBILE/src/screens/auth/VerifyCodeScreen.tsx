@@ -75,6 +75,7 @@ export const VerifyCodeScreen: React.FC<{ navigation: any }> = ({ navigation }) 
       } catch (e: any) {
         setError(e?.message ?? 'That code is incorrect or has expired.')
         setCode('')
+        setCooldown(0)
       } finally {
         setBusy(false)
       }

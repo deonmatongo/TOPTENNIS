@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/services/supabase';
 import { setUser as setSentryUser, clearUser as clearSentryUser } from '@/services/sentry';
@@ -145,13 +146,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Restore any persisted session on mount — users stay signed in until they
     // manually sign out. getSession() reads from SecureStore and resolves
     // before the first auth-dependent render.
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) setSentryUser(session.user.id);
-      else clearSentryUser();
-      setLoading(false);
-    });
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) setSentryUser(session.user.id);
+        else clearSentryUser();
+      })
+      .catch(() => { /* network unavailable — stay signed out */ })
+      .finally(() => setLoading(false));
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
@@ -202,7 +205,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw new AuthFieldError('Password must be at least 8 characters long.', 'password');
     }
 
-    const { data, message, field } = await invokeJson<{ ok: boolean }>('start-signup', {
+    const { data, message, field } = await invokeJson<{ ok: boolean; phone: string }>('start-signup', {
       phone,
       username,
       defaultCountry,
@@ -212,8 +215,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw new AuthFieldError(message ?? 'Could not start signup. Please try again.', field);
     }
 
+    // Normalise to E.164 so verifyOtp uses the same phone string that GoTrue
+    // received when the OTP was issued. Prefer the server's canonical value;
+    // fall back to parsing locally with the same library the server uses.
     // Held in memory only. completeSignup consumes it; cancelSignup clears it.
-    setPendingSignup({ phone, username, password });
+    const e164 =
+      data.phone ??
+      parsePhoneNumberFromString(phone, defaultCountry as never)?.number ??
+      phone;
+    setPendingSignup({ phone: e164, username, password });
   };
 
   const resendSignupCode = async () => {

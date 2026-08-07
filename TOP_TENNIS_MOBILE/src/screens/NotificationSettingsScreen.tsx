@@ -140,7 +140,11 @@ export const NotificationSettingsScreen: React.FC<{ navigation: any }> = ({ navi
           onPress: async () => {
             const allOff = Object.keys(settings).reduce((acc, k) => ({ ...acc, [k]: false }), {}) as NotifSettings;
             setSettings(allOff);
-            await supabase.from('app_settings').upsert({ user_id: user!.id, ...allOff }, { onConflict: 'user_id' });
+            try {
+              await supabase.from('app_settings').upsert({ user_id: user!.id, ...allOff }, { onConflict: 'user_id' });
+            } catch {
+              // best-effort — in-memory state is already updated
+            }
           },
         },
       ]
