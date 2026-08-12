@@ -5,10 +5,15 @@
 // non-existent account from a wrong password by timing the reply. Any early
 // return that skips it reopens the enumeration channel.
 
+// Restrict cross-origin access to the declared origin only.
+// Mobile app clients (no browser sandbox) are unaffected by CORS.
+// Override for local dev: set ALLOWED_ORIGIN=http://localhost:5173 in
+// supabase/functions/.env or via `supabase secrets set`.
 export const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') ?? 'https://toptennis.app',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Vary': 'Origin',
 }
 
 /** Every auth reply takes at least this long, whatever actually happened. */
