@@ -39,12 +39,19 @@ export function subscribeWithRetry(
       }
 
       if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') && !stopped) {
-        if (channel) supabase.removeChannel(channel);
+        const deadChannel = channel;
         channel = null;
         const delay = Math.min(BASE_DELAY_MS * 2 ** attempts, MAX_DELAY_MS);
         attempts++;
         if (__DEV__) console.log(`[realtime:${label}] retry in ${delay}ms (attempt ${attempts})`);
-        timer = setTimeout(subscribe, delay);
+        // Await removal so the _onClose callback fires and clears this channel
+        // from Supabase's registry before factory() reuses the same topic name.
+        // Without the await, supabase.channel(name) returns the stale subscribed
+        // instance, causing "cannot add postgres_changes callbacks after subscribe()".
+        void (async () => {
+          if (deadChannel) await supabase.removeChannel(deadChannel);
+          if (!stopped) timer = setTimeout(subscribe, delay);
+        })();
       }
     });
   };

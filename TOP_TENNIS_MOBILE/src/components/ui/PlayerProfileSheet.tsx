@@ -311,7 +311,7 @@ export const PlayerProfileSheet: React.FC<Props> = ({ player, visible, onClose, 
           ))}
         </View>
 
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {/* Profile Tab */}
           {tab === 'profile' && (
             <View style={styles.section}>

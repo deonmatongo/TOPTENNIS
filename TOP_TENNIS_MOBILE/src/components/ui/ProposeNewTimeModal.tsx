@@ -128,7 +128,7 @@ export const ProposeNewTimeModal: React.FC<Props> = ({ visible, invite, userId, 
             </View>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             {/* Current match info */}
             {invite && (
               <View style={styles.currentCard}>

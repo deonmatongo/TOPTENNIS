@@ -101,7 +101,7 @@ export const ScoreConfirmationModal: React.FC<Props> = ({ visible, match, userId
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {/* Result summary */}
           <View style={[styles.resultCard, didIWin ? styles.resultCardWin : styles.resultCardLoss]}>
             <View style={styles.resultRow}>

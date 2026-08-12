@@ -1195,10 +1195,12 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
       {loading && !refreshing ? (
         <View style={ls.center}><ActivityIndicator color={Colors.primary} size="large" /></View>
       ) : (
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom: 32 }}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
         >
           {/* Chats */}
@@ -1372,6 +1374,7 @@ export const MessagesScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
             ))
           )}
         </ScrollView>
+        </KeyboardAvoidingView>
       )}
 
       <GroupCreateModal

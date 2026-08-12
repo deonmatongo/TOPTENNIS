@@ -118,7 +118,7 @@ export const MatchInviteResponseModal: React.FC<Props> = ({
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {/* League badge */}
           {isLeagueMatch && (
             <View style={styles.leagueBadgeRow}>

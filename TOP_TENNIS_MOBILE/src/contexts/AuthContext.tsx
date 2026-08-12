@@ -205,7 +205,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw new AuthFieldError('Password must be at least 8 characters long.', 'password');
     }
 
-    const { data, message, field } = await invokeJson<{ ok: boolean; phone: string }>('start-signup', {
+    const { data, message, field } = await invokeJson<{ ok: boolean }>('start-signup', {
       phone,
       username,
       defaultCountry,
@@ -216,11 +216,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     // Normalise to E.164 so verifyOtp uses the same phone string that GoTrue
-    // received when the OTP was issued. Prefer the server's canonical value;
-    // fall back to parsing locally with the same library the server uses.
-    // Held in memory only. completeSignup consumes it; cancelSignup clears it.
+    // received when the OTP was issued. Held in memory only; completeSignup
+    // consumes it, cancelSignup clears it.
     const e164 =
-      data.phone ??
       parsePhoneNumberFromString(phone, defaultCountry as never)?.number ??
       phone;
     setPendingSignup({ phone: e164, username, password });

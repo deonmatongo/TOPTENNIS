@@ -149,7 +149,7 @@ export const MatchScoringModal: React.FC<Props> = ({ visible, match, playerRecor
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {/* Winner selection */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Who won the match? <Text style={styles.required}>*</Text></Text>

@@ -111,9 +111,11 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={[]}>
       <StatusBar style="light" />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 32 }}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
         }
@@ -571,6 +573,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
         </YStack>
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Schedule a Match — player search modal */}
       <Modal

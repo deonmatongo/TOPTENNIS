@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
@@ -211,7 +212,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: { message: message ?? 'Could not start signup. Please try again.', field } };
     }
 
-    setPendingSignup({ phone, username, password });
+    // Normalise to E.164 so verifyOtp uses the same phone string that GoTrue
+    // received when the OTP was issued.
+    const e164 =
+      parsePhoneNumberFromString(phone, defaultCountry as never)?.number ??
+      phone;
+    setPendingSignup({ phone: e164, username, password });
     setTimeout(() => {
       logUserActivity('registration_attempt', { timestamp: new Date().toISOString() });
     }, 0);

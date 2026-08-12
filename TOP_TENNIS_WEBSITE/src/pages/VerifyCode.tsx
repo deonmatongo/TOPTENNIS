@@ -30,7 +30,7 @@ const VerifyCode = () => {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { remaining, restart } = useResendCooldown(30);
+  const { remaining, restart, expire } = useResendCooldown(30);
 
   const [needsUsername, setNeedsUsername] = useState(false);
   const [newUsername, setNewUsername] = useState("");
@@ -68,6 +68,7 @@ const VerifyCode = () => {
       if (err) {
         setError(err.message);
         setCode("");
+        expire();
         setBusy(false);
         return;
       }

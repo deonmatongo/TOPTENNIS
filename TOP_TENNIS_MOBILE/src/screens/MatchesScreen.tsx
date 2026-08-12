@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, Alert, ActivityIndicator, TextInput,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -155,9 +156,11 @@ export const MatchesScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
       </View>
 
       {/* ── Content ─────────────────────────────────────────────────────── */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
       >
         {loading && !refreshing ? (
@@ -186,6 +189,7 @@ export const MatchesScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
           )
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* ── Modals ──────────────────────────────────────────────────────── */}
       <MatchInviteResponseModal

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, Modal, FlatList, StyleSheet,
+  KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { AsYouType, getCountryCallingCode } from 'libphonenumber-js'
@@ -164,6 +165,7 @@ export const PhoneField: React.FC<{
       </Field>
 
       <Modal visible={pickerOpen} animationType="slide" onRequestClose={() => setPickerOpen(false)}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={s.modal}>
           <View style={s.modalHeader}>
             <Text style={s.modalTitle}>Select country</Text>
@@ -208,6 +210,7 @@ export const PhoneField: React.FC<{
             )}
           />
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   )

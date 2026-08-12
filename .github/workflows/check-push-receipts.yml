@@ -1,0 +1,23 @@
+name: Check Push Receipts
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # every hour
+  workflow_dispatch:      # allow manual runs
+
+jobs:
+  check-receipts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call process_push_tickets via Supabase RPC
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            -X POST \
+            "$SUPABASE_URL/rest/v1/rpc/process_push_tickets" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{}'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

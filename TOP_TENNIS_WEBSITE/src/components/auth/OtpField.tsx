@@ -73,5 +73,5 @@ export function useResendCooldown(seconds = 30) {
     return () => clearTimeout(t);
   }, [remaining]);
 
-  return { remaining, restart: () => setRemaining(seconds) };
+  return { remaining, restart: () => setRemaining(seconds), expire: () => setRemaining(0) };
 }

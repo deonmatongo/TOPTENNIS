@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Alert, ActivityIndicator, Switch,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -124,7 +125,8 @@ export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
         </TouchableOpacity>
       </LinearGradient>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
 
         {/* ── Hero ──────────────────────────────────────────────────────── */}
         <LinearGradient
@@ -306,6 +308,7 @@ export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
 
         <View style={{ height: 40 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

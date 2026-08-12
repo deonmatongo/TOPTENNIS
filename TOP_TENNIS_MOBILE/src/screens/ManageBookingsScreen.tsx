@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, ActivityIndicator, Alert, TextInput,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -303,10 +304,12 @@ export const ManageBookingsScreen: React.FC<{ navigation: any }> = ({ navigation
       </ScrollView>
 
       {/* List */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
         style={styles.list}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
       >
         {loading && !refreshing ? (
@@ -327,6 +330,7 @@ export const ManageBookingsScreen: React.FC<{ navigation: any }> = ({ navigation
       </ScrollView>
 
       {/* Response modal */}
+      </KeyboardAvoidingView>
       <MatchInviteResponseModal
         visible={!!selectedInvite}
         invite={selectedInvite}

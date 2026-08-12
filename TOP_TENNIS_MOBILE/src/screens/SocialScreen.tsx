@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, ActivityIndicator, TextInput, Alert,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -222,9 +223,11 @@ export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         })}
       </View>
 
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.content}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
       >
         {/* ── Requests ── */}
@@ -388,6 +391,7 @@ export const SocialScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           )
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <PlayerProfileSheet
         player={selectedPlayer}

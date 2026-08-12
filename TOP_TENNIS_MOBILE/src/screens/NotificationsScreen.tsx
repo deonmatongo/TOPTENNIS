@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   RefreshControl, ActivityIndicator, TextInput, Alert, Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { supabase } from '@/services/supabase';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -447,6 +448,7 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
       )}
 
       {/* ── List ────────────────────────────────────────────────────────── */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       {loading && !refreshing ? (
         <View style={s.center}><ActivityIndicator size="large" color={Colors.primary} /></View>
       ) : (
@@ -454,6 +456,7 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
           data={filtered}
           keyExtractor={n => n.id}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={filtered.length === 0 ? s.emptyContainer : s.listContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
           ItemSeparatorComponent={() => <View style={s.sep} />}
@@ -474,6 +477,7 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
           }
         />
       )}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

@@ -309,7 +309,7 @@ export const ScheduleLeagueMatchModal: React.FC<Props> = ({ visible, divisionId,
           <View style={[styles.stepDot, step === 'details' && styles.stepDotActive]} />
         </View>
 
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {step === 'opponent' ? renderOpponentStep() : renderDetailsStep()}
         </ScrollView>
 

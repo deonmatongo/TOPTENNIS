@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, ActivityIndicator, TextInput, Alert,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -59,7 +60,7 @@ export const CasualMatchScreen: React.FC<{ navigation: any }> = ({ navigation })
     const status = friendStatus(p.user_id);
     const wr = winRate(p);
     return (
-      <TouchableOpacity style={s.playerCard} onPress={() => setSelectedPlayer(p)} activeOpacity={0.85}>
+      <TouchableOpacity style={s.playerCard} onPress={() => { setSelectedPlayer(p); setSearchQuery(''); setSearchResults([]); }} activeOpacity={0.85}>
         <Avatar name={p.name || 'P'} size={52} imageUrl={p.profile_picture_url} />
         <View style={s.playerInfo}>
           <View style={s.playerNameRow}>
@@ -121,9 +122,11 @@ export const CasualMatchScreen: React.FC<{ navigation: any }> = ({ navigation })
         </View>
       </LinearGradient>
 
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); setRefreshing(false); }} tintColor={Colors.primary} />}
       >
         {/* ── Selection mode ── */}
@@ -240,6 +243,7 @@ export const CasualMatchScreen: React.FC<{ navigation: any }> = ({ navigation })
           </View>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <PlayerProfileSheet
         player={selectedPlayer}
