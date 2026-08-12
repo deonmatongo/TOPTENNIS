@@ -11,8 +11,6 @@ import { useUserAvailability } from '@/hooks/useUserAvailability';
 import { useMatches } from '@/hooks/useMatches';
 import { useDivisionAssignments } from '@/hooks/useDivisionAssignments';
 import { useLeagueMatches } from '@/hooks/useLeagueMatches';
-import { useCalendarExport } from '@/hooks/useCalendarExport';
-import { useProfile } from '@/hooks/useProfile';
 import { CasualMatchScoringModal } from '@/components/ui/CasualMatchScoringModal'
 import { DateWheelPicker, TimeWheelPicker } from '@/components/ui/DateWheelPicker';
 import { supabase } from '@/services/supabase';
@@ -427,8 +425,6 @@ export const ScheduleScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
   const { assignments } = useDivisionAssignments();
   const primaryDivisionId = assignments[0]?.division_id;
   const { userMatches: leagueMatches } = useLeagueMatches(primaryDivisionId);
-  const { exportMultiple, exporting } = useCalendarExport();
-
   useFocusEffect(useCallback(() => { refetchInvites(); }, [refetchInvites]));
 
   const scrollRef      = useRef<ScrollView>(null);
@@ -651,31 +647,10 @@ export const ScheduleScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
     ]);
   };
 
-  const handleExportAll = async () => {
-    const acceptedMatches  = (invites || []).filter(i => i.status === 'accepted' && i.date);
-    const leagueScheduled  = (leagueMatches || []).filter(m => m.scheduled_date && (m.status === 'scheduled' || m.status === 'pending'));
-    const events = [
-      ...acceptedMatches.map(inv => {
-        const other = inv.sender_id === user?.id ? inv.receiver : inv.sender;
-        const name  = other ? `${other.first_name || ''} ${other.last_name || ''}`.trim() : 'Opponent';
-        return { title: `Tennis vs ${name}`, date: inv.date, startTime: inv.start_time, endTime: inv.end_time, location: inv.court_location };
-      }),
-      ...leagueScheduled.map(m => ({
-        title: `🏆 League vs ${m.opponent_name}`,
-        date: m.scheduled_date!,
-        startTime: m.scheduled_time || '09:00',
-        endTime: (() => { const h = parseInt((m.scheduled_time || '09:00').split(':')[0]) + 1; return `${String(h).padStart(2, '0')}:00`; })(),
-        location: m.court_location,
-      })),
-    ];
-    if (events.length === 0) { Alert.alert('Nothing to Export', 'No upcoming confirmed matches to add to your calendar.'); return; }
-    await exportMultiple(events);
-  };
 
   agendaDaysRef.current = agendaDays;
 
   // ── Grid-view state ────────────────────────────────────────────────────────
-  const { profile } = useProfile();
   const [anchorDate, setAnchorDate] = useState(() => startOfDay(new Date()));
   const [nowMinutes, setNowMinutes] = useState(() => {
     const n = new Date(); return n.getHours() * 60 + n.getMinutes();
@@ -719,13 +694,6 @@ export const ScheduleScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
     return () => clearInterval(id);
   }, []);
 
-  // Avatar initials
-  const initials = useMemo(() => {
-    const f = profile?.first_name?.[0] ?? '';
-    const l = profile?.last_name?.[0]  ?? '';
-    if (f || l) return `${f}${l}`.toUpperCase();
-    return (profile?.username?.[0] ?? user?.phone?.[user.phone.length - 2] ?? 'U').toUpperCase();
-  }, [profile, user]);
 
   const nowY = nowMinutes * (HOUR_H / 60);
   const todayVisible = visibleDays.some(d => format(d, 'yyyy-MM-dd') === todayStr);
@@ -740,24 +708,8 @@ export const ScheduleScreen: React.FC<{ navigation?: any; route?: any }> = ({ na
       <View style={[g.header, { paddingTop: insets.top + 10 }]}>
         {/* Avatar + month + actions */}
         <View style={g.headerTop}>
-          <View style={g.avatarRow}>
-            <View style={g.avatar}>
-              <Text style={g.avatarText}>{initials}</Text>
-            </View>
-            <Text style={g.monthName}>{anchorMonth}</Text>
-          </View>
+          <Text style={g.monthName}>{anchorMonth}</Text>
           <View style={g.headerActions}>
-            <TouchableOpacity
-              style={g.hBtn}
-              onPress={handleExportAll}
-              disabled={exporting}
-              accessibilityRole="button"
-              accessibilityLabel="Export to calendar"
-            >
-              {exporting
-                ? <ActivityIndicator size="small" color="rgba(0,0,0,0.45)" />
-                : <Ionicons name="share-outline" size={20} color="rgba(0,0,0,0.55)" />}
-            </TouchableOpacity>
             {/* View picker icon — shows current view's icon; tap to switch */}
             <TouchableOpacity
               style={g.hBtn}
@@ -1362,13 +1314,6 @@ const g = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 10,
   },
-  avatarRow:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#c026d3',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  avatarText: { fontSize: 14, fontFamily: Font.bold, color: '#fff' },
   monthName:  { fontSize: 26, fontFamily: Font.black, color: '#111827', letterSpacing: -0.5 },
   headerActions: { flexDirection: 'row', gap: 8 },
   hBtn: {

@@ -3,7 +3,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']);
 
@@ -19,8 +18,47 @@ function normaliseMime(raw: string | undefined): { mime: string; ext: string } {
 
 export function useProfilePicture() {
   const { user } = useAuth();
-  const { updatePlayerProfile } = usePlayerProfile();
   const [uploading, setUploading] = useState(false);
+
+  const uploadAsset = async (asset: ImagePicker.ImagePickerAsset): Promise<string> => {
+    if (!user) throw new Error('Not authenticated');
+
+    const { mime, ext } = normaliseMime(asset.mimeType);
+    const fileName = `${user.id}/${Date.now()}.${ext}`;
+
+    // arrayBuffer() is more reliable than blob() in React Native's fetch polyfill.
+    const response = await fetch(asset.uri);
+    if (!response.ok) throw new Error(`Could not read image (status ${response.status})`);
+    const arrayBuffer = await response.arrayBuffer();
+
+    const { data, error } = await supabase.storage
+      .from('profile-pictures')
+      .upload(fileName, arrayBuffer, {
+        contentType: mime,
+        cacheControl: '3600',
+        upsert: true,
+      });
+
+    if (error) throw error;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('profile-pictures')
+      .getPublicUrl(data.path);
+
+    // Append a bust param so React Native's image cache never reuses
+    // a previous render for this account's avatar slot.
+    const url = `${publicUrl}?t=${Date.now()}`;
+
+    // Update profiles directly — doesn't require the player row to be loaded
+    // in a separate hook instance, which can race against the upload.
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ profile_picture_url: url })
+      .eq('id', user.id);
+    if (profileError) throw profileError;
+
+    return url;
+  };
 
   const pickAndUpload = async (): Promise<string | null> => {
     if (!user) return null;
@@ -49,32 +87,7 @@ export function useProfilePicture() {
 
     setUploading(true);
     try {
-      const { mime, ext } = normaliseMime(asset.mimeType);
-      const fileName = `${user.id}/${Date.now()}.${ext}`;
-
-      const response = await fetch(asset.uri);
-      const blob = await response.blob();
-
-      const { data, error } = await supabase.storage
-        .from('profile-pictures')
-        .upload(fileName, blob, {
-          contentType: mime,
-          cacheControl: '3600',
-          upsert: true,
-        });
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('profile-pictures')
-        .getPublicUrl(data.path);
-
-      // Append a bust param so React Native's image cache never reuses
-      // a previous render for this account's avatar slot.
-      const url = `${publicUrl}?t=${Date.now()}`;
-      await updatePlayerProfile({ profile_picture_url: url });
-
-      return url;
+      return await uploadAsset(asset);
     } catch (e: any) {
       Alert.alert('Upload failed', e?.message || 'Could not upload image. Please try again.');
       return null;
@@ -103,30 +116,7 @@ export function useProfilePicture() {
     const asset = result.assets[0];
     setUploading(true);
     try {
-      const { mime, ext } = normaliseMime(asset.mimeType);
-      const fileName = `${user.id}/${Date.now()}.${ext}`;
-
-      const response = await fetch(asset.uri);
-      const blob = await response.blob();
-
-      const { data, error } = await supabase.storage
-        .from('profile-pictures')
-        .upload(fileName, blob, {
-          contentType: mime,
-          cacheControl: '3600',
-          upsert: true,
-        });
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('profile-pictures')
-        .getPublicUrl(data.path);
-
-      const url = `${publicUrl}?t=${Date.now()}`;
-      await updatePlayerProfile({ profile_picture_url: url });
-
-      return url;
+      return await uploadAsset(asset);
     } catch (e: any) {
       Alert.alert('Upload failed', e?.message || 'Could not upload image. Please try again.');
       return null;

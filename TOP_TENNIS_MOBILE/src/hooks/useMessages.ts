@@ -59,7 +59,7 @@ export const useMessages = () => {
       setMessages(enriched);
     } catch (e) {
       captureError(e);
-      if (__DEV__) console.error('Error fetching messages:', e);
+      if (__DEV__) console.warn('Error fetching messages:', e);
     } finally {
       setLoading(false);
     }

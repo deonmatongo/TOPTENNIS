@@ -166,7 +166,7 @@ export const useConversations = () => {
       setConversations(built);
     } catch (err) {
       captureError(err);
-      if (__DEV__) console.error('useConversations fetch error:', err);
+      if (__DEV__) console.warn('useConversations fetch error:', err);
     } finally {
       setLoading(false);
     }

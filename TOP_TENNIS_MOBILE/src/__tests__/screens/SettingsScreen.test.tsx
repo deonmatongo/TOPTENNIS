@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 
@@ -47,25 +47,29 @@ const goToSettingsTab = (getByText: (text: string) => any) => {
 };
 
 describe('SettingsScreen', () => {
-  it('renders without crashing', () => {
-    expect(() => render(<SettingsScreen navigation={navigation} />)).not.toThrow();
+  it('renders without crashing', async () => {
+    render(<SettingsScreen navigation={navigation} />);
+    await waitFor(() => expect(getSupabase().rpc).toHaveBeenCalled());
   });
 
   describe('displayName', () => {
-    it('shows full name from player profile', () => {
+    it('shows full name from player profile', async () => {
       const { getAllByText } = render(<SettingsScreen navigation={navigation} />);
+      await waitFor(() => expect(getSupabase().rpc).toHaveBeenCalled());
       expect(getAllByText('Alex Smith').length).toBeGreaterThan(0);
     });
 
-    it('falls back to "Player" when profile is null', () => {
+    it('falls back to "Player" when profile is null', async () => {
       mockPlayer = null;
       const { getAllByText } = render(<SettingsScreen navigation={navigation} />);
+      await waitFor(() => expect(getSupabase().rpc).toHaveBeenCalled());
       expect(getAllByText('Player').length).toBeGreaterThan(0);
     });
 
-    it('shows partial name when only first name exists', () => {
+    it('shows partial name when only first name exists', async () => {
       mockPlayer = { first_name: 'Jordan', last_name: '' };
       const { getAllByText } = render(<SettingsScreen navigation={navigation} />);
+      await waitFor(() => expect(getSupabase().rpc).toHaveBeenCalled());
       expect(getAllByText('Jordan').length).toBeGreaterThan(0);
     });
   });
@@ -108,9 +112,10 @@ describe('SettingsScreen', () => {
   });
 
   describe('handleSignOut()', () => {
-    it('shows a confirmation Alert when Sign Out is pressed', () => {
+    it('shows a confirmation Alert when Sign Out is pressed', async () => {
       const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
       const { getByText } = render(<SettingsScreen navigation={navigation} />);
+      await waitFor(() => expect(getSupabase().rpc).toHaveBeenCalled());
       goToSettingsTab(getByText);
       fireEvent.press(getByText('Sign Out'));
       expect(alertSpy).toHaveBeenCalledWith(
@@ -130,6 +135,7 @@ describe('SettingsScreen', () => {
         btn?.onPress?.();
       });
       const { getByText } = render(<SettingsScreen navigation={navigation} />);
+      await waitFor(() => expect(getSupabase().rpc).toHaveBeenCalled());
       goToSettingsTab(getByText);
       fireEvent.press(getByText('Sign Out'));
       expect(mockSignOut).toHaveBeenCalled();
@@ -137,9 +143,10 @@ describe('SettingsScreen', () => {
   });
 
   describe('handleDeleteAccount()', () => {
-    it('shows a confirmation Alert when Delete Account is pressed', () => {
+    it('shows a confirmation Alert when Delete Account is pressed', async () => {
       const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
       const { getByText } = render(<SettingsScreen navigation={navigation} />);
+      await waitFor(() => expect(getSupabase().rpc).toHaveBeenCalled());
       goToSettingsTab(getByText);
       fireEvent.press(getByText('Delete Account'));
       expect(alertSpy).toHaveBeenCalledWith(
@@ -159,6 +166,7 @@ describe('SettingsScreen', () => {
         btn?.onPress?.();
       });
       const { getByText } = render(<SettingsScreen navigation={navigation} />);
+      await waitFor(() => expect(getSupabase().rpc).toHaveBeenCalled());
       goToSettingsTab(getByText);
       fireEvent.press(getByText('Delete Account'));
       await Promise.resolve(); // flush microtasks
@@ -179,6 +187,7 @@ describe('SettingsScreen', () => {
       getSupabase().functions.invoke.mockResolvedValueOnce({ data: null, error: new Error('server error') });
 
       const { getByText } = render(<SettingsScreen navigation={navigation} />);
+      await waitFor(() => expect(getSupabase().rpc).toHaveBeenCalled());
       goToSettingsTab(getByText);
       fireEvent.press(getByText('Delete Account'));
       await Promise.resolve();

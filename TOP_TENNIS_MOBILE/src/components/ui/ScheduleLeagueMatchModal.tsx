@@ -91,7 +91,7 @@ export const ScheduleLeagueMatchModal: React.FC<Props> = ({ visible, divisionId,
       setOpponents(data || []);
     } catch (e: any) {
       captureError(e);
-      if (__DEV__) console.error('[ScheduleLeagueMatchModal] fetch opponents:', e);
+      if (__DEV__) console.warn('[ScheduleLeagueMatchModal] fetch opponents:', e);
     } finally {
       setLoadingOpponents(false);
     }

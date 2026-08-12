@@ -38,7 +38,7 @@ export const useBlockedUsers = () => {
       setBlockedUsers(data || []);
     } catch (err) {
       captureError(err);
-      if (__DEV__) console.error('useBlockedUsers fetch error:', err);
+      if (__DEV__) console.warn('useBlockedUsers fetch error:', err);
     } finally {
       setLoading(false);
     }

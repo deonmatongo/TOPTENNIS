@@ -33,7 +33,7 @@ export function useUserAvailability() {
       setAvailability(data || []);
     } catch (e) {
       captureError(e);
-      if (__DEV__) console.error('Error fetching availability:', e);
+      if (__DEV__) console.warn('Error fetching availability:', e);
     } finally {
       setLoading(false);
     }

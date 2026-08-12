@@ -32,7 +32,7 @@ export function usePlayerAvailability(playerUserId?: string) {
 
     if (error) {
       captureError(error);
-      if (__DEV__) console.error('[usePlayerAvailability]', error.message);
+      if (__DEV__) console.warn('[usePlayerAvailability]', error.message);
     }
     setAvailability(data || []);
     setLoading(false);

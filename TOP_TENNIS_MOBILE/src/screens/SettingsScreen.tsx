@@ -51,24 +51,24 @@ const SETTINGS_SECTIONS = [
     icon: 'shield-checkmark' as const,
     label: 'Privacy',
     desc: 'Visibility, data sharing',
-    tint: Colors.info,
-    bg:   'rgba(59,130,246,0.12)',
+    tint: Colors.primary,
+    bg:   'rgba(234,88,12,0.12)',
   },
   {
     screen: 'NotificationsSection',
     icon: 'notifications' as const,
     label: 'Notifications',
     desc: 'Push, email, match & social alerts',
-    tint: Colors.warning,
-    bg:   'rgba(245,158,11,0.12)',
+    tint: Colors.primary,
+    bg:   'rgba(234,88,12,0.12)',
   },
   {
     screen: 'MatchPreferencesSection',
     icon: 'tennisball' as const,
     label: 'Match Preferences',
     desc: 'Duration, surface, time, distance',
-    tint: Colors.success,
-    bg:   'rgba(16,185,129,0.12)',
+    tint: Colors.primary,
+    bg:   'rgba(234,88,12,0.12)',
   },
   {
     screen: 'AppPreferencesSection',
@@ -83,8 +83,8 @@ const SETTINGS_SECTIONS = [
     icon: 'help-circle' as const,
     label: 'Support & More',
     desc: 'Help, integrations, legal, data',
-    tint: Colors.info,
-    bg:   'rgba(59,130,246,0.12)',
+    tint: Colors.primary,
+    bg:   'rgba(234,88,12,0.12)',
   },
 ];
 
@@ -425,8 +425,8 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                   icon="shield"
                   label="Admin Panel"
                   desc="Reset all user data"
-                  tint="#7c3aed"
-                  bg="rgba(124,58,237,0.12)"
+                  tint={Colors.primary}
+                  bg="rgba(234,88,12,0.12)"
                   onPress={handleAdminReset}
                   last
                 />
@@ -518,7 +518,7 @@ const sg = StyleSheet.create({
   },
   labelActive: {
     fontFamily: Font.semibold,
-    color: Colors.text,
+    color: Palette.orange500,
   },
 });
 
@@ -648,7 +648,7 @@ const s = StyleSheet.create({
   groupLabel: {
     fontSize: FontSize.xs,
     fontFamily: Font.medium,
-    color: Colors.textSecondary,
+    color: Palette.orange500,
     textTransform: 'uppercase',
     letterSpacing: 0.7,
   },

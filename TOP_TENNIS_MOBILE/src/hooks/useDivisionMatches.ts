@@ -107,7 +107,7 @@ export const useDivisionMatches = (divisionId?: string) => {
         setMatches(formatted);
       } catch (e: any) {
         captureError(e);
-        if (__DEV__) console.error('[useDivisionMatches]', e);
+        if (__DEV__) console.warn('[useDivisionMatches]', e);
       } finally {
         setLoading(false);
       }

@@ -78,7 +78,7 @@ export const useLeagueLeaderboard = (leagueId?: string) => {
         setLeaderboard(sorted);
       } catch (e: any) {
         captureError(e);
-        if (__DEV__) console.error('[useLeagueLeaderboard]', e);
+        if (__DEV__) console.warn('[useLeagueLeaderboard]', e);
       } finally {
         setLoading(false);
       }

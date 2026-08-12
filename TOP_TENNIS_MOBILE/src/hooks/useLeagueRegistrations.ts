@@ -98,7 +98,7 @@ export function useLeagueRegistrations() {
 
     if (error) {
       captureError(error);
-      if (__DEV__) console.error('[useLeagueRegistrations] fetch error:', error.message);
+      if (__DEV__) console.warn('[useLeagueRegistrations] fetch error:', error.message);
     }
     // Attach static league data to each registration
     const enriched = (data || []).map(r => ({

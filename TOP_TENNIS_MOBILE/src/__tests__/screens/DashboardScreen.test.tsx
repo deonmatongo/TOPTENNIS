@@ -168,12 +168,12 @@ describe('DashboardScreen', () => {
       expect(getByText('Keep it going')).toBeTruthy();
     });
 
-    it('shows the "Find an opponent" welcome banner for a new player with no scheduled match', () => {
+    it('shows the "Add availability" welcome banner for a new player with no scheduled match', () => {
       mockPlayer = { wins: 0, losses: 0, current_streak: 0 };
       mockUpcoming = [];
       const { getByText } = renderScreen();
       expect(getByText('Play your first match')).toBeTruthy();
-      expect(getByText('Find an opponent')).toBeTruthy();
+      expect(getByText('Add availability')).toBeTruthy();
     });
 
     it('hides the welcome banner once a first match is scheduled', () => {

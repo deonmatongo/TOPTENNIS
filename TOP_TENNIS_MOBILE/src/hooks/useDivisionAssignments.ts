@@ -45,7 +45,7 @@ export const useDivisionAssignments = () => {
 
     if (error) {
       captureError(error);
-      if (__DEV__) console.error('[useDivisionAssignments]', error.message);
+      if (__DEV__) console.warn('[useDivisionAssignments]', error.message);
     }
     setAssignments(data || []);
     setLoading(false);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { AccountSection } from '@/screens/settings/AccountSection';
 
@@ -27,8 +27,9 @@ beforeEach(() => {
 });
 
 describe('AccountSection', () => {
-  it('renders without crashing', () => {
-    expect(() => render(<AccountSection navigation={navigation} />)).not.toThrow();
+  it('renders without crashing', async () => {
+    render(<AccountSection navigation={navigation} />);
+    await waitFor(() => expect(supabaseMock.from).toHaveBeenCalled());
   });
 
   it('renders identity rows and no longer offers email', async () => {
@@ -46,9 +47,10 @@ describe('AccountSection', () => {
     await waitFor(() => expect(getByText('rallyking')).toBeTruthy());
   });
 
-  it('masks the phone number to its last four digits', () => {
+  it('masks the phone number to its last four digits', async () => {
     // The full number never reaches a client; only the last 4 may be displayed.
     const { getByText, queryByText } = render(<AccountSection navigation={navigation} />);
+    await waitFor(() => expect(supabaseMock.from).toHaveBeenCalled());
     expect(getByText(/0001/)).toBeTruthy();
     expect(queryByText(/15551230001/)).toBeNull();
   });

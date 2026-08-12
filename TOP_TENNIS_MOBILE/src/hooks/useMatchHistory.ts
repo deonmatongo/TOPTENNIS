@@ -151,7 +151,7 @@ export const useMatchHistory = (limit = 20) => {
         setHistory(entries.slice(0, limit));
       } catch (e: any) {
         captureError(e);
-        if (__DEV__) console.error('[useMatchHistory]', e);
+        if (__DEV__) console.warn('[useMatchHistory]', e);
       } finally {
         setLoading(false);
       }

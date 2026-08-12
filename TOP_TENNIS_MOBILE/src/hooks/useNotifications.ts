@@ -89,7 +89,7 @@ export const useNotifications = () => {
       pendingQueueRef.current = [];
     } catch (e) {
       captureError(e);
-      if (__DEV__) console.error('Error fetching notifications:', e);
+      if (__DEV__) console.warn('Error fetching notifications:', e);
       setNotifications([]);
       setUnreadCount(0);
       hasLoadedRef.current = true;

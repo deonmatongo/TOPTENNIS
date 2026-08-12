@@ -133,7 +133,7 @@ export const useLeagueMatches = (divisionId?: string) => {
       setAllDivisionMatches((allRes.data || []).map((m: any) => mapMatch(m, user?.id)));
     } catch (e: any) {
       captureError(e);
-      if (__DEV__) console.error('[useLeagueMatches]', e);
+      if (__DEV__) console.warn('[useLeagueMatches]', e);
     } finally {
       setLoading(false);
     }

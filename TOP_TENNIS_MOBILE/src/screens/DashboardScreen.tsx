@@ -103,7 +103,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const spotlight = streak >= 2
     ? { icon: 'flame' as const, kicker: 'ON A ROLL', title: `You're on a ${streak}-win streak`, cta: 'Keep it going', colors: ['#EA580C', '#F97316'] as const, onPress: () => setShowScheduleModal(true) }
     : total === 0 && !hasScheduledMatch
-    ? { icon: 'tennisball' as const, kicker: 'WELCOME', title: 'Play your first match', cta: 'Find an opponent', colors: [Palette.orange600, Palette.orange500] as const, onPress: () => setShowScheduleModal(true) }
+    ? { icon: 'tennisball' as const, kicker: 'WELCOME', title: 'Play your first match', cta: 'Add availability', colors: [Palette.orange600, Palette.orange500] as const, onPress: () => navigation.navigate('Schedule') }
     : total === 0 && hasScheduledMatch
     ? { icon: 'calendar' as const, kicker: 'GET READY', title: 'Your first match is scheduled', cta: 'View schedule', colors: [Palette.orange600, Palette.orange500] as const, onPress: () => navigation.navigate('Schedule') }
     : { icon: 'trophy' as const, kicker: 'YOUR SEASON', title: `${wins} wins · ${winRate}% win rate`, cta: 'Schedule a match', colors: [Palette.orange600, Palette.orange500] as const, onPress: () => setShowScheduleModal(true) }
@@ -581,7 +581,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         animationType="slide"
         transparent
         onRequestClose={() => { setShowScheduleModal(false); clearScheduleSearch(); }}
-        onShow={() => setTimeout(() => scheduleSearchRef.current?.focus(), 150)}
+        onShow={() => setTimeout(() => scheduleSearchRef.current?.focus(), 250)}
       >
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -593,125 +593,150 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
             onPress={() => { setShowScheduleModal(false); clearScheduleSearch(); }}
           />
           <YStack
-            backgroundColor={Colors.background}
-            borderTopLeftRadius={24}
-            borderTopRightRadius={24}
-            paddingTop={Spacing.md}
-            paddingBottom={insets.bottom + Spacing.xl}
-            style={{ position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '85%' }}
+            style={{ position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '92%', borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', backgroundColor: Colors.background }}
           >
-            {/* Handle */}
-            <YStack alignItems="center" marginBottom={Spacing.md}>
-              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border }} />
-            </YStack>
-
-            {/* Header */}
-            <XStack alignItems="center" justifyContent="space-between" paddingHorizontal={Spacing.lg} marginBottom={Spacing.md}>
-              <Text style={s.modalTitle}>Schedule a Match</Text>
-              <TouchableOpacity onPress={() => { setShowScheduleModal(false); clearScheduleSearch(); }} accessibilityRole="button" accessibilityLabel="Close">
-                <Ionicons name="close" size={24} color={Colors.text} />
-              </TouchableOpacity>
-            </XStack>
-
-            {/* Search input */}
-            <XStack
-              alignItems="center"
-              gap={Spacing.sm}
-              backgroundColor={Colors.surface}
-              borderRadius={Radius.full}
-              paddingHorizontal={Spacing.md}
-              height={46}
-              marginHorizontal={Spacing.lg}
-              marginBottom={Spacing.md}
-              borderWidth={1}
-              borderColor={Colors.border}
+            {/* Navy gradient header with search */}
+            <LinearGradient
+              colors={[Palette.navy, Palette.navy700]}
+              style={s.scheduleHeader}
             >
-              <Ionicons name="search-outline" size={18} color={Colors.textMuted} />
-              <TextInput
-                ref={scheduleSearchRef}
-                style={s.modalSearchInput}
-                placeholder="Search players by name, city..."
-                placeholderTextColor={Colors.textMuted}
-                value={scheduleQuery}
-                onChangeText={scheduleSearch}
-                returnKeyType="search"
-                autoCorrect={false}
-                autoCapitalize="none"
-              />
-              {scheduleSearching && <ActivityIndicator size="small" color={Colors.primary} />}
-              {scheduleQuery.length > 0 && !scheduleSearching && (
-                <TouchableOpacity onPress={clearScheduleSearch} accessibilityRole="button" accessibilityLabel="Clear search">
-                  <Ionicons name="close-circle" size={17} color={Colors.textMuted} />
-                </TouchableOpacity>
-              )}
-            </XStack>
+              <YStack alignItems="center" marginBottom={Spacing.lg}>
+                <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)' }} />
+              </YStack>
 
-            {/* Results */}
+              <XStack alignItems="flex-start" justifyContent="space-between">
+                <YStack flex={1} gap={Spacing.xs}>
+                  <Text style={s.scheduleHeaderKicker}>SCHEDULE A MATCH</Text>
+                  <Text style={s.scheduleHeaderTitle}>Find your{'\n'}opponent</Text>
+                  <Text style={s.scheduleHeaderSub}>Search by name or city</Text>
+                </YStack>
+                <YStack gap={Spacing.md} alignItems="flex-end">
+                  <TouchableOpacity
+                    style={s.scheduleCloseBtn}
+                    onPress={() => { setShowScheduleModal(false); clearScheduleSearch(); }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close"
+                  >
+                    <Ionicons name="close" size={18} color="rgba(255,255,255,0.9)" />
+                  </TouchableOpacity>
+                  <View style={s.scheduleBallWrap}>
+                    <Ionicons name="tennisball" size={30} color={Palette.orange400} />
+                  </View>
+                </YStack>
+              </XStack>
+
+              {/* Search bar inside header */}
+              <XStack
+                alignItems="center"
+                gap={Spacing.sm}
+                height={48}
+                marginTop={Spacing.lg}
+                paddingHorizontal={Spacing.md}
+                style={{ backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: Radius.full, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' }}
+              >
+                <Ionicons name="search-outline" size={18} color="rgba(255,255,255,0.55)" />
+                <TextInput
+                  ref={scheduleSearchRef}
+                  style={s.scheduleSearchInput}
+                  placeholder="Search players by name, city..."
+                  placeholderTextColor="rgba(255,255,255,0.38)"
+                  value={scheduleQuery}
+                  onChangeText={scheduleSearch}
+                  returnKeyType="search"
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                />
+                {scheduleSearching && <ActivityIndicator size="small" color="rgba(255,255,255,0.7)" />}
+                {scheduleQuery.length > 0 && !scheduleSearching && (
+                  <TouchableOpacity onPress={clearScheduleSearch} accessibilityRole="button" accessibilityLabel="Clear search">
+                    <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.45)" />
+                  </TouchableOpacity>
+                )}
+              </XStack>
+            </LinearGradient>
+
+            {/* Results body */}
             <ScrollView
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: Spacing.lg }}
+              contentContainerStyle={{ paddingBottom: insets.bottom + Spacing.xxl }}
             >
               {scheduleQuery.length === 0 ? (
-                <YStack alignItems="center" paddingVertical={Spacing.xxl} gap={Spacing.sm}>
-                  <YStack width={60} height={60} borderRadius={30} backgroundColor={Colors.surfaceWarm} alignItems="center" justifyContent="center">
-                    <Ionicons name="tennisball-outline" size={28} color={Colors.primary} />
+                <YStack alignItems="center" paddingVertical={Spacing.xxxxl} gap={Spacing.md} paddingHorizontal={Spacing.xxl}>
+                  <YStack width={72} height={72} borderRadius={36} backgroundColor={Colors.primaryLight} alignItems="center" justifyContent="center">
+                    <Ionicons name="people-outline" size={32} color={Colors.primary} />
                   </YStack>
-                  <Text style={s.modalEmptyTitle}>Find your opponent</Text>
-                  <Text style={s.modalEmptySub}>Search by name, city, or skill level</Text>
+                  <YStack alignItems="center" gap={Spacing.xs}>
+                    <Text style={s.scheduleEmptyTitle}>Who are you challenging?</Text>
+                    <Text style={s.scheduleEmptySub}>Type a name or city to find players in your area</Text>
+                  </YStack>
                 </YStack>
               ) : scheduleSearching ? (
-                <ActivityIndicator color={Colors.primary} style={{ marginTop: Spacing.xl }} />
+                <YStack alignItems="center" paddingVertical={Spacing.xxxxl} gap={Spacing.md}>
+                  <ActivityIndicator color={Colors.primary} />
+                  <Text style={s.scheduleEmptySub}>Searching players...</Text>
+                </YStack>
               ) : scheduleResults.length === 0 ? (
-                <YStack alignItems="center" paddingVertical={Spacing.xxl} gap={Spacing.sm}>
-                  <Ionicons name="search-outline" size={32} color={Colors.textMuted} />
-                  <Text style={s.modalEmptySub}>No players found for "{scheduleQuery}"</Text>
+                <YStack alignItems="center" paddingVertical={Spacing.xxxxl} gap={Spacing.sm} paddingHorizontal={Spacing.xxl}>
+                  <Ionicons name="search-outline" size={36} color={Colors.textMuted} />
+                  <Text style={s.scheduleEmptyTitle}>No players found</Text>
+                  <Text style={s.scheduleEmptySub}>No results for "{scheduleQuery}" — try a different name or city</Text>
                 </YStack>
               ) : (
-                scheduleResults.map((p, idx) => {
-                  const tot = (p.wins || 0) + (p.losses || 0)
-                  const wr = tot > 0 ? Math.round(((p.wins || 0) / tot) * 100) : 0
-                  const skillLvl = p.skill_level
-                  const skillLabel = !skillLvl ? null : skillLvl >= 7 ? 'Advanced' : skillLvl >= 4 ? 'Intermediate' : 'Beginner'
-                  const skillColor = !skillLvl ? Colors.textMuted : skillLvl >= 7 ? Colors.error : skillLvl >= 4 ? Colors.warning : Colors.success
-                  const isLast = idx === scheduleResults.length - 1
-                  return (
-                    <TouchableOpacity
-                      key={p.id}
-                      style={[s.schedulePlayerRow, !isLast && s.schedulePlayerRowBorder]}
-                      activeOpacity={0.8}
-                      onPress={() => {
-                        setShowScheduleModal(false)
-                        clearScheduleSearch()
-                        setSelectedPlayer(p)
-                      }}
-                    >
-                      <Avatar name={p.name || 'P'} size={48} imageUrl={p.profile_picture_url} />
-                      <YStack flex={1} gap={4}>
-                        <XStack alignItems="center" gap={6} flexWrap="wrap">
-                          <Text style={s.schedulePlayerName} numberOfLines={1}>{p.name}</Text>
-                          {skillLabel && (
-                            <YStack borderRadius={Radius.sm} paddingHorizontal={6} paddingVertical={2} backgroundColor={skillColor + '20'}>
-                              <Text style={{ fontSize: 10, fontFamily: Font.semibold, color: skillColor }}>{skillLabel}</Text>
-                            </YStack>
-                          )}
-                        </XStack>
-                        <XStack alignItems="center" flexWrap="wrap" gap={0}>
-                          {tot > 0 && <Text style={s.schedulePlayerMeta}>{p.wins}W–{p.losses}L · {wr}% WR</Text>}
-                          {p.city && <Text style={s.schedulePlayerMeta}>{tot > 0 ? ' · ' : ''}{p.city}</Text>}
-                        </XStack>
-                      </YStack>
-                      <YStack
-                        backgroundColor={Colors.primary}
-                        paddingHorizontal={Spacing.md}
-                        paddingVertical={6}
-                        borderRadius={Radius.full}
+                <YStack paddingHorizontal={Spacing.lg} paddingTop={Spacing.lg} gap={Spacing.sm}>
+                  <Text style={s.scheduleResultsLabel}>{scheduleResults.length} player{scheduleResults.length !== 1 ? 's' : ''} found</Text>
+                  {scheduleResults.map((p) => {
+                    const tot = (p.wins || 0) + (p.losses || 0)
+                    const wr = tot > 0 ? Math.round(((p.wins || 0) / tot) * 100) : 0
+                    const skillLvl = p.skill_level
+                    const skillLabel = !skillLvl ? null : skillLvl >= 7 ? 'Advanced' : skillLvl >= 4 ? 'Intermediate' : 'Beginner'
+                    const skillColor = !skillLvl ? Colors.textMuted : skillLvl >= 7 ? Colors.error : skillLvl >= 4 ? Colors.warning : Colors.success
+                    return (
+                      <TouchableOpacity
+                        key={p.id}
+                        style={s.schedulePlayerCard}
+                        activeOpacity={0.82}
+                        onPress={() => {
+                          setShowScheduleModal(false)
+                          clearScheduleSearch()
+                          setSelectedPlayer(p)
+                        }}
                       >
-                        <Text style={{ fontSize: FontSize.xs, color: '#fff', fontFamily: Font.semibold }}>Invite</Text>
-                      </YStack>
-                    </TouchableOpacity>
-                  )
-                })
+                        <Avatar name={p.name || 'P'} size={52} imageUrl={p.profile_picture_url} />
+                        <YStack flex={1} gap={4}>
+                          <XStack alignItems="center" gap={6} flexWrap="wrap">
+                            <Text style={s.schedulePlayerName} numberOfLines={1}>{p.name}</Text>
+                            {skillLabel && (
+                              <YStack borderRadius={Radius.xs} paddingHorizontal={6} paddingVertical={2} backgroundColor={skillColor + '20'}>
+                                <Text style={{ fontSize: FontSize.xxs, fontFamily: Font.bold, color: skillColor }}>{skillLabel}</Text>
+                              </YStack>
+                            )}
+                          </XStack>
+                          <XStack alignItems="center" gap={Spacing.sm} flexWrap="wrap">
+                            {tot > 0 && (
+                              <XStack alignItems="center" gap={3}>
+                                <Ionicons name="trophy-outline" size={11} color={Colors.textMuted} />
+                                <Text style={s.schedulePlayerMeta}>{p.wins}W · {wr}%</Text>
+                              </XStack>
+                            )}
+                            {p.city && (
+                              <XStack alignItems="center" gap={3}>
+                                <Ionicons name="location-outline" size={11} color={Colors.textMuted} />
+                                <Text style={s.schedulePlayerMeta}>{p.city}</Text>
+                              </XStack>
+                            )}
+                          </XStack>
+                        </YStack>
+                        <LinearGradient
+                          colors={[Palette.orange500, Palette.orange600]}
+                          style={s.scheduleInviteBtn}
+                        >
+                          <Text style={s.scheduleInviteTxt}>Invite</Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </YStack>
               )}
             </ScrollView>
           </YStack>
@@ -773,13 +798,22 @@ const s = StyleSheet.create({
   searchMetaTxt:{ fontSize: FontSize.xs, color: Colors.textSecondary },
   searchEmpty:  { padding: Spacing.md, textAlign: 'center', color: Colors.textMuted, fontSize: FontSize.sm },
 
-  modalBackdrop:       { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
-  modalTitle:          { fontSize: FontSize.lg, fontFamily: Font.bold, color: Colors.text },
-  modalSearchInput:    { flex: 1, fontSize: FontSize.sm, color: Colors.text, paddingVertical: 0 },
-  modalEmptyTitle:     { fontSize: FontSize.md, fontFamily: Font.bold, color: Colors.text },
-  modalEmptySub:       { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center' },
-  schedulePlayerRow:   { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md },
-  schedulePlayerRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
-  schedulePlayerName:  { fontSize: FontSize.sm, fontFamily: Font.semibold, color: Colors.text },
-  schedulePlayerMeta:  { fontSize: FontSize.xs, color: Colors.textSecondary },
+  modalBackdrop:         { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
+
+  // Schedule match modal — redesigned
+  scheduleHeader:        { paddingTop: Spacing.md, paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xl },
+  scheduleHeaderKicker:  { fontSize: 10, fontFamily: Font.black, color: 'rgba(255,255,255,0.45)', letterSpacing: 1.4 },
+  scheduleHeaderTitle:   { fontSize: FontSize.xxxl, fontFamily: Font.black, color: '#fff', letterSpacing: -0.5, lineHeight: 36 },
+  scheduleHeaderSub:     { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.50)', fontFamily: Font.regular, marginTop: 2 },
+  scheduleCloseBtn:      { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center' as const, justifyContent: 'center' as const },
+  scheduleBallWrap:      { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center' as const, justifyContent: 'center' as const },
+  scheduleSearchInput:   { flex: 1, fontSize: FontSize.sm, color: '#fff', paddingVertical: 0 },
+  scheduleResultsLabel:  { fontSize: FontSize.xs, fontFamily: Font.semibold, color: Colors.textMuted, marginBottom: Spacing.xs },
+  schedulePlayerCard:    { flexDirection: 'row' as const, alignItems: 'center' as const, gap: Spacing.md, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border, ...Shadow.xs },
+  schedulePlayerName:    { fontSize: FontSize.md, fontFamily: Font.bold, color: Colors.text },
+  schedulePlayerMeta:    { fontSize: FontSize.xs, color: Colors.textSecondary },
+  scheduleInviteBtn:     { borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
+  scheduleInviteTxt:     { fontSize: FontSize.xs, fontFamily: Font.bold, color: '#fff' },
+  scheduleEmptyTitle:    { fontSize: FontSize.md, fontFamily: Font.bold, color: Colors.text, textAlign: 'center' as const },
+  scheduleEmptySub:      { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center' as const, lineHeight: 20 },
 })

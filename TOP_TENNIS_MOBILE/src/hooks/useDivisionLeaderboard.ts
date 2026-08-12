@@ -72,7 +72,7 @@ export const useDivisionLeaderboard = (divisionId?: string) => {
 
         setLeaderboard(sorted);
       } catch (e: any) {
-        logger.error('useDivisionLeaderboard', 'fetch failed', e);
+        logger.warn('useDivisionLeaderboard', 'fetch failed', e);
       } finally {
         setLoading(false);
       }

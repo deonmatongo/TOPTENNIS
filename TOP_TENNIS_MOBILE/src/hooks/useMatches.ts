@@ -134,7 +134,7 @@ export const useMatches = () => {
       checkPastDueMatches(enriched).catch(() => {});
     } catch (e) {
       captureError(e);
-      if (__DEV__) console.error('Error fetching matches:', e);
+      if (__DEV__) console.warn('Error fetching matches:', e);
     } finally {
       setLoading(false);
     }
