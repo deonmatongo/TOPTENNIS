@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SymbolView } from 'expo-symbols';
-import type { SFSymbol } from 'sf-symbols-typescript';
+import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import Constants from 'expo-constants';
 import { useAuth } from '@/contexts/AuthContext';
@@ -41,68 +40,77 @@ function skillColor(level?: number): string {
 const SETTINGS_SECTIONS = [
   {
     screen: 'AccountSection',
-    symbol: 'person.circle.fill' as SFSymbol,
+    icon: 'person-circle' as const,
     label: 'Account',
     desc: 'Profile & security',
-    tint: Colors.primary,        // orange — accent
+    tint: Colors.primary,
     bg:   'rgba(234,88,12,0.12)',
   },
   {
     screen: 'PrivacySection',
-    symbol: 'lock.shield.fill' as SFSymbol,
+    icon: 'shield-checkmark' as const,
     label: 'Privacy',
     desc: 'Visibility, data sharing',
-    tint: Colors.info,           // blue — info
+    tint: Colors.info,
     bg:   'rgba(59,130,246,0.12)',
   },
   {
     screen: 'NotificationsSection',
-    symbol: 'bell.fill' as SFSymbol,
+    icon: 'notifications' as const,
     label: 'Notifications',
     desc: 'Push, email, match & social alerts',
-    tint: Colors.warning,        // yellow — warning
+    tint: Colors.warning,
     bg:   'rgba(245,158,11,0.12)',
   },
   {
     screen: 'MatchPreferencesSection',
-    symbol: 'figure.tennis' as SFSymbol,
+    icon: 'tennisball' as const,
     label: 'Match Preferences',
     desc: 'Duration, surface, time, distance',
-    tint: Colors.success,        // green — success
+    tint: Colors.success,
     bg:   'rgba(16,185,129,0.12)',
   },
   {
     screen: 'AppPreferencesSection',
-    symbol: 'paintbrush.fill' as SFSymbol,
+    icon: 'color-palette' as const,
     label: 'App Preferences',
     desc: 'Haptics, sounds, display',
-    tint: Colors.primary,        // orange — accent
+    tint: Colors.primary,
     bg:   'rgba(234,88,12,0.12)',
   },
   {
     screen: 'SupportSection',
-    symbol: 'questionmark.circle.fill' as SFSymbol,
+    icon: 'help-circle' as const,
     label: 'Support & More',
     desc: 'Help, integrations, legal, data',
-    tint: Colors.info,           // blue — info
+    tint: Colors.info,
     bg:   'rgba(59,130,246,0.12)',
   },
-] as const;
+];
 
 // ─── Profile completeness steps ───────────────────────────────────────────────
-type CheckStep = { label: string; done: boolean };
+type CheckStep = { label: string; done: boolean; startEditing?: boolean };
 function completenessSteps(player: ReturnType<typeof usePlayerProfile>['player'], phone?: string): CheckStep[] {
   return [
     { label: 'Phone number verified', done: !!phone },
-    { label: 'Add your full name',    done: !!(player?.first_name && player?.last_name) },
-    { label: 'Add profile photo',     done: !!player?.profile_picture_url },
-    { label: 'Set your skill level',  done: !!player?.skill_level },
+    { label: 'Add your full name',    done: !!(player?.first_name && player?.last_name), startEditing: true },
+    { label: 'Add profile photo',     done: !!player?.profile_picture_url,               startEditing: false },
+    { label: 'Set your skill level',  done: !!player?.skill_level,                       startEditing: true },
   ];
 }
 
+function stepOnPress(step: CheckStep, navigation: any) {
+  if (step.done) return undefined;
+  if (step.label === 'Phone number verified') {
+    return () =>
+      Alert.alert('Phone verified', 'Your number was verified when you signed up. No action needed.');
+  }
+  return () => navigation.navigate('Profile', step.startEditing ? { startEditing: true } : undefined);
+}
+
 // ─── Row component ────────────────────────────────────────────────────────────
-type RowProps = { symbol: SFSymbol; label: string; desc?: string; tint: string; bg: string; onPress: () => void; last?: boolean };
-function SettingsRow({ symbol, label, desc, tint, bg, onPress, last = false }: RowProps) {
+type RowProps = { icon: string; label: string; desc?: string; tint: string; bg: string; onPress: () => void; last?: boolean };
+function SettingsRow({ icon, label, desc, tint, bg, onPress, last = false }: RowProps) {
   return (
     <TouchableOpacity
       style={[s.row, !last && s.rowBorder]}
@@ -112,13 +120,13 @@ function SettingsRow({ symbol, label, desc, tint, bg, onPress, last = false }: R
       accessibilityLabel={desc ? `${label}. ${desc}` : label}
     >
       <View style={[s.rowIcon, { backgroundColor: bg }]}>
-        <SymbolView name={symbol} size={18} tintColor={tint} weight="semibold" type="monochrome" />
+        <Ionicons name={icon as any} size={18} color={tint} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={s.rowLabel}>{label}</Text>
         {!!desc && <Text style={s.rowDesc} numberOfLines={1}>{desc}</Text>}
       </View>
-      <SymbolView name="chevron.right" size={13} tintColor={Colors.textMuted} weight="semibold" type="monochrome" />
+      <Ionicons name="chevron-forward" size={13} color={Colors.textMuted} />
     </TouchableOpacity>
   );
 }
@@ -159,8 +167,13 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const { user, signOut } = useAuth();
   const { player } = usePlayerProfile();
 
-  const [activeTab, setActiveTab] = useState(0);   // 0 = Profile, 1 = Settings
-  const [isAdmin, setIsAdmin]     = useState(false);
+  const [activeTab, setActiveTab]   = useState(0);   // 0 = Profile, 1 = Settings
+  const [isAdmin, setIsAdmin]       = useState(false);
+  const [imgError, setImgError]     = useState(false);
+  const resetImgError = useCallback(() => setImgError(false), []);
+
+  // Clear stale error state whenever the avatar URL changes (new upload).
+  useEffect(() => { setImgError(false); }, [player?.profile_picture_url]);
 
   useEffect(() => {
     if (!user?.id) { setIsAdmin(false); return; }
@@ -270,15 +283,20 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
       <View style={s.hero}>
         <TouchableOpacity
           style={[s.avatarWrap, { backgroundColor: avatarColor }]}
-          onPress={() => navigation.navigate('AccountSection')}
+          onPress={() => navigation.navigate('Profile')}
           activeOpacity={0.85}
         >
-          {player?.profile_picture_url
-            ? <Image source={{ uri: player.profile_picture_url }} style={s.avatarImg} />
+          {player?.profile_picture_url && !imgError
+            ? <Image
+                source={{ uri: player.profile_picture_url }}
+                style={s.avatarImg}
+                onLoad={resetImgError}
+                onError={() => setImgError(true)}
+              />
             : <Text style={s.avatarInitials}>{initials}</Text>
           }
           <View style={s.avatarEditBadge}>
-            <SymbolView name="camera.fill" size={10} tintColor="#fff" type="monochrome" />
+            <Ionicons name="camera" size={10} color="#fff" />
           </View>
         </TouchableOpacity>
 
@@ -334,11 +352,11 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
               {!!nextStep && (
                 <TouchableOpacity
                   style={s.nextStepBtn}
-                  onPress={() => navigation.navigate('AccountSection')}
+                  onPress={stepOnPress(nextStep, navigation)}
                   activeOpacity={0.8}
                 >
                   <Text style={s.nextStepBtnText}>{nextStep.label}</Text>
-                  <SymbolView name="arrow.right" size={13} tintColor="#fff" weight="semibold" type="monochrome" />
+                  <Ionicons name="arrow-forward" size={13} color="#fff" />
                 </TouchableOpacity>
               )}
             </View>
@@ -346,25 +364,30 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
           {/* Checklist */}
           <View style={s.card}>
-            {steps.map((step, i) => (
-              <View key={step.label} style={[s.checkRow, i < steps.length - 1 && s.rowBorder]}>
-                <View style={[s.checkIcon, { backgroundColor: step.done ? 'rgba(16,185,129,0.12)' : Colors.backgroundAlt }]}>
-                  <SymbolView
-                    name={step.done ? 'checkmark.circle.fill' : 'plus.circle'}
-                    size={18}
-                    tintColor={step.done ? Colors.success : Colors.textMuted}
-                    weight="semibold"
-                    type="monochrome"
-                  />
-                </View>
-                <Text style={[s.checkLabel, step.done && s.checkLabelDone]}>{step.label}</Text>
-                {step.done && (
-                  <View style={s.checkBadge}>
-                    <Text style={s.checkBadgeText}>Done</Text>
+            {steps.map((step, i) => {
+              const press = stepOnPress(step, navigation);
+              const Row = press ? TouchableOpacity : View;
+              return (
+                <Row
+                  key={step.label}
+                  style={[s.checkRow, i < steps.length - 1 && s.rowBorder]}
+                  {...(press ? { onPress: press, activeOpacity: 0.65 } : {})}
+                >
+                  <View style={[s.checkIcon, { backgroundColor: step.done ? 'rgba(249,115,22,0.12)' : Colors.backgroundAlt }]}>
+                    <Ionicons
+                      name={step.done ? 'checkmark-circle' : 'add-circle-outline'}
+                      size={18}
+                      color={step.done ? Palette.orange500 : Colors.textMuted}
+                    />
                   </View>
-                )}
-              </View>
-            ))}
+                  <Text style={[s.checkLabel, step.done && s.checkLabelDone]}>{step.label}</Text>
+                  {step.done
+                    ? <View style={s.checkBadge}><Text style={s.checkBadgeText}>Done</Text></View>
+                    : <Ionicons name="chevron-forward" size={13} color={Colors.textMuted} />
+                  }
+                </Row>
+              );
+            })}
           </View>
         </>
       )}
@@ -380,7 +403,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             {SETTINGS_SECTIONS.map((sec, i) => (
               <SettingsRow
                 key={sec.screen}
-                symbol={sec.symbol}
+                icon={sec.icon}
                 label={sec.label}
                 desc={sec.desc}
                 tint={sec.tint}
@@ -399,7 +422,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
               </View>
               <View style={s.card}>
                 <SettingsRow
-                  symbol="shield.lefthalf.filled"
+                  icon="shield"
                   label="Admin Panel"
                   desc="Reset all user data"
                   tint="#7c3aed"
@@ -434,7 +457,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
               accessibilityLabel="Sign Out"
             >
               <View style={[s.rowIcon, { backgroundColor: 'rgba(239,68,68,0.12)' }]}>
-                <SymbolView name="rectangle.portrait.and.arrow.right" size={18} tintColor={Colors.error} weight="semibold" type="monochrome" />
+                <Ionicons name="log-out-outline" size={18} color={Colors.error} />
               </View>
               <Text style={[s.rowLabel, { flex: 1, color: Colors.error }]}>Sign Out</Text>
             </TouchableOpacity>
@@ -446,7 +469,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
               accessibilityLabel="Delete Account"
             >
               <View style={[s.rowIcon, { backgroundColor: 'rgba(239,68,68,0.12)' }]}>
-                <SymbolView name="trash.fill" size={18} tintColor={Colors.error} weight="semibold" type="monochrome" />
+                <Ionicons name="trash" size={18} color={Colors.error} />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={[s.rowLabel, { color: Colors.error }]}>Delete Account</Text>
@@ -700,7 +723,7 @@ const s = StyleSheet.create({
     color: Colors.textSecondary,
   },
   checkBadge: {
-    backgroundColor: 'rgba(16,185,129,0.12)',
+    backgroundColor: 'rgba(249,115,22,0.12)',
     borderRadius: Radius.full,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -708,7 +731,7 @@ const s = StyleSheet.create({
   checkBadgeText: {
     fontSize: FontSize.xxs,
     fontFamily: Font.semibold,
-    color: Colors.success,
+    color: Palette.orange500,
   },
 
   // ── Completeness card ─────────────────────────────────────────────────────

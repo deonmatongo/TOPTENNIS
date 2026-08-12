@@ -5,6 +5,18 @@ import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlayerProfile } from '@/hooks/usePlayerProfile';
 
+const ALLOWED_MIME = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']);
+
+// iOS often returns HEIC/HEIF. The bucket allows only common web formats,
+// so we normalise anything unrecognised to JPEG before uploading.
+function normaliseMime(raw: string | undefined): { mime: string; ext: string } {
+  if (raw && ALLOWED_MIME.has(raw)) {
+    const ext = raw === 'image/jpg' ? 'jpg' : raw.split('/')[1];
+    return { mime: raw, ext };
+  }
+  return { mime: 'image/jpeg', ext: 'jpg' };
+}
+
 export function useProfilePicture() {
   const { user } = useAuth();
   const { updatePlayerProfile } = usePlayerProfile();
@@ -37,7 +49,7 @@ export function useProfilePicture() {
 
     setUploading(true);
     try {
-      const ext = (asset.uri.split('.').pop() || 'jpg').toLowerCase();
+      const { mime, ext } = normaliseMime(asset.mimeType);
       const fileName = `${user.id}/${Date.now()}.${ext}`;
 
       const response = await fetch(asset.uri);
@@ -46,7 +58,7 @@ export function useProfilePicture() {
       const { data, error } = await supabase.storage
         .from('profile-pictures')
         .upload(fileName, blob, {
-          contentType: asset.mimeType || `image/${ext}`,
+          contentType: mime,
           cacheControl: '3600',
           upsert: true,
         });
@@ -57,9 +69,12 @@ export function useProfilePicture() {
         .from('profile-pictures')
         .getPublicUrl(data.path);
 
-      await updatePlayerProfile({ profile_picture_url: publicUrl });
+      // Append a bust param so React Native's image cache never reuses
+      // a previous render for this account's avatar slot.
+      const url = `${publicUrl}?t=${Date.now()}`;
+      await updatePlayerProfile({ profile_picture_url: url });
 
-      return publicUrl;
+      return url;
     } catch (e: any) {
       Alert.alert('Upload failed', e?.message || 'Could not upload image. Please try again.');
       return null;
@@ -88,7 +103,7 @@ export function useProfilePicture() {
     const asset = result.assets[0];
     setUploading(true);
     try {
-      const ext = (asset.uri.split('.').pop() || 'jpg').toLowerCase();
+      const { mime, ext } = normaliseMime(asset.mimeType);
       const fileName = `${user.id}/${Date.now()}.${ext}`;
 
       const response = await fetch(asset.uri);
@@ -97,7 +112,7 @@ export function useProfilePicture() {
       const { data, error } = await supabase.storage
         .from('profile-pictures')
         .upload(fileName, blob, {
-          contentType: asset.mimeType || `image/${ext}`,
+          contentType: mime,
           cacheControl: '3600',
           upsert: true,
         });
@@ -108,9 +123,10 @@ export function useProfilePicture() {
         .from('profile-pictures')
         .getPublicUrl(data.path);
 
-      await updatePlayerProfile({ profile_picture_url: publicUrl });
+      const url = `${publicUrl}?t=${Date.now()}`;
+      await updatePlayerProfile({ profile_picture_url: url });
 
-      return publicUrl;
+      return url;
     } catch (e: any) {
       Alert.alert('Upload failed', e?.message || 'Could not upload image. Please try again.');
       return null;

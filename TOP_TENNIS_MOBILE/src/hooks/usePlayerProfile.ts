@@ -97,11 +97,8 @@ export function usePlayerProfile() {
     if (!user) { setLoading(false); return; }
     fetchPlayer();
 
-    // Bug fix: usePlayerProfile previously had no realtime subscription.
-    // recordMatchResult() directly UPDATEs the players row (wins, losses,
-    // total_matches), but the Dashboard and PerformanceScreen never saw it
-    // until re-mount. Subscribe to UPDATE on the current user's players row
-    // so stats refresh the moment the score lands.
+    // Subscribe to both tables so stats AND profile fields (avatar, name, etc.)
+    // propagate to every hook instance the moment they change.
     const channel = supabase
       .channel(channelTopic)
       .on('postgres_changes', {
@@ -111,6 +108,15 @@ export function usePlayerProfile() {
         filter: `user_id=eq.${user.id}`,
       }, (payload: any) => {
         if (__DEV__) console.log('[player-profile] players UPDATE', payload);
+        fetchPlayer();
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles',
+        filter: `id=eq.${user.id}`,
+      }, (payload: any) => {
+        if (__DEV__) console.log('[player-profile] profiles UPDATE', payload);
         fetchPlayer();
       })
       .subscribe((status: string) => {

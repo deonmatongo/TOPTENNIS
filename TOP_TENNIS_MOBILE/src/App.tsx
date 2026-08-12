@@ -72,7 +72,7 @@ const INTRO_SEEN_KEY = 'toptennis_intro_seen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-function TabNavigator() {
+function TabNavigator({ initialRouteName }: { initialRouteName?: string } = {}) {
   const { pendingReceived } = useMatches();
   const { getTotalUnread } = useConversations();
   const { unreadCount } = useNotifications();
@@ -82,6 +82,7 @@ function TabNavigator() {
 
   return (
     <Tab.Navigator
+      initialRouteName={initialRouteName}
       tabBar={(props) => <TabBar {...props} />}
       sceneContainerStyle={isTablet ? { marginLeft: sidebarWidth } : undefined}
       screenOptions={({ route }) => ({
@@ -144,6 +145,7 @@ function SettingsNavigator() {
 function AppNavigator() {
   const { user, loading, pendingSignup } = useAuth();
   const { player, loading: playerLoading, refetch } = usePlayerProfile();
+  const [justOnboarded, setJustOnboarded] = useState(false);
 
   // verifyOtp during signup creates a real session, which would otherwise flip
   // this navigator into the app and unmount VerifyCodeScreen before it can claim
@@ -193,10 +195,12 @@ function AppNavigator() {
         </>
       ) : !player ? (
         <Stack.Screen name="Onboarding">
-          {() => <OnboardingScreen onComplete={refetch} />}
+          {() => <OnboardingScreen onComplete={() => { setJustOnboarded(true); refetch(); }} />}
         </Stack.Screen>
       ) : (
-        <Stack.Screen name="Main" component={TabNavigator} />
+        <Stack.Screen name="Main">
+          {() => <TabNavigator initialRouteName={justOnboarded ? 'Schedule' : undefined} />}
+        </Stack.Screen>
       )}
     </Stack.Navigator>
   );

@@ -2,8 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SymbolView } from 'expo-symbols';
-import type { SFSymbol } from 'sf-symbols-typescript';
+import { Ionicons } from '@expo/vector-icons';
 import { selection as hapticSelection } from '@/utils/haptics';
 import Animated, { ZoomIn, FadeIn } from 'react-native-reanimated';
 import { Palette, Font } from '@/theme/colors';
@@ -15,18 +14,18 @@ export const TAB_BAR_HEIGHT = 62;
 const PILL_RADIUS = 28;
 const PILL_BG     = 'rgba(11,21,38,0.95)';
 const PILL_BORDER = 'rgba(255,255,255,0.10)';
-const ACTIVE_FILL = 'rgba(249,115,22,0.17)';
+const ACTIVE_FILL = 'rgba(249,115,22,0.28)';
 const ICON_INACTIVE  = 'rgba(255,255,255,0.48)';
 const LABEL_INACTIVE = 'rgba(255,255,255,0.38)';
 
-type TabMeta = { focused: SFSymbol; unfocused: SFSymbol; label: string };
+type TabMeta = { focused: string; unfocused: string; label: string };
 
 const TAB_META: Record<string, TabMeta> = {
-  Home:     { focused: 'house.fill',                       unfocused: 'house',                        label: 'Home'     },
-  Schedule: { focused: 'calendar',                         unfocused: 'calendar',                     label: 'Schedule' },
-  Matches:  { focused: 'figure.tennis',                    unfocused: 'figure.tennis',                label: 'Matches'  },
-  Messages: { focused: 'bubble.left.and.bubble.right.fill', unfocused: 'bubble.left.and.bubble.right', label: 'Messages' },
-  Settings: { focused: 'person.crop.circle.fill',          unfocused: 'person.crop.circle',           label: 'Profile'  },
+  Home:     { focused: 'home',             unfocused: 'home-outline',             label: 'Home'     },
+  Schedule: { focused: 'calendar',         unfocused: 'calendar-outline',         label: 'Schedule' },
+  Matches:  { focused: 'tennisball',       unfocused: 'tennisball-outline',       label: 'Matches'  },
+  Messages: { focused: 'chatbubbles',      unfocused: 'chatbubbles-outline',      label: 'Messages' },
+  Settings: { focused: 'person-circle',   unfocused: 'person-circle-outline',   label: 'Profile'  },
 };
 
 export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
@@ -57,7 +56,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     return (
       <View style={[sb.container, { width: sidebarWidth, paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8 }]}>
         <View style={sb.logoWrap}>
-          <SymbolView name="figure.tennis" size={showLabel ? 26 : 22} tintColor={Palette.orange500} type="monochrome" />
+          <Ionicons name="tennisball" size={showLabel ? 26 : 22} color={Palette.orange500} />
           {showLabel && <Text style={sb.logoText}>Top Tennis</Text>}
         </View>
 
@@ -74,12 +73,10 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             accessibilityState={{ selected: isFocused }}
           >
             <View style={[sb.iconBox, isFocused && sb.iconBoxActive]}>
-              <SymbolView
-                name={isFocused ? meta.focused : meta.unfocused}
+              <Ionicons
+                name={(isFocused ? meta.focused : meta.unfocused) as any}
                 size={22}
-                tintColor={isFocused ? '#fff' : ICON_INACTIVE}
-                weight={isFocused ? 'semibold' : 'regular'}
-                type="monochrome"
+                color={isFocused ? '#fff' : ICON_INACTIVE}
               />
               {!!badge && badge > 0 && (
                 <View style={sb.badge}>
@@ -117,24 +114,14 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             accessibilityState={{ selected: isFocused }}
           >
             <View style={bt.inner}>
-              {isFocused && (
-                <Animated.View
-                  key={`ind-${key}`}
-                  entering={ZoomIn.springify().damping(14).stiffness(280)}
-                  style={[StyleSheet.absoluteFill, bt.indicator]}
-                />
-              )}
               <Animated.View
                 key={`icon-${key}-${isFocused}`}
                 entering={isFocused ? ZoomIn.springify().damping(14).stiffness(300) : FadeIn.duration(120)}
               >
-                <SymbolView
-                  name={isFocused ? meta.focused : meta.unfocused}
+                <Ionicons
+                  name={(isFocused ? meta.focused : meta.unfocused) as any}
                   size={22}
-                  tintColor={isFocused ? Palette.orange500 : ICON_INACTIVE}
-                  weight={isFocused ? 'semibold' : 'regular'}
-                  type="monochrome"
-                  style={bt.icon}
+                  color={isFocused ? Palette.orange500 : ICON_INACTIVE}
                 />
               </Animated.View>
               <Text
@@ -285,17 +272,7 @@ const bt = StyleSheet.create({
     gap: 3,
     paddingHorizontal: 10,
     paddingVertical: 7,
-    borderRadius: 16,
-    overflow: 'hidden',
     minWidth: 52,
-  },
-  indicator: {
-    borderRadius: 16,
-    backgroundColor: ACTIVE_FILL,
-  },
-  icon: {
-    width: 24,
-    height: 24,
   },
   label: {
     fontSize: 10,

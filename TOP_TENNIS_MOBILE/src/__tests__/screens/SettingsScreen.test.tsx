@@ -39,6 +39,13 @@ beforeEach(() => {
   setAdmin(false);
 });
 
+/** Switch the segmented control to the Settings tab. */
+const goToSettingsTab = (getByText: (text: string) => any) => {
+  // The SegControl renders a "Profile" and a "Settings" option.
+  // The "Settings" option is the second tab in the control.
+  fireEvent.press(getByText('Settings'));
+};
+
 describe('SettingsScreen', () => {
   it('renders without crashing', () => {
     expect(() => render(<SettingsScreen navigation={navigation} />)).not.toThrow();
@@ -66,14 +73,16 @@ describe('SettingsScreen', () => {
   describe('Admin panel', () => {
     it('is hidden when has_role returns false', async () => {
       setAdmin(false);
-      const { queryByText } = render(<SettingsScreen navigation={navigation} />);
+      const { queryByText, getByText } = render(<SettingsScreen navigation={navigation} />);
+      goToSettingsTab(getByText);
       await waitFor(() => expect(getSupabase().rpc).toHaveBeenCalled());
       expect(queryByText('Admin Panel')).toBeNull();
     });
 
     it('is visible when has_role returns true', async () => {
       setAdmin(true);
-      const { findByText } = render(<SettingsScreen navigation={navigation} />);
+      const { findByText, getByText } = render(<SettingsScreen navigation={navigation} />);
+      goToSettingsTab(getByText);
       expect(await findByText('Admin Panel')).toBeTruthy();
     });
 
@@ -91,7 +100,8 @@ describe('SettingsScreen', () => {
     it('fails closed when the has_role lookup errors', async () => {
       // A lookup failure must never grant admin.
       getSupabase().rpc.mockResolvedValue({ data: null, error: new Error('boom') });
-      const { queryByText } = render(<SettingsScreen navigation={navigation} />);
+      const { queryByText, getByText } = render(<SettingsScreen navigation={navigation} />);
+      goToSettingsTab(getByText);
       await waitFor(() => expect(getSupabase().rpc).toHaveBeenCalled());
       expect(queryByText('Admin Panel')).toBeNull();
     });
@@ -101,6 +111,7 @@ describe('SettingsScreen', () => {
     it('shows a confirmation Alert when Sign Out is pressed', () => {
       const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
       const { getByText } = render(<SettingsScreen navigation={navigation} />);
+      goToSettingsTab(getByText);
       fireEvent.press(getByText('Sign Out'));
       expect(alertSpy).toHaveBeenCalledWith(
         'Sign Out',
@@ -119,6 +130,7 @@ describe('SettingsScreen', () => {
         btn?.onPress?.();
       });
       const { getByText } = render(<SettingsScreen navigation={navigation} />);
+      goToSettingsTab(getByText);
       fireEvent.press(getByText('Sign Out'));
       expect(mockSignOut).toHaveBeenCalled();
     });
@@ -128,6 +140,7 @@ describe('SettingsScreen', () => {
     it('shows a confirmation Alert when Delete Account is pressed', () => {
       const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
       const { getByText } = render(<SettingsScreen navigation={navigation} />);
+      goToSettingsTab(getByText);
       fireEvent.press(getByText('Delete Account'));
       expect(alertSpy).toHaveBeenCalledWith(
         'Delete Account',
@@ -146,6 +159,7 @@ describe('SettingsScreen', () => {
         btn?.onPress?.();
       });
       const { getByText } = render(<SettingsScreen navigation={navigation} />);
+      goToSettingsTab(getByText);
       fireEvent.press(getByText('Delete Account'));
       await Promise.resolve(); // flush microtasks
       expect(getSupabase().functions.invoke).toHaveBeenCalledWith(
@@ -165,6 +179,7 @@ describe('SettingsScreen', () => {
       getSupabase().functions.invoke.mockResolvedValueOnce({ data: null, error: new Error('server error') });
 
       const { getByText } = render(<SettingsScreen navigation={navigation} />);
+      goToSettingsTab(getByText);
       fireEvent.press(getByText('Delete Account'));
       await Promise.resolve();
       await Promise.resolve();
@@ -178,7 +193,8 @@ describe('SettingsScreen', () => {
     it('shows first confirmation alert when admin presses Admin Panel', async () => {
       setAdmin(true);
       const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-      const { findByText } = render(<SettingsScreen navigation={navigation} />);
+      const { findByText, getByText } = render(<SettingsScreen navigation={navigation} />);
+      goToSettingsTab(getByText);
       fireEvent.press(await findByText('Admin Panel'));
       expect(alertSpy).toHaveBeenCalledWith(
         expect.stringContaining('Reset All User Data'),

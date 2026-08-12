@@ -4,9 +4,9 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { Font } from '@/theme/colors'
 
 // ── Layout constants ──────────────────────────────────────────────────────────
-const ITEM_H  = 46          // height of each row in pts
-const SIDE    = 2           // rows visible above and below the selected row
-const TOTAL_H = ITEM_H * (SIDE * 2 + 1)   // 230 pt tall widget
+const ITEM_H  = 44          // height of each row in pts
+const SIDE    = 1           // rows visible above and below the selected row
+const TOTAL_H = ITEM_H * (SIDE * 2 + 1)   // 132 pt tall widget
 
 // ── Data helpers ─────────────────────────────────────────────────────────────
 const MONTH_LABELS = [
@@ -178,6 +178,55 @@ export function DateWheelPicker({
         selectedIndex={yearIdx}
         onSelect={(i) => emit(yMin + i, clampedMonth, clampedDay)}
         flex={3}
+        selectionColor={c.border}
+        textColor={c.text}
+      />
+    </View>
+  )
+}
+
+// ── TimeWheelPicker ────────────────────────────────────────────────────────────
+const HOURS_LIST   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+const MINUTES_LIST = ['00', '15', '30', '45']
+
+interface TimeWheelPickerProps {
+  /** "HH:MM" 24-hour string */
+  value: string
+  onChange: (time: string) => void
+}
+
+export function TimeWheelPicker({ value, onChange }: TimeWheelPickerProps) {
+  const { colors: c } = useTheme()
+
+  const [rawH, rawM] = (value || '09:00').split(':')
+  const hourIdx = Math.max(0, Math.min(23, parseInt(rawH, 10) || 0))
+  const rawMin  = parseInt(rawM, 10) || 0
+  const minIdx  = MINUTES_LIST.reduce(
+    (best, m, i) =>
+      Math.abs(parseInt(m) - rawMin) < Math.abs(parseInt(MINUTES_LIST[best]) - rawMin) ? i : best,
+    0,
+  )
+
+  const emit = useCallback((h: number, mi: number) => {
+    onChange(`${String(h).padStart(2, '0')}:${MINUTES_LIST[mi]}`)
+  }, [onChange])
+
+  return (
+    <View style={[styles.container, { backgroundColor: c.surface, borderColor: c.border }]}>
+      <WheelColumn
+        items={HOURS_LIST}
+        selectedIndex={hourIdx}
+        onSelect={(i) => emit(i, minIdx)}
+        flex={1}
+        selectionColor={c.border}
+        textColor={c.text}
+      />
+      <View style={[styles.divider, { backgroundColor: c.border }]} />
+      <WheelColumn
+        items={MINUTES_LIST}
+        selectedIndex={minIdx}
+        onSelect={(i) => emit(hourIdx, i)}
+        flex={1}
         selectionColor={c.border}
         textColor={c.text}
       />

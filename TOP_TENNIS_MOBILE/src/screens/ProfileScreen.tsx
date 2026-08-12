@@ -23,7 +23,7 @@ const skillColor = (l?: number): string => !l ? Palette.gray400 : l <= 3 ? Palet
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
+export const ProfileScreen: React.FC<{ navigation?: any; route?: any }> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const { user, signOut } = useAuth();
   const { player: profile, loading, updatePlayerProfile: updateProfile, refetch: refetchProfile } = usePlayerProfile();
@@ -72,6 +72,15 @@ export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
       setSaving(false);
     }
   };
+
+  // Auto-open edit mode when navigated here with startEditing param
+  // (e.g. from the "Complete your profile" checklist).
+  React.useEffect(() => {
+    if (route?.params?.startEditing && !loading) {
+      startEdit();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route?.params?.startEditing, loading]);
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure?', [

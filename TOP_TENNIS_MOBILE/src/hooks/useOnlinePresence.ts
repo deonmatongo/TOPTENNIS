@@ -3,6 +3,7 @@ import { AppState, AppStateStatus } from 'react-native';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { logger } from '@/services/logger';
+import { useUniqueChannel } from '@/hooks/useUniqueChannel';
 
 /**
  * Tracks online status using the user_presence postgres table + postgres_changes.
@@ -18,6 +19,7 @@ const ONLINE_THRESHOLD_MS = 60_000;  // 60 s
 
 export const useOnlinePresence = () => {
   const { user } = useAuth();
+  const channelTopic = useUniqueChannel('mobile-presence');
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<any>(null);
@@ -70,7 +72,7 @@ export const useOnlinePresence = () => {
 
     // Subscribe to postgres_changes — any change = re-fetch the full list
     const channel = supabase
-      .channel(`mobile-presence-${user.id}`)
+      .channel(channelTopic)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'user_presence' },
@@ -103,7 +105,7 @@ export const useOnlinePresence = () => {
       if (channelRef.current) supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     };
-  }, [user?.id, updateOwnPresence, fetchOnlineUsers, removeOwnPresence]);
+  }, [user?.id, channelTopic, updateOwnPresence, fetchOnlineUsers, removeOwnPresence]);
 
   return { onlineUserIds, isOnline };
 };

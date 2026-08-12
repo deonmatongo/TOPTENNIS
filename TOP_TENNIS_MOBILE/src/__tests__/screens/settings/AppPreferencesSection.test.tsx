@@ -1,6 +1,7 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
 import { Switch } from 'react-native';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AppPreferencesSection } from '@/screens/settings/AppPreferencesSection';
 import { SETTINGS_DEFAULTS } from '@/hooks/useAppSettings';
 
@@ -19,6 +20,9 @@ jest.mock('@/hooks/useAppSettings', () => ({
 
 const navigation = { goBack: jest.fn() };
 
+// AppPreferencesSection calls useTheme() so every render needs ThemeProvider.
+const wrap = (ui: React.ReactElement) => render(<ThemeProvider>{ui}</ThemeProvider>);
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockLoading = false;
@@ -27,18 +31,18 @@ beforeEach(() => {
 
 describe('AppPreferencesSection', () => {
   it('renders without crashing', () => {
-    expect(() => render(<AppPreferencesSection navigation={navigation} />)).not.toThrow();
+    expect(() => wrap(<AppPreferencesSection navigation={navigation} />)).not.toThrow();
   });
 
   it('shows ActivityIndicator while loading', () => {
     mockLoading = true;
-    const { UNSAFE_getByType } = render(<AppPreferencesSection navigation={navigation} />);
+    const { UNSAFE_getByType } = wrap(<AppPreferencesSection navigation={navigation} />);
     const { ActivityIndicator } = require('react-native');
     expect(UNSAFE_getByType(ActivityIndicator)).toBeTruthy();
   });
 
   it('renders all 5 preference labels when loaded', () => {
-    const { getByText } = render(<AppPreferencesSection navigation={navigation} />);
+    const { getByText } = wrap(<AppPreferencesSection navigation={navigation} />);
     expect(getByText('Haptic Feedback')).toBeTruthy();
     expect(getByText('Sound Effects')).toBeTruthy();
     expect(getByText('Auto-Confirm Scores')).toBeTruthy();
@@ -47,7 +51,7 @@ describe('AppPreferencesSection', () => {
   });
 
   it('calls update with correct key when a switch is toggled', () => {
-    const { UNSAFE_getAllByType } = render(<AppPreferencesSection navigation={navigation} />);
+    const { UNSAFE_getAllByType } = wrap(<AppPreferencesSection navigation={navigation} />);
     const switches = UNSAFE_getAllByType(Switch);
     // First switch is haptics_enabled (true by default); toggle to false
     switches[0].props.onValueChange(false);
