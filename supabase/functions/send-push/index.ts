@@ -1,7 +1,11 @@
 // Supabase Edge Function — send-push
-// Called by the notify_push_on_notification_insert DB trigger after every
-// notifications row INSERT. Looks up the user's Expo push token from the
-// profiles table and delivers the notification via the Expo Push API.
+// No longer in the hot path: the notify_push_on_notification_insert DB trigger
+// now calls the Expo Push API directly (migration 20260806000001). This function
+// is kept for manual / ad-hoc delivery only (e.g. targeted announcements).
+//
+// Requires the env var PUSH_SECRET to be set.
+// Set with:  supabase secrets set PUSH_SECRET=<strong-random-value>
+// Include in callers: Authorization: Bearer <PUSH_SECRET>
 //
 // Deploy with:
 //   supabase functions deploy send-push --no-verify-jwt
@@ -10,9 +14,24 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const EXPO_PUSH_URL = 'https://api.expo.dev/v2/push/send'
 
+// Shared secret required on all requests. Prevents arbitrary callers from
+// sending push notifications to any user whose UUID is known.
+const PUSH_SECRET = Deno.env.get('PUSH_SECRET')
+
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 })
+  }
+
+  // Reject if the secret is not configured — fail closed, not open.
+  if (!PUSH_SECRET) {
+    console.error('[send-push] PUSH_SECRET env var is not set')
+    return new Response('Service misconfigured', { status: 503 })
+  }
+
+  const bearer = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+  if (!bearer || bearer !== PUSH_SECRET) {
+    return new Response('Unauthorized', { status: 401 })
   }
 
   let body: Record<string, unknown>
