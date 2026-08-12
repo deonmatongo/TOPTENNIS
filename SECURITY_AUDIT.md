@@ -1,8 +1,8 @@
 # Security Audit — Phase 1 Report
 
 **Branch audited:** `feat/phone-username-auth`  
-**Audit date:** 2026-08-11  
-**Auditor:** Claude Sonnet 4.6 (automated + manual review)  
+**Audit date:** 2026-08-11 / 2026-08-12  
+**Auditor:** Claude Sonnet 4.6 (automated multi-agent + manual review)  
 **Remediation branch:** `security/hardening`
 
 ---
@@ -11,86 +11,149 @@
 
 | ID | Severity | Title | Status |
 |----|----------|-------|--------|
-| C-SEC-01 | **CRITICAL** | Service-role key hardcoded in source | Fixed |
-| C-SEC-02 | MEDIUM | CORS wildcard on auth endpoints | Fixed |
-| C-SEC-03 | LOW | `x-forwarded-for` attacker-controllable | Accepted |
-| C-SEC-04 | INFO | Access token carries phone in JWT claims | Known/Accepted |
+| C-SEC-01 | **CRITICAL** | Service-role key hardcoded in source (current session) | Fixed (code); **key must be rotated** |
+| C-SEC-02 | **CRITICAL** | Older service-role key in git history (prior commits) | **Awaiting user decision** — see below |
+| C-SEC-03 | MEDIUM | CORS wildcard on auth endpoints | Fixed |
+| C-SEC-04 | **HIGH** | Username bypass via direct PostgREST write | Fixed |
+| C-SEC-05 | **HIGH** | `send-push` Edge Function unauthenticated | Fixed |
+| C-SEC-06 | MEDIUM | Mobile admin reset gated by client-side state only | Open — next sprint |
+| C-SEC-07 | MEDIUM | Rate limit fails open on DB error | Accepted (by design) |
+| C-SEC-08 | LOW | `start-signup` working-tree change would leak E.164 phone | Open — do not commit |
+| C-SEC-09 | LOW | No request body size/schema limits on Edge Functions | Open |
+| C-SEC-10 | INFO | Access token JWT carries phone in JWT claims | Known/Accepted |
 
 ---
 
-## C-SEC-01 — Service-role key hardcoded in source (CRITICAL)
+## C-SEC-01 — Service-role key hardcoded in source (CRITICAL) ✅ Fixed
 
-**File:** `scripts/create-demo-account.mjs`  
-**Lines:** 10–13
+**File:** `scripts/create-demo-account.mjs` (written in this session)  
+**Commit:** `fdb036a`
 
-`scripts/create-demo-account.mjs` had the Supabase service-role key, the demo account phone number, and the demo account password as plain string literals. Any clone of the repository — or any future `git log --all -p` — would expose a credential with unrestricted write access to the production database, including the ability to create admin users, bypass RLS, and read every row in every table.
+Script had the Supabase service-role key, demo phone, and password as string literals. Removed; script now reads `SUPABASE_SERVICE_ROLE_KEY`, `DEMO_PHONE`, `DEMO_PASSWORD` from environment variables. Added `scripts/.env.example`.
 
-**Fix (commit `fdb036a`):** Script now reads `SUPABASE_SERVICE_ROLE_KEY`, `DEMO_PHONE`, and `DEMO_PASSWORD` from environment variables. It exits with a clear error message if any are absent. Added `scripts/.env.example` as a template; `scripts/.env` is covered by the root `.gitignore` (`.env` pattern).
-
-**Required action (cannot be done in code):** The service-role key that was in the file must be rotated in the Supabase dashboard: **Settings → API → Regenerate service role key**. Removing it from source does not revoke it. Until it is rotated, anyone who has a copy of the repo at that commit retains admin access to production.
+**Required action:** Rotate the service-role key in Supabase dashboard → Settings → API → Regenerate. Removing it from source does not revoke it.
 
 ---
 
-## C-SEC-02 — CORS wildcard on auth endpoints (MEDIUM)
+## C-SEC-02 — Older service-role key in git history (CRITICAL) ⚠️ User decision required
 
-**File:** `supabase/functions/_shared/http.ts`, line 9
+**Commits:** `33bc234` (added scripts with key), `42b7b07` (deleted those files, noted rotation needed)
 
-`'Access-Control-Allow-Origin': '*'` was set on all auth Edge Function responses. This allows any web page to make cross-origin requests to the login, signup, username-check, and password-reset endpoints and read the full responses — including session tokens returned by `login-with-username` and `verify-reset-code`.
+Eleven utility scripts committed in a prior session embed a different service-role key. The `42b7b07` commit message says "ROTATE that key in the dashboard" — but the key remains readable in git history for anyone with a clone.
 
-The wildcard doesn't enable CSRF (credentials must still be known to login, and the OTP must still arrive on the victim's handset for reset). The primary risk is that a malicious page could silently consume auth API responses in a victim's browser session, or that phishing kit could relay login responses without detection.
+**What needs to happen:**
 
-**Fix (commit `7b7405c`):** Changed to `Deno.env.get('ALLOWED_ORIGIN') ?? 'https://toptennis.app'` with a `Vary: Origin` header. Mobile clients are unaffected — CORS is a browser-only mechanism. For local development, set `ALLOWED_ORIGIN=http://localhost:5173` in `supabase/functions/.env`.
+1. Verify whether the key from commit `33bc234` is already rotated. If it is, anyone with an old clone has a dead credential — no further impact.
+2. If it has NOT been rotated, rotate it immediately in the Supabase dashboard.
+3. To make the key permanently unreachable: rewrite git history with [BFG Repo Cleaner](https://rtyley.github.io/bfg-repo-cleaner/) or `git filter-repo`. This is destructive: all collaborators must re-clone, and any open PRs will need rebasing.
 
----
-
-## C-SEC-03 — `x-forwarded-for` is attacker-controllable (LOW / Accepted)
-
-**File:** `supabase/functions/_shared/http.ts`, `clientIp()` function
-
-Rate-limit buckets keyed on IP use `x-forwarded-for`, which a caller can spoof. An attacker could set `x-forwarded-for: 1.2.3.4` to make their requests count against a different IP bucket.
-
-**Why accepted:** The IP rate limit is a secondary control. The primary controls are per-account failure tracking (keyed on the identifier the attacker must guess, not on IP) and GoTrue's own per-phone OTP limits. IP spoofing does allow a single host to evade the per-IP bucket, but it provides no path to account compromise. Per-account backoff still applies regardless of the IP.
-
-Fixing this would require relying on a Supabase-injected header rather than the forwarded-for chain. This is a platform-level constraint. Documented here for awareness; no code change required.
+**This is a user decision** — git history rewriting affects all collaborators and the remote repo. I have not done it automatically.
 
 ---
 
-## C-SEC-04 — Access token JWT carries phone number (INFO / Known)
+## C-SEC-03 — CORS wildcard on auth endpoints (MEDIUM) ✅ Fixed
 
-**File:** `supabase/functions/login-with-username/index.ts`, line 173–180
+**File:** `supabase/functions/_shared/http.ts`  
+**Commit:** `7b7405c`
 
-GoTrue's issued `access_token` is a standard JWT. Its claims include the `phone` field for accounts created via phone auth. This means that after a successful login, a user can decode their own access token and read their phone number.
-
-This is noted explicitly in a code comment in `login-with-username`. It is an unavoidable property of Supabase's GoTrue JWT schema without a custom JWT secret or a token-translation layer. It is not the privacy leak the server-side username→phone resolution is designed to prevent — that resolution only makes it harder for one user to learn another user's phone number. An authenticated user can always read their own number via their own token, and that is fine.
-
-No fix required or planned.
+`'Access-Control-Allow-Origin': '*'` replaced with `Deno.env.get('ALLOWED_ORIGIN') ?? 'https://toptennis.app'`. Added `Vary: Origin` header. Set `ALLOWED_ORIGIN` in Supabase secrets for any additional origins.
 
 ---
 
-## Checks that passed (no action required)
+## C-SEC-04 — Username bypass via direct PostgREST write (HIGH) ✅ Fixed
 
-| Check | Finding |
-|-------|---------|
-| **C03 — SQL injection** | All queries use parameterised Supabase client calls or RPCs. No raw SQL in Edge Functions. |
-| **C04 — RLS coverage** | `user_phone_identities`, `auth_rate_limits`, `auth_events` all have RLS enabled with zero permissive policies and explicit revokes from `anon`/`authenticated`. |
-| **C05 — Username enumeration** | `check-username` returns only `{ available: boolean }`. Login path returns one generic message for all failure modes with uniform response padding. |
-| **C06 — PII in logs** | `logEvent()` stores only `phoneLast4`, salted-SHA-256 subject hashes. Full phone and IP never reach the `auth_events` table. |
-| **C07 — Session token leak** | `login-with-username` and `verify-reset-code` return only `access_token` + `refresh_token`. The full GoTrue session (with nested `user.phone`) is not forwarded. |
-| **C08 — Rate limiting** | All five auth functions enforce per-IP and/or per-account limits via `consume_rate_limit()`. `check-username` has its own IP limit. |
-| **C09 — Response timing** | `respondUniform()` pads all auth responses to ≥600 ms. Rate-limit and malformed-body 4xx branches bypass this intentionally (they reveal nothing about account state). |
-| **C10 — Auth hash salt** | `security.ts` reads `AUTH_HASH_SALT` from `Deno.env` and throws at cold start if missing or shorter than 16 chars. No hardcoded salt. |
-| **C11 — Admin key in Edge Functions** | `audit.ts` reads `SUPABASE_SERVICE_ROLE_KEY` from `Deno.env`. No hardcoded key in deployed functions. |
-| **C12 — Claim identity race** | `claim_identity()` RPC validates `phone_confirmed_at` and reads the phone server-side inside a single transaction. No client-supplied phone accepted. |
-| **C13 — IDOR on profiles** | Username lookup in `check-username` and `start-signup` uses the service-role client; the anon client's RLS policies on `profiles` are not bypassed. |
-| **C14 — Input validation** | `classifyIdentifier()` rejects malformed identifiers; `isValidUsername()` enforces format; `normalizePhone()` validates and E.164-normalises phone numbers. |
+**Files:** `supabase/migrations/20260812000001_block_direct_username_write.sql`, `TOP_TENNIS_MOBILE/src/hooks/useProfile.ts`  
+**Commit:** `b02f93a`
+
+The `profiles` UPDATE RLS policy checked `auth.uid() = id` but had no column restriction. Any authenticated user could `PATCH /rest/v1/profiles?id=eq.<their_id>` with `{ username: "anyFreeHandle" }` and claim it without phone verification — bypassing `claim_identity()` entirely.
+
+**Fix:** Two-layer defence:
+1. `guard_username_change()` BEFORE UPDATE trigger raises `insufficient_privilege` for any non-service_role caller that changes `username`.
+2. `useProfile.ts` strips `username`, `id`, `user_id`, `phone`, `wins`, `losses` before any PostgREST UPDATE.
 
 ---
 
-## Pending user action
+## C-SEC-05 — `send-push` Edge Function unauthenticated (HIGH) ✅ Fixed
 
-1. **Rotate the service-role key** in Supabase dashboard → Settings → API → Regenerate service role key. This is the only action that actually revokes the credential that was in source. Code changes alone do not help if the old key is still valid.
+**File:** `supabase/functions/send-push/index.ts`  
+**Commit:** `fa04f44`
 
-2. **Set `ALLOWED_ORIGIN` in production Supabase secrets** if the web app ever runs at any origin other than `https://toptennis.app`:
-   ```bash
-   supabase secrets set ALLOWED_ORIGIN=https://toptennis.app
-   ```
+Function was deployed with `--no-verify-jwt` and had no other authentication. Any caller that knew a victim's user UUID could send arbitrary push notifications to their device (phishing / harassment vector).
+
+**Fix:** Added `PUSH_SECRET` env var check. Callers must include `Authorization: Bearer <PUSH_SECRET>`. Missing or wrong secret → 401. Unset env var → 503 (fail closed).
+
+**Required action:** Set the secret: `supabase secrets set PUSH_SECRET=<strong-random-value>`
+
+---
+
+## C-SEC-06 — Mobile admin reset gated by client-side `isAdmin` only (MEDIUM) 🔵 Open
+
+**File:** `TOP_TENNIS_MOBILE/src/screens/SettingsScreen.tsx`
+
+`handleAdminReset` fires three direct PostgREST mutations (`players`, `match_invites`, `notifications`) after a client-side `isAdmin` check. The RLS policies on those tables limit the blast radius to the caller's own rows, so a non-admin user cannot wipe all data — but the admin-only UX intent is defeated.
+
+**Recommended fix:** Wrap the three mutations in a `SECURITY DEFINER admin_reset_all_data()` RPC that calls `has_role(auth.uid(), 'admin')` at the top and raises if false.
+
+**Not fixed yet** — flagged for next sprint.
+
+---
+
+## C-SEC-07 — Rate limit fails open on DB error (MEDIUM) — Accepted
+
+**File:** `supabase/functions/_shared/ratelimit.ts`
+
+When `consume_rate_limit()` returns a DB error, `consume()` returns `{ allowed: true }` (fail open). The code comment explicitly documents this: *"an outage in the ledger must not lock every user out of signing in."* This is the correct trade-off for an auth endpoint. No change made.
+
+**Future:** Move rate-limit store to Upstash Redis (independent of application DB).
+
+---
+
+## C-SEC-08 — Working-tree `start-signup` would leak E.164 phone (LOW) 🔴 Do not commit
+
+**File:** `supabase/functions/start-signup/index.ts` (working tree, not committed)
+
+Uncommitted change on `feat/phone-username-auth` changes the success response to `{ ok: true, phone }`. Both `AuthContext.tsx` files already have `parsePhoneNumberFromString(phone, defaultCountry)` as a fallback — `data.phone` is not needed. **Do not commit this change.**
+
+---
+
+## C-SEC-09 — No request body size / schema limits on Edge Functions (LOW) 🔵 Open
+
+No Zod or similar schema library; `readJson<T>()` is a plain cast. No max-length guards on `identifier` or `password` before string processing.
+
+**Recommended fix:** Add explicit max-length checks at the top of each handler (e.g. 200 chars for identifier, 1024 for password) before any async work.
+
+---
+
+## C-SEC-10 — Access token JWT carries phone (INFO) — Accepted
+
+GoTrue JWTs include the `phone` claim. This is the user's own number on their own account — not a cross-account leak. Documented in `login-with-username` function comments. No fix planned.
+
+---
+
+## Checks that passed
+
+| Check | Result |
+|-------|--------|
+| SQL injection | All queries use parameterised Supabase client calls or typed RPCs |
+| RLS: `user_phone_identities`, `auth_rate_limits`, `auth_events` | Enabled, zero permissive policies, revoked from anon/authenticated |
+| Username/phone enumeration | Generic messages + uniform timing across all failure branches |
+| PII in audit logs | `phoneLast4` and salted SHA-256 subject hashes only |
+| Session token leak | Only `access_token` + `refresh_token` returned from login/reset functions |
+| Auth hash salt | Read from `Deno.env`, throws at cold start if absent or < 16 chars |
+| Admin key in deployed functions | Read from `Deno.env`, not hardcoded |
+| `claim_identity()` race condition | Single-transaction, phone read server-side, `phone_confirmed_at` required |
+| Payment webhooks | None present in codebase |
+| Storage bucket RLS | `profile-pictures`: public read, authenticated write, owner-folder-prefix scoped |
+
+---
+
+## Required user actions
+
+| Action | Priority |
+|--------|----------|
+| **Rotate the current service-role key** (Supabase → Settings → API → Regenerate) | CRITICAL — do this now |
+| **Verify / rotate the older key** from commit `33bc234` (check if already rotated) | CRITICAL |
+| Consider git history rewrite to remove all key traces (BFG Repo Cleaner) | HIGH — your call |
+| Set `PUSH_SECRET` in Supabase secrets: `supabase secrets set PUSH_SECRET=<value>` | HIGH — required for C-SEC-05 fix |
+| Set `ALLOWED_ORIGIN` if web client ever runs at a different origin | MEDIUM |
+| Do NOT commit the `start-signup` working-tree change that adds `phone` to the response | LOW |
