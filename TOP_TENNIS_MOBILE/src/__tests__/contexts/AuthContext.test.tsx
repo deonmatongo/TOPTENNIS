@@ -21,12 +21,13 @@ const fnError = (status: number, body: Record<string, unknown>) => ({
 
 const SESSION = { access_token: 'at', refresh_token: 'rt' };
 
-describe('AuthContext — phone + username auth', () => {
+describe('AuthContext — email + password auth', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     supabase.auth.signOut.mockResolvedValue({ error: null });
+    supabase.auth.signUp.mockResolvedValue({ data: { session: SESSION, user: { id: 'u1' } }, error: null });
+    supabase.auth.signInWithPassword.mockResolvedValue({ data: {}, error: null });
     supabase.auth.updateUser.mockResolvedValue({ data: {}, error: null });
-    supabase.auth.verifyOtp.mockResolvedValue({ data: {}, error: null });
     supabase.auth.setSession.mockResolvedValue({ data: {}, error: null });
     supabase.rpc.mockResolvedValue({ data: null, error: null });
     supabase.auth.getSession.mockResolvedValue({ data: { session: null } });
@@ -61,253 +62,148 @@ describe('AuthContext — phone + username auth', () => {
 
   // ── Login ────────────────────────────────────────────────────────────────────
 
-  it('signIn: routes through the Edge Function and never resolves a username locally', async () => {
-    supabase.functions.invoke.mockResolvedValueOnce({ data: { session: SESSION }, error: null });
+  it('signIn: calls signInWithPassword directly, no Edge Function', async () => {
     const result = await mount();
 
-    await act(async () => { await result.current.signIn('rallyking', 'hunter2xx'); });
+    await act(async () => { await result.current.signIn('player@example.com', 'hunter2xx'); });
 
-    expect(supabase.functions.invoke).toHaveBeenCalledWith('login-with-username', {
-      body: { identifier: 'rallyking', password: 'hunter2xx', defaultCountry: 'US' },
+    expect(supabase.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: 'player@example.com',
+      password: 'hunter2xx',
     });
-    // The phone path must NOT shortcut to a direct client sign-in: that would
-    // give it a different latency profile and leak account existence by timing.
-    expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
-    expect(supabase.auth.setSession).toHaveBeenCalledWith(SESSION);
+    expect(supabase.functions.invoke).not.toHaveBeenCalled();
   });
 
-  it('signIn: forwards only the two tokens, even if the server returns a fat session', async () => {
-    // Regression guard. login-with-username originally returned GoTrue's session
-    // object wholesale, whose nested `user` carries phone, email and metadata —
-    // defeating the point of resolving the username server-side. The server was
-    // fixed to trim it; this asserts the client never relays the extra fields
-    // even if something upstream starts sending them again.
-    supabase.functions.invoke.mockResolvedValueOnce({
-      data: {
-        session: {
-          access_token: 'at',
-          refresh_token: 'rt',
-          token_type: 'bearer',
-          expires_in: 3600,
-          weak_password: null,
-          user: { id: 'u1', phone: '14155550100', email: 'leak@example.com' },
-        },
-      },
-      error: null,
+  it('signIn: a failure produces one generic message', async () => {
+    supabase.auth.signInWithPassword.mockResolvedValueOnce({
+      data: {},
+      error: { message: 'Invalid login credentials' },
     });
     const result = await mount();
 
-    await act(async () => { await result.current.signIn('rallyking', 'hunter2xx'); });
-
-    expect(supabase.auth.setSession).toHaveBeenCalledWith({
-      access_token: 'at',
-      refresh_token: 'rt',
-    });
-    const forwarded = JSON.stringify(supabase.auth.setSession.mock.calls[0][0]);
-    expect(forwarded).not.toContain('14155550100');
-    expect(forwarded).not.toContain('leak@example.com');
-  });
-
-  it('signIn: a phone number identifier also goes through the Edge Function', async () => {
-    supabase.functions.invoke.mockResolvedValueOnce({ data: { session: SESSION }, error: null });
-    const result = await mount();
-
-    await act(async () => { await result.current.signIn('+15551230001', 'hunter2xx'); });
-
-    expect(supabase.functions.invoke).toHaveBeenCalledWith(
-      'login-with-username',
-      expect.objectContaining({ body: expect.objectContaining({ identifier: '+15551230001' }) }),
-    );
-    expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
-  });
-
-  it('signIn: unknown account produces the same generic error as a wrong password', async () => {
-    supabase.functions.invoke.mockResolvedValueOnce(
-      fnError(401, { error: 'Incorrect username or password.' }),
-    );
-    const result = await mount();
-
-    await expectReject(() => result.current.signIn('ghost', 'whatever'), GENERIC_SIGNIN_ERROR);
-
-    supabase.functions.invoke.mockResolvedValueOnce(
-      fnError(401, { error: 'Incorrect username or password.' }),
-    );
-    await expectReject(() => result.current.signIn('rallyking', 'wrongpass'), GENERIC_SIGNIN_ERROR);
-  });
-
-  it('signIn: a rate-limit trip is surfaced distinctly from a credential failure', async () => {
-    supabase.functions.invoke.mockResolvedValueOnce(
-      fnError(429, { error: 'Too many attempts. Please try again shortly.' }),
-    );
-    const result = await mount();
-
-    // 429 is about the caller's own behaviour, so it reveals nothing about the
-    // account and should not be flattened into the generic message.
-    await expectReject(() => result.current.signIn('rallyking', 'hunter2xx'), 'Too many attempts. Please try again shortly.');
+    await expectReject(() => result.current.signIn('ghost@example.com', 'whatever'), GENERIC_SIGNIN_ERROR);
   });
 
   // ── Signup ───────────────────────────────────────────────────────────────────
 
-  const startSignup = async (result: any) => {
-    supabase.functions.invoke.mockResolvedValueOnce({ data: { ok: true }, error: null });
-    await act(async () => {
-      await result.current.startSignup({
-        phone: '5551230001',
-        username: 'rallyking',
-        password: 'hunter2xx',
-      });
-    });
-  };
-
-  it('startSignup: never sends the password to the pre-auth endpoint', async () => {
+  it('signUp: creates the account and flips pendingClaim until claimProfile finishes', async () => {
     const result = await mount();
-    await startSignup(result);
 
-    const [fn, opts] = supabase.functions.invoke.mock.calls[0];
-    expect(fn).toBe('start-signup');
-    expect(opts.body).not.toHaveProperty('password');
-    expect(JSON.stringify(opts.body)).not.toContain('hunter2xx');
-    // The pending phone is normalised to E.164 so completeSignup's verifyOtp
-    // uses the same string GoTrue issued the OTP against. This response has no
-    // `phone`, so it comes from the local libphonenumber fallback.
-    expect(result.current.pendingSignup).toEqual({
-      phone: '+15551230001',
-      username: 'rallyking',
-      password: 'hunter2xx',
-    });
-  });
+    await act(async () => { await result.current.signUp({ email: 'p@example.com', password: 'hunter2xx' }); });
 
-  it('startSignup: prefers the canonical phone returned by start-signup', async () => {
-    const result = await mount();
-    supabase.functions.invoke.mockResolvedValueOnce({
-      data: { ok: true, phone: '+15551230001' },
-      error: null,
-    });
+    expect(supabase.auth.signUp).toHaveBeenCalledWith({ email: 'p@example.com', password: 'hunter2xx' });
+    expect(result.current.pendingClaim).toBe(true);
+
     await act(async () => {
-      await result.current.startSignup({
-        phone: '(555) 123-0001',
+      await result.current.claimProfile({
         username: 'rallyking',
-        password: 'hunter2xx',
+        securityQuestion: 'What was the name of your first pet?',
+        securityAnswer: 'rex',
       });
     });
 
-    expect(result.current.pendingSignup.phone).toBe('+15551230001');
+    expect(supabase.rpc).toHaveBeenCalledWith('claim_username', { p_username: 'rallyking' });
+    expect(supabase.rpc).toHaveBeenCalledWith('set_security_answer', {
+      p_question: 'What was the name of your first pet?',
+      p_answer: 'rex',
+    });
+    expect(result.current.pendingClaim).toBe(false);
   });
 
-  it('startSignup: rejects a short password before any network call', async () => {
+  it('signUp: rejects a short password before any network call', async () => {
     const result = await mount();
     await expectReject(
-      () => result.current.startSignup({ phone: '5551230001', username: 'x_1', password: 'short' }),
+      () => result.current.signUp({ email: 'p@example.com', password: 'short' }),
       /at least 8 characters/i,
     );
-    expect(supabase.functions.invoke).not.toHaveBeenCalled();
+    expect(supabase.auth.signUp).not.toHaveBeenCalled();
   });
 
-  it('verifyPhoneOtp: a wrong code does not distinguish itself from an expired one', async () => {
+  it('signUp: an already-registered email is reported as a field error', async () => {
+    supabase.auth.signUp.mockResolvedValueOnce({
+      data: { user: { id: 'u1', identities: [] }, session: null },
+      error: null,
+    });
     const result = await mount();
-    await startSignup(result);
-
-    supabase.auth.verifyOtp.mockResolvedValueOnce({
-      data: {},
-      error: { message: 'Token has expired or is invalid' },
-    });
-    await expectReject(() => result.current.verifyPhoneOtp('000000'), 'That code is incorrect or has expired. Request a new one.');
-
-    // Same message for a plain wrong code — an attacker must not learn whether a
-    // code was ever valid.
-    supabase.auth.verifyOtp.mockResolvedValueOnce({
-      data: {},
-      error: { message: 'Invalid token' },
-    });
-    await expectReject(() => result.current.verifyPhoneOtp('111111'), 'That code is incorrect or has expired. Request a new one.');
+    await expectReject(
+      () => result.current.signUp({ email: 'taken@example.com', password: 'hunter2xx' }),
+      /already registered/i,
+    );
   });
 
-  it('completeSignup: sets the password then claims the username', async () => {
+  it('claimProfile: a lost username race keeps the session so a retry works', async () => {
     const result = await mount();
-    await startSignup(result);
+    await act(async () => { await result.current.signUp({ email: 'p@example.com', password: 'hunter2xx' }); });
 
-    await act(async () => { await result.current.completeSignup(); });
+    supabase.rpc.mockResolvedValueOnce({ data: null, error: { message: 'USERNAME_TAKEN' } });
+    await expectReject(
+      () => result.current.claimProfile({
+        username: 'rallyking',
+        securityQuestion: 'q',
+        securityAnswer: 'rex',
+      }),
+      /just taken/i,
+    );
+    expect(result.current.pendingClaim).toBe(true);
 
-    expect(supabase.auth.updateUser).toHaveBeenCalledWith({ password: 'hunter2xx' });
-    expect(supabase.rpc).toHaveBeenCalledWith('claim_identity', { p_username: 'rallyking' });
-    expect(result.current.pendingSignup).toBeNull();
-  });
-
-  it('completeSignup: a lost username race keeps the verified session so a retry works', async () => {
-    const result = await mount();
-    await startSignup(result);
-
-    supabase.rpc.mockResolvedValueOnce({
-      data: null,
-      error: { message: 'USERNAME_TAKEN' },
+    supabase.rpc.mockResolvedValueOnce({ data: null, error: null }); // claim_username
+    supabase.rpc.mockResolvedValueOnce({ data: null, error: null }); // set_security_answer
+    await act(async () => {
+      await result.current.claimProfile({
+        username: 'rallyking2',
+        securityQuestion: 'q',
+        securityAnswer: 'rex',
+      });
     });
 
-    await expectReject(() => result.current.completeSignup(), /just taken/i);
-
-    // The pending signup survives, so the user picks another handle instead of
-    // redoing SMS verification for someone else's timing.
-    expect(result.current.pendingSignup).not.toBeNull();
-
-    supabase.rpc.mockResolvedValueOnce({ data: null, error: null });
-    await act(async () => { await result.current.completeSignup('rallyking2'); });
-
-    expect(supabase.rpc).toHaveBeenLastCalledWith('claim_identity', { p_username: 'rallyking2' });
-    expect(result.current.pendingSignup).toBeNull();
-  });
-
-  it('completeSignup: an unverified phone is rejected', async () => {
-    const result = await mount();
-    await startSignup(result);
-    supabase.rpc.mockResolvedValueOnce({
-      data: null,
-      error: { message: 'PHONE_NOT_VERIFIED' },
-    });
-    await expectReject(() => result.current.completeSignup(), /not verified/i);
+    expect(supabase.rpc).toHaveBeenLastCalledWith('set_security_answer', { p_question: 'q', p_answer: 'rex' });
+    expect(result.current.pendingClaim).toBe(false);
   });
 
   // ── Password reset ───────────────────────────────────────────────────────────
 
-  it('requestPasswordReset: resolves normally for an unknown account', async () => {
-    // The Edge Function answers { ok: true } either way, so the client must not
-    // invent a "no such user" branch — that would rebuild the enumeration oracle.
-    supabase.functions.invoke.mockResolvedValueOnce({ data: { ok: true }, error: null });
+  it('getSecurityQuestion: resolves to a question for any well-formed email', async () => {
+    supabase.functions.invoke.mockResolvedValueOnce({
+      data: { question: 'What was the name of your first pet?' },
+      error: null,
+    });
     const result = await mount();
 
-    await act(async () => { await result.current.requestPasswordReset('ghost'); });
+    let question = '';
+    await act(async () => { question = await result.current.getSecurityQuestion('ghost@example.com'); });
 
-    expect(supabase.functions.invoke).toHaveBeenCalledWith('resolve-for-reset', {
-      body: { identifier: 'ghost', defaultCountry: 'US' },
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('get-security-question', {
+      body: { email: 'ghost@example.com' },
     });
+    expect(question).toBe('What was the name of your first pet?');
   });
 
-  it('verifyResetOtp: goes through the Edge Function, not a local verifyOtp', async () => {
+  it('verifySecurityAnswer: goes through the Edge Function and establishes a session', async () => {
     const result = await mount();
-    supabase.functions.invoke.mockResolvedValueOnce({ data: { ok: true }, error: null });
-    await act(async () => { await result.current.requestPasswordReset('rallyking'); });
+    supabase.functions.invoke.mockResolvedValueOnce({ data: { question: 'q' }, error: null });
+    await act(async () => { await result.current.getSecurityQuestion('player@example.com'); });
 
     supabase.functions.invoke.mockResolvedValueOnce({ data: { session: SESSION }, error: null });
-    await act(async () => { await result.current.verifyResetOtp('123456'); });
+    await act(async () => { await result.current.verifySecurityAnswer('rex'); });
 
-    // A local verifyOtp is impossible on the username path: the client is never
-    // told which number the code went to.
-    expect(supabase.auth.verifyOtp).not.toHaveBeenCalled();
-    expect(supabase.functions.invoke).toHaveBeenLastCalledWith('verify-reset-code', {
-      body: { identifier: 'rallyking', token: '123456', defaultCountry: 'US' },
+    expect(supabase.functions.invoke).toHaveBeenLastCalledWith('verify-security-answer', {
+      body: { email: 'player@example.com', answer: 'rex' },
     });
+    expect(supabase.auth.setSession).toHaveBeenCalledWith(SESSION);
     expect(result.current.resetPending).toBe(true);
   });
 
-  it('verifyResetOtp: refuses when no reset was requested', async () => {
+  it('verifySecurityAnswer: refuses when no reset was requested', async () => {
     const result = await mount();
-    await expectReject(() => result.current.verifyResetOtp('123456'), /no reset in progress/i);
+    await expectReject(() => result.current.verifySecurityAnswer('rex'), /no reset in progress/i);
   });
 
   it('setNewPassword: revokes every session so the user must sign in again', async () => {
     const result = await mount();
-    supabase.functions.invoke.mockResolvedValueOnce({ data: { ok: true }, error: null });
-    await act(async () => { await result.current.requestPasswordReset('rallyking'); });
+    supabase.functions.invoke.mockResolvedValueOnce({ data: { question: 'q' }, error: null });
+    await act(async () => { await result.current.getSecurityQuestion('player@example.com'); });
     supabase.functions.invoke.mockResolvedValueOnce({ data: { session: SESSION }, error: null });
-    await act(async () => { await result.current.verifyResetOtp('123456'); });
+    await act(async () => { await result.current.verifySecurityAnswer('rex'); });
 
     await act(async () => { await result.current.setNewPassword('brandnewpass'); });
 
@@ -334,7 +230,7 @@ describe('AuthContext — phone + username auth', () => {
     const result = await mount();
 
     // Reporting "available" on a failure would let the user get all the way
-    // through SMS verification before claim_identity rejected the handle.
+    // through signup before claim_username rejected the handle.
     const check = await result.current.checkUsername('rallyking');
     expect(check.available).toBe(false);
   });

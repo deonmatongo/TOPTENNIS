@@ -3,10 +3,11 @@ import { Link } from "react-router-dom";
 const NAVY = "#0B1526";
 
 /**
- * Split-panel chrome shared by the six auth pages.
+ * Split-panel chrome shared by the auth pages (login, register, forgot
+ * password, reset password).
  *
- * Extracted from the old Login page so the phone/username flow does not duplicate
- * ~90 lines of marketing panel across every step.
+ * Extracted from the old Login page so the auth flow does not duplicate ~90
+ * lines of marketing panel across every step.
  */
 const AuthLayout: React.FC<{
   /** Small pill above the headline on the left panel. */

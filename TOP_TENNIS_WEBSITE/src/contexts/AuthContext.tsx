@@ -1,32 +1,37 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
 
 /**
- * Phone + username authentication.
+ * Email + password authentication, with a security question for password reset.
  *
- * Mirrors the mobile app exactly — both clients share one auth.users table, so a
- * behavioural difference between them is a security difference. In particular:
+ * Mirrors TOP_TENNIS_MOBILE/src/contexts/AuthContext.tsx as closely as this
+ * app's calling convention allows. In particular:
  *
- *  * signIn always goes through the login-with-username Edge Function, for BOTH
- *    usernames and phone numbers. Resolving a username to a phone number in the
- *    browser would be a PII leak; handling the phone case locally while usernames
- *    went server-side would give the two paths different response times and
- *    reintroduce the account-enumeration signal.
+ *  Signup   signUp -> claimProfile
+ *           signUp() calls supabase.auth.signUp({ email, password }) directly —
+ *           email confirmations are disabled project-wide, so this returns a
+ *           real session immediately, no OTP/confirmation step. That session
+ *           creation flips `user` truthy right away, which would otherwise let
+ *           AuthRedirect navigate away from the signup form before the username
+ *           and security question are claimed. `pendingClaim` keeps the form
+ *           mounted in between — claimProfile() is a separate call so a
+ *           username collision can be retried without recreating the account.
  *
- *  * The signup password is never sent to start-signup. The account is created
- *    without one and the password is applied on the session verifyOtp returns.
+ *  Login    signIn() calls supabase.auth.signInWithPassword({ email, password })
+ *           directly. There is no PII to resolve server-side the way a phone
+ *           number was, so no Edge Function is needed here.
  *
- *  * Password reset verification also goes server-side, because on the username
- *    path this client is never told which number the code was sent to.
+ *  Reset    getSecurityQuestion -> verifySecurityAnswer -> setNewPassword
+ *           verifySecurityAnswer mints a short-lived session server-side (no
+ *           email is sent); setNewPassword then revokes every session,
+ *           including this one, so the user lands back on the login screen
+ *           rather than being dropped into the app from a recovery flow.
  *
  * Errors are RETURNED, not thrown — the existing pages are written against that
  * convention and it is preserved here deliberately.
  */
-
-type PendingSignup = { phone: string; username: string; password: string };
 
 type Result = { error: { message: string; field?: string } | null };
 /**
@@ -41,29 +46,25 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
 
-  /** In-memory only. Non-null between startSignup and completeSignup. */
-  pendingSignup: PendingSignup | null;
-  /** True between a verified reset code and the new password being saved. */
+  /** True between signUp() creating the account and claimProfile() finishing. */
+  pendingClaim: boolean;
+  /** True between a verified security answer and the new password being saved. */
   resetPending: boolean;
 
   checkUsername: (username: string) => Promise<UsernameCheck>;
 
-  startSignup: (args: {
-    phone: string;
+  signUp: (args: { email: string; password: string }) => Promise<Result>;
+  claimProfile: (args: {
     username: string;
-    password: string;
-    defaultCountry?: string;
+    securityQuestion: string;
+    securityAnswer: string;
   }) => Promise<Result>;
-  resendSignupCode: () => Promise<Result>;
-  verifyPhoneOtp: (token: string) => Promise<Result>;
-  completeSignup: (usernameOverride?: string) => Promise<Result>;
-  cancelSignup: () => void;
 
-  signIn: (identifier: string, password: string, defaultCountry?: string) => Promise<Result>;
+  signIn: (email: string, password: string) => Promise<Result>;
 
-  requestPasswordReset: (identifier: string, defaultCountry?: string) => Promise<Result>;
-  verifyResetOtp: (token: string) => Promise<Result>;
-  resendResetCode: () => Promise<Result>;
+  /** Always resolves, whether or not the account exists. `question` is what to show. */
+  getSecurityQuestion: (email: string) => Promise<{ question: string | null } & Result>;
+  verifySecurityAnswer: (answer: string) => Promise<Result>;
   setNewPassword: (password: string) => Promise<Result>;
 
   signOut: () => Promise<void>;
@@ -80,7 +81,7 @@ export const useAuth = () => {
 };
 
 /** The only message shown for a failed sign-in, whatever actually went wrong. */
-export const GENERIC_SIGNIN_ERROR = 'Incorrect username or password.';
+export const GENERIC_SIGNIN_ERROR = 'Incorrect email or password.';
 
 /**
  * supabase.functions.invoke puts the response body on error.context for any
@@ -114,13 +115,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [pendingSignup, setPendingSignup] = useState<PendingSignup | null>(null);
+  const [pendingClaim, setPendingClaim] = useState(false);
   const [resetPending, setResetPending] = useState(false);
 
-  // What the user typed on the forgot-password screen — NOT a phone number. On
-  // the username path the number is never disclosed to this client.
-  const resetIdentifier = useRef<string | null>(null);
-  const resetCountry = useRef<string>('US');
+  // The email the user typed on the "forgot password" screen. Kept so the
+  // verify step can be resolved server-side.
+  const resetEmail = useRef<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -136,7 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (event === 'SIGNED_IN' && session?.user) {
         setTimeout(() => {
           logUserActivity('user_logged_in', {
-            provider: session.user.app_metadata?.provider || 'phone',
+            provider: session.user.app_metadata?.provider || 'email',
             timestamp: new Date().toISOString(),
           });
         }, 0);
@@ -181,9 +181,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const checkUsername = useCallback(async (username: string): Promise<UsernameCheck> => {
     const { data, message } = await invokeJson<UsernameCheck>('check-username', { username });
     if (!data) {
-      // Never report "available" on a failed check — claim_identity would reject
-      // it later, after the user had already verified their number. Flag it as a
-      // failure so the UI does not say "taken".
+      // Never report "available" on a failed check — claim_username would reject
+      // it later, after the account already exists. Flag it as a failure so the
+      // UI does not say "taken".
       return {
         available: false,
         failed: true,
@@ -195,83 +195,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ── Signup ──────────────────────────────────────────────────────────────────
 
-  const startSignup = useCallback<AuthContextType['startSignup']>(async ({
-    phone, username, password, defaultCountry = 'US',
-  }) => {
+  const signUp = useCallback<AuthContextType['signUp']>(async ({ email, password }) => {
     if (password.length < 8) {
       return { error: { message: 'Password must be at least 8 characters long.', field: 'password' } };
     }
 
-    const { data, message, field } = await invokeJson<{ ok: boolean }>('start-signup', {
-      phone,
-      username,
-      defaultCountry,
-    });
+    const { data, error } = await supabase.auth.signUp({ email, password });
 
-    if (!data?.ok) {
-      return { error: { message: message ?? 'Could not start signup. Please try again.', field } };
+    // A duplicate, already-confirmed email returns no error but also no
+    // session and an empty identities array — Supabase's own anti-enumeration
+    // shape for "this account already exists".
+    if (!error && data.user && !data.session && (data.user.identities ?? []).length === 0) {
+      return { error: { message: 'That email is already registered.', field: 'email' } };
     }
 
-    // Normalise to E.164 so verifyOtp uses the same phone string that GoTrue
-    // received when the OTP was issued.
-    const e164 =
-      parsePhoneNumberFromString(phone, defaultCountry as never)?.number ??
-      phone;
-    setPendingSignup({ phone: e164, username, password });
+    if (error) {
+      const msg = error.message?.toLowerCase() ?? '';
+      const duplicate = msg.includes('already registered') || msg.includes('already exists');
+      return {
+        error: {
+          message: duplicate
+            ? 'That email is already registered.'
+            : (error.message || 'Could not create your account.'),
+          field: 'email',
+        },
+      };
+    }
+
+    if (!data.session) {
+      return {
+        error: { message: 'Could not sign you in after creating your account. Please try signing in.' },
+      };
+    }
+
+    // The session is now live, which flips `user` truthy. pendingClaim keeps
+    // AuthRedirect from navigating away until claimProfile() finishes below.
+    setPendingClaim(true);
     setTimeout(() => {
       logUserActivity('registration_attempt', { timestamp: new Date().toISOString() });
     }, 0);
+
     return { error: null };
   }, []);
 
-  const resendSignupCode = useCallback(async (): Promise<Result> => {
-    if (!pendingSignup) return { error: { message: 'No signup in progress.' } };
-    const { data, message } = await invokeJson<{ ok: boolean }>('start-signup', {
-      phone: pendingSignup.phone,
-      username: pendingSignup.username,
-    });
-    if (!data?.ok) return { error: { message: message ?? 'Could not resend your code.' } };
-    return { error: null };
-  }, [pendingSignup]);
-
-  const verifyPhoneOtp = useCallback(async (token: string): Promise<Result> => {
-    // Signup only: the user typed this number, so the client legitimately knows
-    // it. The reset path cannot do this — see verifyResetOtp.
-    const phone = pendingSignup?.phone;
-    if (!phone) return { error: { message: 'No signup in progress.' } };
-
-    const { error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
-    if (error) {
-      // One message for wrong and expired alike: distinguishing them would tell
-      // an attacker whether a code was ever valid.
-      return { error: { message: 'That code is incorrect or has expired. Request a new one.' } };
+  const claimProfile = useCallback<AuthContextType['claimProfile']>(async ({
+    username,
+    securityQuestion,
+    securityAnswer,
+  }) => {
+    if (securityAnswer.trim().length < 2) {
+      return { error: { message: 'Enter an answer at least 2 characters long.', field: 'securityAnswer' } };
     }
-    return { error: null };
-  }, [pendingSignup]);
 
-  const completeSignup = useCallback(async (usernameOverride?: string): Promise<Result> => {
-    if (!pendingSignup) return { error: { message: 'No signup in progress.' } };
-    const username = (usernameOverride ?? pendingSignup.username).trim();
-
-    // Password first: if the handle turns out to be taken, the account is still
-    // usable and the user only has to pick another name.
-    const { error: pwError } = await supabase.auth.updateUser({ password: pendingSignup.password });
-    if (pwError) return { error: { message: pwError.message } };
-
-    const { error: claimError } = await supabase.rpc('claim_identity', { p_username: username });
-
+    const { error: claimError } = await supabase.rpc('claim_username', {
+      p_username: username.trim(),
+    });
     if (claimError) {
       const raw = claimError.message ?? '';
       if (raw.includes('USERNAME_TAKEN')) {
-        // The verified session is left intact so the user can pick another handle
-        // without redoing SMS verification.
+        // The session is intentionally left intact so the user can pick
+        // another handle without recreating the account.
         return { error: { message: 'That username was just taken. Try another.', field: 'username' } };
-      }
-      if (raw.includes('PHONE_TAKEN')) {
-        return { error: { message: 'That number is already linked to another account.', field: 'phone' } };
-      }
-      if (raw.includes('PHONE_NOT_VERIFIED')) {
-        return { error: { message: 'Your number is not verified yet. Enter the code we sent you.' } };
       }
       if (raw.includes('INVALID_USERNAME')) {
         return {
@@ -284,93 +268,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: { message: 'Could not finish setting up your account. Please try again.' } };
     }
 
-    setPendingSignup(null);
-    return { error: null };
-  }, [pendingSignup]);
+    const { error: answerError } = await supabase.rpc('set_security_answer', {
+      p_question: securityQuestion,
+      p_answer: securityAnswer.trim(),
+    });
+    if (answerError) {
+      return {
+        error: { message: 'Could not save your security question. You can set it later from Settings.' },
+      };
+    }
 
-  const cancelSignup = useCallback(() => setPendingSignup(null), []);
+    setPendingClaim(false);
+    return { error: null };
+  }, []);
 
   // ── Login ───────────────────────────────────────────────────────────────────
 
-  const signIn = useCallback(async (
-    identifier: string,
-    password: string,
-    defaultCountry = 'US',
-  ): Promise<Result> => {
-    const { data, status, message } = await invokeJson<{
-      session: { access_token: string; refresh_token: string };
-    }>('login-with-username', { identifier, password, defaultCountry });
-
-    if (!data?.session) {
-      // 429 is about the caller's own behaviour and says nothing about whether
-      // the account exists, so it is the one case worth surfacing distinctly.
-      if (status === 429) {
-        return { error: { message: message ?? 'Too many attempts. Please try again shortly.' } };
-      }
-      return { error: { message: GENERIC_SIGNIN_ERROR } };
-    }
-
-    const { error } = await supabase.auth.setSession({
-      access_token: data.session.access_token,
-      refresh_token: data.session.refresh_token,
-    });
+  const signIn = useCallback(async (email: string, password: string): Promise<Result> => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: { message: GENERIC_SIGNIN_ERROR } };
-
     return { error: null };
   }, []);
 
   // ── Password reset ──────────────────────────────────────────────────────────
 
-  const requestPasswordReset = useCallback(async (
-    identifier: string,
-    defaultCountry = 'US',
-  ): Promise<Result> => {
-    const { data, status, message } = await invokeJson<{ ok: boolean }>('resolve-for-reset', {
-      identifier,
-      defaultCountry,
+  const getSecurityQuestion = useCallback(async (
+    email: string,
+  ): Promise<{ question: string | null } & Result> => {
+    const { data, status, message } = await invokeJson<{ question: string }>('get-security-question', {
+      email,
     });
 
     if (status === 429) {
-      return { error: { message: message ?? 'Too many requests. Please try again later.' } };
+      return { question: null, error: { message: message ?? 'Too many requests. Please try again later.' } };
     }
-    // Anything else non-ok is a genuine fault, not "no such user" — the function
-    // returns { ok: true } for unknown accounts on purpose.
-    if (!data?.ok) {
-      return { error: { message: message ?? 'Something went wrong. Please try again.' } };
+    if (!data?.question) {
+      return { question: null, error: { message: message ?? 'Something went wrong. Please try again.' } };
     }
 
-    resetIdentifier.current = identifier;
-    resetCountry.current = defaultCountry;
-    return { error: null };
+    resetEmail.current = email;
+    return { question: data.question, error: null };
   }, []);
 
-  const resendResetCode = useCallback(async (): Promise<Result> => {
-    if (!resetIdentifier.current) return { error: { message: 'No reset in progress.' } };
-    return requestPasswordReset(resetIdentifier.current, resetCountry.current);
-  }, [requestPasswordReset]);
-
-  const verifyResetOtp = useCallback(async (token: string): Promise<Result> => {
-    const identifier = resetIdentifier.current;
-    if (!identifier) return { error: { message: 'No reset in progress.' } };
+  /**
+   * Verify the answer via verify-security-answer, which mints a short-lived
+   * session server-side. Establishes the session that setNewPassword then acts
+   * on — same contract the old OTP-based reset used.
+   */
+  const verifySecurityAnswer = useCallback(async (answer: string): Promise<Result> => {
+    const email = resetEmail.current;
+    if (!email) return { error: { message: 'No reset in progress.' } };
 
     const { data, status, message } = await invokeJson<{
       session: { access_token: string; refresh_token: string };
-    }>('verify-reset-code', { identifier, token, defaultCountry: resetCountry.current });
+    }>('verify-security-answer', { email, answer });
 
     if (!data?.session) {
       if (status === 429) {
         return { error: { message: message ?? 'Too many attempts. Please try again shortly.' } };
       }
-      return {
-        error: { message: message ?? 'That code is incorrect or has expired. Request a new one.' },
-      };
+      return { error: { message: message ?? 'That answer is incorrect. Try again.' } };
     }
 
     const { error } = await supabase.auth.setSession({
       access_token: data.session.access_token,
       refresh_token: data.session.refresh_token,
     });
-    if (error) return { error: { message: 'Could not verify that code. Please try again.' } };
+    if (error) return { error: { message: 'Could not verify that answer. Please try again.' } };
 
     setResetPending(true);
     return { error: null };
@@ -385,10 +349,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) return { error: { message: error.message } };
 
     setResetPending(false);
-    resetIdentifier.current = null;
+    resetEmail.current = null;
 
-    // Revoke every session, this one included. A reset must invalidate whatever
-    // an attacker may already hold, and must not double as a way into the app.
+    // Revoke every session, this one included. A password reset must invalidate
+    // whatever an attacker may already hold, and the user is deliberately sent
+    // back to the login screen instead of being dropped into the app.
     await supabase.auth.signOut({ scope: 'global' });
     return { error: null };
   }, []);
@@ -399,6 +364,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setUser(null);
       setSession(null);
+      // Otherwise a signup abandoned mid-claim would leave the next sign-in
+      // permanently stuck off AuthRedirect — pendingClaim is in-memory only.
+      setPendingClaim(false);
       localStorage.removeItem('supabase.auth.token');
       sessionStorage.clear();
       await supabase.auth.signOut({ scope: 'global' });
@@ -406,6 +374,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logger.error('Signout error', { error });
       setUser(null);
       setSession(null);
+      setPendingClaim(false);
       localStorage.removeItem('supabase.auth.token');
       sessionStorage.clear();
     }
@@ -415,18 +384,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     session,
     loading,
-    pendingSignup,
+    pendingClaim,
     resetPending,
     checkUsername,
-    startSignup,
-    resendSignupCode,
-    verifyPhoneOtp,
-    completeSignup,
-    cancelSignup,
+    signUp,
+    claimProfile,
     signIn,
-    requestPasswordReset,
-    verifyResetOtp,
-    resendResetCode,
+    getSecurityQuestion,
+    verifySecurityAnswer,
     setNewPassword,
     signOut,
   };

@@ -1,43 +1,46 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertCircle, Eye, EyeOff, Lock } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, HelpCircle, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import AuthLayout, { fieldClass, submitClass, Spinner } from "@/components/auth/AuthLayout";
 
 /**
- * Forgot password, step 3.
+ * Forgot password, step 2 — answer the security question and choose a new
+ * password in one screen, matching mobile's consolidated ResetPasswordScreen.
  *
- * No longer a deep-link landing page: there are no email recovery links, so there
- * is no token in the URL to exchange. It is reached only from /verify-reset, and
- * guards on `resetPending` so a normal signed-in session cannot wander in.
- *
- * setNewPassword revokes EVERY session including this one, so on success the user
- * is signed out and sent back to /login. That is deliberate — a recovery flow must
- * invalidate any session an attacker already holds, and must not double as a way
- * into the app.
+ * Reached only from /forgot-password, which hands the question along as route
+ * state. verifySecurityAnswer mints a short-lived session server-side (no
+ * email/SMS sent); setNewPassword then saves the password and revokes every
+ * session, this one included, so the user is signed out and returned to
+ * /login on success.
  */
 const ResetPassword = () => {
   const navigate = useNavigate();
-  const { setNewPassword, resetPending } = useAuth();
+  const location = useLocation();
+  const { verifySecurityAnswer, setNewPassword } = useAuth();
 
+  const question: string | undefined = (location.state as { question?: string } | null)?.question;
+
+  const [answer, setAnswer] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-  // Arriving here without a verified reset code means the flow was skipped or the
-  // page was reloaded (which clears the in-memory reset state).
+  // Arriving here without a question means the flow was skipped, the page was
+  // reloaded (which clears route state), or the URL was typed directly.
   useEffect(() => {
-    if (!resetPending) navigate("/forgot-password", { replace: true });
-  }, [resetPending, navigate]);
+    if (!question) navigate("/forgot-password", { replace: true });
+  }, [question, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
+    if (!answer.trim()) errs.answer = "Enter your answer";
     if (!password) errs.password = "Choose a password";
     else if (password.length < 8) errs.password = "At least 8 characters";
     if (!confirm) errs.confirm = "Confirm your password";
@@ -47,12 +50,19 @@ const ResetPassword = () => {
 
     setLoading(true);
     try {
-      const { error } = await setNewPassword(password);
-      if (error) {
-        if (error.field) setErrors({ [error.field as string]: error.message });
-        else toast.error(error.message);
+      const { error: answerError } = await verifySecurityAnswer(answer.trim());
+      if (answerError) {
+        setErrors({ answer: answerError.message });
         return;
       }
+
+      const { error: passwordError } = await setNewPassword(password);
+      if (passwordError) {
+        if (passwordError.field) setErrors({ [passwordError.field]: passwordError.message });
+        else toast.error(passwordError.message);
+        return;
+      }
+
       toast.success("Password updated. You've been signed out everywhere — sign in again.");
       navigate("/login", { replace: true });
     } catch {
@@ -62,13 +72,15 @@ const ResetPassword = () => {
     }
   };
 
+  if (!question) return null;
+
   return (
     <AuthLayout
       eyebrow="Account Recovery"
-      headline={["Choose a", "new password."]}
+      headline={["Answer & choose", "a new password."]}
       blurb="Saving a new password signs you out on every device, including this one."
-      title="New password"
-      subtitle="Then sign in with it."
+      title="Reset your password"
+      subtitle={question}
       footer={
         <Link
           to="/login"
@@ -79,6 +91,40 @@ const ResetPassword = () => {
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="answer"
+            className="text-xs font-bold text-gray-500 uppercase tracking-widest"
+          >
+            Your answer
+          </Label>
+          <div className="relative">
+            <HelpCircle className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              id="answer"
+              name="answer"
+              type="text"
+              autoComplete="off"
+              autoFocus
+              required
+              value={answer}
+              onChange={(e) => {
+                setAnswer(e.target.value);
+                setErrors((p) => ({ ...p, answer: "" }));
+              }}
+              disabled={loading}
+              placeholder="Enter your answer"
+              className={`pl-10 ${fieldClass(!!errors.answer)}`}
+            />
+          </div>
+          {errors.answer && (
+            <p className="flex items-center gap-1 text-xs text-red-500">
+              <AlertCircle className="w-3 h-3" />
+              {errors.answer}
+            </p>
+          )}
+        </div>
+
         <div className="space-y-1.5">
           <Label
             htmlFor="password"
@@ -93,7 +139,6 @@ const ResetPassword = () => {
               name="password"
               type={showPassword ? "text" : "password"}
               autoComplete="new-password"
-              autoFocus
               required
               value={password}
               onChange={(e) => {

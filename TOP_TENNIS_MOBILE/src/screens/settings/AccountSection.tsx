@@ -12,33 +12,14 @@ import {
 } from './_shared';
 
 /**
- * Account settings for phone + username auth.
+ * Account settings for email + username auth.
  *
- * What changed and why:
- *
- *  * The change-email flow is gone. Email is no longer an identifier or a
- *    recovery channel, so an email address on the account would be a dead field
- *    that still looked authoritative.
- *
- *  * "Reset password" no longer mails a link. The user is signed in, so they can
- *    set a password directly — and because the session already proves identity,
- *    no code is needed. Current password is required so that a borrowed unlocked
- *    phone cannot be used to take the account over.
- *
- *  * The phone number is shown masked to its last 4 digits. The full number is
- *    never sent to a client: it lives in user_phone_identities, which is
- *    service-role only.
- *
- *  * Changing the phone number is deliberately absent — it needs its own
- *    verify-both-numbers flow and is tracked separately.
+ * "Reset password" here is signed-in-user password change, not the
+ * forgotten-password flow. The user is signed in, so they can set a password
+ * directly — and because the session already proves identity, no security
+ * question is needed. Current password is still required so that a borrowed
+ * unlocked phone cannot be used to take the account over.
  */
-
-/** Mask to the last 4 digits, matching what the audit log is allowed to store. */
-const maskPhone = (phone: string | null | undefined): string => {
-  const digits = (phone ?? '').replace(/\D/g, '');
-  if (digits.length < 4) return '—';
-  return `••• ••• ${digits.slice(-4)}`;
-};
 
 export const AccountSection: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuth();
@@ -94,11 +75,7 @@ export const AccountSection: React.FC<{ navigation: any }> = ({ navigation }) =>
       // Re-authenticate first. updateUser({ password }) alone would let anyone
       // holding an unlocked phone change the password without knowing the old
       // one, which is an account-takeover path.
-      //
-      // Reauthentication goes through login-with-username because the phone
-      // number is not available client-side by design. It also means a wrong
-      // guess here counts against the same failure backoff as a login attempt.
-      if (!username) {
+      if (!user?.email) {
         Alert.alert(
           'Could not verify',
           'We could not confirm your identity. Please sign out and use "Forgot password".',
@@ -106,10 +83,10 @@ export const AccountSection: React.FC<{ navigation: any }> = ({ navigation }) =>
         return;
       }
 
-      const { error: reauthError } = await supabase.functions
-        .invoke('login-with-username', {
-          body: { identifier: username, password: currentPassword },
-        });
+      const { error: reauthError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
       if (reauthError) {
         Alert.alert('Incorrect password', 'Your current password is not correct.');
         return;
@@ -157,14 +134,14 @@ export const AccountSection: React.FC<{ navigation: any }> = ({ navigation }) =>
             onPress={() => navigation.navigate('Profile')}
           />
           <NavRow
-            icon="call-outline"
-            label="Phone Number"
-            desc={`${maskPhone(user?.phone)} · contact support to change`}
+            icon="mail-outline"
+            label="Email"
+            desc={`${user?.email ?? '—'} · contact support to change`}
             color={Colors.textSecondary}
             onPress={() =>
               Alert.alert(
-                'Change phone number',
-                'For security, changing the number on your account has to be verified on both the old and new number. Contact support@toptennis.app and we will help.',
+                'Change email',
+                'For security, changing the email on your account has to be verified. Contact support@toptennis.app and we will help.',
               )
             }
           />

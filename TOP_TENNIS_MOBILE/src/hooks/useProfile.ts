@@ -7,9 +7,8 @@ export interface UserProfile {
   user_id: string;
   first_name: string;
   last_name: string;
-  /** Phone-only accounts have no email. */
   email?: string | null;
-  /** Case-insensitive unique handle. Null for legacy email-only accounts. */
+  /** Case-insensitive unique handle. */
   username?: string | null;
   phone?: string;
   city?: string;
@@ -52,7 +51,7 @@ export const useProfile = () => {
 
   const updateProfile = useCallback(async (updates: Partial<UserProfile>) => {
     if (!user) return;
-    // Strip server-controlled fields: username (claim_identity only), identity
+    // Strip server-controlled fields: username (claim_username only), identity
     // columns, and aggregate counters that are updated by DB functions.
     const { id: _id, user_id: _uid, username: _u, phone: _ph, wins: _w, losses: _l, ...safe } = updates;
     const { error: err } = await supabase

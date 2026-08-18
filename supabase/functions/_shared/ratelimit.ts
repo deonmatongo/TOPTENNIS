@@ -15,15 +15,15 @@ export const LIMITS = {
   /** Debounced availability lookups while the user types. Per IP. */
   usernameCheckPerIp: { bucket: 'username_check:ip', limit: 120, windowSeconds: 3600 },
 
-  /** OTP sends we control: the password-reset path. Per phone number. */
-  otpSendPerPhone: { bucket: 'otp_send:phone', limit: 3, windowSeconds: 3600 },
-  /** OTP sends we control: the password-reset path. Per IP. */
-  otpSendPerIp: { bucket: 'otp_send:ip', limit: 10, windowSeconds: 3600 },
+  /** Security-question lookups on the reset flow. Per email. */
+  securityQuestionPerEmail: { bucket: 'security_question:email', limit: 5, windowSeconds: 3600 },
+  /** Security-question lookups on the reset flow. Per IP. */
+  securityQuestionPerIp: { bucket: 'security_question:ip', limit: 20, windowSeconds: 3600 },
 
-  /** Login attempts per IP, regardless of which account is targeted. */
-  loginPerIp: { bucket: 'login:ip', limit: 30, windowSeconds: 900 },
-  /** Failed logins per account. Drives the progressive backoff below. */
-  loginFailPerAccount: { bucket: 'login_fail:account', limit: 5, windowSeconds: 900 },
+  /** Security-answer submissions. Per email — this is the guess-the-answer brake. */
+  securityAnswerPerEmail: { bucket: 'security_answer:email', limit: 5, windowSeconds: 3600 },
+  /** Security-answer submissions. Per IP. */
+  securityAnswerPerIp: { bucket: 'security_answer:ip', limit: 20, windowSeconds: 3600 },
 } as const satisfies Record<string, Limit>
 
 export type RateResult = {
@@ -65,55 +65,3 @@ export async function consume(
   }
 }
 
-/**
- * Read the current window's count without incrementing it.
- *
- * Use this to decide whether to throttle; use `consume` only to record an event
- * that should count against the limit. Reading with `consume` would make every
- * successful login count as a failure.
- */
-export async function peek(
-  admin: SupabaseClient,
-  limit: Limit,
-  subject: string,
-): Promise<number> {
-  const hash = await subjectHash(subject)
-  const { data, error } = await admin.rpc('peek_rate_limit', {
-    p_bucket: limit.bucket,
-    p_subject_hash: hash,
-    p_window_seconds: limit.windowSeconds,
-  })
-  if (error) {
-    console.error(`[ratelimit] ${limit.bucket} peek error: ${error.message}`)
-    return 0
-  }
-  return typeof data === 'number' ? data : 0
-}
-
-/** Clear a counter — called when a correct password ends a failure streak. */
-export async function reset(
-  admin: SupabaseClient,
-  limit: Limit,
-  subject: string,
-): Promise<void> {
-  const hash = await subjectHash(subject)
-  const { error } = await admin.rpc('reset_rate_limit', {
-    p_bucket: limit.bucket,
-    p_subject_hash: hash,
-  })
-  if (error) console.error(`[ratelimit] ${limit.bucket} reset error: ${error.message}`)
-}
-
-/**
- * Progressive backoff for repeated login failures against one account.
- *
- * Doubles per failure past the threshold and caps at 5 minutes. The window
- * expires on its own, so an account is slowed but never permanently locked —
- * a permanent lock would hand any attacker a denial-of-service primitive
- * against a known username.
- */
-export function backoffSeconds(failureHits: number, threshold = LIMITS.loginFailPerAccount.limit): number {
-  if (failureHits <= threshold) return 0
-  const over = failureHits - threshold
-  return Math.min(2 ** over, 300)
-}

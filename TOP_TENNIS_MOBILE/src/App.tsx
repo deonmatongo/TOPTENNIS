@@ -34,10 +34,8 @@ import { navigationRef } from '@/navigation/navigationRef';
 
 import { LoginScreen } from '@/screens/auth/LoginScreen';
 import { SignUpScreen } from '@/screens/auth/SignUpScreen';
-import { VerifyCodeScreen } from '@/screens/auth/VerifyCodeScreen';
 import { ForgotPasswordScreen } from '@/screens/auth/ForgotPasswordScreen';
-import { VerifyResetCodeScreen } from '@/screens/auth/VerifyResetCodeScreen';
-import { SetNewPasswordScreen } from '@/screens/auth/SetNewPasswordScreen';
+import { ResetPasswordScreen } from '@/screens/auth/ResetPasswordScreen';
 import { AppIntroScreen } from '@/screens/AppIntroScreen';
 import { OnboardingScreen } from '@/screens/OnboardingScreen';
 import { ScheduleScreen } from '@/screens/ScheduleScreen';
@@ -143,15 +141,15 @@ function SettingsNavigator() {
 
 
 function AppNavigator() {
-  const { user, loading, pendingSignup } = useAuth();
+  const { user, loading, pendingClaim } = useAuth();
   const { player, loading: playerLoading, refetch } = usePlayerProfile();
   const [justOnboarded, setJustOnboarded] = useState(false);
 
-  // verifyOtp during signup creates a real session, which would otherwise flip
-  // this navigator into the app and unmount VerifyCodeScreen before it can claim
-  // the username. Keeping the auth stack mounted while a signup is pending is
-  // what makes that step reliable.
-  const inAuthFlow = !user || !!pendingSignup;
+  // signUp() creates a real session before the username/security-question
+  // claim finishes, which would otherwise flip this navigator into the app
+  // and unmount SignUpScreen mid-claim. Keeping the auth stack mounted while a
+  // claim is pending is what makes that step reliable.
+  const inAuthFlow = !user || pendingClaim;
 
   // null = still loading from SecureStore
   const [introSeen, setIntroSeen] = useState<boolean | null>(null);
@@ -188,10 +186,8 @@ function AppNavigator() {
         <>
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="SignUp" component={SignUpScreen} />
-          <Stack.Screen name="VerifyCode" component={VerifyCodeScreen} />
           <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-          <Stack.Screen name="VerifyResetCode" component={VerifyResetCodeScreen} />
-          <Stack.Screen name="SetNewPassword" component={SetNewPasswordScreen} />
+          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
         </>
       ) : !player ? (
         <Stack.Screen name="Onboarding">
@@ -206,7 +202,7 @@ function AppNavigator() {
   );
 }
 
-// Password recovery is an in-app SMS code flow now, so there is no
+// Password recovery is an in-app security-question flow, so there is no
 // reset-password deep link to route and no recovery tokens arriving by URL.
 const linking = {
   prefixes: ['toptennis://'],

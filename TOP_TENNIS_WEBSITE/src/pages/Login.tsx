@@ -2,30 +2,22 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, AlertCircle, User as UserIcon, Lock, Shield } from "lucide-react";
+import { Eye, EyeOff, AlertCircle, Mail, Lock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import AuthRedirect from "@/components/AuthRedirect";
 import AuthLayout, { fieldClass, submitClass, Spinner } from "@/components/auth/AuthLayout";
 
-/**
- * One identifier field for both usernames and phone numbers.
- *
- * The page does not decide which one it is — signIn sends whatever was typed to
- * the login-with-username Edge Function, which classifies it server-side.
- * Branching here would give the two paths different latencies and hand back the
- * account-enumeration signal that function exists to remove.
- */
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({ identifier: "", password: "" });
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!formData.identifier.trim()) e.identifier = "Enter your username or phone number";
+    if (!formData.email.trim()) e.email = "Enter your email address";
     if (!formData.password) e.password = "Password is required";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -36,7 +28,7 @@ const Login = () => {
     if (!validate()) return;
     setLoading(true);
     try {
-      const { error } = await signIn(formData.identifier.trim(), formData.password);
+      const { error } = await signIn(formData.email.trim(), formData.password);
       if (error) toast.error(error.message);
       else toast.success("Welcome back!");
     } catch {
@@ -70,42 +62,34 @@ const Login = () => {
             </Link>
           </>
         }
-        footer={
-          <p className="flex items-center justify-center gap-1.5 text-xs text-gray-400 mt-6">
-            <Shield className="w-3 h-3" />
-            We verify your account with a text message. Standard rates may apply.
-          </p>
-        }
       >
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <div className="space-y-1.5">
             <Label
-              htmlFor="identifier"
+              htmlFor="email"
               className="text-xs font-bold text-gray-500 uppercase tracking-widest"
             >
-              Username or phone number
+              Email
             </Label>
             <div className="relative">
-              <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
-                id="identifier"
-                name="identifier"
-                type="text"
-                // 'username' rather than 'tel': password managers key on this
-                // field, and the value is a handle more often than a number.
-                autoComplete="username"
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
                 required
-                value={formData.identifier}
+                value={formData.email}
                 onChange={handleChange}
                 disabled={loading}
-                placeholder="rallyking or your mobile number"
-                className={`pl-10 ${fieldClass(!!errors.identifier)}`}
+                placeholder="you@example.com"
+                className={`pl-10 ${fieldClass(!!errors.email)}`}
               />
             </div>
-            {errors.identifier && (
+            {errors.email && (
               <p className="flex items-center gap-1 text-xs text-red-500">
                 <AlertCircle className="w-3 h-3" />
-                {errors.identifier}
+                {errors.email}
               </p>
             )}
           </div>

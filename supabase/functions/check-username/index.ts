@@ -16,7 +16,7 @@
 //            { error: string }                   429 / 500
 
 import { clientIp, json, preflight, readJson, respondUniform } from '../_shared/http.ts'
-import { isValidUsername } from '../_shared/phone.ts'
+import { isValidUsername } from '../_shared/validation.ts'
 import { LIMITS, consume } from '../_shared/ratelimit.ts'
 import { adminClient, logEvent, logLine } from '../_shared/audit.ts'
 import { correlationId } from '../_shared/security.ts'

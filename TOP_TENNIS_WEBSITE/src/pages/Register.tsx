@@ -3,32 +3,43 @@ import { Link, useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AlertCircle, AtSign, Check, Eye, EyeOff, Loader2, Lock } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { AlertCircle, AtSign, Check, Eye, EyeOff, HelpCircle, Loader2, Lock, Mail } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import AuthRedirect from "@/components/AuthRedirect";
 import AuthLayout, { fieldClass, submitClass, Spinner } from "@/components/auth/AuthLayout";
-import PhoneInput from "@/components/auth/PhoneInput";
+import { SECURITY_QUESTIONS } from "@/constants/securityQuestions";
 
 const USERNAME_RE = /^[A-Za-z0-9_]{3,20}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const Register = () => {
   const navigate = useNavigate();
-  const { startSignup, checkUsername } = useAuth();
+  const { signUp, claimProfile, checkUsername } = useAuth();
+
+  // Tracks whether signUp() already created the account, so a username
+  // collision can be retried with claimProfile() alone instead of trying (and
+  // failing) to create the account a second time.
+  const accountCreated = useRef(false);
 
   const [username, setUsername] = useState("");
-  const [country, setCountry] = useState("US");
-  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [agree, setAgree] = useState(false);
 
+  const [securityQuestion, setSecurityQuestion] = useState(SECURITY_QUESTIONS[0]);
+  const [securityAnswer, setSecurityAnswer] = useState("");
+
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-  // Debounced availability check. Advisory only: claim_identity re-checks against
-  // the unique constraint after verification, which is what closes the race.
+  // Debounced availability check. Advisory only: claim_username re-checks against
+  // the unique constraint after the account is created, which is what closes the race.
   const [checking, setChecking] = useState(false);
   const [availableFor, setAvailableFor] = useState<string | null>(null);
   // Tracks WHY the handle is unconfirmed, so submit can say "couldn't verify"
@@ -82,13 +93,17 @@ const Register = () => {
           : "That username is taken.";
     }
 
-    if (!phone.replace(/\D/g, "")) e.phone = "Enter your mobile number";
+    if (!email.trim()) e.email = "Enter your email address";
+    else if (!EMAIL_RE.test(email.trim())) e.email = "Enter a valid email address";
 
     if (!password) e.password = "Choose a password";
     else if (password.length < 8) e.password = "At least 8 characters";
 
     if (!confirm) e.confirm = "Confirm your password";
     else if (password !== confirm) e.confirm = "Passwords do not match";
+
+    if (!securityAnswer.trim()) e.securityAnswer = "Enter an answer you will remember";
+    else if (securityAnswer.trim().length < 2) e.securityAnswer = "At least 2 characters";
 
     if (!agree) e.agree = "You must agree to continue";
 
@@ -101,18 +116,28 @@ const Register = () => {
     if (!validate()) return;
     setLoading(true);
     try {
-      const { error } = await startSignup({
-        phone: phone.replace(/\D/g, ""),
+      if (!accountCreated.current) {
+        const { error } = await signUp({ email: email.trim(), password });
+        if (error) {
+          if (error.field) setErrors((p) => ({ ...p, [error.field as string]: error.message }));
+          else toast.error(error.message);
+          return;
+        }
+        accountCreated.current = true;
+      }
+
+      const { error } = await claimProfile({
         username: username.trim(),
-        password,
-        defaultCountry: country,
+        securityQuestion,
+        securityAnswer: securityAnswer.trim(),
       });
       if (error) {
         if (error.field) setErrors((p) => ({ ...p, [error.field as string]: error.message }));
         else toast.error(error.message);
         return;
       }
-      navigate("/verify-code");
+      // No navigate() call: AuthRedirect takes over once pendingClaim clears.
+      toast.success("You're all set!");
     } catch {
       toast.error("An unexpected error occurred. Please try again.");
     } finally {
@@ -183,18 +208,39 @@ const Register = () => {
             )}
           </div>
 
-          {/* Phone */}
-          <PhoneInput
-            country={country}
-            onCountryChange={setCountry}
-            value={phone}
-            onChange={(v) => {
-              setPhone(v);
-              setErrors((p) => ({ ...p, phone: "" }));
-            }}
-            error={errors.phone}
-            disabled={loading}
-          />
+          {/* Email */}
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="email"
+              className="text-xs font-bold text-gray-500 uppercase tracking-widest"
+            >
+              Email
+            </Label>
+            <div className="relative">
+              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setErrors((p) => ({ ...p, email: "" }));
+                }}
+                disabled={loading}
+                placeholder="you@example.com"
+                className={`pl-10 ${fieldClass(!!errors.email)}`}
+              />
+            </div>
+            {errors.email && (
+              <p className="flex items-center gap-1 text-xs text-red-500">
+                <AlertCircle className="w-3 h-3" />
+                {errors.email}
+              </p>
+            )}
+          </div>
 
           {/* Password */}
           <div className="space-y-1.5">
@@ -275,6 +321,64 @@ const Register = () => {
             )}
           </div>
 
+          {/* Security question */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+              Security question
+            </Label>
+            <p className="text-xs text-gray-400">Used to reset your password if you forget it.</p>
+            <Select
+              value={securityQuestion}
+              onValueChange={setSecurityQuestion}
+              disabled={loading}
+            >
+              <SelectTrigger className={fieldClass()}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SECURITY_QUESTIONS.map((q) => (
+                  <SelectItem key={q} value={q}>
+                    {q}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Security answer */}
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="securityAnswer"
+              className="text-xs font-bold text-gray-500 uppercase tracking-widest"
+            >
+              Your answer
+            </Label>
+            <div className="relative">
+              <HelpCircle className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                id="securityAnswer"
+                name="securityAnswer"
+                type="text"
+                autoComplete="off"
+                required
+                value={securityAnswer}
+                onChange={(e) => {
+                  setSecurityAnswer(e.target.value);
+                  setErrors((p) => ({ ...p, securityAnswer: "" }));
+                }}
+                disabled={loading}
+                placeholder="Enter your answer"
+                className={`pl-10 ${fieldClass(!!errors.securityAnswer)}`}
+              />
+            </div>
+            {errors.securityAnswer && (
+              <p className="flex items-center gap-1 text-xs text-red-500">
+                <AlertCircle className="w-3 h-3" />
+                {errors.securityAnswer}
+              </p>
+            )}
+          </div>
+
           {/* Terms */}
           <div className="flex items-start gap-2.5 pt-1">
             <Checkbox
@@ -309,10 +413,10 @@ const Register = () => {
           <button type="submit" disabled={loading} className={submitClass}>
             {loading ? (
               <>
-                <Spinner /> Sending code…
+                <Spinner /> Creating account…
               </>
             ) : (
-              "Send verification code"
+              "Create Account"
             )}
           </button>
         </form>

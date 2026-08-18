@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, Modal, FlatList } from 'react-native'
 import * as WebBrowser from 'expo-web-browser'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth, AuthFieldError } from '@/contexts/AuthContext'
 import { AuthShell, Field, SubmitButton, authStyles } from '@/components/auth/AuthShell'
-import { PhoneField } from '@/components/auth/PhoneField'
-import { Palette, FontWeight } from '@/theme/colors'
+import { SECURITY_QUESTIONS } from '@/constants/securityQuestions'
+import { Palette, FontWeight, Colors, Radius } from '@/theme/colors'
 
 const USERNAME_RE = /^[A-Za-z0-9_]{3,20}$/
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /** Length only. Composition rules push users toward shorter, guessable passwords. */
 const passwordHint = (pw: string) => {
@@ -17,22 +18,30 @@ const passwordHint = (pw: string) => {
 }
 
 export const SignUpScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { startSignup, checkUsername } = useAuth()
+  const { signUp, claimProfile, checkUsername } = useAuth()
+
+  // Tracks whether signUp() already created the account, so a username
+  // collision can be retried with claimProfile() alone instead of trying (and
+  // failing) to create the account a second time.
+  const accountCreated = useRef(false)
 
   const [username, setUsername] = useState('')
-  const [country, setCountry] = useState('US')
-  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [agree, setAgree] = useState(false)
 
+  const [securityQuestion, setSecurityQuestion] = useState(SECURITY_QUESTIONS[0])
+  const [securityAnswer, setSecurityAnswer] = useState('')
+  const [questionPickerOpen, setQuestionPickerOpen] = useState(false)
+
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [focused, setFocused] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Debounced availability check. Advisory only: claim_identity re-checks against
-  // the unique constraint after verification, which is what closes the race.
+  // Debounced availability check. Advisory only: claim_username re-checks against
+  // the unique constraint after the account is created, which is what closes the race.
   const [checking, setChecking] = useState(false)
   const [availableFor, setAvailableFor] = useState<string | null>(null)
   // Tracks WHY the handle is not confirmed available, so submit can say
@@ -84,7 +93,8 @@ export const SignUpScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           : 'That username is taken.'
     }
 
-    if (!phone.replace(/\D/g, '')) e.phone = 'Enter your mobile number'
+    if (!email.trim()) e.email = 'Enter your email address'
+    else if (!EMAIL_RE.test(email.trim())) e.email = 'Enter a valid email address'
 
     if (!password) e.password = 'Choose a password'
     else if (password.length < 8) e.password = 'At least 8 characters'
@@ -92,28 +102,34 @@ export const SignUpScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     if (!confirm) e.confirm = 'Confirm your password'
     else if (password !== confirm) e.confirm = 'Passwords do not match'
 
+    if (!securityAnswer.trim()) e.securityAnswer = 'Enter an answer you will remember'
+    else if (securityAnswer.trim().length < 2) e.securityAnswer = 'At least 2 characters'
+
     if (!agree) e.agree = 'You must agree to continue'
 
     setErrors(e)
     return Object.keys(e).length === 0
-  }, [username, availableFor, checking, checkFailed, phone, password, confirm, agree])
+  }, [username, availableFor, checking, checkFailed, email, password, confirm, securityAnswer, agree])
 
   const handleSubmit = async () => {
     if (!validate()) return
     setLoading(true)
     try {
-      await startSignup({
-        phone: phone.replace(/\D/g, ''),
+      if (!accountCreated.current) {
+        await signUp({ email: email.trim(), password })
+        accountCreated.current = true
+      }
+      await claimProfile({
         username: username.trim(),
-        password,
-        defaultCountry: country,
+        securityQuestion,
+        securityAnswer: securityAnswer.trim(),
       })
-      navigation.navigate('VerifyCode')
+      // No navigation call: pendingClaim clearing flips the navigator gate.
     } catch (e: any) {
       if (e instanceof AuthFieldError && e.field) {
-        setErrors((p) => ({ ...p, [e.field === 'phone' ? 'phone' : e.field!]: e.message }))
+        setErrors((p) => ({ ...p, [e.field!]: e.message }))
       } else {
-        setErrors((p) => ({ ...p, form: e?.message ?? 'Could not start signup.' }))
+        setErrors((p) => ({ ...p, form: e?.message ?? 'Could not create your account.' }))
       }
     } finally {
       setLoading(false)
@@ -152,13 +168,27 @@ export const SignUpScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         />
       </Field>
 
-      <PhoneField
-        country={country}
-        onCountryChange={setCountry}
-        value={phone}
-        onChangeText={(v) => { setPhone(v); setErrors((p) => ({ ...p, phone: '' })) }}
-        error={errors.phone}
-      />
+      <Field
+        label="Email"
+        error={errors.email}
+        icon="mail-outline"
+        focused={focused === 'email'}
+      >
+        <TextInput
+          style={authStyles.input}
+          placeholder="you@example.com"
+          placeholderTextColor="rgba(255,255,255,0.25)"
+          value={email}
+          onChangeText={(v) => { setEmail(v); setErrors((p) => ({ ...p, email: '' })) }}
+          onFocus={() => setFocused('email')}
+          onBlur={() => setFocused(null)}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          autoComplete="email"
+          textContentType="emailAddress"
+        />
+      </Field>
 
       <Field
         label="Password"
@@ -210,6 +240,71 @@ export const SignUpScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         />
       </Field>
 
+      <View style={{ gap: 6 }}>
+        <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+          Security Question
+        </Text>
+        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>
+          Used to reset your password if you forget it.
+        </Text>
+        <TouchableOpacity
+          onPress={() => setQuestionPickerOpen(true)}
+          style={{
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+            backgroundColor: 'rgba(255,255,255,0.07)',
+            borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+            borderRadius: Radius.lg, paddingHorizontal: 14, minHeight: 52,
+          }}
+        >
+          <Text style={{ color: '#fff', fontSize: 15, flex: 1 }} numberOfLines={1}>
+            {securityQuestion}
+          </Text>
+          <Ionicons name="chevron-down" size={16} color="rgba(255,255,255,0.35)" />
+        </TouchableOpacity>
+      </View>
+
+      <Field
+        label="Your Answer"
+        error={errors.securityAnswer}
+        icon="help-circle-outline"
+        focused={focused === 'securityAnswer'}
+      >
+        <TextInput
+          style={authStyles.input}
+          placeholder="Enter your answer"
+          placeholderTextColor="rgba(255,255,255,0.25)"
+          value={securityAnswer}
+          onChangeText={(v) => { setSecurityAnswer(v); setErrors((p) => ({ ...p, securityAnswer: '' })) }}
+          onFocus={() => setFocused('securityAnswer')}
+          onBlur={() => setFocused(null)}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+      </Field>
+
+      <Modal visible={questionPickerOpen} transparent animationType="fade" onRequestClose={() => setQuestionPickerOpen(false)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}
+          activeOpacity={1}
+          onPress={() => setQuestionPickerOpen(false)}
+        >
+          <View style={{ backgroundColor: Colors.surface, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, paddingBottom: 24 }}>
+            <FlatList
+              data={SECURITY_QUESTIONS}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={{ paddingVertical: 16, paddingHorizontal: 20 }}
+                  onPress={() => { setSecurityQuestion(item); setQuestionPickerOpen(false) }}
+                >
+                  <Text style={{ color: Colors.text, fontSize: 15 }}>{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       <TouchableOpacity
         style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
         onPress={() => { setAgree((v) => !v); setErrors((p) => ({ ...p, agree: '' })) }}
@@ -247,7 +342,7 @@ export const SignUpScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
       {!!errors.form && <Text style={authStyles.fieldError}>{errors.form}</Text>}
 
-      <SubmitButton label="Send verification code" onPress={handleSubmit} loading={loading} />
+      <SubmitButton label="Create Account" onPress={handleSubmit} loading={loading} />
 
       <Text style={authStyles.switchText}>
         {'Already have an account? '}

@@ -6,29 +6,29 @@ import { AuthShell, Field, SubmitButton, authStyles } from '@/components/auth/Au
 /**
  * Forgot password, step 1.
  *
- * On success this ALWAYS advances to the code screen, whether or not the account
- * exists — the Edge Function returns an identical response either way. Showing
- * "no account with that username" here would turn this screen into a free
- * account-existence oracle, which is exactly what the server-side design is
- * built to prevent. The only non-advancing outcome is a rate-limit trip, which
- * is about the caller's own behaviour.
+ * On success this ALWAYS advances to the answer screen with a question to
+ * show, whether or not the account exists — the Edge Function returns a
+ * generic fallback question for an unknown email. Showing "no account with
+ * that email" here would turn this screen into a free account-existence
+ * oracle. The only non-advancing outcome is a rate-limit trip, which is about
+ * the caller's own behaviour.
  */
 export const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { requestPasswordReset } = useAuth()
-  const [identifier, setIdentifier] = useState('')
+  const { getSecurityQuestion } = useAuth()
+  const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async () => {
-    if (!identifier.trim()) {
-      setError('Enter your username or phone number.')
+    if (!email.trim()) {
+      setError('Enter your email address.')
       return
     }
     setError(null)
     setLoading(true)
     try {
-      await requestPasswordReset(identifier.trim())
-      navigation.navigate('VerifyResetCode')
+      const question = await getSecurityQuestion(email.trim())
+      navigation.navigate('ResetPassword', { question })
     } catch (e: any) {
       setError(e?.message ?? 'Something went wrong. Please try again.')
     } finally {
@@ -39,26 +39,28 @@ export const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation
   return (
     <AuthShell
       headline="Reset your password."
-      subline="We'll text a code to the number on your account."
+      subline="We'll ask your security question."
       onBack={() => navigation.goBack()}
     >
-      <Field label="Username or phone number" icon="person-outline">
+      <Field label="Email" icon="mail-outline">
         <TextInput
           style={authStyles.input}
-          placeholder="rallyking or your mobile number"
+          placeholder="you@example.com"
           placeholderTextColor="rgba(255,255,255,0.25)"
-          value={identifier}
-          onChangeText={(v) => { setIdentifier(v); setError(null) }}
+          value={email}
+          onChangeText={(v) => { setEmail(v); setError(null) }}
           autoCapitalize="none"
           autoCorrect={false}
-          autoComplete="username"
+          keyboardType="email-address"
+          autoComplete="email"
+          textContentType="emailAddress"
           autoFocus
         />
       </Field>
 
       {!!error && <Text style={authStyles.fieldError}>{error}</Text>}
 
-      <SubmitButton label="Send code" onPress={handleSubmit} loading={loading} />
+      <SubmitButton label="Continue" onPress={handleSubmit} loading={loading} />
 
       <TouchableOpacity style={authStyles.centered} onPress={() => navigation.goBack()}>
         <Text style={authStyles.linkText}>Back to sign in</Text>

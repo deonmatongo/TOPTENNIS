@@ -179,12 +179,7 @@ password_requirements = ""
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
 email_sent = 2
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
-#
-# Project-wide hourly ceiling on outbound SMS — a backstop, not the primary
-# control. Every OTP send in this app is proxied through an Edge Function
-# (start-signup for signup, resolve-for-reset for recovery), so the per-phone and
-# per-IP counters in public.auth_rate_limits bind first. This figure is what
-# stops a bug in those functions from running up a Twilio bill.
+# Phone/SMS auth is disabled (see [auth.sms] below) — left at the default.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
 anonymous_users = 30
@@ -203,10 +198,9 @@ web3 = 30
 # require the Expo app to produce a token too, and Turnstile has no React Native
 # SDK — it would mean a WebView challenge inside signup.
 #
-# The reason a captcha was wanted (bounding signup OTP sends) is instead handled
-# properly: the client never calls auth.signUp. Signup goes through the
-# start-signup Edge Function, which rate-limits per phone AND per IP against
-# public.auth_rate_limits before any SMS is sent.
+# Signup goes directly through supabase.auth.signUp(), bounded by the
+# sign_in_sign_ups rate limit above (per IP, 5-minute window) — there is no
+# per-account SMS/email cost to protect here, unlike the old phone flow.
 # [auth.captcha]
 # enabled = true
 # provider = "turnstile"
@@ -251,19 +245,13 @@ otp_expiry = 3600
 # content_path = "./templates/password_changed_notification.html"
 
 [auth.sms]
-# Allow/disallow new user signups via SMS to your project.
-enable_signup = true
-# Phone must be confirmed before the account can sign in. Required: without it a
-# user could sign up with someone else's number and never prove control of it,
-# and claim_identity() would have no phone_confirmed_at to trust.
-enable_confirmations = true
-# Ignored when the provider is twilio_verify — Twilio Verify owns the message
-# template and the code itself. Left in place for reference only.
-template = "Your code is {{ .Code }}"
-# Server-side floor between OTP sends. This is what actually enforces the 30s
-# resend cooldown; the client's countdown timer is only a hint and can be
-# bypassed by anyone talking to the API directly.
-max_frequency = "30s"
+# Phone/SMS auth removed in favour of email+password — this app is
+# pre-revenue and Twilio Verify billed per verification. Left disabled rather
+# than deleted so the block documents what NOT to turn back on without also
+# reinstating the per-phone/per-IP rate limiting the old start-signup and
+# resolve-for-reset Edge Functions used to provide.
+enable_signup = false
+enable_confirmations = false
 
 # Use pre-defined map of phone number to OTP for testing.
 # [auth.sms.test_otp]
@@ -286,25 +274,16 @@ max_frequency = "30s"
 # enabled = true
 # uri = "pg-functions://<database>/<schema>/<hook_name>"
 
-# Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.
-#
-# Plain `twilio` stays disabled. We use `twilio_verify` below so that Twilio owns
-# code generation, the 10-minute TTL, single-use invalidation and the max-check
-# attempt cap. Rolling our own OTP store would mean reimplementing all four.
+# Both providers disabled — phone/SMS auth is removed. See the [auth.sms]
+# comment above.
 [auth.sms.twilio]
 enabled = false
 account_sid = ""
 message_service_sid = ""
-# DO NOT commit your Twilio auth token to git. Use environment variable substitution instead:
 auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
 
-# Twilio Verify — the active SMS provider.
-#
-# `message_service_sid` is the Verify *Service* SID (starts with VA...), not a
-# Messaging Service SID. Set the token with:
-#   supabase secrets set SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN=...
 [auth.sms.twilio_verify]
-enabled = true
+enabled = false
 account_sid = "env(TWILIO_ACCOUNT_SID)"
 message_service_sid = "env(TWILIO_VERIFY_SERVICE_SID)"
 auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
@@ -396,16 +375,10 @@ allow_dynamic_registration = false
 [functions.check-username]
 verify_jwt = false
 
-[functions.start-signup]
+[functions.get-security-question]
 verify_jwt = false
 
-[functions.login-with-username]
-verify_jwt = false
-
-[functions.resolve-for-reset]
-verify_jwt = false
-
-[functions.verify-reset-code]
+[functions.verify-security-answer]
 verify_jwt = false
 
 [edge_runtime]

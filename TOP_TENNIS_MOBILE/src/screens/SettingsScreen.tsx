@@ -90,9 +90,9 @@ const SETTINGS_SECTIONS = [
 
 // ─── Profile completeness steps ───────────────────────────────────────────────
 type CheckStep = { label: string; done: boolean; startEditing?: boolean };
-function completenessSteps(player: ReturnType<typeof usePlayerProfile>['player'], phone?: string): CheckStep[] {
+function completenessSteps(player: ReturnType<typeof usePlayerProfile>['player'], email?: string | null): CheckStep[] {
   return [
-    { label: 'Phone number verified', done: !!phone },
+    { label: 'Email verified', done: !!email },
     { label: 'Add your full name',    done: !!(player?.first_name && player?.last_name), startEditing: true },
     { label: 'Add profile photo',     done: !!player?.profile_picture_url,               startEditing: false },
     { label: 'Set your skill level',  done: !!player?.skill_level,                       startEditing: true },
@@ -101,9 +101,9 @@ function completenessSteps(player: ReturnType<typeof usePlayerProfile>['player']
 
 function stepOnPress(step: CheckStep, navigation: any) {
   if (step.done) return undefined;
-  if (step.label === 'Phone number verified') {
+  if (step.label === 'Email verified') {
     return () =>
-      Alert.alert('Phone verified', 'Your number was verified when you signed up. No action needed.');
+      Alert.alert('Email verified', 'Your email was verified when you signed up. No action needed.');
   }
   return () => navigation.navigate('Profile', step.startEditing ? { startEditing: true } : undefined);
 }
@@ -261,7 +261,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const totalMatches = (player?.wins ?? 0) + (player?.losses ?? 0);
   const winRate      = totalMatches > 0 ? Math.round(((player?.wins ?? 0) / totalMatches) * 100) : 0;
 
-  const steps   = completenessSteps(player, user?.phone);
+  const steps   = completenessSteps(player, user?.email);
   const doneCount = steps.filter(s => s.done).length;
   const progress = doneCount / steps.length;
   const nextStep = steps.find(s => !s.done);
@@ -302,8 +302,8 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
         <Text style={s.heroName}>{displayName}</Text>
         {!!username && <Text style={s.heroUsername}>@{username}</Text>}
-        {!username && !!user?.phone && (
-          <Text style={s.heroUsername}>{user.phone}</Text>
+        {!username && !!user?.email && (
+          <Text style={s.heroUsername}>{user.email}</Text>
         )}
 
         {!!skill && (

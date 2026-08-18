@@ -5,16 +5,17 @@ import { useAuth, AuthFieldError } from '@/contexts/AuthContext'
 import { AuthShell, Field, SubmitButton, authStyles } from '@/components/auth/AuthShell'
 
 /**
- * Forgot password, step 3.
- *
- * setNewPassword revokes EVERY session including this one, so on success the user
- * is signed out and returned to the login screen. That is deliberate: a recovery
- * flow must invalidate any session an attacker already holds, and it should not
- * double as a way into the app.
+ * Forgot password, step 2 — answer the security question and choose a new
+ * password in one screen. verifySecurityAnswer mints a short-lived session
+ * server-side (no email/SMS sent); setNewPassword then saves the password and
+ * revokes every session, this one included, so the user is signed out and
+ * returned to the login screen on success.
  */
-export const SetNewPasswordScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { setNewPassword } = useAuth()
+export const ResetPasswordScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
+  const { verifySecurityAnswer, setNewPassword } = useAuth()
+  const question: string = route?.params?.question ?? 'Your security question'
 
+  const [answer, setAnswer] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -23,6 +24,7 @@ export const SetNewPasswordScreen: React.FC<{ navigation: any }> = ({ navigation
 
   const handleSubmit = async () => {
     const e: Record<string, string> = {}
+    if (!answer.trim()) e.answer = 'Enter your answer'
     if (!password) e.password = 'Choose a password'
     else if (password.length < 8) e.password = 'At least 8 characters'
     if (!confirm) e.confirm = 'Confirm your password'
@@ -32,18 +34,18 @@ export const SetNewPasswordScreen: React.FC<{ navigation: any }> = ({ navigation
 
     setLoading(true)
     try {
+      await verifySecurityAnswer(answer.trim())
       await setNewPassword(password)
-      // The global sign-out has already cleared the session; the navigator is
-      // back on the auth stack, so just tell the user what happened.
       Alert.alert(
         'Password updated',
         'You have been signed out everywhere. Sign in with your new password.',
       )
+      navigation.navigate('Login')
     } catch (err: any) {
       if (err instanceof AuthFieldError && err.field) {
         setErrors({ [err.field]: err.message })
       } else {
-        setErrors({ form: err?.message ?? 'Could not update your password.' })
+        setErrors({ form: err?.message ?? 'Could not reset your password.' })
       }
     } finally {
       setLoading(false)
@@ -51,12 +53,21 @@ export const SetNewPasswordScreen: React.FC<{ navigation: any }> = ({ navigation
   }
 
   return (
-    <AuthShell headline="Choose a new password." subline="Then sign in with it.">
-      <Field
-        label="New password"
-        error={errors.password}
-        icon="lock-closed-outline"
-      >
+    <AuthShell headline="Answer & choose a password." subline={question} onBack={() => navigation.goBack()}>
+      <Field label="Your Answer" error={errors.answer} icon="help-circle-outline">
+        <TextInput
+          style={authStyles.input}
+          placeholder="Enter your answer"
+          placeholderTextColor="rgba(255,255,255,0.25)"
+          value={answer}
+          onChangeText={(v) => { setAnswer(v); setErrors((p) => ({ ...p, answer: '' })) }}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoFocus
+        />
+      </Field>
+
+      <Field label="New password" error={errors.password} icon="lock-closed-outline">
         <TextInput
           style={authStyles.input}
           placeholder="At least 8 characters"
@@ -66,7 +77,6 @@ export const SetNewPasswordScreen: React.FC<{ navigation: any }> = ({ navigation
           secureTextEntry={!showPassword}
           autoComplete="new-password"
           textContentType="newPassword"
-          autoFocus
         />
         <TouchableOpacity onPress={() => setShowPassword((v) => !v)} style={{ padding: 4 }}>
           <Ionicons

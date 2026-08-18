@@ -20,9 +20,7 @@ import { logger } from "@/utils/logger";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import VerifyCode from "./pages/VerifyCode";
 import ForgotPassword from "./pages/ForgotPassword";
-import VerifyResetCode from "./pages/VerifyResetCode";
 import ResetPassword from "./pages/ResetPassword";
 import NewDashboard from "./pages/NewDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -107,12 +105,7 @@ const App: React.FC = () => {
                   <Route path="/" element={<Index />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
-                  {/* Not wrapped in AuthRedirect: verifyOtp creates a session
-                      mid-flow, and redirecting on it would abandon the signup
-                      before the username was claimed. */}
-                  <Route path="/verify-code" element={<VerifyCode />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
-                  <Route path="/verify-reset" element={<VerifyResetCode />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/leagues" element={<Leagues />} />
                   <Route path="/league/:leagueId" element={

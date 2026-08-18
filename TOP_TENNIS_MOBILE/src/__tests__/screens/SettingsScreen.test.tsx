@@ -4,8 +4,7 @@ import { Alert } from 'react-native';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 
 const mockSignOut = jest.fn().mockResolvedValue(undefined);
-// Phone-only user: there is no email on the account any more.
-let mockUser: any = { id: 'u1', phone: '15551230001' };
+let mockUser: any = { id: 'u1', email: 'player@example.com' };
 
 /**
  * Admin status now comes from the has_role() RPC rather than an email allowlist,
@@ -33,7 +32,7 @@ const getSupabase = () => jest.requireMock('@/services/supabase').supabase;
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockUser = { id: 'u1', phone: '15551230001' };
+  mockUser = { id: 'u1', email: 'player@example.com' };
   mockPlayer = { first_name: 'Alex', last_name: 'Smith' };
   navigation.navigate.mockReset();
   setAdmin(false);
