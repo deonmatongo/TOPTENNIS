@@ -3,11 +3,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 import { logger } from '@/utils/logger';
+import { useUniqueChannel } from '@/hooks/useUniqueChannel';
 
 type Player = Tables<'players'>;
 
 export const usePlayerProfile = () => {
   const { user } = useAuth();
+  const channelTopic = useUniqueChannel('player-profile');
   const [player, setPlayer] = useState<Player | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +23,7 @@ export const usePlayerProfile = () => {
     const fetchPlayerProfile = async () => {
       try {
         logger.debug('Fetching player profile for user', { userId: user.id });
-        
+
         const { data, error } = await supabase
           .from('players')
           .select('*')
@@ -45,7 +47,25 @@ export const usePlayerProfile = () => {
     };
 
     fetchPlayerProfile();
-  }, [user]);
+
+    // Subscribe so stats changes (e.g. wins/losses from server-processed match
+    // results) propagate to every hook instance without a manual refetch.
+    const channel = supabase
+      .channel(channelTopic)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'players',
+        filter: `user_id=eq.${user.id}`,
+      }, () => {
+        fetchPlayerProfile();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   const createPlayerProfile = async (playerData: {
     name: string;
