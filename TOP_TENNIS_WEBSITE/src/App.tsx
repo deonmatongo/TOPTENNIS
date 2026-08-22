@@ -34,6 +34,7 @@ import Contact from "./pages/Contact";
 import Rules from "./pages/Rules";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
+import DeleteAccount from "./pages/DeleteAccount";
 import ScrollToTop from "@/components/ScrollToTop";
 
 const queryClient = new QueryClient({
@@ -118,6 +119,7 @@ const App: React.FC = () => {
                   <Route path="/rules" element={<Rules />} />
                   <Route path="/terms" element={<Terms />} />
                   <Route path="/privacy" element={<Privacy />} />
+                  <Route path="/delete-account" element={<DeleteAccount />} />
                   <Route path="/profile-setup" element={
                     <ProtectedRoute>
                       <ProfileSetup />
